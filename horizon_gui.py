@@ -3,13 +3,15 @@ from functools import partial
 
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
                              QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QDesktopWidget, QMenuBar, QStyle,
-                             QSpinBox, QStyleFactory, QFrame, QTabWidget, QProgressBar, QDialog, QButtonGroup, QLayout, QTableWidgetItem, QRubberBand, QComboBox, QScrollArea, QTableWidget)
+                             QSpinBox, QStyleFactory, QFrame, QTabWidget, QProgressBar, QDialog, QButtonGroup, QLayout, QLineEdit, QTextEdit, QTableWidgetItem,
+                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter)
 
-from PyQt5.QtGui import QIcon, QPixmap, QPalette, QColor, QDrag, QPainter, QCursor
-from PyQt5.QtCore import Qt, QRect, QMimeData, QPoint, QSize
+from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent, QPalette, QColor, QDrag, QTextCursor, QPainter, QCursor, QBrush, QTextCharFormat, QSyntaxHighlighter, QFont
+from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegExp, pyqtSlot
 
 from widget1_ui import Ui_Form
-
+from custom_functions import highlighter
+from custom_widgets import horizon_line
 import qrc_resources
 
 class DraggableLabel(QLabel):
@@ -97,86 +99,9 @@ class ConstraintBar(QWidget):
         bar.setMinimumWidth(100)
         self.splitter.addWidget(bar)
 
-class HorizonLine(QWidget):
-
-    def __init__(self, *args, **kwargs):
-        QWidget.__init__(self, *args, **kwargs)
-
-
-        self.n_nodes = 10
-        self.setGeometry(220, 0, 300, 150)
-        self.layout = QGridLayout()
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(1)
-        self.ct_line = []
-
-        self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
-        self.setMouseTracking(True)
-
-        # Add widgets to the layout
-        for i in range(self.n_nodes):
-            n_i = QPushButton("{}".format(i))
-            n_i.setFixedSize(20,20)
-            self.layout.addWidget(n_i, 0, i)
-
-        self.ct_tab = QTabWidget()
-        self.ct_tab.setGeometry(QRect(50, 100, 671, 80))
-        self.layout.addWidget(self.ct_tab, 1, 0, 1, self.n_nodes)
-        self.setLayout(self.layout)
-
-    def addConstraint(self):
-
-        self.ct = QWidget()
-        ct_n_layout = QHBoxLayout()
-        n_constraint = len(self.ct_line)
-        self.ct_line.append(list())
-
-        for node in range(self.n_nodes):
-            # self.group_node = QButtonGroup()
-            self.ct_line[n_constraint].append(QCheckBox(self)) #QRadioButton
-            self.ct_line[n_constraint][node].stateChanged.connect(partial(self.checkConstraintNodes, n_constraint, node))
-            # self.group_node.addButton(self.n_ct)
-            ct_n_layout.addWidget(self.ct_line[n_constraint][node])
-
-        self.ct.setLayout(ct_n_layout)
-        self.ct_tab.addTab(self.ct, "porcoddio")
-
-
-    def checkConstraintNodes(self, row, column):
-        if self.ct_line[row][column].isChecked():
-            print("constraint at {}, {} is CHECKED!".format(row, column))
-        else:
-            print("constraint at {}, {} is UNCHECKED!".format(row, column))
-
-    def mousePressEvent(self, event):
-        self.origin = event.pos()
-        self.rubberband.setGeometry(QRect(self.origin, QSize()))
-        self.rubberband.show()
-        QWidget.mousePressEvent(self, event)
-
-    def mouseMoveEvent(self, event):
-        if self.rubberband.isVisible():
-            self.rubberband.setGeometry(QRect(self.origin, event.pos()).normalized())
-        QWidget.mouseMoveEvent(self, event)
-
-    def mouseReleaseEvent(self, event):
-        if self.rubberband.isVisible():
-            self.rubberband.hide()
-            selected = []
-            rect = self.rubberband.geometry()
-
-            for child in self.ct_tab.widget(self.ct_tab.currentIndex()).findChildren(QCheckBox):
-                if rect.intersects(child.geometry()):
-                    selected.append(child)
-            for elem in selected:
-                if elem.isChecked():
-                    elem.setChecked(False)
-                else:
-                    elem.setChecked(True)
-
-        QWidget.mouseReleaseEvent(self, event)
-
 class Widget1(QWidget, Ui_Form):
+    invalid_sv = pyqtSignal(str)
+
     def __init__(self):
         super(Widget1, self).__init__()
 
@@ -192,27 +117,57 @@ class Widget1(QWidget, Ui_Form):
         # label.setGeometry(190, 65, 100, 100)
         # label_to_drag = DraggableLabel("drag this", self)
 
-        self.horizonLine = HorizonLine(self.PRB)
+        self.horizonLine = horizon_line.HorizonLine(self.PRB)
 
-        # self.ctbar = ConstraintBar(self.PRB)
-        self.button = QPushButton("Push for CT", self.PRB)
-        self.button.clicked.connect(self.horizonLine.addConstraint)
+        # self.gridLayoutWidget = QtWidgets.QWidget(self.PRB)
 
+        self.ct_layout = QHBoxLayout(self.CT)
+        self.ct_entry = self.setuCTEditor(self.PRB)
+
+        self.CTButton.clicked.connect(partial(self.addConstraint))
+
+    @pyqtSlot()
+    def on_invalid_sv(self, str):
+        self.invalid_sv.emit(str)
+
+    def addConstraint(self):
+        name = self.CTNameInput.text()
+        self.horizonLine.addConstraintToHorizon(name)
+
+    def setuCTEditor(self, parent):
+        font = QFont()
+        font.setFamily('Courier')
+        font.setFixedPitch(True)
+        font.setPointSize(10)
+
+        self.highlighter = highlighter.Highlighter(self.CTFunctionInput.document()) #with QLineEdit doesn't work, so I had to override QTextEdit
+
+        mykeywords = ['penis', 'daburu', 'sakamoto']
+        self.completer = QCompleter(mykeywords)
+        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.completer.setWrapAround(False)
+        self.CTFunctionInput.setCompleter(self.completer)
 
     def addStateVariable(self):
 
+        sv_list = [] # todo horizon.getStateVariables()
         self.sv_name = self.SVNameInput.text()
         self.sv_dim = self.SVDimInput.value()
         self.sv_nodes = self.SVNodeInput.value()
 
         if self.sv_name == "":
-            print("Empty Value Not Allowed")
+            self.on_invalid_sv("Empty Value Not Allowed")
+            self.SVNameInput.setFocus()
+        elif self.sv_name in sv_list:
+            self.on_invalid_sv("State Variable already inserted")
             self.SVNameInput.setFocus()
         else:
             print('state variable {} added.'.format(self.sv_name))
             print('dimension: {}'.format(self.sv_dim))
             print('previous node: {}'.format(self.sv_nodes))
             self._addRow()
+            # todo horizon.setStateVariable()
+
     def _connectActions(self):
 
         self.SVAddButton.clicked.connect(self.addStateVariable)
@@ -250,12 +205,12 @@ class HorizonGUI(QMainWindow):
         widget1 = Widget1()
 
         # another qwidget
-        self.red_widget = QWidget(self)
-        self.red_widget.setAutoFillBackground(True)
-
-        palette = self.red_widget.palette()
-        palette.setColor(QPalette.Window, QColor('red'))
-        self.red_widget.setPalette(palette)
+        # self.red_widget = QWidget(self)
+        # self.red_widget.setAutoFillBackground(True)
+        #
+        # palette = self.red_widget.palette()
+        # palette.setColor(QPalette.Window, QColor('red'))
+        # self.red_widget.setPalette(palette)
 
         # yet another qwidget
         self.text_widget = QLabel("Hello, World")
@@ -263,24 +218,21 @@ class HorizonGUI(QMainWindow):
 
         # generate a layout for a widget, I can populate the layout with more widget
         self.main_layout = QVBoxLayout()
-        self.main_layout.addWidget(self.red_widget,1)
-        self.main_layout.addWidget(widget1,4)
-        self.main_layout.addWidget(self.text_widget,1)
+        # self.main_layout.addWidget(self.red_widget,1)
+        self.widget1 = widget1
+        self.main_layout.addWidget(self.widget1, 4)
+        # self.main_layout.addWidget(self.text_widget,1)
 
         # generate a main widget to assign to centralwidget
         self.main_widget = QWidget()
         self.main_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.main_widget)
-
-
         self.setWindowTitle("Horizon GUI")
         # setting geometry
         # self.setGeometry(1000, 200, 300, 200)
         self.showMaximized()
         # miniwindow = TimeLine()
 
-
-        #
         # self.setCentralWidget(self.centralWidget)
 
 
@@ -344,6 +296,11 @@ class HorizonGUI(QMainWindow):
         # Connect Open Recent to dynamically populate it
         self.openRecentMenu.aboutToShow.connect(self.populateOpenRecent)
 
+        # This is amazing, I can connect a custom signal from a widget to the main window here
+        # basically horizonLine in widget1 sends a signal with a msg, which I connect to the status bar
+        self.widget1.horizonLine.invalid_ct.connect(self.writeInStatusBar)
+        self.widget1.invalid_sv.connect(self.writeInStatusBar)
+
     def _createContextMenu(self):
         # Setting contextMenuPolicy
         self.text_widget.setContextMenuPolicy(Qt.ActionsContextMenu)
@@ -382,6 +339,9 @@ class HorizonGUI(QMainWindow):
         self.helpContentAction = QAction("&Help Content", self)
 
         self.aboutAction = QAction("&About", self)
+
+    def writeInStatusBar(self, msg):
+        self.statusbar.showMessage(msg, 10000)
 
     def populateOpenRecent(self):
         # Step 1. Remove the old options from the menu
@@ -574,5 +534,4 @@ sys.exit(app.exec_())
 # # 4. Show your application's GUI
 # window.show()
 #
-# # 5. Run your application's event loop (or main loop)
-# sys.exit(app.exec_())
+# # 5. Run your application's event loop (or main

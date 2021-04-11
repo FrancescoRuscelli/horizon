@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>816</width>
-    <height>685</height>
+    <width>1099</width>
+    <height>942</height>
    </rect>
   </property>
   <property name="mouseTracking">
@@ -19,33 +19,84 @@
   <widget class="QGroupBox" name="CT">
    <property name="geometry">
     <rect>
-     <x>500</x>
-     <y>550</y>
-     <width>301</width>
-     <height>111</height>
+     <x>380</x>
+     <y>20</y>
+     <width>421</width>
+     <height>131</height>
     </rect>
+   </property>
+   <property name="layoutDirection">
+    <enum>Qt::LeftToRight</enum>
    </property>
    <property name="title">
     <string>Constraints</string>
    </property>
-   <widget class="QPushButton" name="pushButton">
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+   <widget class="QWidget" name="gridLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>80</x>
-      <y>80</y>
-      <width>111</width>
-      <height>22</height>
+      <x>40</x>
+      <y>20</y>
+      <width>321</width>
+      <height>91</height>
      </rect>
     </property>
-    <property name="text">
-     <string>Add Constraint</string>
-    </property>
+    <layout class="QGridLayout" name="CTGrid">
+     <property name="spacing">
+      <number>0</number>
+     </property>
+     <item row="0" column="0">
+      <widget class="QLabel" name="CTName">
+       <property name="text">
+        <string>name:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QLineEdit" name="CTNameInput"/>
+     </item>
+     <item row="2" column="0" colspan="3">
+      <widget class="QPushButton" name="CTButton">
+       <property name="text">
+        <string>Add Constraint</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="CTFunction">
+       <property name="text">
+        <string>function:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1" colspan="2">
+      <widget class="LineEdit" name="CTFunctionInput"/>
+     </item>
+     <item row="0" column="2">
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Expanding</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
    </widget>
   </widget>
   <widget class="QGroupBox" name="SV">
    <property name="geometry">
     <rect>
-     <x>460</x>
+     <x>10</x>
      <y>20</y>
      <width>341</width>
      <height>131</height>
@@ -102,7 +153,7 @@
    <widget class="NodesSpinBox" name="SVNodeInput">
     <property name="geometry">
      <rect>
-      <x>240</x>
+      <x>239</x>
       <y>36</y>
       <width>91</width>
       <height>23</height>
@@ -222,10 +273,10 @@
   <widget class="QTableWidget" name="TableSV">
    <property name="geometry">
     <rect>
-     <x>20</x>
-     <y>541</y>
+     <x>170</x>
+     <y>750</y>
      <width>461</width>
-     <height>121</height>
+     <height>181</height>
     </rect>
    </property>
    <column>
@@ -247,46 +298,20 @@
   <widget class="QGroupBox" name="PRB">
    <property name="geometry">
     <rect>
-     <x>10</x>
-     <y>340</y>
-     <width>781</width>
-     <height>171</height>
+     <x>9</x>
+     <y>160</y>
+     <width>1051</width>
+     <height>581</height>
     </rect>
    </property>
    <property name="title">
     <string>Problem</string>
    </property>
   </widget>
-  <widget class="QWidget" name="verticalLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>120</x>
-     <y>90</y>
-     <width>160</width>
-     <height>80</height>
-    </rect>
-   </property>
-   <layout class="QVBoxLayout" name="penis"/>
-  </widget>
-  <widget class="QStackedWidget" name="stackedWidget">
-   <property name="geometry">
-    <rect>
-     <x>600</x>
-     <y>220</y>
-     <width>120</width>
-     <height>80</height>
-    </rect>
-   </property>
-   <property name="currentIndex">
-    <number>0</number>
-   </property>
-   <widget class="QWidget" name="page"/>
-   <widget class="QWidget" name="page_2"/>
-  </widget>
   <action name="actionExit">
    <property name="icon">
     <iconset>
-     <normaloff>../../../../../.designer/resources/rocket.svg</normaloff>../../../../../.designer/resources/rocket.svg</iconset>
+     <normaloff>../../../../.designer/resources/rocket.svg</normaloff>../../../../.designer/resources/rocket.svg</iconset>
    </property>
    <property name="text">
     <string>Exit</string>
@@ -301,7 +326,7 @@
   <action name="actionAbout">
    <property name="icon">
     <iconset>
-     <normaloff>../../../../../.designer/resources/info.svg</normaloff>../../../../../.designer/resources/info.svg</iconset>
+     <normaloff>../../../../.designer/resources/info.svg</normaloff>../../../../.designer/resources/info.svg</iconset>
    </property>
    <property name="text">
     <string>About</string>
@@ -319,6 +344,11 @@
    <class>NodesSpinBox</class>
    <extends>QSpinBox</extends>
    <header>custom_widgets/nodes_spinbox.h</header>
+  </customwidget>
+  <customwidget>
+   <class>LineEdit</class>
+   <extends>QLineEdit</extends>
+   <header>custom_widgets/line_edit.h</header>
   </customwidget>
  </customwidgets>
  <resources/>
