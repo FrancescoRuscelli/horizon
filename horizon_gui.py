@@ -142,8 +142,8 @@ class Widget1(QWidget, Ui_Form):
 
         self.highlighter = highlighter.Highlighter(self.CTFunctionInput.document()) #with QLineEdit doesn't work, so I had to override QTextEdit
 
-        mykeywords = ['penis', 'daburu', 'sakamoto']
-        self.completer = QCompleter(mykeywords)
+        self.ct_keywords = list()
+        self.completer = QCompleter(self.ct_keywords)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.completer.setWrapAround(False)
         self.CTFunctionInput.setCompleter(self.completer)
@@ -159,13 +159,18 @@ class Widget1(QWidget, Ui_Form):
             self.on_invalid_sv("Empty Value Not Allowed")
             self.SVNameInput.setFocus()
         elif self.sv_name in sv_list:
-            self.on_invalid_sv("State Variable already inserted")
+            self.on_invalid_sv("State Variable Already Inserted")
             self.SVNameInput.setFocus()
         else:
             print('state variable {} added.'.format(self.sv_name))
             print('dimension: {}'.format(self.sv_dim))
             print('previous node: {}'.format(self.sv_nodes))
             self._addRow()
+            self.highlighter.addKeyword(self.sv_name)
+            self.ct_keywords.append('{}'.format(self.sv_name))
+            model = self.completer.model()
+            model.setStringList(self.ct_keywords)
+
             # todo horizon.setStateVariable()
 
     def _connectActions(self):

@@ -7,7 +7,7 @@ Hazen 06/13
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
-class Slice():
+class Slice(QtGui.QWidget):
     def __init__(self, min, max):
         self.min = min
         self.max = max
@@ -35,6 +35,15 @@ class Slice():
 
     def getValues(self):
         return [self.scale_min, self.scale_max]
+
+
+    def enterEvent(self, event):
+        print("Mouse Entered")
+        return super(Slice, self).enterEvent(event)
+
+    def leaveEvent(self, event):
+        print("Mouse Left")
+        return super(Slice, self).enterEvent(event)
 
 
 class QRangeSlider(QtWidgets.QWidget):
@@ -65,47 +74,46 @@ class QRangeSlider(QtWidgets.QWidget):
 
         self.setFocusPolicy(QtCore.Qt.ClickFocus)
 
-    def keyPressEvent(self, event):
-        key = event.key()
-        #
-        # move bars based on arrow keys
-        moving_max = False
-        if key == QtCore.Qt.Key_Up:
-            self.scale_max += self.single_step
-            moving_max = True
-        elif key == QtCore.Qt.Key_Down:
-            self.scale_max -= self.single_step
-            moving_max = True
-        elif key == QtCore.Qt.Key_Left:
-            self.scale_min -= self.single_step
-        elif key == QtCore.Qt.Key_Right:
-            self.scale_min += self.single_step
-
-        # update (if necessary) based on allowed range
-        if moving_max:
-            if (self.scale_max < self.scale_min):
-                self.scale_min = self.scale_max
-        else:
-            if (self.scale_min > self.scale_max):
-                self.scale_max = self.scale_min
-
-        if (self.scale_min < self.start):
-            self.scale_min = self.start
-        if (self.scale_max < self.start):
-            self.scale_max = self.start
-
-        slider_max = self.start + self.scale
-        if (self.scale_min > slider_max):
-            self.scale_min = slider_max
-        if (self.scale_max > slider_max):
-            self.scale_max = slider_max
-
-        self.emitRange()
-        self.updateDisplayValues()
-        self.update()
+    # def keyPressEvent(self, event):
+    #     key = event.key()
+    #     #
+    #     # move bars based on arrow keys
+    #     moving_max = False
+    #     if key == QtCore.Qt.Key_Up:
+    #         self.scale_max += self.single_step
+    #         moving_max = True
+    #     elif key == QtCore.Qt.Key_Down:
+    #         self.scale_max -= self.single_step
+    #         moving_max = True
+    #     elif key == QtCore.Qt.Key_Left:
+    #         self.scale_min -= self.single_step
+    #     elif key == QtCore.Qt.Key_Right:
+    #         self.scale_min += self.single_step
+    #
+    #     # update (if necessary) based on allowed range
+    #     if moving_max:
+    #         if (self.scale_max < self.scale_min):
+    #             self.scale_min = self.scale_max
+    #     else:
+    #         if (self.scale_min > self.scale_max):
+    #             self.scale_max = self.scale_min
+    #
+    #     if (self.scale_min < self.start):
+    #         self.scale_min = self.start
+    #     if (self.scale_max < self.start):
+    #         self.scale_max = self.start
+    #
+    #     slider_max = self.start + self.scale
+    #     if (self.scale_min > slider_max):
+    #         self.scale_min = slider_max
+    #     if (self.scale_max > slider_max):
+    #         self.scale_max = slider_max
+    #
+    #     self.emitRange()
+    #     self.updateDisplayValues()
+    #     self.update()
 
     def mouseDoubleClickEvent(self, event):
-        # self.emit(QtCore.SIGNAL("doubleClick()"))
         self.doubleClick.emit()
 
     def mouseMoveEvent(self, event):
@@ -210,24 +218,25 @@ class QHRangeSlider(QRangeSlider):
         painter.setBrush(QtCore.Qt.lightGray)
         painter.drawRect(2, 2, w - 4, h - 4)
 
-        self.addSlice(h, self.display_min, self.display_max)
+        for slice in self.slices:
+            self.addSlice(h, slice)
         # self.addSlice(h, 4, 5)
 
-    def addSlice(self, h, init, end):
+    def addSlice(self, h, slice):
         painter = QtGui.QPainter(self)
         # range bar
         painter.setPen(QtCore.Qt.darkGray)
         painter.setBrush(QtCore.Qt.darkGray)
-        painter.drawRect(init - 1, 5, end - init + 2, h - 10)
+        painter.drawRect(slice.getDisplayValues(0) - 1, 5, slice.getDisplayValues(1) - slice.getDisplayValues(0) + 2, h - 10)
 
         # min & max tabs
         painter.setPen(QtCore.Qt.black)
         painter.setBrush(QtCore.Qt.gray)
-        painter.drawRect(init - self.bar_width, 1, self.bar_width, h - 2)
+        painter.drawRect(slice.getDisplayValues(0) - self.bar_width, 1, self.bar_width, h - 2)
 
         painter.setPen(QtCore.Qt.black)
         painter.setBrush(QtCore.Qt.gray)
-        painter.drawRect(end, 1, self.bar_width, h - 2)
+        painter.drawRect(slice.getDisplayValues(1), 1, self.bar_width, h - 2)
 
     def rangeSliderSize(self):
         return self.width()
@@ -293,8 +302,8 @@ if (__name__ == "__main__"):
     hslider = QHRangeSlider(slider_range=[-5.0, 5.0, 0.5], values=[-4, -3])
     hslider.setEmitWhileMoving(True)
     hslider.show()
-    # else:
-    #     vslider = QVRangeSlider(slider_range=[-5.0, 5.0, 0.5], values=[-2.5, 2.5])
+
+        # vslider = QVRangeSlider(slider_range=[-5.0, 5.0, 0.5], values=[-2.5, 2.5])
     #     vslider.setEmitWhileMoving(True)
     #     vslider.show()
     sys.exit(app.exec_())

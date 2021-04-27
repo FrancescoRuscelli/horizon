@@ -275,7 +275,7 @@ if (__name__ == "__main__"):
 
 
     app = QtWidgets.QApplication(sys.argv)
-    if False:
+    if True:
         hslider = QHRangeSlider(slider_range=[-5.0, 5.0, 0.5], values=[-2.5, 2.5])
         hslider.setEmitWhileMoving(True)
         hslider.show()
