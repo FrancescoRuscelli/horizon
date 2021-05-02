@@ -72,9 +72,9 @@ class QRangeSlider(QtWidgets.QWidget):
         self.bar_width = 10
         self.emit_while_moving = 0
         self.slices = []
-        self.setMouseTracking(False)
+        self.setMouseTracking(True)
         self.moving = "none"
-        
+
         self.add_slice_button = QtWidgets.QPushButton('Add Slice', self)
 
         self.resize(500, 400)
@@ -116,10 +116,20 @@ class QRangeSlider(QtWidgets.QWidget):
         self.single_step = slider_range[2]
 
     def updateDisplayValues(self, slider):
-        size = float(self.width() - 2 * self.bar_width - 1)
+        size = float(self.width() - 2 * self.bar_width - 1) # bar width is the width of the two sliders (the edges)
+
+
         # these are the visual sliders max/min
         display_min = int(size * (slider.getValues()[0] - self.start) / self.scale) + self.bar_width
         display_max = int(size * (slider.getValues()[1] - self.start) / self.scale) + self.bar_width
+
+        print('(slider.getValues()[0] - self.start)', (slider.getValues()[0] - self.start))
+        print('int(size * (slider.getValues()[0] - self.start) / self.scale)', int(size * (slider.getValues()[0] - self.start) / self.scale)  )
+        print('self.width()', self.width())
+        print('size', size)
+
+        print('display_min', display_min)
+        print('display_max', display_max)
 
         return [display_min, display_max]
     #
@@ -186,10 +196,14 @@ class QRangeSlider(QtWidgets.QWidget):
                     self.slices.remove(slice)
                     self.slices.remove(self.current_slice)
                     self.slices.append(Slice(slice.getValues()[0], self.current_slice.getValues()[1]))
+                    self.moving = "none"
+                    QtWidgets.QApplication.restoreOverrideCursor()
                 elif current_display_max > display_min and current_display_min < display_min:
                     self.slices.remove(slice)
                     self.slices.remove(self.current_slice)
                     self.slices.append(Slice(self.current_slice.getValues()[0], slice.getValues()[1]))
+                    self.moving = "none"
+                    QtWidgets.QApplication.restoreOverrideCursor()
 
     def getPos(self, event):
         return event.x()
@@ -218,33 +232,63 @@ class QRangeSlider(QtWidgets.QWidget):
 
             self.start_pos = pos
 
+
     def mouseMoveEvent(self, event):
-        size = self.width()
-        diff = self.start_pos - self.getPos(event)
-        if self.moving == "min":
-            # todo add logic to switch max with min
-            temp = self.current_display_min - diff
-            if (temp >= self.bar_width) and (temp < size - self.bar_width):
-                self.current_slice_visual_min = temp
-                # if self.current_slice_visual_min > self.updateDisplayValues(self.current_slice)[1]:
-                self.updateCurrentSlice()
-                if self.emit_while_moving:
-                    self.current_slice.emitRange()
-        elif self.moving == "max":
-            temp = self.current_display_max - diff
-            if (temp >= self.bar_width) and (temp < size - self.bar_width):
-                self.current_slice_visual_max = temp
-                self.updateCurrentSlice()
-                if self.emit_while_moving:
-                    self.current_slice.emitRange()
-        elif self.moving == "bar":
-            temp = self.current_display_min - diff
-            if (temp >= self.bar_width) and (temp < size - self.bar_width - (self.current_display_max - self.current_display_min)):
-                self.current_slice_visual_min = temp
-                self.current_slice_visual_max = self.current_display_max - diff
-                self.updateCurrentSlice()
-                if self.emit_while_moving:
-                    self.current_slice.emitRange()
+
+        # this is to switch cursor
+        if not event.buttons():
+            for slice in self.slices:
+                if abs(self.updateDisplayValues(slice)[0] - 0.5 * self.bar_width - self.getPos(event)) < (0.5 * self.bar_width):
+                    QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.SplitHCursor)
+                elif abs(self.updateDisplayValues(slice)[1] + 0.5 * self.bar_width - self.getPos(event)) < (0.5 * self.bar_width):
+                    QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.SplitHCursor)
+                else:
+                    QtWidgets.QApplication.restoreOverrideCursor()
+        else:
+
+            size = self.width() # the length of the bar
+            # the length of the bar
+            # start pos the position clicked
+            # getPos the current position
+            diff = self.start_pos - self.getPos(event)
+
+            if self.moving == "min":
+                # todo add logic to switch max with min
+                temp = self.current_display_min - diff
+                if (temp >= self.bar_width) and (temp < size - self.bar_width):
+                    self.current_slice_visual_min = temp
+
+
+                    self.updateCurrentSlice()
+
+                    # if self.current_slice.getValues()[0] - self.current_slice.getValues()[1] > self.single_step:
+                    #     pisello = self.current_slice.getValues()[0]
+                    #     print('min:', self.current_slice.getValues()[0])
+                    #     print('max:', self.current_slice.getValues()[1])
+                    #     self.current_slice.setMin(self.current_slice.getValues()[1])
+                    #     self.current_slice.setMax(pisello) # ??
+                    #     print('min-max:', self.current_slice.getValues())
+                    #     print('--------------------------------------')
+
+                    if self.emit_while_moving:
+                        self.current_slice.emitRange()
+            elif self.moving == "max":
+                temp = self.current_display_max - diff
+                if (temp >= self.bar_width) and (temp < size - self.bar_width):
+                    self.current_slice_visual_max = temp
+                    self.updateCurrentSlice()
+                    if self.emit_while_moving:
+                        self.current_slice.emitRange()
+            elif self.moving == "bar":
+                temp = self.current_display_min - diff
+                if (temp >= self.bar_width) and (temp < size - self.bar_width - (self.current_display_max - self.current_display_min)):
+                    self.current_slice_visual_min = temp
+                    self.current_slice_visual_max = self.current_display_max - diff
+                    self.updateCurrentSlice()
+                    if self.emit_while_moving:
+                        self.current_slice.emitRange()
+
+
 
     def mouseReleaseEvent(self, event):
         if not (self.moving == "none"):
