@@ -182,19 +182,19 @@ class QRangeSlider(QtWidgets.QWidget):
 
     def mergeSlider(self):
 
-        display_min, display_max = self.updateDisplayValues(self.active_slice)
+        active_display_min, active_display_max = self.updateDisplayValues(self.active_slice)
 
         for slice in self.slices:
             if slice is not self.active_slice:
                 display_min, display_max = self.updateDisplayValues(slice)
 
-                if display_min < display_max and display_max > display_max:
+                if active_display_min < display_max and active_display_max > display_max:
                     self.slices.remove(slice)
                     self.slices.remove(self.active_slice)
                     self.slices.append(Slice(slice.getValues()[0], self.active_slice.getValues()[1]))
                     self.moving = "none"
                     QtWidgets.QApplication.restoreOverrideCursor()
-                elif display_max > display_min and display_min < display_min:
+                elif active_display_max > display_min and active_display_min < display_min:
                     self.slices.remove(slice)
                     self.slices.remove(self.active_slice)
                     self.slices.append(Slice(self.active_slice.getValues()[0], slice.getValues()[1]))
@@ -271,6 +271,7 @@ class QRangeSlider(QtWidgets.QWidget):
 
                     if self.emit_while_moving:
                         self.active_slice.emitRange()
+
             elif self.moving == "max":
                 temp = self.display_max - diff
                 if (temp >= self.bar_width) and (temp < size - self.bar_width):
@@ -283,6 +284,7 @@ class QRangeSlider(QtWidgets.QWidget):
                         self.start_pos = self.getPos(event)
                         self.moving = 'min'
                         self.display_min = temp
+
                     if self.emit_while_moving:
                         self.active_slice.emitRange()
             elif self.moving == "bar":
@@ -291,6 +293,7 @@ class QRangeSlider(QtWidgets.QWidget):
                     self.current_display_min = temp
                     self.current_display_max = self.display_max - diff
                     self.updateCurrentSlice()
+
                     if self.emit_while_moving:
                         self.active_slice.emitRange()
 
