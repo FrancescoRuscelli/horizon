@@ -3,6 +3,8 @@ from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSignal, pyqtSlot
 
 from functools import partial
 
+from custom_widgets.multi_slider import QMultiSlider
+
 # class TabButtonWidget(QWidget):
 #     def __init__(self, parent):
 #         super().__init__(parent)
@@ -25,8 +27,24 @@ from functools import partial
 #
 #         # Use layout in widget
 #         self.setLayout(self.layout)
+class ConstraintTab_Slider(QWidget):
+    def __init__(self, name, n_nodes, parent=None):
+        super().__init__(parent)
 
-class ConstraintTab(QWidget):
+        self.ct = list()
+
+        self.name = name
+        self.n_nodes = n_nodes
+
+        self.hlayout = QHBoxLayout(self)
+        self.hlayout.setContentsMargins(0, 0, 0, 0)
+        self.hlayout.setSpacing(0)
+
+        self.slider = QMultiSlider(slider_range=[-5.0, 5.0, 0.5], values=[-4, -3], parent=self)
+    # hslider.setEmitWhileMoving(True)
+        self.slider.show()
+
+class ConstraintTab_CheckBox(QWidget):
     def __init__(self, name, n_nodes, parent=None):
         super().__init__(parent)
 
@@ -100,7 +118,7 @@ class HorizonLine(QWidget):
             self.on_invalid_ct("empty name of constraint not allowed")
             return
 
-        self.ct = ConstraintTab(name, self.n_nodes)
+        self.ct = ConstraintTab_Slider(name, self.n_nodes)
         self.ct_tab.addTab(self.ct, str(name))
         self.constraints[name] = self.ct.getConstraint()
 

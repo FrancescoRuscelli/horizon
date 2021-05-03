@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 """
-Qt Widget Range slider widget.
-Hazen 06/13
+Qt Widget Multiple Slider widget.
 """
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 
 class Slice(QtWidgets.QWidget):
     rangeChanged = QtCore.pyqtSignal(float, float)
@@ -35,11 +33,9 @@ class Slice(QtWidgets.QWidget):
 
     def setMin(self, min):
         self.min = min
-        # self.checkMinMax()
 
     def setMax(self, max):
         self.max = max
-        # self.checkMinMax()
 
     def getValues(self):
         return [self.min, self.max]
@@ -50,17 +46,7 @@ class Slice(QtWidgets.QWidget):
             self.min = self.max
             self.max = temp
 
-
-    # def enterEvent(self, event):
-    #     print("Mouse Entered")
-    #     return super(Slice, self).enterEvent(event)
-    #
-    # def leaveEvent(self, event):
-    #     print("Mouse Left")
-    #     return super(Slice, self).enterEvent(event)
-
-
-class QRangeSlider(QtWidgets.QWidget):
+class QMultiSlider(QtWidgets.QWidget):
     """
     Range Slider super class.
     """
@@ -80,7 +66,7 @@ class QRangeSlider(QtWidgets.QWidget):
 
         self.add_slice_button = QtWidgets.QPushButton('Add Slice', self)
 
-        self.resize(500, 400)
+        # self.resize(500, 400)
 
         if slider_range:
             self.setRange(slider_range)
@@ -105,7 +91,8 @@ class QRangeSlider(QtWidgets.QWidget):
         self.update()
 
     # def resizeEvent(self, event):
-        # self.updateDisplayValues()
+    #     for slice in self.slices:
+    #         self.updateDisplayValues(slice)
     #
     def setEmitWhileMoving(self, flag):
         if flag:
@@ -127,7 +114,7 @@ class QRangeSlider(QtWidgets.QWidget):
         display_max = int(size * (slider.getValues()[1] - self.start) / self.scale) + self.bar_width
 
         return [display_min, display_max]
-    #
+
     def updateCurrentSlice(self):
         size = float(self.width() - 2 * self.bar_width - 1)
         if (self.moving == "min") or (self.moving == "bar"):
@@ -156,6 +143,7 @@ class QRangeSlider(QtWidgets.QWidget):
         painter.setBrush(QtCore.Qt.lightGray)
         painter.drawRect(2, 2, w - 4, h - 4)
 
+        # todo I don't need a resizeEvent because every time I change size paintEvent gets called which call addSlice which call updateDisplayValues
         for elem in self.slices:
             self.addSlice(elem)
 
@@ -181,7 +169,6 @@ class QRangeSlider(QtWidgets.QWidget):
         painter.drawRect(display_max, 1, self.bar_width, h - 2)
 
     def mergeSlider(self):
-
         active_display_min, active_display_max = self.updateDisplayValues(self.active_slice)
 
         for slice in self.slices:
@@ -210,13 +197,13 @@ class QRangeSlider(QtWidgets.QWidget):
         for slice in self.slices:
             if abs(self.updateDisplayValues(slice)[0] - 0.5 * self.bar_width - pos) < (0.5 * self.bar_width):
                 self.moving = "min"
-                print('slice', slice, 'min')
+                # print('slice', slice, 'min')
                 self.active_slice = slice
                 self.display_min = self.updateDisplayValues(self.active_slice)[0]
                 self.display_max = self.updateDisplayValues(self.active_slice)[1]
             elif abs(self.updateDisplayValues(slice)[1] + 0.5 * self.bar_width - pos) < (0.5 * self.bar_width):
                 self.moving = "max"
-                print('slice', slice, 'max')
+                # print('slice', slice, 'max')
                 self.active_slice = slice
                 self.display_min = self.updateDisplayValues(self.active_slice)[0]
                 self.display_max = self.updateDisplayValues(self.active_slice)[1]
@@ -229,8 +216,7 @@ class QRangeSlider(QtWidgets.QWidget):
             self.start_pos = pos
 
     def mouseMoveEvent(self, event):
-
-        # this is to switch cursor
+        # this is to switch cursor when on slider
         if not event.buttons():
             for slice in self.slices:
                 if abs(self.updateDisplayValues(slice)[0] - 0.5 * self.bar_width - self.getPos(event)) < (0.5 * self.bar_width):
@@ -314,7 +300,7 @@ if (__name__ == "__main__"):
 
     app = QtWidgets.QApplication(sys.argv)
 
-    hslider = QRangeSlider(slider_range=[-5.0, 5.0, 0.5], values=[-4, -3])
+    hslider = QMultiSlider(slider_range=[-5.0, 5.0, 0.5], values=[-4, -3])
     # hslider.setEmitWhileMoving(True)
     hslider.show()
     sys.exit(app.exec_())
