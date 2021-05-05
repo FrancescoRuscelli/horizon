@@ -55,7 +55,8 @@ class QMultiSlider(QtWidgets.QWidget):
 
     def __init__(self, slider_range, values, parent=None):
         QtWidgets.QWidget.__init__(self, parent)
-        self.bar_width = 10
+        self.bar_width = 1
+        self.bar_area_selection = 10
         self.emit_while_moving = 0
         self.slices = []
         self.setMouseTracking(True)
@@ -66,7 +67,7 @@ class QMultiSlider(QtWidgets.QWidget):
 
         self.add_slice_button = QtWidgets.QPushButton('Add Slice', self)
 
-        # self.resize(500, 400)
+        self.resize(500, 400)
 
         if slider_range:
             self.setRange(slider_range)
@@ -93,7 +94,7 @@ class QMultiSlider(QtWidgets.QWidget):
     # def resizeEvent(self, event):
     #     for slice in self.slices:
     #         self.updateDisplayValues(slice)
-    #
+
     def setEmitWhileMoving(self, flag):
         if flag:
             self.emit_while_moving = 1
@@ -195,13 +196,16 @@ class QMultiSlider(QtWidgets.QWidget):
         pos = self.getPos(event)
 
         for slice in self.slices:
-            if abs(self.updateDisplayValues(slice)[0] - 0.5 * self.bar_width - pos) < (0.5 * self.bar_width):
+            # if abs(self.updateDisplayValues(slice)[0] - 0.5 * self.bar_area_selection - pos) < (0.5 * self.bar_area_selection):
+            if self.getPos(event) >= (self.updateDisplayValues(slice)[0] - 0.5 * self.bar_area_selection) and \
+                    self.getPos(event) <= (self.updateDisplayValues(slice)[0] + 0.5 * self.bar_area_selection):
                 self.moving = "min"
                 # print('slice', slice, 'min')
                 self.active_slice = slice
                 self.display_min = self.updateDisplayValues(self.active_slice)[0]
                 self.display_max = self.updateDisplayValues(self.active_slice)[1]
-            elif abs(self.updateDisplayValues(slice)[1] + 0.5 * self.bar_width - pos) < (0.5 * self.bar_width):
+            elif self.getPos(event) >= (self.updateDisplayValues(slice)[1] - 0.5 * self.bar_area_selection) and \
+                    self.getPos(event) <= (self.updateDisplayValues(slice)[1] + 0.5 * self.bar_area_selection):
                 self.moving = "max"
                 # print('slice', slice, 'max')
                 self.active_slice = slice
@@ -217,14 +221,20 @@ class QMultiSlider(QtWidgets.QWidget):
 
     def mouseMoveEvent(self, event):
         # this is to switch cursor when on slider
+        # todo something is wrong when adding a slice, it does NOT change the cursor over the old slices
         if not event.buttons():
-            for slice in self.slices:
-                if abs(self.updateDisplayValues(slice)[0] - 0.5 * self.bar_width - self.getPos(event)) < (0.5 * self.bar_width):
+            for segment in self.slices:
+                if self.getPos(event) >= (self.updateDisplayValues(segment)[0] - 0.5 * self.bar_area_selection) and \
+                        self.getPos(event) <= (self.updateDisplayValues(segment)[0] + 0.5 * self.bar_area_selection):
                     QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.SplitHCursor)
-                elif abs(self.updateDisplayValues(slice)[1] + 0.5 * self.bar_width - self.getPos(event)) < (0.5 * self.bar_width):
+                    break
+                elif self.getPos(event) >= (self.updateDisplayValues(segment)[1] - 0.5 * self.bar_area_selection) and \
+                        self.getPos(event) <= (self.updateDisplayValues(segment)[1] + 0.5 * self.bar_area_selection):
                     QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.SplitHCursor)
+                    break
                 else:
-                    QtWidgets.QApplication.restoreOverrideCursor()
+                    QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.ArrowCursor)
+
         else:
 
             size = self.width() # the length of the bar

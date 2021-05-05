@@ -27,9 +27,12 @@ from custom_widgets.multi_slider import QMultiSlider
 #
 #         # Use layout in widget
 #         self.setLayout(self.layout)
-class ConstraintTab_Slider(QWidget):
+
+class ConstraintTab(QWidget):
     def __init__(self, name, n_nodes, parent=None):
         super().__init__(parent)
+
+        slider_flag = True
 
         self.ct = list()
 
@@ -40,28 +43,15 @@ class ConstraintTab_Slider(QWidget):
         self.hlayout.setContentsMargins(0, 0, 0, 0)
         self.hlayout.setSpacing(0)
 
-        self.slider = QMultiSlider(slider_range=[-5.0, 5.0, 0.5], values=[-4, -3], parent=self)
-    # hslider.setEmitWhileMoving(True)
-        self.slider.show()
-
-class ConstraintTab_CheckBox(QWidget):
-    def __init__(self, name, n_nodes, parent=None):
-        super().__init__(parent)
-
-        self.ct = list()
-
-        self.name = name
-        self.n_nodes = n_nodes
-
-        self.hlayout = QHBoxLayout(self)
-        self.hlayout.setContentsMargins(0, 0, 0, 0)
-        self.hlayout.setSpacing(0)
-
-        for node in range(self.n_nodes):
-            self.ct_node = QCheckBox(self)
-            self.hlayout.addWidget(self.ct_node)
-            self.ct_node.stateChanged.connect(partial(self.checkConstraintNodes, node))
-            self.ct.append(self.ct_node)
+        if slider_flag:
+            self.slider = QMultiSlider(slider_range=[0, self.n_nodes-1, 1], values=[2, 3])
+            self.hlayout.addWidget(self.slider)
+        else:
+            for node in range(self.n_nodes):
+                self.ct_node = QCheckBox(self)
+                self.hlayout.addWidget(self.ct_node)
+                self.ct_node.stateChanged.connect(partial(self.checkConstraintNodes, node))
+                self.ct.append(self.ct_node)
 
         # layout.addStretch()
         # self.ct.setLayout(self.ct.layout)
@@ -87,13 +77,17 @@ class HorizonLine(QWidget):
         self.n_nodes = 10
         self.setGeometry(QRect(210, 60, 341, 231))
         self.layout = QGridLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setContentsMargins(-1, 10, 100, 1)
         self.layout.setSpacing(1)
         self.constraints = dict()
 
         self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
         self.setMouseTracking(True)
 
+        # self.start = 0
+        # self.scale = self.n_nodes - self.start
+        # self.single_step = 1
+        # display_scale = int(self.width() /self.scale)
 
         # Add widgets to the layout
         for i in range(self.n_nodes):
@@ -102,7 +96,8 @@ class HorizonLine(QWidget):
             self.layout.addWidget(n_i, 0, i, 1, 1)
 
         self.ct_tab = QTabWidget(self)
-        self.ct_tab.setGeometry(200, 100, 300, 150)
+        # self.ct_tab.setGeometry(200, 100, 300, 150)
+        self.ct_tab.setTabPosition(1)
         self.layout.addWidget(self.ct_tab, 1, 0, 1, self.n_nodes)
 
     @pyqtSlot()
@@ -118,7 +113,7 @@ class HorizonLine(QWidget):
             self.on_invalid_ct("empty name of constraint not allowed")
             return
 
-        self.ct = ConstraintTab_Slider(name, self.n_nodes)
+        self.ct = ConstraintTab(name, self.n_nodes)
         self.ct_tab.addTab(self.ct, str(name))
         self.constraints[name] = self.ct.getConstraint()
 
