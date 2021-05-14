@@ -4,75 +4,20 @@ from functools import partial
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
                              QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QDesktopWidget, QMenuBar, QStyle,
                              QSpinBox, QStyleFactory, QFrame, QTabWidget, QProgressBar, QDialog, QButtonGroup, QLayout, QLineEdit, QTextEdit, QTableWidgetItem,
-                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter)
+                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QMessageBox, QListWidgetItem)
 
 from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent, QPalette, QColor, QDrag, QTextCursor, QPainter, QCursor, QBrush, QTextCharFormat, QSyntaxHighlighter, QFont
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegExp, pyqtSlot
 
 from widget1_ui import Ui_Form
 from custom_functions import highlighter
-from custom_widgets import horizon_line
+from custom_widgets import horizon_line, line_edit, on_destroy_signal_window
 import qrc_resources
 
-class DraggableLabel(QLabel):
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.drag_start_position = event.pos()
-
-    def mouseMoveEvent(self, event):
-        if not (event.buttons() & Qt.LeftButton):
-            return
-        if (event.pos() - self.drag_start_position).manhattanLength() < QApplication.startDragDistance():
-            return
-
-        drag = QDrag(self)
-        mimedata = QMimeData()
-        mimedata.setText(self.text())
-        drag.setMimeData(mimedata)
-        pixmap = QPixmap(self.size())
-        painter = QPainter(pixmap)
-        painter.drawPixmap(self.rect(), self.grab())
-        painter.end()
-        drag.setPixmap(pixmap)
-        drag.setHotSpot(event.pos())
-        drag.exec_(Qt.CopyAction | Qt.MoveAction)
-
-class DropLabel(QLabel):
-    def __init__(self, *args, **kwargs):
-        QLabel.__init__(self, *args, **kwargs)
-        self.setAcceptDrops(True)
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasText():
-            event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        pos = event.pos()
-        text = event.mimeData().text()
-        self.setText(text)
-        event.acceptProposedAction()
-
-    def dragEnterEvent(self,event):
-        if event.mimeData().hasFormat("text/plain"):
-            event.accept()
-        else:
-            event.ignore()
-
-    def dropEvent(self,event):
-        self.setText(event.mimeData().text())
-
-# class AnotherWindow(QWidget):
-#     """
-#     This "window" is a QWidget. If it has no parent, it
-#     will appear as a free-floating window as we want.
-#     """
-#     def __init__(self):
-#         super().__init__()
-#         layout = QVBoxLayout()
-#         self.label = QLabel("Another Window")
-#         layout.addWidget(self.label)
-#         self.setLayout(layout)
+# todo:
+#
+#
+#
 
 class ConstraintBar(QWidget):
     def __init__(self, *args, **kwargs):
@@ -101,38 +46,120 @@ class ConstraintBar(QWidget):
 
 class Widget1(QWidget, Ui_Form):
     invalid_sv = pyqtSignal(str)
+    invalid_ct = pyqtSignal(str)
 
     def __init__(self):
         super(Widget1, self).__init__()
 
         N = 20
+        self.ct_keywords = list()
+        self.ct_dict = dict()
 
         self.setupUi(self)
         self._connectActions()
         self.SVNodeInput.setRange(-N, 0)
         self.TableSV.setEditTriggers(QTableWidget.NoEditTriggers)
 
-        # drag and drop stuff
-        # label = DropLabel("drop there", self)
-        # label.setGeometry(190, 65, 100, 100)
-        # label_to_drag = DraggableLabel("drag this", self)
-
+        self.layout_problem = QHBoxLayout(self.PRB)
         self.horizonLine = horizon_line.HorizonLine(self.PRB)
-
-        # self.gridLayoutWidget = QtWidgets.QWidget(self.PRB)
+        self.layout_problem.addWidget(self.horizonLine)
 
         self.ct_layout = QHBoxLayout(self.CT)
-        self.ct_entry = self.setuCTEditor(self.PRB)
+        self.ct_entry = self.setuCTEditor(self.CT)
 
-        self.CTButton.clicked.connect(partial(self.addConstraint))
+        self.CTButton.clicked.connect(self.generateConstraint)
+        self.CTList.itemDoubleClicked.connect(self.openCTFunction)
+
 
     @pyqtSlot()
     def on_invalid_sv(self, str):
         self.invalid_sv.emit(str)
 
-    def addConstraint(self):
+    @pyqtSlot()
+    def on_invalid_ct(self, str):
+        self.invalid_ct.emit(str)
+
+    def openCTFunction(self, item):
+        # create window that emit a signal when closed
+        self.temp_win = on_destroy_signal_window.DestroySignalWindow()
+
+        # create a layout for the window
+        self.ct_window_layout = QVBoxLayout()
+
+        #populate it
+        self.label = QLabel("constraint:")
+        self.ct_window_layout.addWidget(self.label)
+
+        self.temp_line_edit = line_edit.LineEdit()
+        self.temp_line_edit.setText(self.ct_dict[item.text()])
+        self.temp_line_edit.setDisabled(True)
+
+        palette = QPalette()
+        # palette.setColor(QPalette.Base, Qt.white)
+        palette.setColor(QPalette.Text, Qt.black)
+        self.temp_line_edit.setPalette(palette)
+        self.ct_window_layout.addWidget(self.temp_line_edit)
+
+        self.edit_button = QPushButton('Edit Constraint')
+        self.edit_button.setCheckable(True)
+        # self.edit_button.setStyleSheet("background-color : lightblue")
+        self.edit_button.clicked.connect(partial(self.enableEdit, item))
+        self.ct_window_layout.addWidget(self.edit_button)
+
+        self.temp_win.setWindowTitle(item.text())
+        self.temp_win.setLayout(self.ct_window_layout)
+
+        # show window
+        self.temp_win.show()
+
+        # temp_win emits a message when it is closed, before being destroyed.
+        # remember that I have to manually destroy it
+        self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
+
+    def enableEdit(self, item):
+        if self.edit_button.isChecked():
+            # self.edit_button.setStyleSheet("background-color : lightblue")
+            self.highlighter.setDocument(self.temp_line_edit.document())
+            self.temp_line_edit.setDisabled(False)
+            self.edit_button.setText('Done')
+        else:
+            # self.edit_button.setStyleSheet("background-color : lightgrey")
+            self.highlighter.setDocument(self.CTFunctionInput.document())
+
+            # update ct_dict with edited function
+            self.ct_dict[item.text()] = self.temp_line_edit.toPlainText()
+            self.temp_line_edit.setDisabled(True)
+            self.edit_button.setText('Edit Constraint')
+
+
+    def yieldHighlighter(self):
+        # return the highlighter to the CTFunctionInput
+        self.temp_win.destroyCompletely()
+        self.highlighter.setDocument(self.CTFunctionInput.document())
+
+    def checkConstraint(self, name, fun):
+        if name in self.ct_dict.keys():
+            self.on_invalid_ct("constraint already inserted")
+            return False
+        elif name == "":
+            self.on_invalid_ct("empty name of constraint not allowed")
+            return False
+
+        if fun == "":
+            self.on_invalid_ct("empty constraint function not allowed")
+            return False
+
+        return True
+
+    def generateConstraint(self):
         name = self.CTNameInput.text()
-        self.horizonLine.addConstraintToHorizon(name)
+        if self.checkConstraint(name, self.CTFunctionInput.toPlainText()):
+            self.ct_dict[name] = self.CTFunctionInput.toPlainText()
+
+            item_to_add = QListWidgetItem()
+            item_to_add.setText(name)
+            item_to_add.setData(Qt.UserRole, self.CTFunctionInput.toPlainText())
+            self.CTList.addItem(item_to_add)
 
     def setuCTEditor(self, parent):
         font = QFont()
@@ -140,9 +167,10 @@ class Widget1(QWidget, Ui_Form):
         font.setFixedPitch(True)
         font.setPointSize(10)
 
-        self.highlighter = highlighter.Highlighter(self.CTFunctionInput.document()) #with QLineEdit doesn't work, so I had to override QTextEdit
+        # with QLineEdit doesn't work, so I had to override QTextEdit
+        self.highlighter = highlighter.Highlighter(self.CTFunctionInput.document())
 
-        self.ct_keywords = list()
+
         self.completer = QCompleter(self.ct_keywords)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.completer.setWrapAround(False)
@@ -303,7 +331,8 @@ class HorizonGUI(QMainWindow):
 
         # This is amazing, I can connect a custom signal from a widget to the main window here
         # basically horizonLine in widget1 sends a signal with a msg, which I connect to the status bar
-        self.widget1.horizonLine.invalid_ct.connect(self.writeInStatusBar)
+        self.widget1.horizonLine.repeated_ct.connect(self.writeInStatusBar)
+        self.widget1.invalid_ct.connect(self.writeInStatusBar)
         self.widget1.invalid_sv.connect(self.writeInStatusBar)
 
     def _createContextMenu(self):

@@ -1,10 +1,13 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QRubberBand, QPushButton, QTabWidget, QHBoxLayout, QCheckBox
-from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QWidget, QGridLayout, QRubberBand, QPushButton, QTabWidget, QHBoxLayout, QVBoxLayout, QCheckBox, QSpacerItem, QSizePolicy
+from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSignal, pyqtSlot, QMimeData, QDataStream, QIODevice, QModelIndex
+from PyQt5.QtGui import QStandardItemModel
 
 from functools import partial
 
 from custom_widgets.multi_slider import QMultiSlider
 
+import os
+#
 # class TabButtonWidget(QWidget):
 #     def __init__(self, parent):
 #         super().__init__(parent)
@@ -29,131 +32,176 @@ from custom_widgets.multi_slider import QMultiSlider
 #         self.setLayout(self.layout)
 
 class ConstraintTab(QWidget):
-    def __init__(self, name, n_nodes, parent=None):
+    def __init__(self, name, fun, n_nodes, parent=None):
         super().__init__(parent)
 
-        slider_flag = True
-
-        self.ct = list()
-
         self.name = name
+        self.ct = fun
         self.n_nodes = n_nodes
 
         self.hlayout = QHBoxLayout(self)
-        self.hlayout.setContentsMargins(0, 0, 0, 0)
-        self.hlayout.setSpacing(0)
+        self.slider = QMultiSlider(slider_range=[0, self.n_nodes-1, 1], values=[2, 3])
+        self.hlayout.addWidget(self.slider)
 
-        if slider_flag:
-            self.slider = QMultiSlider(slider_range=[0, self.n_nodes-1, 1], values=[2, 3])
-            self.hlayout.addWidget(self.slider)
-        else:
-            for node in range(self.n_nodes):
-                self.ct_node = QCheckBox(self)
-                self.hlayout.addWidget(self.ct_node)
-                self.ct_node.stateChanged.connect(partial(self.checkConstraintNodes, node))
-                self.ct.append(self.ct_node)
-
-        # layout.addStretch()
-        # self.ct.setLayout(self.ct.layout)
 
         # adding + - push button to tab
         # self.ct_tab.tabBar().setTabButton(0, self.ct_tab.tabBar().RightSide, TabButtonWidget())
 
-    def getConstraint(self):
-        return self.ct
-
-    def checkConstraintNodes(self, node):
-        if self.ct[node].isChecked():
-            print("constraint '{}': node {} is CHECKED!".format(self.name, node))
-        else:
-            print("constraint '{}': node {} is CHECKED!".format(self.name, node))
 
 class HorizonLine(QWidget):
-    invalid_ct = pyqtSignal(str)
+    repeated_ct = pyqtSignal(str)
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
+        self.setAcceptDrops(True)
 
-        self.n_nodes = 10
-        self.setGeometry(QRect(210, 60, 341, 231))
-        self.layout = QGridLayout(self)
-        self.layout.setContentsMargins(-1, 10, 100, 1)
-        self.layout.setSpacing(1)
+        self.n_nodes = 35
+        self.ct_active = dict()
+
+        self.setWindowState(Qt.WindowMaximized)
+        self.showMaximized()
+
+
         self.constraints = dict()
 
-        self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
-        self.setMouseTracking(True)
+        self.main_layout = QHBoxLayout(self)
 
-        # self.start = 0
-        # self.scale = self.n_nodes - self.start
-        # self.single_step = 1
-        # display_scale = int(self.width() /self.scale)
+        self.ct_tab = QTabWidget(self)
+
+        with open('custom_css\\tab.css', 'r') as f:
+            self.ct_tab.setStyleSheet(f.read())
+
+        self.ct_tab.setTabPosition(1)
+        self.ct_tab.setTabsClosable(True)
+
+        self.main_layout.addWidget(self.ct_tab)
+
+        # self.ct_tab.setStyleSheet("QTabBar::tab { height: 100px; width: 100px; background: 'red'}")
+
+        self.ct_tab_layout = QGridLayout(self.ct_tab)
+
+        # self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
+        # self.setMouseTracking(True)
 
         # Add widgets to the layout
         for i in range(self.n_nodes):
             n_i = QPushButton("{}".format(i), self)
-            n_i.setFixedSize(20, 20)
-            self.layout.addWidget(n_i, 0, i, 1, 1)
+            self.ct_tab_layout.addWidget(n_i, 0, i, 1, 1, alignment=Qt.AlignTop)
 
-        self.ct_tab = QTabWidget(self)
-        # self.ct_tab.setGeometry(200, 100, 300, 150)
-        self.ct_tab.setTabPosition(1)
-        self.layout.addWidget(self.ct_tab, 1, 0, 1, self.n_nodes)
+        self.ct_tab.tabCloseRequested.connect(self.removeActiveConstraint)
+
+    def removeActiveConstraint(self, index):
+
+        print(self.ct_tab.tabText(index))
+        self.ct_active.pop(self.ct_tab.tabText(index), None)
+        self.ct_tab.removeTab(index)
+
+    def dragEnterEvent(self, event):
+        # source_Widget = event.source()
+        # items = source_Widget.selectedItems()
+        # for i in items:
+        #     source_Widget.takeItem(source_Widget.indexFromItem(i).row())
+        #     # self.addItem(i)
+        #     print(i.text())
+        #     print('drop event')
+        # standard format of mimeData from QListWidget
+        if event.mimeData().hasFormat('application/x-qabstractitemmodeldatalist'):
+            event.accept()
+        else:
+            event.ignore()
+
+
+    def dropEvent(self, event):
+        source_item = QStandardItemModel()
+        source_item.dropMimeData(event.mimeData(), Qt.CopyAction, 0, 0, QModelIndex())
+        ct_name = source_item.item(0, 0).text()
+        ct_fun = source_item.item(0, 0).data(Qt.UserRole)
+
+        if self.checkActiveConstraint(ct_name):
+            self.addConstraintToHorizon(ct_name, ct_fun)
+
 
     @pyqtSlot()
-    def on_invalid_ct(self, str):
-        self.invalid_ct.emit(str)
+    def on_repeated_ct(self, str):
+        self.repeated_ct.emit(str)
 
-    def addConstraintToHorizon(self, name):
-        # check if constraint is already in the archive
-        if name in self.constraints:
-            self.on_invalid_ct("constraint already inserted")
-            return
-        elif name == "":
-            self.on_invalid_ct("empty name of constraint not allowed")
-            return
+    def checkActiveConstraint(self, name):
+        # check if constraint is already active
+        if name in self.ct_active.keys():
+            self.on_repeated_ct("constraint already active")
+            return False
 
-        self.ct = ConstraintTab(name, self.n_nodes)
-        self.ct_tab.addTab(self.ct, str(name))
-        self.constraints[name] = self.ct.getConstraint()
+        return True
+
+    def addConstraintToHorizon(self, name, fun):
+
+        node_box_width = self.ct_tab_layout.itemAt(0).widget().width()
+        self.ct = ConstraintTab(name, fun, self.n_nodes)
+        self.ct_max_lim = ConstraintTab(name, fun, self.n_nodes)
+        self.ct_min_lim = ConstraintTab(name, fun, self.n_nodes)
+        verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
+
+        #todo hardcoded bottom margin
+        # self.ct.setContentsMargins(0, 0, 0, 400)
+
+        # self.ct.setMaximumHeight(100)
+        self.intab_layout = QVBoxLayout()
+
+        # don't fucking ask me why, these are magic numbers (-2, -5) in margins for alignment
+        self.intab_layout.setContentsMargins(node_box_width/2-2, 20, node_box_width/2-5, 0)
+        self.intab_layout.addWidget(self.ct, stretch=3)
+        self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
+        self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
+        self.intab_layout.addSpacerItem(verticalSpacer)
+
+
+        self.tab = QWidget()
+        self.tab.setLayout(self.intab_layout)
+
+        self.ct_tab.addTab(self.tab, str(name))
+
+        self.ct_active[name] = fun
+
+        print('active cts:', self.ct_active)
+
 
     def getConstraint(self, name):
-        return self.constraints[name]
+        return self.ct_active[name]
 
-    def mousePressEvent(self, event):
-        self.origin = event.pos()
-        self.rubberband.setGeometry(QRect(self.origin, QSize()))
-        self.rubberband.show()
-        QWidget.mousePressEvent(self, event)
-
-    def mouseMoveEvent(self, event):
-        if self.rubberband.isVisible():
-            self.rubberband.setGeometry(QRect(self.origin, event.pos()).normalized())
-        QWidget.mouseMoveEvent(self, event)
+    # def mousePressEvent(self, event):
+    #     self.origin = event.pos()
+    #     self.rubberband.setGeometry(QRect(self.origin, QSize()))
+    #     self.rubberband.show()
+    #     QWidget.mousePressEvent(self, event)
     #
-    def mouseReleaseEvent(self, event):
-            if self.rubberband.isVisible():
-                self.rubberband.hide()
-                selected = []
-                rect = self.rubberband.geometry()
-                if self.ct_tab.widget(self.ct_tab.currentIndex()) is not None:
-                    for child in self.ct_tab.widget(self.ct_tab.currentIndex()).findChildren(QCheckBox):
-                        # get absolute geometry and then map it to self (HorizonLine)
-                        # the problem was that .geometry() returns the position w.r.t. the parent:
-                        # I was comparing the geometry of the rubberband taken in the HorizonLine's coordinates with
-                        # the geometry of the QCheckBox taken in the QGridLayout's coordinates.
-
-                        gp = child.mapToGlobal(QPoint(0, 0))
-                        b_a = self.mapFromGlobal(gp)
-
-                        # todo check if possible, right now im subtracting a small value to make the geometry of the checkbox smaller
-                        if rect.intersects(QRect(b_a.x(), b_a.y(), child.geometry().width()-20, child.geometry().height())):
-                            selected.append(child)
-
-                for elem in selected:
-                    if event.button() == Qt.RightButton:
-                        elem.setChecked(False)
-                    elif event.button() == Qt.LeftButton:
-                        elem.setChecked(True)
-
-            QWidget.mouseReleaseEvent(self, event)
+    # def mouseMoveEvent(self, event):
+    #     if self.rubberband.isVisible():
+    #         self.rubberband.setGeometry(QRect(self.origin, event.pos()).normalized())
+    #     QWidget.mouseMoveEvent(self, event)
+    #
+    # def mouseReleaseEvent(self, event):
+    #         if self.rubberband.isVisible():
+    #             self.rubberband.hide()
+    #             selected = []
+    #             rect = self.rubberband.geometry()
+    #             if self.ct_tab.widget(self.ct_tab.currentIndex()) is not None:
+    #                 for child in self.ct_tab.widget(self.ct_tab.currentIndex()).findChildren(QCheckBox):
+    #                     # get absolute geometry and then map it to self (HorizonLine)
+    #                     # the problem was that .geometry() returns the position w.r.t. the parent:
+    #                     # I was comparing the geometry of the rubberband taken in the HorizonLine's coordinates with
+    #                     # the geometry of the QCheckBox taken in the QGridLayout's coordinates.
+    #
+    #                     gp = child.mapToGlobal(QPoint(0, 0))
+    #                     b_a = self.mapFromGlobal(gp)
+    #
+    #                     # todo check if possible, right now im subtracting a small value to make the geometry of the checkbox smaller
+    #                     if rect.intersects(QRect(b_a.x(), b_a.y(), child.geometry().width()-20, child.geometry().height())):
+    #                         selected.append(child)
+    #
+    #             for elem in selected:
+    #                 if event.button() == Qt.RightButton:
+    #                     elem.setChecked(False)
+    #                 elif event.button() == Qt.LeftButton:
+    #                     elem.setChecked(True)
+    #
+    #         QWidget.mouseReleaseEvent(self, event)

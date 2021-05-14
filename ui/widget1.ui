@@ -19,9 +19,9 @@
   <widget class="QGroupBox" name="CT">
    <property name="geometry">
     <rect>
-     <x>380</x>
+     <x>360</x>
      <y>20</y>
-     <width>421</width>
+     <width>701</width>
      <height>131</height>
     </rect>
    </property>
@@ -37,7 +37,7 @@
    <widget class="QWidget" name="gridLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>40</x>
+      <x>20</x>
       <y>20</y>
       <width>321</width>
       <height>91</height>
@@ -91,6 +91,22 @@
       </spacer>
      </item>
     </layout>
+   </widget>
+   <widget class="QListWidget" name="CTList">
+    <property name="geometry">
+     <rect>
+      <x>380</x>
+      <y>20</y>
+      <width>291</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="dragEnabled">
+     <bool>true</bool>
+    </property>
+    <property name="dragDropMode">
+     <enum>QAbstractItemView::DragOnly</enum>
+    </property>
    </widget>
   </widget>
   <widget class="QGroupBox" name="SV">

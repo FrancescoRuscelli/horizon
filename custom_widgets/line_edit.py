@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QTextEdit, QCompleter
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QTextCursor
 
+
 class LineEdit(QTextEdit):
     returnPressed = pyqtSignal()
 
