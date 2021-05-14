@@ -37,7 +37,7 @@ class Highlighter(QSyntaxHighlighter):
 
     def addKeyword(self, keyword):
         # todo if a variable 'x' is in the ct function and a new state variable matching it ('x') is inserted, it does NOT hightlight right now. FIX!
-        self.highlightingRules.append((keyword + "(\[[0-9]:[0-9]\])", self.numberFormat))
+        self.highlightingRules.append((keyword + '(\[\d+:\d+\])', self.numberFormat))
         self.highlightingRules.append(("\\b" + keyword + "\\b", self.keywordFormat))
 
 
