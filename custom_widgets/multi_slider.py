@@ -65,7 +65,7 @@ class QMultiSlider(QtWidgets.QWidget):
         self.current_display_min = 0
         self.current_display_max = 0
 
-        self.add_slice_button = QtWidgets.QPushButton('Add Slice', self)
+        # self.add_slice_button = QtWidgets.QPushButton('Add Slice', self)
 
         self.resize(500, 400)
 
@@ -85,7 +85,8 @@ class QMultiSlider(QtWidgets.QWidget):
         self._connectActions()
 
     def _connectActions(self):
-        self.add_slice_button.clicked.connect(self.addSliceAction)
+        return 1
+    #     self.add_slice_button.clicked.connect(self.addSliceAction)
 
     def addSliceAction(self):
         self.slices.append(Slice(3, 4))
@@ -141,8 +142,10 @@ class QMultiSlider(QtWidgets.QWidget):
 
         # background
         painter.setPen(QtCore.Qt.gray)
-        painter.setBrush(QtCore.Qt.lightGray)
-        painter.drawRect(2, 2, w - 4, h - 4)
+        painter.setBrush(QtCore.Qt.darkGreen)
+        # int x, int y, int width, int height
+        # (background)
+        painter.drawRect(0, 10, w, h - 4)
 
         # todo I don't need a resizeEvent because every time I change size paintEvent gets called which call addSlice which call updateDisplayValues
         for elem in self.slices:
@@ -156,18 +159,54 @@ class QMultiSlider(QtWidgets.QWidget):
         display_min, display_max = self.updateDisplayValues(slice)
 
         # range bar
-        painter.setPen(QtCore.Qt.darkGray)
-        painter.setBrush(QtCore.Qt.darkGray)
-        painter.drawRect(display_min - 1, 5, display_max - display_min + 2, h - 10)
+        painter.setPen(QtCore.Qt.darkYellow)
+        painter.setBrush(QtCore.Qt.green)
+        # int x, int y, int width, int height
+        painter.drawRect(display_min - 1, 10, display_max - display_min + 2, h - 10)
 
         # min & max tabs
-        painter.setPen(QtCore.Qt.black)
-        painter.setBrush(QtCore.Qt.gray)
+        painter.setPen(QtCore.Qt.darkRed)
+        # painter.setBrush(QtCore.Qt.black)
         painter.drawRect(display_min - self.bar_width, 1, self.bar_width, h - 2)
 
-        painter.setPen(QtCore.Qt.black)
-        painter.setBrush(QtCore.Qt.gray)
+        painter.setPen(QtCore.Qt.darkRed)
+        # painter.setBrush(QtCore.Qt.gray)
         painter.drawRect(display_max, 1, self.bar_width, h - 2)
+
+        # tickz
+        painter.setPen(QtCore.Qt.darkCyan)
+        # painter.setBrush(QtCore.Qt.darkGreen)
+
+        size = float(self.width() - 2 * self.bar_width)
+        display_unit = size / self.scale * self.single_step
+        display_ticks = [x * display_unit for x in list(range(int(self.scale / self.single_step)+1))]
+        for tick_pos in display_ticks:
+            painter.drawRect(tick_pos, 1, self.bar_width, 10)
+        # rect = painter.drawText(QtCore.QRect(), QtCore.Qt.TextDontPrint, 'something')
+        # left = self.width() // 2
+        # bottom = self.rect().bottom()
+        # pos = QtCore.QPoint(left, bottom)
+        # painter.drawText(pos, 'porcacciodedio')
+
+        # enlarge margins if clipping
+        # if v == self.sl.minimum():
+        #     if left <= 0:
+        #         self.left_margin = rect.width() // 2 - x_loc
+        #     if self.bottom_margin <= rect.height():
+        #         self.bottom_margin = rect.height()
+        #
+        #     self.layout.setContentsMargins(self.left_margin,
+        #                                    self.top_margin, self.right_margin,
+        #                                    self.bottom_margin)
+        #
+        # if v == self.sl.maximum() and rect.width() // 2 >= self.right_margin:
+        #     self.right_margin = rect.width() // 2
+        #     self.layout.setContentsMargins(self.left_margin,
+        #                                    self.top_margin, self.right_margin,
+        #                                    self.bottom_margin)
+
+
+
 
     def mergeSlider(self):
         active_display_min, active_display_max = self.updateDisplayValues(self.active_slice)
@@ -176,13 +215,13 @@ class QMultiSlider(QtWidgets.QWidget):
             if slice is not self.active_slice:
                 display_min, display_max = self.updateDisplayValues(slice)
 
-                if active_display_min < display_max and active_display_max > display_max:
+                if active_display_min <= display_max and active_display_max > display_max:
                     self.slices.remove(slice)
                     self.slices.remove(self.active_slice)
                     self.slices.append(Slice(slice.getValues()[0], self.active_slice.getValues()[1]))
                     self.moving = "none"
                     QtWidgets.QApplication.restoreOverrideCursor()
-                elif active_display_max > display_min and active_display_min < display_min:
+                elif active_display_max >= display_min and active_display_min < display_min:
                     self.slices.remove(slice)
                     self.slices.remove(self.active_slice)
                     self.slices.append(Slice(self.active_slice.getValues()[0], slice.getValues()[1]))
@@ -300,13 +339,6 @@ class QMultiSlider(QtWidgets.QWidget):
 
 if (__name__ == "__main__"):
     import sys
-
-
-    class Parameters:
-        def __init__(self):
-            self.x_pixels = 200
-            self.y_pixels = 200
-
 
     app = QtWidgets.QApplication(sys.argv)
 
