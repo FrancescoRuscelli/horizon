@@ -55,7 +55,7 @@ class HorizonLine(QWidget):
         QWidget.__init__(self, parent)
         self.setAcceptDrops(True)
 
-        self.n_nodes = 35
+        self.n_nodes = 25
         self.ct_active = dict()
 
         self.setWindowState(Qt.WindowMaximized)

@@ -14,7 +14,7 @@ class LineEdit(QTextEdit):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setFixedHeight(self.document().documentLayout().documentSize().height() + self.height() - self.viewport().height())
-
+        self.setTabChangesFocus(True)
         self._completer = None
 
     def setCompleter(self, completer):
@@ -51,7 +51,23 @@ class LineEdit(QTextEdit):
 
         super(LineEdit, self).focusInEvent(e)
 
+    def selfClosing(self, e):
+
+        char_list = {'[': ']', '(': ')'}
+        closing_char = char_list.get(e.text())
+
+        if closing_char:
+            tc = self.textCursor()
+            char_pos = tc.position()
+
+            self.insertPlainText(closing_char)
+            tc.setPosition(char_pos)
+            self.setTextCursor(tc)
+
     def keyPressEvent(self, e):
+
+        # close parentheses
+        self.selfClosing(e)
 
         if self._completer is not None and self._completer.popup().isVisible():
             # The following keys are forwarded by the completer to the widget.
@@ -61,6 +77,7 @@ class LineEdit(QTextEdit):
                 return
 
         # this is to prevent Return or Enter key to create new line
+        # (since this is a QText disguised as QLine)
         if e.key() in (Qt.Key_Return, Qt.Key_Enter):
             # self.returnPressed.emit() I can also connect it to my custom Signal!!!!
             return
@@ -75,7 +92,7 @@ class LineEdit(QTextEdit):
             return
 
         eow = "~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-="
-        hasModifier = (e.modifiers() != Qt.NoModifier)# and not ctrlOrShift
+        hasModifier = (e.modifiers() != Qt.NoModifier) # and not ctrlOrShift
         completionPrefix = self.textUnderCursor()
 
         if not isShortcut and (hasModifier or len(completionPrefix) < 1): #or len(e.text()) == 0 # or len(completionPrefix) < 1 or e.text()[-1] in eow
