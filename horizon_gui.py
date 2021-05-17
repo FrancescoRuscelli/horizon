@@ -19,11 +19,13 @@ from custom_widgets import horizon_line, line_edit, on_destroy_signal_window, bo
 import qrc_resources
 
 # todo:
-# SCREEN WITH ERRORS from casadi and python
-# EDIT CONSTRAINT NOW IS WRONG (visualize function and not string)
-# EMBELLISH USAGE TABLE
-#
+# SCREEN WITH ERRORS from casadi and python                           DONE
+# EDIT CONSTRAINT NOW IS WRONG (visualize function and not string)    DONE
+# EMBELLISH USAGE TABLE                                               DONE
+# make option for showing all constraints_line together or one for each tab
 # REMOVE CONSTRAINT (FROM LIST)
+# ADD CONSISTENCY CHECK FOR CASADI VARIABLES
+# ADD PRINT CASADI FUNCTION TO CHECK
 # REMOVE STATE VARIABLE (FROM TABLE) CHECK USAGES IN CONSTRAINTS
 # ADD A VARIABLE EDITOR
 # ADDD DIALOG BUTTON TO CONSTRAINT
