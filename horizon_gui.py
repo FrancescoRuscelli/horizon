@@ -3,6 +3,7 @@ from functools import partial
 import class_try as horizon
 import parser
 import re
+import logging
 
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
                              QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QDesktopWidget, QMenuBar, QStyle,
@@ -14,7 +15,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegEx
 
 from widget1_ui import Ui_Form
 from custom_functions import highlighter
-from custom_widgets import horizon_line, line_edit, on_destroy_signal_window, box_state_var
+from custom_widgets import horizon_line, line_edit, on_destroy_signal_window, box_state_var, highlight_delegate
 import qrc_resources
 
 # todo:
@@ -52,15 +53,17 @@ class ConstraintBar(QWidget):
         bar.setMinimumWidth(100)
         self.splitter.addWidget(bar)
 
-class EmittingStream(QObject):
-
-    textWritten = pyqtSignal(str)
-
-    def write(self, text):
-        self.textWritten.emit(str(text))
-
-    def flush(self):
-        pass
+# class EmittingStream(QObject):
+#
+#     textWritten = pyqtSignal(str)
+#
+#     def write(self, text):
+#         now = datetime.now()
+#         # current_time = now.strftime("%H:%M:%S")
+#         self.textWritten.emit('{}'.format(text))
+#
+#     def flush(self):
+#         pass
 
 class Widget1(QWidget, Ui_Form):
     invalid_sv = pyqtSignal(str)
@@ -69,8 +72,9 @@ class Widget1(QWidget, Ui_Form):
     def __init__(self):
         super(Widget1, self).__init__()
 
-        sys.stdout = EmittingStream()
-        sys.stdout.textWritten.connect(self.normalOutputWritten)
+        # emitting stream from python terminal
+        # sys.stdout = EmittingStream()
+        # sys.stdout.textWritten.connect(self.normalOutputWritten)
 
         N = 20
         # todo put it somewhere else?
@@ -81,6 +85,12 @@ class Widget1(QWidget, Ui_Form):
         self.sv_dict = dict()  # todo horizon.getStateVariables()
 
         self.setupUi(self)
+
+        # #todo logger! use it everywhere!
+        logging.getLogger().addHandler(self.consoleLogger)
+        logging.getLogger().setLevel(logging.DEBUG)
+
+
         self._connectActions()
         self.SVNodeInput.setRange(-N, 0)
 
@@ -94,7 +104,6 @@ class Widget1(QWidget, Ui_Form):
         self.CTButton.clicked.connect(self.generateConstraint)
         self.CTList.itemDoubleClicked.connect(self.openCTFunction)
         self.SVTable.itemDoubleClicked.connect(self.openSV)
-
 
     @pyqtSlot()
     def on_invalid_sv(self, str):
@@ -154,6 +163,7 @@ class Widget1(QWidget, Ui_Form):
             # update ct_dict with edited function
             str_fun = self.temp_line_edit.toPlainText()
             if self.fromTxtToFun(item.text(), str_fun):
+                # todo what to do here?
                 print('Failed Editing')
             self.temp_line_edit.setDisabled(True)
             self.edit_button.setText('Edit Constraint')
@@ -222,6 +232,11 @@ class Widget1(QWidget, Ui_Form):
         self.usages_table = QTableWidget()
         self.usages_table.setColumnCount(2)
         self.usages_table.setHorizontalHeaderLabels(['Name', 'Function'])
+
+        self._delegate = highlight_delegate.HighlightDelegate(self.usages_table)
+        self.usages_table.setItemDelegateForColumn(1, self._delegate)
+        self._delegate.setFilters(item.text())
+
         header = self.usages_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -234,10 +249,6 @@ class Widget1(QWidget, Ui_Form):
                 self.usages_table.insertRow(row_pos)
                 self.usages_table.setItem(row_pos, 0, QTableWidgetItem(ct['ct'].getName()))
                 self.usages_table.setItem(row_pos, 1, QTableWidgetItem(ct['str']))
-                # item.setForeground(QBrush(QColor(0, 255, 0)))
-                # https://www.qtcentre.org/threads/59288-How-do-I-color-a-part-of-text-in-a-QListView-QTableView
-                # https://stackoverflow.com/questions/64339373/is-it-possible-to-change-the-color-in-pyqt5-tableview-via-delegate
-                # https://stackoverflow.com/questions/53353450/how-to-highlight-a-words-in-qtablewidget-from-a-searchlist
 
 
         self.remove_button = QPushButton('Remove Variable')
@@ -314,7 +325,7 @@ class Widget1(QWidget, Ui_Form):
         try:
             constraint = self.casadi_prb.createConstraint(name, eval(code))
         except Exception as e:
-            print(e)
+            logging.warning(e)
             return False
 
         # set constraint to dict for fast retrieve
@@ -436,18 +447,19 @@ class Widget1(QWidget, Ui_Form):
         self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.sv_dict[name]['dim'])))
         # self.SVTable.setCellWidget(row_pos, 2, scroll)
 
-    def normalOutputWritten(self, text):
-        cursor = self.codeStream.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.insertText(text)
-        self.codeStream.setTextCursor(cursor)
-        self.codeStream.ensureCursorVisible()
-
-    def closeEvent(self, event):
-        """Shuts down application on close."""
-        # Return stdout to defaults.
-        sys.stdout = sys.__stdout__
-        super().closeEvent(event)
+    # def normalOutputWritten(self, text):
+    #
+    #     cursor = self.codeStream.textCursor()
+    #     cursor.movePosition(QTextCursor.End)
+    #     cursor.insertText(text)
+    #     self.codeStream.setTextCursor(cursor)
+    #     self.codeStream.ensureCursorVisible()
+    #
+    # def closeEvent(self, event):
+    #     """Shuts down application on close."""
+    #     # Return stdout to defaults.
+    #     sys.stdout = sys.__stdout__
+    #     super().closeEvent(event)
 
     def __del__(self):
         # Restore sys.stdout
