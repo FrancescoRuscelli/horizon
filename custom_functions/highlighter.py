@@ -25,10 +25,17 @@ class Highlighter(QSyntaxHighlighter):
         # quotationFormat.setForeground(Qt.darkGreen)
         # self.highlightingRules.append((QRegExp("\".*\""), quotationFormat))
 
-        self.numberFormat = QTextCharFormat()
-        self.numberFormat.setFontWeight(QFont.Bold)
-        self.numberFormat.setForeground(Qt.darkBlue)
-        # self.highlightingRules.append((QRegExp("(\[[0-9]:[0-9]\])"), self.numberFormat))
+        self.sliceFormat = QTextCharFormat()
+        self.sliceFormat.setFontWeight(QFont.Bold)
+        self.sliceFormat.setForeground(Qt.darkBlue)
+
+        self.baseOperatorFormat = QTextCharFormat()
+        self.baseOperatorFormat.setFontItalic(True)
+        self.baseOperatorFormat.setFontWeight(QFont.Bold)
+        self.baseOperatorFormat.setForeground(Qt.darkCyan)
+        base_op = ['sin', 'cos', 'sqrt']
+        self.highlightingRules.append(('|'.join(base_op), self.baseOperatorFormat))
+
 
         # functionFormat = QTextCharFormat()
         # functionFormat.setFontItalic(True)
@@ -37,8 +44,9 @@ class Highlighter(QSyntaxHighlighter):
 
     def addKeyword(self, keyword):
         # todo if a variable 'x' is in the ct function and a new state variable matching it ('x') is inserted, it does NOT hightlight right now. FIX!
-        self.highlightingRules.append((keyword + '(\[\d+:\d+\])', self.numberFormat))
-        self.highlightingRules.append(("\\b" + keyword + "\\b", self.keywordFormat))
+        self.highlightingRules.append((keyword + '(\[\d+(:\d+)?\])', self.sliceFormat))
+        # self.highlightingRules.append(("\\b" + keyword + "\\b", self.keywordFormat))
+        self.highlightingRules.append((keyword, self.keywordFormat))
 
 
     def highlightBlock(self, text):
