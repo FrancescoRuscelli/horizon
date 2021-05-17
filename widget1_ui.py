@@ -13,7 +13,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
-        Form.resize(1099, 912)
+        Form.resize(1225, 912)
         Form.setMouseTracking(False)
         self.CT = QtWidgets.QGroupBox(Form)
         self.CT.setGeometry(QtCore.QRect(570, 20, 501, 131))
@@ -118,19 +118,19 @@ class Ui_Form(object):
         self.SVTable.horizontalHeader().setMinimumSectionSize(20)
         self.SVTable.verticalHeader().setDefaultSectionSize(21)
         self.PRB = QtWidgets.QGroupBox(Form)
-        self.PRB.setGeometry(QtCore.QRect(9, 160, 1061, 381))
+        self.PRB.setGeometry(QtCore.QRect(9, 160, 1061, 481))
         self.PRB.setObjectName("PRB")
-        self.codeStream = QtWidgets.QTextEdit(Form)
-        self.codeStream.setGeometry(QtCore.QRect(10, 570, 1061, 141))
+        self.consoleLogger = ConsoleLogger(Form)
+        self.consoleLogger.setGeometry(QtCore.QRect(10, 660, 1061, 192))
         font = QtGui.QFont()
         font.setFamily("Monospace")
-        self.codeStream.setFont(font)
-        self.codeStream.setStyleSheet("QFrame {background-color: rgb(46, 52, 54)}\n"
+        self.consoleLogger.setFont(font)
+        self.consoleLogger.setStyleSheet("QFrame {background-color: rgb(46, 52, 54)}\n"
 "QTextEdit {color: rgb(238, 238, 236)}")
-        self.codeStream.setFrameShape(QtWidgets.QFrame.WinPanel)
-        self.codeStream.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.codeStream.setReadOnly(True)
-        self.codeStream.setObjectName("codeStream")
+        self.consoleLogger.setFrameShape(QtWidgets.QFrame.WinPanel)
+        self.consoleLogger.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.consoleLogger.setReadOnly(True)
+        self.consoleLogger.setObjectName("consoleLogger")
         self.actionExit = QtWidgets.QAction(Form)
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap("ui/../../../../.designer/resources/rocket.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
@@ -176,6 +176,7 @@ class Ui_Form(object):
         self.actionAbout.setToolTip(_translate("Form", "Info about Horizon GUI"))
         self.actionAbout.setShortcut(_translate("Form", "Ctrl+I"))
 from custom_widgets.box_state_var import BoxStateVar
+from custom_widgets.console_logger import ConsoleLogger
 from custom_widgets.line_edit import LineEdit
 from custom_widgets.nodes_spinbox import NodesSpinBox
 

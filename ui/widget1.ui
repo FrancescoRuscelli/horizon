@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1099</width>
+    <width>1225</width>
     <height>912</height>
    </rect>
   </property>
@@ -337,20 +337,20 @@
      <x>9</x>
      <y>160</y>
      <width>1061</width>
-     <height>381</height>
+     <height>481</height>
     </rect>
    </property>
    <property name="title">
     <string>Problem</string>
    </property>
   </widget>
-  <widget class="QTextEdit" name="codeStream">
+  <widget class="ConsoleLogger" name="consoleLogger">
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>570</y>
+     <y>660</y>
      <width>1061</width>
-     <height>141</height>
+     <height>192</height>
     </rect>
    </property>
    <property name="font">
@@ -418,6 +418,11 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
    <class>BoxStateVar</class>
    <extends>QTableWidget</extends>
    <header>custom_widgets/box_state_var.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ConsoleLogger</class>
+   <extends>QTextEdit</extends>
+   <header>custom_widgets/console_logger.h</header>
   </customwidget>
  </customwidgets>
  <tabstops>
