@@ -1,23 +1,31 @@
 import sys
 from functools import partial
+import class_try as horizon
+import parser
+import re
 
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
                              QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QDesktopWidget, QMenuBar, QStyle,
                              QSpinBox, QStyleFactory, QFrame, QTabWidget, QProgressBar, QDialog, QButtonGroup, QLayout, QLineEdit, QTextEdit, QTableWidgetItem,
                              QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QMessageBox, QListWidgetItem)
 
-from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent, QPalette, QColor, QDrag, QTextCursor, QPainter, QCursor, QBrush, QTextCharFormat, QSyntaxHighlighter, QFont
+from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent, QPalette, QColor, QDrag, QTextCursor, QPainter, QCursor, QBrush, QTextCharFormat, QSyntaxHighlighter, QFont, QFontMetrics
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegExp, pyqtSlot
 
 from widget1_ui import Ui_Form
 from custom_functions import highlighter
-from custom_widgets import horizon_line, line_edit, on_destroy_signal_window
+from custom_widgets import horizon_line, line_edit, on_destroy_signal_window, box_state_var
 import qrc_resources
 
 # todo:
+# SCREEN WITH ERRORS from casadi and python
+# EDIT CONSTRAINT NOW IS WRONG (visualize function and not string)
+# EMBELLISH USAGE TABLE
 #
-#
-#
+# REMOVE CONSTRAINT (FROM LIST)
+# REMOVE STATE VARIABLE (FROM TABLE) CHECK USAGES IN CONSTRAINTS
+# ADD A VARIABLE EDITOR
+# ADDD DIALOG BUTTON TO CONSTRAINT
 
 class ConstraintBar(QWidget):
     def __init__(self, *args, **kwargs):
@@ -52,13 +60,21 @@ class Widget1(QWidget, Ui_Form):
         super(Widget1, self).__init__()
 
         N = 20
+        # todo put it somewhere else?
+        self.casadi_prb = horizon.Problem(N)
+
         self.ct_keywords = list()
         self.ct_dict = dict()
+        self.sv_dict = dict()  # todo horizon.getStateVariables()
 
         self.setupUi(self)
         self._connectActions()
         self.SVNodeInput.setRange(-N, 0)
-        self.TableSV.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        self.SVTable = box_state_var.BoxStateVar(self)
+        self.SVTable.setEditTriggers(QTableWidget.NoEditTriggers)
+        # self.mainLayout.addWidget(self.SVTable)
+        self.SVTable.setGeometry(QRect(170, 750, 461, 181))
 
         self.layout_problem = QHBoxLayout(self.PRB)
         self.horizonLine = horizon_line.HorizonLine(self.PRB)
@@ -69,6 +85,7 @@ class Widget1(QWidget, Ui_Form):
 
         self.CTButton.clicked.connect(self.generateConstraint)
         self.CTList.itemDoubleClicked.connect(self.openCTFunction)
+        self.SVTable.itemDoubleClicked.connect(self.openSV)
 
 
     @pyqtSlot()
@@ -91,7 +108,7 @@ class Widget1(QWidget, Ui_Form):
         self.ct_window_layout.addWidget(self.label)
 
         self.temp_line_edit = line_edit.LineEdit()
-        self.temp_line_edit.setText(self.ct_dict[item.text()])
+        self.temp_line_edit.setText(str(self.ct_dict[item.text()]['str']))
         self.temp_line_edit.setDisabled(True)
 
         palette = QPalette()
@@ -103,7 +120,7 @@ class Widget1(QWidget, Ui_Form):
         self.edit_button = QPushButton('Edit Constraint')
         self.edit_button.setCheckable(True)
         # self.edit_button.setStyleSheet("background-color : lightblue")
-        self.edit_button.clicked.connect(partial(self.enableEdit, item))
+        self.edit_button.clicked.connect(partial(self.enableCTEdit, item))
         self.ct_window_layout.addWidget(self.edit_button)
 
         self.temp_win.setWindowTitle(item.text())
@@ -116,7 +133,7 @@ class Widget1(QWidget, Ui_Form):
         # remember that I have to manually destroy it
         self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
 
-    def enableEdit(self, item):
+    def enableCTEdit(self, item):
         if self.edit_button.isChecked():
             # self.edit_button.setStyleSheet("background-color : lightblue")
             self.highlighter.setDocument(self.temp_line_edit.document())
@@ -127,7 +144,11 @@ class Widget1(QWidget, Ui_Form):
             self.highlighter.setDocument(self.CTFunctionInput.document())
 
             # update ct_dict with edited function
-            self.ct_dict[item.text()] = self.temp_line_edit.toPlainText()
+            # TODO WRONG!!!!!!
+            str_fun = self.temp_line_edit.toPlainText()
+            print(str_fun)
+            self.fromTxtToFun(item.text(), str_fun)
+
             self.temp_line_edit.setDisabled(True)
             self.edit_button.setText('Edit Constraint')
 
@@ -137,29 +158,179 @@ class Widget1(QWidget, Ui_Form):
         self.temp_win.destroyCompletely()
         self.highlighter.setDocument(self.CTFunctionInput.document())
 
+    def openSV(self, item):
+
+        # regardless of where I click, get the first item of the table
+        item = self.SVTable.item(self.SVTable.row(item), 0)
+        # create window that emit a signal when closed
+        self.temp_win = on_destroy_signal_window.DestroySignalWindow()
+
+        # create a layout for the window
+        #widget, fromRow, int fromColumn, int rowSpan, int columnSpan, Qt::Alignment alignment = Qt::Alignment()
+        self.sv_window_layout = QGridLayout()
+
+        # populate it
+        self.label_name = QLabel("name:")
+        self.sv_window_layout.addWidget(self.label_name, 0, 0, 1, 1)
+
+        palette = QPalette()
+        palette.setColor(QPalette.Text, Qt.black)
+
+        self.display_name = QLineEdit()
+        self.display_name.setFixedWidth(50)
+        self.display_name.setText(item.text())
+        self.display_name.setDisabled(True)
+        self.display_name.setPalette(palette)
+
+
+        self.display_name.setPalette(palette)
+
+        self.sv_window_layout.addWidget(self.display_name, 0, 1, 1, 1)
+
+        self.label_dim = QLabel("dimension:")
+        self.sv_window_layout.addWidget(self.label_dim, 0, 2, 1, 1)
+
+        self.display_dim = QLineEdit()
+        self.display_dim.setFixedWidth(20)
+        self.display_dim.setText(str(self.sv_dict[item.text()]['dim']))
+        self.display_dim.setDisabled(True)
+        self.display_dim.setPalette(palette)
+        self.sv_window_layout.addWidget(self.display_dim, 0, 3, 1, 1)
+
+        self.label_fun = QLabel("var:")
+        self.sv_window_layout.addWidget(self.label_fun, 1, 0, 1, 1)
+
+        self.display_fun = QLineEdit()
+        width = self.display_fun.fontMetrics().width(str(self.sv_dict[item.text()]['var']))
+        self.display_fun.setText(str(self.sv_dict[item.text()]['var']))
+        self.display_fun.setDisabled(True)
+        # todo magic number?
+        self.display_fun.setMinimumWidth(width+5)
+        self.display_fun.setAlignment(Qt.AlignCenter)
+        self.display_fun.setPalette(palette)
+        self.sv_window_layout.addWidget(self.display_fun, 1, 1, 1, 3)
+
+        self.label_usages = QLabel("usages:")
+        self.sv_window_layout.addWidget(self.label_usages, 2, 0, 1, 4)
+        self.usages_table = QTableWidget()
+        self.usages_table.setColumnCount(2)
+        self.sv_window_layout.addWidget(self.usages_table, 3, 0, 1, 4)
+
+        # # todo add usages (add constraint logic and check if constraint depends on variable)
+        for name, ct in self.ct_dict.items():
+            if item.text() in ct['ct'].getVariables():
+                row_pos = self.usages_table.rowCount()
+                self.usages_table.insertRow(row_pos)
+                self.usages_table.setItem(row_pos, 0, QTableWidgetItem(ct['ct'].getName()))
+                self.usages_table.setItem(row_pos, 1, QTableWidgetItem(ct['str']))
+                # item.setForeground(QBrush(QColor(0, 255, 0)))
+                # https://www.qtcentre.org/threads/59288-How-do-I-color-a-part-of-text-in-a-QListView-QTableView
+                # https://stackoverflow.com/questions/64339373/is-it-possible-to-change-the-color-in-pyqt5-tableview-via-delegate
+                # https://stackoverflow.com/questions/53353450/how-to-highlight-a-words-in-qtablewidget-from-a-searchlist
+
+
+        self.remove_button = QPushButton('Remove Variable')
+        # self.edit_button.setStyleSheet("background-color : lightblue")
+        self.remove_button.clicked.connect(partial(self.removeStateVariable, item))
+
+        self.sv_window_layout.addWidget(self.remove_button)
+
+        self.temp_win.setWindowTitle(item.text())
+        self.temp_win.setLayout(self.sv_window_layout)
+
+        # show window
+        self.temp_win.show()
+
+        # temp_win emits a message when it is closed, before being destroyed.
+        # remember that I have to manually destroy it
+        # self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
+
     def checkConstraint(self, name, fun):
         if name in self.ct_dict.keys():
             self.on_invalid_ct("constraint already inserted")
             return False
         elif name == "":
             self.on_invalid_ct("empty name of constraint not allowed")
+            self.CTNameInput.setFocus()
             return False
 
         if fun == "":
             self.on_invalid_ct("empty constraint function not allowed")
+            self.CTFunctionInput.setFocus()
             return False
 
         return True
 
+    def checkStateVariable(self, name):
+        if name == "":
+            self.on_invalid_sv("State Variable: Empty Value Not Allowed")
+            self.SVNameInput.setFocus()
+            return False
+        elif name in self.sv_dict.keys():
+            self.on_invalid_sv("State Variable: Already Inserted")
+            self.SVNameInput.setFocus()
+            return False
+        elif name.isnumeric():
+            self.on_invalid_sv("State Variable: Invalid Name")
+            return False
+
+        return True
+
+    def fromTxtToFun(self, name, str_fun):
+
+        # todo CHECK IF STR_FUN IS CORRECT?
+
+        # todo better approach? the problem is that i should have here a set of variables
+        # i don't want to write on the GUI self.x or worse self.sv_dict[]... better ideas?
+        # is it possible for some of the variables not to be substituted?
+
+        # get from text all variables and substitute them with self.sv_dict[''] ..
+
+        dict_vars = dict()
+        for var in self.sv_dict.keys():
+            dict_vars[var] = "self.sv_dict['{}']['var']".format(var)
+
+        # these are all the state variable found in sv_dict
+        regex_vars = '\\b|'.join(sorted(re.escape(k) for k in self.sv_dict.keys()))
+        # If repl is a function, it is called for every non-overlapping occurrence of pattern.
+        modified_fun = re.sub(regex_vars, lambda m: dict_vars.get(m.group(0)), str_fun, flags=re.IGNORECASE)
+
+        # parse str to code
+        res = parser.expr(modified_fun)
+        code = res.compile()
+
+        # generate constraint
+        constraint = self.casadi_prb.createConstraint(name, eval(code))
+
+        # set constraint to dict for fast retrieve
+        # todo should I divide better casadi from gui? for instance, making a dict of casadi constraint
+        #  and another individual dict for constraint names strings?
+        self.ct_dict[name] = dict(ct=constraint, str=str_fun)
+        print(self.ct_dict)
+
+
     def generateConstraint(self):
         name = self.CTNameInput.text()
         if self.checkConstraint(name, self.CTFunctionInput.toPlainText()):
-            self.ct_dict[name] = self.CTFunctionInput.toPlainText()
+
+            # get Function from Text
+            str_fun = self.CTFunctionInput.toPlainText()
+            self.fromTxtToFun(name, str_fun)
 
             item_to_add = QListWidgetItem()
             item_to_add.setText(name)
             item_to_add.setData(Qt.UserRole, self.CTFunctionInput.toPlainText())
             self.CTList.addItem(item_to_add)
+
+            # clear mask
+            self.CTNameInput.clear()
+            self.CTFunctionInput.clear()
+
+    def removeConstraint(self, item):
+        print('Yet to implement')
+
+    def removeStateVariable(self, item):
+        print('Yet to implement')
 
     def setuCTEditor(self, parent):
         font = QFont()
@@ -176,59 +347,75 @@ class Widget1(QWidget, Ui_Form):
         self.completer.setWrapAround(False)
         self.CTFunctionInput.setCompleter(self.completer)
 
-    def addStateVariable(self):
+    def generateStateVariable(self):
 
-        sv_list = [] # todo horizon.getStateVariables()
-        self.sv_name = self.SVNameInput.text()
-        self.sv_dim = self.SVDimInput.value()
-        self.sv_nodes = self.SVNodeInput.value()
+        default_dim = 1
+        default_past_node = 0
 
-        if self.sv_name == "":
-            self.on_invalid_sv("Empty Value Not Allowed")
-            self.SVNameInput.setFocus()
-        elif self.sv_name in sv_list:
-            self.on_invalid_sv("State Variable Already Inserted")
-            self.SVNameInput.setFocus()
-        else:
-            print('state variable {} added.'.format(self.sv_name))
-            print('dimension: {}'.format(self.sv_dim))
-            print('previous node: {}'.format(self.sv_nodes))
-            self._addRow()
-            self.highlighter.addKeyword(self.sv_name)
-            self.ct_keywords.append('{}'.format(self.sv_name))
+        sv_name = self.SVNameInput.text()
+        sv_dim = self.SVDimInput.value()
+        sv_nodes = self.SVNodeInput.value()
+
+        if self.checkStateVariable(sv_name):
+            # todo fake set and get Variable
+            # todo horizon.setStateVariable()
+
+            if sv_nodes == 0:
+                var = self.casadi_prb.createStateVariable(sv_name, sv_dim)
+            else:
+                var = self.casadi_prb.createStateVariable(sv_name,sv_dim, sv_nodes)
+
+
+            self.sv_dict[sv_name] = dict(var=var, dim=sv_dim)
+
+            print('state variable {} added.'.format(sv_name))
+            print('dimension: {}'.format(sv_dim))
+            print('previous node: {}'.format(sv_nodes))
+            print('function: {}'.format(var))
+
+            self._addRowToSVTable(sv_name)
+            # add variable to highlighter and to completer
+            self.highlighter.addKeyword(sv_name)
+            self.ct_keywords.append('{}'.format(sv_name))
             model = self.completer.model()
             model.setStringList(self.ct_keywords)
 
-            # todo horizon.setStateVariable()
+            self.SVNameInput.clear()
+            self.SVDimInput.setValue(default_dim)
+            self.SVNodeInput.setValue(default_past_node)
+
 
     def _connectActions(self):
 
-        self.SVAddButton.clicked.connect(self.addStateVariable)
+        self.SVAddButton.clicked.connect(self.generateStateVariable)
 
-    def _addRow(self):
-        row_pos = self.TableSV.rowCount()
-        self.TableSV.insertRow(row_pos)
+    def _addRowToSVTable(self, name):
+
+        row_pos = self.SVTable.rowCount()
+        self.SVTable.insertRow(row_pos)
+        # self.SVTable.verticalHeader().setVisible(False)
+
 
         combo_box = QComboBox()
         scroll = QScrollArea()
 
         widget = QWidget()  # Widget that contains the collection of Vertical Box
-        vbox = QVBoxLayout()  # The Vertical Box that contains the Horizontal Boxes of  labels and buttons
+        vbox = QVBoxLayout()  # The Vertical Box that contains the Horizontal Boxes of labels and buttons
 
         widget.setLayout(vbox)
 
-        for i in range(1, 50):
-            object = QLabel("TextLabel")
-            vbox.addWidget(object)
+        # for i in range(1, 50):
+        #     object = QLabel("TextLabel")
+        #     vbox.addWidget(object)
 
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(widget)
+        # scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        # scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # scroll.setWidgetResizable(True)
+        # scroll.setWidget(widget)
 
-        self.TableSV.setItem(row_pos, 0, QTableWidgetItem(self.sv_name))
-        self.TableSV.setItem(row_pos, 1, QTableWidgetItem(str(self.sv_dim)))
-        self.TableSV.setCellWidget(row_pos, 2, scroll)
+        self.SVTable.setItem(row_pos, 0, QTableWidgetItem(name))
+        self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.sv_dict[name]['dim'])))
+        # self.SVTable.setCellWidget(row_pos, 2, scroll)
 
 class HorizonGUI(QMainWindow):
     def __init__(self):
