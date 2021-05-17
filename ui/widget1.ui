@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1099</width>
-    <height>942</height>
+    <height>912</height>
    </rect>
   </property>
   <property name="mouseTracking">
@@ -38,9 +38,9 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>20</y>
+      <y>10</y>
       <width>321</width>
-      <height>91</height>
+      <height>111</height>
      </rect>
     </property>
     <layout class="QGridLayout" name="CTGrid">
@@ -71,9 +71,6 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="1" colspan="2">
-      <widget class="LineEdit" name="CTFunctionInput"/>
-     </item>
      <item row="0" column="2">
       <spacer name="horizontalSpacer">
        <property name="orientation">
@@ -90,6 +87,9 @@
        </property>
       </spacer>
      </item>
+     <item row="1" column="1" colspan="2">
+      <widget class="LineEdit" name="CTFunctionInput"/>
+     </item>
     </layout>
    </widget>
    <widget class="QListWidget" name="CTList">
@@ -100,6 +100,9 @@
       <width>291</width>
       <height>91</height>
      </rect>
+    </property>
+    <property name="editTriggers">
+     <set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed</set>
     </property>
     <property name="dragEnabled">
      <bool>true</bool>
@@ -133,8 +136,8 @@
    <widget class="QPushButton" name="SVAddButton">
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>100</y>
+      <x>110</x>
+      <y>90</y>
       <width>131</width>
       <height>22</height>
      </rect>
@@ -285,31 +288,19 @@
      <number>1</number>
     </property>
    </widget>
-  </widget>
-  <widget class="QTableWidget" name="TableSV">
-   <property name="geometry">
-    <rect>
-     <x>170</x>
-     <y>750</y>
-     <width>461</width>
-     <height>181</height>
-    </rect>
-   </property>
-   <column>
-    <property name="text">
-     <string>State Variable</string>
+   <widget class="Line" name="line">
+    <property name="geometry">
+     <rect>
+      <x>110</x>
+      <y>67</y>
+      <width>118</width>
+      <height>20</height>
+     </rect>
     </property>
-   </column>
-   <column>
-    <property name="text">
-     <string>Dimension</string>
+    <property name="orientation">
+     <enum>Qt::Horizontal</enum>
     </property>
-   </column>
-   <column>
-    <property name="text">
-     <string>Usage</string>
-    </property>
-   </column>
+   </widget>
   </widget>
   <widget class="QGroupBox" name="PRB">
    <property name="geometry">
@@ -367,6 +358,16 @@
    <header>custom_widgets/line_edit.h</header>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>SVNameInput</tabstop>
+  <tabstop>SVDimInput</tabstop>
+  <tabstop>SVNodeInput</tabstop>
+  <tabstop>SVAddButton</tabstop>
+  <tabstop>CTNameInput</tabstop>
+  <tabstop>CTFunctionInput</tabstop>
+  <tabstop>CTButton</tabstop>
+  <tabstop>CTList</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
  <slots>
