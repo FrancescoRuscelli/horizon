@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QWidget, QGridLayout, QRubberBand, QPushButton, QTab
 from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSignal, pyqtSlot, QMimeData, QDataStream, QIODevice, QModelIndex
 from PyQt5.QtGui import QStandardItemModel
 
+import os
 from functools import partial
 
 from custom_widgets.multi_slider import QMultiSlider
@@ -68,8 +69,12 @@ class HorizonLine(QWidget):
 
         self.ct_tab = QTabWidget(self)
 
-        with open('custom_css\\tab.css', 'r') as f:
-            self.ct_tab.setStyleSheet(f.read())
+        if os.name == 'posix':
+            with open('custom_css/tab.css', 'r') as f:
+                self.ct_tab.setStyleSheet(f.read())
+        elif os.name == 'nt':
+            with open('custom_css\\tab.css', 'r') as f:
+                self.ct_tab.setStyleSheet(f.read())
 
         self.ct_tab.setTabPosition(1)
         self.ct_tab.setTabsClosable(True)
