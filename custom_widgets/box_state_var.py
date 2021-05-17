@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QAbstractItemView
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView
 from PyQt5.QtCore import QRect
 
 
@@ -14,8 +14,11 @@ class BoxStateVar(QTableWidget):
         self.setColumnCount(2)
         self.setRowCount(0)
         self.setHorizontalHeaderLabels(['Name', 'Dimension'])
-        #
         self.verticalHeader().setVisible(False)
+
+        header = self.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
 
         # row_pos = self.rowCount()
         # self.insertRow(row_pos)
