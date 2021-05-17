@@ -2,6 +2,8 @@ from PyQt5.QtWidgets import QWidget, QGridLayout, QRubberBand, QPushButton, QTab
 from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSignal, pyqtSlot, QMimeData, QDataStream, QIODevice, QModelIndex
 from PyQt5.QtGui import QStandardItemModel
 
+from custom_widgets import spinbox_line
+
 import os
 from functools import partial
 
@@ -142,8 +144,8 @@ class HorizonLine(QWidget):
 
         node_box_width = self.ct_tab_layout.itemAt(0).widget().width()
         self.ct = ConstraintTab(name, fun, self.n_nodes)
-        self.ct_max_lim = ConstraintTab(name, fun, self.n_nodes)
-        self.ct_min_lim = ConstraintTab(name, fun, self.n_nodes)
+        self.ct_max_lim = spinbox_line.SpinBoxLine(self.n_nodes)
+        self.ct_min_lim = spinbox_line.SpinBoxLine(self.n_nodes)
         verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
 
         #todo hardcoded bottom margin
