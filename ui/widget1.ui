@@ -19,9 +19,9 @@
   <widget class="QGroupBox" name="CT">
    <property name="geometry">
     <rect>
-     <x>360</x>
+     <x>570</x>
      <y>20</y>
-     <width>701</width>
+     <width>501</width>
      <height>131</height>
     </rect>
    </property>
@@ -38,7 +38,7 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>10</y>
+      <y>20</y>
       <width>321</width>
       <height>111</height>
      </rect>
@@ -95,9 +95,9 @@
    <widget class="QListWidget" name="CTList">
     <property name="geometry">
      <rect>
-      <x>380</x>
-      <y>20</y>
-      <width>291</width>
+      <x>360</x>
+      <y>30</y>
+      <width>131</width>
       <height>91</height>
      </rect>
     </property>
@@ -117,7 +117,7 @@
     <rect>
      <x>10</x>
      <y>20</y>
-     <width>341</width>
+     <width>531</width>
      <height>131</height>
     </rect>
    </property>
@@ -301,18 +301,75 @@
      <enum>Qt::Horizontal</enum>
     </property>
    </widget>
+   <widget class="BoxStateVar" name="SVTable">
+    <property name="geometry">
+     <rect>
+      <x>350</x>
+      <y>30</y>
+      <width>161</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <attribute name="horizontalHeaderMinimumSectionSize">
+     <number>20</number>
+    </attribute>
+    <attribute name="horizontalHeaderDefaultSectionSize">
+     <number>57</number>
+    </attribute>
+    <attribute name="verticalHeaderDefaultSectionSize">
+     <number>21</number>
+    </attribute>
+    <column>
+     <property name="text">
+      <string>Var</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Dim</string>
+     </property>
+    </column>
+   </widget>
   </widget>
   <widget class="QGroupBox" name="PRB">
    <property name="geometry">
     <rect>
      <x>9</x>
      <y>160</y>
-     <width>1051</width>
-     <height>581</height>
+     <width>1061</width>
+     <height>381</height>
     </rect>
    </property>
    <property name="title">
     <string>Problem</string>
+   </property>
+  </widget>
+  <widget class="QTextEdit" name="codeStream">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>570</y>
+     <width>1061</width>
+     <height>141</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <family>Monospace</family>
+    </font>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QFrame {background-color: rgb(46, 52, 54)}
+QTextEdit {color: rgb(238, 238, 236)}</string>
+   </property>
+   <property name="frameShape">
+    <enum>QFrame::WinPanel</enum>
+   </property>
+   <property name="frameShadow">
+    <enum>QFrame::Sunken</enum>
+   </property>
+   <property name="readOnly">
+    <bool>true</bool>
    </property>
   </widget>
   <action name="actionExit">
@@ -356,6 +413,11 @@
    <class>LineEdit</class>
    <extends>QLineEdit</extends>
    <header>custom_widgets/line_edit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>BoxStateVar</class>
+   <extends>QTableWidget</extends>
+   <header>custom_widgets/box_state_var.h</header>
   </customwidget>
  </customwidgets>
  <tabstops>

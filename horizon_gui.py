@@ -7,10 +7,10 @@ import re
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
                              QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QDesktopWidget, QMenuBar, QStyle,
                              QSpinBox, QStyleFactory, QFrame, QTabWidget, QProgressBar, QDialog, QButtonGroup, QLayout, QLineEdit, QTextEdit, QTableWidgetItem,
-                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QMessageBox, QListWidgetItem)
+                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QMessageBox, QListWidgetItem, QHeaderView)
 
 from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent, QPalette, QColor, QDrag, QTextCursor, QPainter, QCursor, QBrush, QTextCharFormat, QSyntaxHighlighter, QFont, QFontMetrics
-from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegExp, pyqtSlot
+from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegExp, pyqtSlot, QObject
 
 from widget1_ui import Ui_Form
 from custom_functions import highlighter
@@ -52,12 +52,25 @@ class ConstraintBar(QWidget):
         bar.setMinimumWidth(100)
         self.splitter.addWidget(bar)
 
+class EmittingStream(QObject):
+
+    textWritten = pyqtSignal(str)
+
+    def write(self, text):
+        self.textWritten.emit(str(text))
+
+    def flush(self):
+        pass
+
 class Widget1(QWidget, Ui_Form):
     invalid_sv = pyqtSignal(str)
     invalid_ct = pyqtSignal(str)
 
     def __init__(self):
         super(Widget1, self).__init__()
+
+        sys.stdout = EmittingStream()
+        sys.stdout.textWritten.connect(self.normalOutputWritten)
 
         N = 20
         # todo put it somewhere else?
@@ -70,11 +83,6 @@ class Widget1(QWidget, Ui_Form):
         self.setupUi(self)
         self._connectActions()
         self.SVNodeInput.setRange(-N, 0)
-
-        self.SVTable = box_state_var.BoxStateVar(self)
-        self.SVTable.setEditTriggers(QTableWidget.NoEditTriggers)
-        # self.mainLayout.addWidget(self.SVTable)
-        self.SVTable.setGeometry(QRect(170, 750, 461, 181))
 
         self.layout_problem = QHBoxLayout(self.PRB)
         self.horizonLine = horizon_line.HorizonLine(self.PRB)
@@ -144,11 +152,9 @@ class Widget1(QWidget, Ui_Form):
             self.highlighter.setDocument(self.CTFunctionInput.document())
 
             # update ct_dict with edited function
-            # TODO WRONG!!!!!!
             str_fun = self.temp_line_edit.toPlainText()
-            print(str_fun)
-            self.fromTxtToFun(item.text(), str_fun)
-
+            if self.fromTxtToFun(item.text(), str_fun):
+                print('Failed Editing')
             self.temp_line_edit.setDisabled(True)
             self.edit_button.setText('Edit Constraint')
 
@@ -212,10 +218,15 @@ class Widget1(QWidget, Ui_Form):
 
         self.label_usages = QLabel("usages:")
         self.sv_window_layout.addWidget(self.label_usages, 2, 0, 1, 4)
+
         self.usages_table = QTableWidget()
         self.usages_table.setColumnCount(2)
-        self.sv_window_layout.addWidget(self.usages_table, 3, 0, 1, 4)
+        self.usages_table.setHorizontalHeaderLabels(['Name', 'Function'])
+        header = self.usages_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
 
+        self.sv_window_layout.addWidget(self.usages_table, 3, 0, 1, 4)
         # # todo add usages (add constraint logic and check if constraint depends on variable)
         for name, ct in self.ct_dict.items():
             if item.text() in ct['ct'].getVariables():
@@ -300,13 +311,17 @@ class Widget1(QWidget, Ui_Form):
         code = res.compile()
 
         # generate constraint
-        constraint = self.casadi_prb.createConstraint(name, eval(code))
+        try:
+            constraint = self.casadi_prb.createConstraint(name, eval(code))
+        except Exception as e:
+            print(e)
+            return False
 
         # set constraint to dict for fast retrieve
         # todo should I divide better casadi from gui? for instance, making a dict of casadi constraint
         #  and another individual dict for constraint names strings?
         self.ct_dict[name] = dict(ct=constraint, str=str_fun)
-        print(self.ct_dict)
+        return True
 
 
     def generateConstraint(self):
@@ -315,16 +330,20 @@ class Widget1(QWidget, Ui_Form):
 
             # get Function from Text
             str_fun = self.CTFunctionInput.toPlainText()
-            self.fromTxtToFun(name, str_fun)
+            if self.fromTxtToFun(name, str_fun):
 
-            item_to_add = QListWidgetItem()
-            item_to_add.setText(name)
-            item_to_add.setData(Qt.UserRole, self.CTFunctionInput.toPlainText())
-            self.CTList.addItem(item_to_add)
+                item_to_add = QListWidgetItem()
+                item_to_add.setText(name)
+                item_to_add.setData(Qt.UserRole, self.CTFunctionInput.toPlainText())
+                self.CTList.addItem(item_to_add)
 
-            # clear mask
-            self.CTNameInput.clear()
-            self.CTFunctionInput.clear()
+                # clear mask
+                self.CTNameInput.clear()
+                self.CTFunctionInput.clear()
+
+            else:
+                self.CTNameInput.clear()
+                self.CTFunctionInput.clear()
 
     def removeConstraint(self, item):
         print('Yet to implement')
@@ -368,10 +387,10 @@ class Widget1(QWidget, Ui_Form):
 
             self.sv_dict[sv_name] = dict(var=var, dim=sv_dim)
 
-            print('state variable {} added.'.format(sv_name))
-            print('dimension: {}'.format(sv_dim))
-            print('previous node: {}'.format(sv_nodes))
-            print('function: {}'.format(var))
+            # print('state variable {} added.'.format(sv_name))
+            # print('dimension: {}'.format(sv_dim))
+            # print('previous node: {}'.format(sv_nodes))
+            # print('function: {}'.format(var))
 
             self._addRowToSVTable(sv_name)
             # add variable to highlighter and to completer
@@ -416,6 +435,23 @@ class Widget1(QWidget, Ui_Form):
         self.SVTable.setItem(row_pos, 0, QTableWidgetItem(name))
         self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.sv_dict[name]['dim'])))
         # self.SVTable.setCellWidget(row_pos, 2, scroll)
+
+    def normalOutputWritten(self, text):
+        cursor = self.codeStream.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(text)
+        self.codeStream.setTextCursor(cursor)
+        self.codeStream.ensureCursorVisible()
+
+    def closeEvent(self, event):
+        """Shuts down application on close."""
+        # Return stdout to defaults.
+        sys.stdout = sys.__stdout__
+        super().closeEvent(event)
+
+    def __del__(self):
+        # Restore sys.stdout
+        sys.stdout = sys.__stdout__
 
 class HorizonGUI(QMainWindow):
     def __init__(self):
@@ -648,7 +684,6 @@ class HorizonGUI(QMainWindow):
         # Using a QToolBar object and a toolbar area
         helpToolBar = QToolBar("Help", self)
         self.addToolBar(Qt.LeftToolBarArea, helpToolBar)
-
 
 class TimeLine(QWidget):
     def __init__(self):
