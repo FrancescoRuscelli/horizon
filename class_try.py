@@ -1,6 +1,7 @@
 import casadi as cs
 import pprint
 from collections import OrderedDict
+from abc import ABC, abstractmethod
 
 def flatten(l):
     if isinstance(l, list):
@@ -31,7 +32,7 @@ class StateVariables:
                 self.state_var[tag] = var
             else:
                 self.state_var_prev[tag] = var
-            return  var
+            return var
         else:
             raise Exception('Yet to declare the present variable!')
 
@@ -102,6 +103,10 @@ class Node:
         self.lb = lb
         self.ub = ub
 
+    @abstractmethod
+    def getValue(self):
+        return self.value
+
 class Constraint:
 
     def __init__(self, name, g, used_vars, nodes):
@@ -109,12 +114,11 @@ class Constraint:
         self.g = g
         self.name = name
         self.nodes = []
-        self.vars = used_vars #todo isn't there another way to get the variable from the function g
+        self.vars = used_vars #todo isn't there another way to get the variables from the function g?
 
         self.fun = cs.Function(name, list(self.vars.values()), [self.g])
 
-        for i in flatten(nodes):
-            self.nodes.append(Node(i))
+        self.setNodes(nodes)
 
     def getName(self):
         return self.name
@@ -122,11 +126,105 @@ class Constraint:
     def getFunction(self):
         return self.fun
 
-    def getNodes(self):
-        return self.nodes
+    def getNodes(self, node=None):
+        if node is None:
+            return self.nodes
+        else:
+            for n in self.nodes:
+                if n.getValue() == node:
+                    return n
 
-    # def setNodes(self):
-        # todo
+    def getNodesList(self):
+        return [node.getValue() for node in self.nodes]
+
+    def setNodes(self, nodes):
+
+        # todo check this logic
+        if isinstance(nodes, int):
+            unraveled_nodes = nodes
+            pass
+        elif any(isinstance(el, list) for el in nodes):
+            unraveled_nodes = list()
+            for el in nodes:
+                temp = list(range(el[0], el[1]))
+                for item in temp:
+                    unraveled_nodes.append(item)
+        elif isinstance(nodes, list):
+            unraveled_nodes = list()
+            temp = list(range(nodes[0], nodes[1]))
+            for item in temp:
+                unraveled_nodes.append(item)
+
+        if isinstance(unraveled_nodes, int):
+            if unraveled_nodes not in [node.getValue() for node in self.nodes]:
+                self.nodes.append(Node(unraveled_nodes))
+                self.nodes.sort(key=lambda i: i.getValue())
+        else:
+            for i in unraveled_nodes:
+                if i not in [node.getValue() for node in self.nodes]:
+                    self.nodes.append(Node(i))
+                    self.nodes.sort(key=lambda n:n.getValue())
+
+    def getVariables(self):
+        return self.vars
+        # return [var for name, var in self.var]
+
+class CostFunction():
+    def __init__(self, name, j, used_vars, nodes):
+
+        self.j = g
+        self.name = name
+        self.nodes = []
+        self.vars = used_vars
+
+        self.fun = cs.Function(name, list(self.vars.values()), [self.j])
+
+        self.setNodes(nodes)
+
+    def getName(self):
+        return self.name
+
+    def getFunction(self):
+        return self.fun
+
+    def getNodes(self, node=None):
+        if node is None:
+            return self.nodes
+        else:
+            for n in self.nodes:
+                if n.getValue() == node:
+                    return n
+
+    def getNodesList(self):
+        return [node.getValue() for node in self.nodes]
+
+    def setNodes(self, nodes):
+
+        # todo check this logic
+        if isinstance(nodes, int):
+            unraveled_nodes = nodes
+            pass
+        elif any(isinstance(el, list) for el in nodes):
+            unraveled_nodes = list()
+            for el in nodes:
+                temp = list(range(el[0], el[1]))
+                for item in temp:
+                    unraveled_nodes.append(item)
+        elif isinstance(nodes, list):
+            unraveled_nodes = list()
+            temp = list(range(nodes[0], nodes[1]))
+            for item in temp:
+                unraveled_nodes.append(item)
+
+        if isinstance(unraveled_nodes, int):
+            if unraveled_nodes not in [node.getValue() for node in self.nodes]:
+                self.nodes.append(Node(unraveled_nodes))
+                self.nodes.sort(key=lambda i: i.getValue())
+        else:
+            for i in unraveled_nodes:
+                if i not in [node.getValue() for node in self.nodes]:
+                    self.nodes.append(Node(i))
+                    self.nodes.sort(key=lambda n:n.getValue())
 
     def getVariables(self):
         return self.vars
@@ -188,8 +286,10 @@ class Problem:
         # print('g_dict:', self.g_dict[name])
         for cnsrt in self.cnstr_container:
             f = cnsrt.getFunction()
-            g = f(*[self.state_var_container.getVarImpl(name, k) for name, val in cnsrt.getVariables().items()])
-            self.cnstr_impl.append(g)
+            # implement constraint only if constraint is present in node k
+            if k in cnsrt.getNodesList():
+                g = f(*[self.state_var_container.getVarImpl(name, k) for name, val in cnsrt.getVariables().items()])
+                self.cnstr_impl.append(g)
         # print('g: {} {}'.format(name, g.shape))
         # print('value:', g)
         # print('bounds: {}'.format(self.g_dict[name]['bounds']))
@@ -203,9 +303,9 @@ class Problem:
             # implement the constraint
             self._updateConstraints(k) #todo not sure but ok, maybe better a constraint class container that updates takin state_var_container?
 
-        print(cs.vertcat(*self.cnstr_impl))
+        # print('state var unraveled:', self.state_var_container.getVarImplList())
+        print('constraints unraveled:', cs.vertcat(*self.cnstr_impl))
         self.state_var_container.getVarImplList()
-
 
     def setConstraint(self, cnstr):
         assert(isinstance(cnstr, Constraint))
@@ -213,7 +313,7 @@ class Problem:
 
 if __name__ == '__main__':
 
-    prb = Problem(4)
+    prb = Problem(10)
 
     x = prb.createStateVariable('x', 6)
     x_prev = prb.createStateVariable('x', 6, prev_nodes=-1) # how to do for previous nodes?
@@ -231,23 +331,27 @@ if __name__ == '__main__':
     # todo how to check if a function has variable that are not defined in the problem? (they are not in state_var)
 
     state_fun = x_prev[2:6] + u
-    fun = u[2:4] +  z **2
+    fun = u[2:4] + z **2
 
     # prb.setVariable('state_fun', state_fun) # is it ok?
     # prb.setVariable('fun', fun)
 
-    # cnsrt = prb.createConstraint('generic_constraint', x[0:2] - x[4:6], nodes=[[0,2], [3,4]])
-    cnsrt = prb.createConstraint('another_constraint', u[0:2] - x[4:6], nodes=2)
+    cnsrt_x = prb.createConstraint('generic_constraint', x[0:2] - x[4:6], nodes=[[0, 2], [3, 4]])
+    # cnsrt_u = prb.createConstraint('another_constraint', u[0:2] - x[4:6], nodes=[[0, 2], [3, 4]])
+    # cnsrt_x.setNodes(5)
+
 
     prb.createProblem()
-    print('constraint nodes:', cnsrt.getNodes())
-    print('constraint name:', cnsrt.getName())
-    print('constraint function:', cnsrt.getFunction())
-    print('constraint variables:', cnsrt.getVariables())
+    print('constraint nodes:', cnsrt_x.getNodes())
+    print('constraint nodes list:', cnsrt_x.getNodesList())
+    print('constraint name:', cnsrt_x.getName())
+    print('constraint function:', cnsrt_x.getFunction())
+    print('constraint variables:', cnsrt_x.getVariables())
 
-    exit()
-    print(cnsrt.getNodes()[2].lb)
-    print(cnsrt.getNodes()[2].value)
+    print(cnsrt_x.getNodes(1).lb)
+    print(cnsrt_x.getNodes(1).ub)
+
+    # todo maybe nodes is not very useful?
 
     # sz_iw
 
