@@ -243,7 +243,6 @@ class Problem:
                         self.addCostFunction(cost_fun)
 
 
-        print(self.ct.getConstraints())
         # todo this is useless here! to place in solve problem, not in build problem
         self.ct.addConstraintBounds()
 
@@ -258,6 +257,7 @@ class Problem:
         # w = [None] * (len(X) + len(U))
         # w[0::2] = X
         # w[1::2] = U
+        print('getConstraints', self.ct.getConstraints())
         g = self.ct.getConstraints()
 
         J = self.j
@@ -396,7 +396,6 @@ class Problem:
                 nodes[1] = self.N
 
         self.j_dict[name] = cost_function
-
 
     def addCostFunction(self, name):
 
@@ -706,8 +705,8 @@ class Constraint:
 
 
 if __name__ == '__main__':
-    N = 5
-    prb = Problem(N, crash_if_suboptimal=True)
+    N = 10
+    prb = Problem(N, crash_if_suboptimal=False)
     h = 1
     grav = 9.8
 
@@ -750,8 +749,10 @@ if __name__ == '__main__':
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0,2], [3,4]], bounds=(dict(lbg=[-1,-1], ubg=[1,1])))
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(nodes=[0,2]))) # should be wrong
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(ubg=[1, 1])))
-    prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
-    prb.ct.setConstraintFunction('generic_constraint', var_opt['u'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
+    prb.ct.setConstraintFunction('generic_constraint1', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
+    # prb.ct.setConstraintFunction('generic_constraint2', var_opt['u'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
+
+
     # prb.ct.setConstraintFunction('generic_constraint',
     #                              var_opt['x'][0:2] - var_opt['x'][4:6],
     #                              nodes=[[0, 2], [3, 4]],
