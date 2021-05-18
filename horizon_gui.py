@@ -29,7 +29,8 @@ import qrc_resources
 # ADD LOG OF EVERYTHING DONE (HISTORY)
 # REMOVE STATE VARIABLE (FROM TABLE) CHECK USAGES IN CONSTRAINTS
 # ADD A VARIABLE EDITOR
-# ADDD DIALOG BUTTON TO CONSTRAINT
+# ADD DIALOG BUTTON TO CONSTRAINT (YES AND NO)
+# ADD BUTTON FOR ADDING HANDLES TO MULTI-SLIDERS
 
 class ConstraintBar(QWidget):
     def __init__(self, *args, **kwargs):
@@ -390,13 +391,10 @@ class Widget1(QWidget, Ui_Form):
         sv_nodes = self.SVNodeInput.value()
 
         if self.checkStateVariable(sv_name):
-            # todo fake set and get Variable
-            # todo horizon.setStateVariable()
-
             if sv_nodes == 0:
                 var = self.casadi_prb.createStateVariable(sv_name, sv_dim)
             else:
-                var = self.casadi_prb.createStateVariable(sv_name,sv_dim, sv_nodes)
+                var = self.casadi_prb.createStateVariable(sv_name, sv_dim, sv_nodes)
 
 
             self.sv_dict[sv_name] = dict(var=var, dim=sv_dim)
@@ -427,7 +425,6 @@ class Widget1(QWidget, Ui_Form):
         row_pos = self.SVTable.rowCount()
         self.SVTable.insertRow(row_pos)
         # self.SVTable.verticalHeader().setVisible(False)
-
 
         combo_box = QComboBox()
         scroll = QScrollArea()
