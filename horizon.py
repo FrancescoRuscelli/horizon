@@ -242,7 +242,7 @@ class Problem:
                     if k in range(self.j_dict[cost_fun]['nodes'][0], self.j_dict[cost_fun]['nodes'][1]):
                         self.addCostFunction(cost_fun)
 
-
+        print(self.j)
         # todo this is useless here! to place in solve problem, not in build problem
         self.ct.addConstraintBounds()
 
