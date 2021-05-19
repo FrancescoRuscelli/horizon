@@ -144,8 +144,8 @@ class HorizonLine(QWidget):
 
         node_box_width = self.ct_tab_layout.itemAt(0).widget().width()
         self.ct = ConstraintTab(name, fun, self.n_nodes)
-        self.ct_max_lim = spinbox_line.SpinBoxLine(self.n_nodes)
-        self.ct_min_lim = spinbox_line.SpinBoxLine(self.n_nodes)
+        # self.ct_max_lim = spinbox_line.SpinBoxLine(self.n_nodes)
+        # self.ct_min_lim = spinbox_line.SpinBoxLine(self.n_nodes)
         verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
 
         #todo hardcoded bottom margin
@@ -157,8 +157,8 @@ class HorizonLine(QWidget):
         # don't fucking ask me why, these are magic numbers (-2, -5) in margins for alignment
         self.intab_layout.setContentsMargins(node_box_width/2-2, 20, node_box_width/2-5, 0)
         self.intab_layout.addWidget(self.ct, stretch=3)
-        self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
-        self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
+        # self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
+        # self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
         self.intab_layout.addSpacerItem(verticalSpacer)
 
 

@@ -1,6 +1,6 @@
 import sys
 from functools import partial
-import class_try as horizon
+from classes import problem as horizon
 import parser
 import re
 import logging
@@ -98,9 +98,19 @@ class Widget1(QWidget, Ui_Form):
         self._connectActions()
         self.SVNodeInput.setRange(-N, 0)
 
-        self.layout_problem = QHBoxLayout(self.PRB)
-        self.horizonLine = horizon_line.HorizonLine(self.PRB)
-        self.layout_problem.addWidget(self.horizonLine)
+        # self.layout_problem = QHBoxLayout(self.PRB)
+        # self.horizonLine = horizon_line.HorizonLine()
+        # self.layout_problem.addWidget(self.horizonLine)
+
+        self.layout_ct = QVBoxLayout(self.CTPage)
+        self.horizonLine = horizon_line.HorizonLine()
+        self.horizonLine.setContentsMargins(0, 40, 0, 0)
+        self.layout_ct.addWidget(self.horizonLine)
+
+        self.layout_cf = QVBoxLayout(self.CFPage)
+        self.horizonLine = horizon_line.HorizonLine()
+        self.horizonLine.setContentsMargins(0, 40, 0, 0)
+        self.layout_cf.addWidget(self.horizonLine)
 
         self.ct_layout = QHBoxLayout(self.CT)
         self.ct_entry = self.setuCTEditor(self.CT)
@@ -108,6 +118,7 @@ class Widget1(QWidget, Ui_Form):
         self.CTButton.clicked.connect(self.generateConstraint)
         self.CTList.itemDoubleClicked.connect(self.openCTFunction)
         self.SVTable.itemDoubleClicked.connect(self.openSV)
+        self.switchPageButton.clicked.connect(self.switchPage)
 
     @pyqtSlot()
     def on_invalid_sv(self, str):
@@ -116,6 +127,15 @@ class Widget1(QWidget, Ui_Form):
     @pyqtSlot()
     def on_invalid_ct(self, str):
         self.invalid_ct.emit(str)
+
+    def switchPage(self):
+        index = self.ProblemMain.currentIndex()
+        if index == 0:
+            self.switchPageButton.setText('Switch to Constraints')
+        else:
+            self.switchPageButton.setText('Switch to Cost Functions')
+
+        self.ProblemMain.setCurrentIndex(abs(index-1))
 
     def openCTFunction(self, item):
         # create window that emit a signal when closed
