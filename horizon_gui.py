@@ -8,7 +8,7 @@ import logging
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
                              QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QDesktopWidget, QMenuBar, QStyle,
                              QSpinBox, QStyleFactory, QFrame, QTabWidget, QProgressBar, QDialog, QButtonGroup, QLayout, QLineEdit, QTextEdit, QTableWidgetItem,
-                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QMessageBox, QListWidgetItem, QHeaderView)
+                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QMessageBox, QListWidgetItem, QHeaderView, QAbstractItemView)
 
 from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent, QPalette, QColor, QDrag, QTextCursor, QPainter, QCursor, QBrush, QTextCharFormat, QSyntaxHighlighter, QFont, QFontMetrics
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegExp, pyqtSlot, QObject
@@ -84,15 +84,20 @@ class Widget1(QWidget, Ui_Form):
         # todo put it somewhere else?
         self.casadi_prb = horizon.Problem(N)
 
-        self.ct_keywords = list()
-        self.ct_dict = dict()
-        self.sv_dict = dict()  # todo horizon.getStateVariables()
+        self.fun_keywords = list()
+
+        self.fun_dict = dict()
+        # self.gf_dict = dict()  # generic function
+        # self.ct_dict = dict()  # constraint function
+
+        self.sv_dict = dict()  # state variables
 
         self.setupUi(self)
 
         # #todo logger! use it everywhere!
-        logging.getLogger().addHandler(self.consoleLogger)
-        logging.getLogger().setLevel(logging.DEBUG)
+        self.logger = logging.getLogger('logger')
+        self.logger.addHandler(self.consoleLogger)
+        self.logger.setLevel(logging.DEBUG)
 
 
         self._connectActions()
@@ -103,20 +108,32 @@ class Widget1(QWidget, Ui_Form):
         # self.layout_problem.addWidget(self.horizonLine)
 
         self.layout_ct = QVBoxLayout(self.CTPage)
-        self.horizonLine = horizon_line.HorizonLine()
-        self.horizonLine.setContentsMargins(0, 40, 0, 0)
-        self.layout_ct.addWidget(self.horizonLine)
+        self.constraintLine = horizon_line.HorizonLine('constraint', logger=self.logger)
+        self.constraintLine.setContentsMargins(0, 40, 0, 0)
+        self.layout_ct.addWidget(self.constraintLine)
 
         self.layout_cf = QVBoxLayout(self.CFPage)
-        self.horizonLine = horizon_line.HorizonLine()
-        self.horizonLine.setContentsMargins(0, 40, 0, 0)
-        self.layout_cf.addWidget(self.horizonLine)
+        self.costfunctionLine = horizon_line.HorizonLine('costfunction', logger=self.logger)
+        self.costfunctionLine.setContentsMargins(0, 40, 0, 0)
+        self.layout_cf.addWidget(self.costfunctionLine)
 
-        self.ct_layout = QHBoxLayout(self.CT)
-        self.ct_entry = self.setuCTEditor(self.CT)
+        self.ct_layout = QHBoxLayout(self.funBox)
+        self.ct_entry = self.setFunEditor(self.funBox)
 
-        self.CTButton.clicked.connect(self.generateConstraint)
-        self.CTList.itemDoubleClicked.connect(self.openCTFunction)
+        self.fun_type_input = 'generic'
+        self.constraintTypeButton.data = 'constraint'
+        self.costfunctionTypeButton.data = 'costfunction'
+        self.genericTypeButton.data = 'generic'
+
+        self.constraintTypeButton.toggled.connect(self.updateInputFunctionType)
+        self.costfunctionTypeButton.toggled.connect(self.updateInputFunctionType)
+        self.genericTypeButton.toggled.connect(self.updateInputFunctionType)
+
+        self.funButton.clicked.connect(self.generateFunction)
+
+        self.funList.itemDoubleClicked.connect(self.openFunction)
+        self.constrList.itemDoubleClicked.connect(self.openFunction)
+        self.costfunList.itemDoubleClicked.connect(self.openFunction)
         self.SVTable.itemDoubleClicked.connect(self.openSV)
         self.switchPageButton.clicked.connect(self.switchPage)
 
@@ -128,6 +145,13 @@ class Widget1(QWidget, Ui_Form):
     def on_invalid_ct(self, str):
         self.invalid_ct.emit(str)
 
+    def updateInputFunctionType(self):
+
+        rbtn = self.sender()
+
+        if rbtn.isChecked() == True:
+            self.fun_type_input = rbtn.data
+
     def switchPage(self):
         index = self.ProblemMain.currentIndex()
         if index == 0:
@@ -137,35 +161,37 @@ class Widget1(QWidget, Ui_Form):
 
         self.ProblemMain.setCurrentIndex(abs(index-1))
 
-    def openCTFunction(self, item):
+    def openFunction(self, item):
+
         # create window that emit a signal when closed
         self.temp_win = on_destroy_signal_window.DestroySignalWindow()
 
         # create a layout for the window
-        self.ct_window_layout = QVBoxLayout()
+        self.window_layout = QVBoxLayout()
 
         #populate it
-        self.label = QLabel("constraint:")
-        self.ct_window_layout.addWidget(self.label)
+        self.label = QLabel("Function:")
+        self.window_layout.addWidget(self.label)
 
+        # TODO REMOVE CT ADD FUNCTION
         self.temp_line_edit = line_edit.LineEdit()
-        self.temp_line_edit.setText(str(self.ct_dict[item.text()]['str']))
+        self.temp_line_edit.setText(str(self.fun_dict[item.text()]['str']))
         self.temp_line_edit.setDisabled(True)
 
         palette = QPalette()
         # palette.setColor(QPalette.Base, Qt.white)
         palette.setColor(QPalette.Text, Qt.black)
         self.temp_line_edit.setPalette(palette)
-        self.ct_window_layout.addWidget(self.temp_line_edit)
+        self.window_layout.addWidget(self.temp_line_edit)
 
-        self.edit_button = QPushButton('Edit Constraint')
+        self.edit_button = QPushButton('Edit Function')
         self.edit_button.setCheckable(True)
         # self.edit_button.setStyleSheet("background-color : lightblue")
-        self.edit_button.clicked.connect(partial(self.enableCTEdit, item))
-        self.ct_window_layout.addWidget(self.edit_button)
+        self.edit_button.clicked.connect(partial(self.enableFunEdit, item))
+        self.window_layout.addWidget(self.edit_button)
 
         self.temp_win.setWindowTitle(item.text())
-        self.temp_win.setLayout(self.ct_window_layout)
+        self.temp_win.setLayout(self.window_layout)
 
         # show window
         self.temp_win.show()
@@ -174,7 +200,7 @@ class Widget1(QWidget, Ui_Form):
         # remember that I have to manually destroy it
         self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
 
-    def enableCTEdit(self, item):
+    def enableFunEdit(self, item):
         if self.edit_button.isChecked():
             # self.edit_button.setStyleSheet("background-color : lightblue")
             self.highlighter.setDocument(self.temp_line_edit.document())
@@ -182,21 +208,22 @@ class Widget1(QWidget, Ui_Form):
             self.edit_button.setText('Done')
         else:
             # self.edit_button.setStyleSheet("background-color : lightgrey")
-            self.highlighter.setDocument(self.CTFunctionInput.document())
+            self.highlighter.setDocument(self.funInput.document())
 
             # update ct_dict with edited function
             str_fun = self.temp_line_edit.toPlainText()
-            if self.fromTxtToFun(item.text(), str_fun):
+            if not self.fromTxtToFun(item.text(), str_fun):
                 # todo what to do here?
                 print('Failed Editing')
             self.temp_line_edit.setDisabled(True)
-            self.edit_button.setText('Edit Constraint')
+            # todo repeated label from openFunction
+            self.edit_button.setText('Edit Function')
 
 
     def yieldHighlighter(self):
-        # return the highlighter to the CTFunctionInput
+        # return the highlighter to the funInput
         self.temp_win.destroyCompletely()
-        self.highlighter.setDocument(self.CTFunctionInput.document())
+        self.highlighter.setDocument(self.funInput.document())
 
     def openSV(self, item):
 
@@ -254,9 +281,8 @@ class Widget1(QWidget, Ui_Form):
         self.sv_window_layout.addWidget(self.label_usages, 2, 0, 1, 4)
 
         self.usages_table = QTableWidget()
-        self.usages_table.setColumnCount(2)
-        self.usages_table.setHorizontalHeaderLabels(['Name', 'Function'])
-
+        self.usages_table.setColumnCount(3)
+        self.usages_table.setHorizontalHeaderLabels(['Name', 'Function', 'Type'])
         self._delegate = highlight_delegate.HighlightDelegate(self.usages_table)
         self.usages_table.setItemDelegateForColumn(1, self._delegate)
         self._delegate.setFilters(item.text())
@@ -264,15 +290,28 @@ class Widget1(QWidget, Ui_Form):
         header = self.usages_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
 
         self.sv_window_layout.addWidget(self.usages_table, 3, 0, 1, 4)
         # # todo add usages (add constraint logic and check if constraint depends on variable)
-        for name, ct in self.ct_dict.items():
-            if item.text() in ct['ct'].getVariables():
+        # TODO REMOVE CT ADD FUNCTION
+
+        for name, function in self.fun_dict.items():
+            if item.text() in function['fun'].getVariables():
                 row_pos = self.usages_table.rowCount()
                 self.usages_table.insertRow(row_pos)
-                self.usages_table.setItem(row_pos, 0, QTableWidgetItem(ct['ct'].getName()))
-                self.usages_table.setItem(row_pos, 1, QTableWidgetItem(ct['str']))
+                fun_name = QTableWidgetItem(function['fun'].getName())
+                fun_name.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+
+                fun_str = QTableWidgetItem(function['str'])
+                fun_str.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+
+                fun_type = QTableWidgetItem(function['type'])
+                fun_type.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+
+                self.usages_table.setItem(row_pos, 0, fun_name)
+                self.usages_table.setItem(row_pos, 1, fun_str)
+                self.usages_table.setItem(row_pos, 2, fun_type)
 
 
         self.remove_button = QPushButton('Remove Variable')
@@ -291,18 +330,19 @@ class Widget1(QWidget, Ui_Form):
         # remember that I have to manually destroy it
         # self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
 
-    def checkConstraint(self, name, fun):
-        if name in self.ct_dict.keys():
-            self.on_invalid_ct("constraint already inserted")
+    def checkFunction(self, name, fun):
+
+        if name in self.fun_dict.keys():
+            self.on_invalid_ct("function already inserted")
             return False
         elif name == "":
-            self.on_invalid_ct("empty name of constraint not allowed")
-            self.CTNameInput.setFocus()
+            self.on_invalid_ct("empty name of function not allowed")
+            self.funNameInput.setFocus()
             return False
 
         if fun == "":
-            self.on_invalid_ct("empty constraint function not allowed")
-            self.CTFunctionInput.setFocus()
+            self.on_invalid_ct("empty function not allowed")
+            self.funInput.setFocus()
             return False
 
         return True
@@ -322,7 +362,7 @@ class Widget1(QWidget, Ui_Form):
 
         return True
 
-    def fromTxtToFun(self, name, str_fun):
+    def fromTxtToFun(self, str_fun):
 
         # todo CHECK IF STR_FUN IS CORRECT?
 
@@ -332,6 +372,7 @@ class Widget1(QWidget, Ui_Form):
 
         # get from text all variables and substitute them with self.sv_dict[''] ..
 
+        # todo add also generic functions
         dict_vars = dict()
         for var in self.sv_dict.keys():
             dict_vars[var] = "self.sv_dict['{}']['var']".format(var)
@@ -345,40 +386,57 @@ class Widget1(QWidget, Ui_Form):
         res = parser.expr(modified_fun)
         code = res.compile()
 
-        # generate constraint
-        try:
-            constraint = self.casadi_prb.createConstraint(name, eval(code))
-        except Exception as e:
-            logging.warning(e)
-            return False
+        # todo add try exception + logger
+        fun = eval(code)
+        # generate function
 
-        # set constraint to dict for fast retrieve
-        # todo should I divide better casadi from gui? for instance, making a dict of casadi constraint
-        #  and another individual dict for constraint names strings?
-        self.ct_dict[name] = dict(ct=constraint, str=str_fun)
-        return True
+        return fun
 
 
-    def generateConstraint(self):
-        name = self.CTNameInput.text()
-        if self.checkConstraint(name, self.CTFunctionInput.toPlainText()):
+    def generateFunction(self):
+        name = self.funNameInput.text()
+
+        if self.checkFunction(name, self.funInput.toPlainText()):
 
             # get Function from Text
-            str_fun = self.CTFunctionInput.toPlainText()
-            if self.fromTxtToFun(name, str_fun):
+            str_fun = self.funInput.toPlainText()
+            fun = self.fromTxtToFun(str_fun)
 
-                item_to_add = QListWidgetItem()
-                item_to_add.setText(name)
-                item_to_add.setData(Qt.UserRole, self.CTFunctionInput.toPlainText())
-                self.CTList.addItem(item_to_add)
 
-                # clear mask
-                self.CTNameInput.clear()
-                self.CTFunctionInput.clear()
+            # TODO I can probably do a wrapper function in casadi self.crateFunction(name, fun, type)
+            # TODO HOW ABOUT GENERIC FUNCTION? Should i do a casadi function for them?
+            if self.fun_type_input == 'constraint':
+                try:
+                    fun_impl = self.casadi_prb.createConstraint(name, fun)
+                    fun_list = self.constrList
+                except Exception as e:
+                    self.logger.warning(e)
+            elif self.fun_type_input == 'costfunction':
+                try:
+                    fun_impl = self.casadi_prb.createCostFunction(name, fun)
+                    fun_list = self.costfunList
+                except Exception as e:
+                    self.logger.warning(e)
+            elif self.fun_type_input == 'generic':
+                fun_impl = fun
+                fun_list = self.funList
 
-            else:
-                self.CTNameInput.clear()
-                self.CTFunctionInput.clear()
+            # fill fun_dict and funList
+            self.fun_dict[name] = dict(fun=fun_impl, str=str_fun, type=self.fun_type_input)
+
+            item_to_add = QListWidgetItem()
+            item_to_add.setText(name)
+            item_to_add.setData(Qt.UserRole, {'type': self.fun_type_input, 'fun': self.funInput.toPlainText()})
+            fun_list.addItem(item_to_add)
+
+            print(self.fun_dict)
+            # clear mask
+            self.funNameInput.clear()
+            self.funInput.clear()
+
+        else:
+            self.funNameInput.clear()
+            self.funInput.clear()
 
     def removeConstraint(self, item):
         print('Yet to implement')
@@ -386,20 +444,20 @@ class Widget1(QWidget, Ui_Form):
     def removeStateVariable(self, item):
         print('Yet to implement')
 
-    def setuCTEditor(self, parent):
+    def setFunEditor(self, parent):
         font = QFont()
         font.setFamily('Courier')
         font.setFixedPitch(True)
         font.setPointSize(10)
 
         # with QLineEdit doesn't work, so I had to override QTextEdit
-        self.highlighter = highlighter.Highlighter(self.CTFunctionInput.document())
+        self.highlighter = highlighter.Highlighter(self.funInput.document())
 
 
-        self.completer = QCompleter(self.ct_keywords)
+        self.completer = QCompleter(self.fun_keywords)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.completer.setWrapAround(False)
-        self.CTFunctionInput.setCompleter(self.completer)
+        self.funInput.setCompleter(self.completer)
 
     def generateStateVariable(self):
 
@@ -427,9 +485,9 @@ class Widget1(QWidget, Ui_Form):
             self._addRowToSVTable(sv_name)
             # add variable to highlighter and to completer
             self.highlighter.addKeyword(sv_name)
-            self.ct_keywords.append('{}'.format(sv_name))
+            self.fun_keywords.append('{}'.format(sv_name))
             model = self.completer.model()
-            model.setStringList(self.ct_keywords)
+            model.setStringList(self.fun_keywords)
 
             self.SVNameInput.clear()
             self.SVDimInput.setValue(default_dim)
@@ -444,27 +502,10 @@ class Widget1(QWidget, Ui_Form):
 
         row_pos = self.SVTable.rowCount()
         self.SVTable.insertRow(row_pos)
-        # self.SVTable.verticalHeader().setVisible(False)
-
-        combo_box = QComboBox()
-        scroll = QScrollArea()
-
-        widget = QWidget()  # Widget that contains the collection of Vertical Box
-        vbox = QVBoxLayout()  # The Vertical Box that contains the Horizontal Boxes of labels and buttons
-
-        widget.setLayout(vbox)
-
-        # for i in range(1, 50):
-        #     object = QLabel("TextLabel")
-        #     vbox.addWidget(object)
-
-        # scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        # scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        # scroll.setWidgetResizable(True)
-        # scroll.setWidget(widget)
 
         self.SVTable.setItem(row_pos, 0, QTableWidgetItem(name))
         self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.sv_dict[name]['dim'])))
+
         # self.SVTable.setCellWidget(row_pos, 2, scroll)
 
     # def normalOutputWritten(self, text):
@@ -586,7 +627,8 @@ class HorizonGUI(QMainWindow):
 
         # This is amazing, I can connect a custom signal from a widget to the main window here
         # basically horizonLine in widget1 sends a signal with a msg, which I connect to the status bar
-        self.widget1.horizonLine.repeated_ct.connect(self.writeInStatusBar)
+        self.widget1.constraintLine.repeated_fun.connect(self.writeInStatusBar)
+        self.widget1.costfunctionLine.repeated_fun.connect(self.writeInStatusBar)
         self.widget1.invalid_ct.connect(self.writeInStatusBar)
         self.widget1.invalid_sv.connect(self.writeInStatusBar)
 

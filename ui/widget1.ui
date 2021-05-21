@@ -16,20 +16,20 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QGroupBox" name="CT">
+  <widget class="QGroupBox" name="funBox">
    <property name="geometry">
     <rect>
-     <x>570</x>
-     <y>20</y>
-     <width>501</width>
-     <height>161</height>
+     <x>400</x>
+     <y>10</y>
+     <width>811</width>
+     <height>201</height>
     </rect>
    </property>
    <property name="layoutDirection">
     <enum>Qt::LeftToRight</enum>
    </property>
    <property name="title">
-    <string>Constraints</string>
+    <string>Functions</string>
    </property>
    <property name="alignment">
     <set>Qt::AlignCenter</set>
@@ -37,9 +37,9 @@
    <widget class="QWidget" name="gridLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>20</x>
-      <y>20</y>
-      <width>321</width>
+      <x>10</x>
+      <y>40</y>
+      <width>291</width>
       <height>101</height>
      </rect>
     </property>
@@ -48,24 +48,24 @@
       <number>0</number>
      </property>
      <item row="0" column="0">
-      <widget class="QLabel" name="CTName">
+      <widget class="QLabel" name="funNameLabel">
        <property name="text">
         <string>name:</string>
        </property>
       </widget>
      </item>
      <item row="0" column="1">
-      <widget class="QLineEdit" name="CTNameInput"/>
+      <widget class="QLineEdit" name="funNameInput"/>
      </item>
      <item row="2" column="0" colspan="3">
-      <widget class="QPushButton" name="CTButton">
+      <widget class="QPushButton" name="funButton">
        <property name="text">
         <string>Add Constraint</string>
        </property>
       </widget>
      </item>
      <item row="1" column="0">
-      <widget class="QLabel" name="CTFunction">
+      <widget class="QLabel" name="funLabel">
        <property name="text">
         <string>function:</string>
        </property>
@@ -88,17 +88,17 @@
       </spacer>
      </item>
      <item row="1" column="1" colspan="2">
-      <widget class="LineEdit" name="CTFunctionInput"/>
+      <widget class="LineEdit" name="funInput"/>
      </item>
     </layout>
    </widget>
-   <widget class="QListWidget" name="CTList">
+   <widget class="QListWidget" name="funList">
     <property name="geometry">
      <rect>
-      <x>360</x>
+      <x>320</x>
       <y>30</y>
-      <width>131</width>
-      <height>91</height>
+      <width>311</width>
+      <height>161</height>
      </rect>
     </property>
     <property name="editTriggers">
@@ -111,34 +111,114 @@
      <enum>QAbstractItemView::DragOnly</enum>
     </property>
    </widget>
+   <widget class="QListWidget" name="constrList">
+    <property name="geometry">
+     <rect>
+      <x>640</x>
+      <y>30</y>
+      <width>141</width>
+      <height>70</height>
+     </rect>
+    </property>
+    <property name="editTriggers">
+     <set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed</set>
+    </property>
+    <property name="dragEnabled">
+     <bool>true</bool>
+    </property>
+    <property name="dragDropMode">
+     <enum>QAbstractItemView::DragOnly</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_4">
+    <property name="geometry">
+     <rect>
+      <x>460</x>
+      <y>17</y>
+      <width>47</width>
+      <height>10</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Generic</string>
+    </property>
+   </widget>
+   <widget class="QListWidget" name="costfunList">
+    <property name="geometry">
+     <rect>
+      <x>640</x>
+      <y>121</y>
+      <width>141</width>
+      <height>70</height>
+     </rect>
+    </property>
+    <property name="editTriggers">
+     <set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed</set>
+    </property>
+    <property name="dragEnabled">
+     <bool>true</bool>
+    </property>
+    <property name="dragDropMode">
+     <enum>QAbstractItemView::DragOnly</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_5">
+    <property name="geometry">
+     <rect>
+      <x>680</x>
+      <y>11</y>
+      <width>51</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Constraint</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_6">
+    <property name="geometry">
+     <rect>
+      <x>675</x>
+      <y>101</y>
+      <width>71</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Cost Function</string>
+    </property>
+   </widget>
    <widget class="QWidget" name="horizontalLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>80</x>
-      <y>130</y>
-      <width>307</width>
-      <height>25</height>
+      <x>40</x>
+      <y>160</y>
+      <width>235</width>
+      <height>19</height>
      </rect>
     </property>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QRadioButton" name="radioButton_4">
+      <widget class="QRadioButton" name="genericTypeButton">
        <property name="text">
-        <string>Cost Function</string>
+        <string>Generic</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QRadioButton" name="radioButton_5">
+      <widget class="QRadioButton" name="constraintTypeButton">
        <property name="text">
         <string>Constraint</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QRadioButton" name="radioButton_3">
+      <widget class="QRadioButton" name="costfunctionTypeButton">
        <property name="text">
-        <string>Generic</string>
+        <string>Cost Function</string>
        </property>
       </widget>
      </item>
@@ -149,9 +229,9 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>20</y>
-     <width>531</width>
-     <height>131</height>
+     <y>10</y>
+     <width>381</width>
+     <height>201</height>
     </rect>
    </property>
    <property name="title">
@@ -169,8 +249,8 @@
    <widget class="QPushButton" name="SVAddButton">
     <property name="geometry">
      <rect>
-      <x>110</x>
-      <y>90</y>
+      <x>30</x>
+      <y>130</y>
       <width>131</width>
       <height>22</height>
      </rect>
@@ -183,7 +263,7 @@
     <property name="geometry">
      <rect>
       <x>51</x>
-      <y>37</y>
+      <y>50</y>
       <width>41</width>
       <height>20</height>
      </rect>
@@ -193,9 +273,9 @@
     <property name="geometry">
      <rect>
       <x>8</x>
-      <y>40</y>
-      <width>59</width>
-      <height>14</height>
+      <y>52</y>
+      <width>41</width>
+      <height>16</height>
      </rect>
     </property>
     <property name="text">
@@ -205,9 +285,9 @@
    <widget class="NodesSpinBox" name="SVNodeInput">
     <property name="geometry">
      <rect>
-      <x>239</x>
-      <y>36</y>
-      <width>91</width>
+      <x>70</x>
+      <y>80</y>
+      <width>81</width>
       <height>23</height>
      </rect>
     </property>
@@ -285,8 +365,8 @@
    <widget class="QLabel" name="SVNode">
     <property name="geometry">
      <rect>
-      <x>198</x>
-      <y>40</y>
+      <x>32</x>
+      <y>82</y>
       <width>40</width>
       <height>16</height>
      </rect>
@@ -299,7 +379,7 @@
     <property name="geometry">
      <rect>
       <x>100</x>
-      <y>40</y>
+      <y>50</y>
       <width>30</width>
       <height>16</height>
      </rect>
@@ -311,10 +391,10 @@
    <widget class="QSpinBox" name="SVDimInput">
     <property name="geometry">
      <rect>
-      <x>141</x>
-      <y>36</y>
-      <width>47</width>
-      <height>23</height>
+      <x>130</x>
+      <y>50</y>
+      <width>41</width>
+      <height>20</height>
      </rect>
     </property>
     <property name="minimum">
@@ -324,9 +404,9 @@
    <widget class="Line" name="line">
     <property name="geometry">
      <rect>
-      <x>110</x>
-      <y>67</y>
-      <width>118</width>
+      <x>17</x>
+      <y>110</y>
+      <width>151</width>
       <height>20</height>
      </rect>
     </property>
@@ -337,17 +417,17 @@
    <widget class="BoxStateVar" name="SVTable">
     <property name="geometry">
      <rect>
-      <x>350</x>
-      <y>30</y>
+      <x>190</x>
+      <y>20</y>
       <width>161</width>
-      <height>91</height>
+      <height>171</height>
      </rect>
     </property>
-    <attribute name="horizontalHeaderMinimumSectionSize">
-     <number>20</number>
-    </attribute>
     <attribute name="horizontalHeaderDefaultSectionSize">
      <number>57</number>
+    </attribute>
+    <attribute name="horizontalHeaderMinimumSectionSize">
+     <number>20</number>
     </attribute>
     <attribute name="verticalHeaderDefaultSectionSize">
      <number>21</number>
@@ -368,8 +448,8 @@
    <property name="geometry">
     <rect>
      <x>9</x>
-     <y>190</y>
-     <width>1061</width>
+     <y>220</y>
+     <width>1201</width>
      <height>451</height>
     </rect>
    </property>
@@ -414,7 +494,7 @@
      <rect>
       <x>2</x>
       <y>20</y>
-      <width>1050</width>
+      <width>1191</width>
       <height>381</height>
      </rect>
     </property>
@@ -480,8 +560,8 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>660</y>
-     <width>1061</width>
+     <y>680</y>
+     <width>1201</width>
      <height>192</height>
     </rect>
    </property>
@@ -503,32 +583,6 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
    <property name="readOnly">
     <bool>true</bool>
    </property>
-  </widget>
-  <widget class="QTabWidget" name="tabWidget">
-   <property name="geometry">
-    <rect>
-     <x>1110</x>
-     <y>210</y>
-     <width>61</width>
-     <height>341</height>
-    </rect>
-   </property>
-   <property name="tabPosition">
-    <enum>QTabWidget::West</enum>
-   </property>
-   <property name="currentIndex">
-    <number>1</number>
-   </property>
-   <widget class="QWidget" name="CTTab">
-    <attribute name="title">
-     <string>Constraints</string>
-    </attribute>
-   </widget>
-   <widget class="QWidget" name="CFTab">
-    <attribute name="title">
-     <string>Cost Functions</string>
-    </attribute>
-   </widget>
   </widget>
   <action name="actionExit">
    <property name="icon">
@@ -588,10 +642,10 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
   <tabstop>SVDimInput</tabstop>
   <tabstop>SVNodeInput</tabstop>
   <tabstop>SVAddButton</tabstop>
-  <tabstop>CTNameInput</tabstop>
-  <tabstop>CTFunctionInput</tabstop>
-  <tabstop>CTButton</tabstop>
-  <tabstop>CTList</tabstop>
+  <tabstop>funNameInput</tabstop>
+  <tabstop>funInput</tabstop>
+  <tabstop>funButton</tabstop>
+  <tabstop>funList</tabstop>
  </tabstops>
  <resources/>
  <connections/>
