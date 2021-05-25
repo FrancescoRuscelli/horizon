@@ -13,7 +13,7 @@ class BoxStateVar(QTableWidget):
         # tableWidget.setStyleSheet('QTableView::item {border-right: 1px solid #d6d9dc;}')
         self.setColumnCount(2)
         self.setRowCount(0)
-        self.setHorizontalHeaderLabels(['Name', 'Dimension'])
+
         self.verticalHeader().setVisible(False)
 
         header = self.horizontalHeader()
