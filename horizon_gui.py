@@ -1,14 +1,12 @@
 import sys
 from functools import partial
-from classes import problem as horizon
-import parser
-import re
+from classes import gui_receiver
 import logging
 
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
                              QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QDesktopWidget, QMenuBar, QStyle,
                              QSpinBox, QStyleFactory, QFrame, QTabWidget, QProgressBar, QDialog, QButtonGroup, QLayout, QLineEdit, QTextEdit, QTableWidgetItem,
-                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QMessageBox, QListWidgetItem, QHeaderView, QAbstractItemView)
+                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QToolButton, QMessageBox, QListWidgetItem, QHeaderView, QAbstractItemView)
 
 from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent, QPalette, QColor, QDrag, QTextCursor, QPainter, QCursor, QBrush, QTextCharFormat, QSyntaxHighlighter, QFont, QFontMetrics
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegExp, pyqtSlot, QObject
@@ -32,31 +30,6 @@ import qrc_resources
 # ADD DIALOG BUTTON TO CONSTRAINT (YES AND NO)
 # ADD BUTTON FOR ADDING HANDLES TO MULTI-SLIDERS
 
-class ConstraintBar(QWidget):
-    def __init__(self, *args, **kwargs):
-        QWidget.__init__(self, *args, **kwargs)
-
-        hbox = QHBoxLayout(self)
-        main = QFrame(self)
-        main.setFrameShape(QFrame.StyledPanel)
-
-        self.splitter = QSplitter(Qt.Horizontal)
-        # self.splitter.setChildrenCollapsible(False)
-        self.splitter.addWidget(main)
-        self.splitter.setStretchFactor(1, 1)
-        self.splitter.setSizes([50, 50])
-        hbox.addWidget(self.splitter)
-        self.setLayout(hbox)
-        QApplication.setStyle(QStyleFactory.create('Cleanlooks'))
-        self.setGeometry(100, 100, 300, 50)
-        self.setWindowTitle('QtGui.QSplitter')
-
-    def addBar(self):
-        bar = QFrame(self)
-        bar.setFrameShape(QFrame.StyledPanel)
-        bar.setMinimumWidth(100)
-        self.splitter.addWidget(bar)
-
 # class EmittingStream(QObject):
 #
 #     textWritten = pyqtSignal(str)
@@ -71,10 +44,17 @@ class ConstraintBar(QWidget):
 
 class Widget1(QWidget, Ui_Form):
     invalid_sv = pyqtSignal(str)
-    invalid_ct = pyqtSignal(str)
+    invalid_fun = pyqtSignal(str)
+    generic_sig = pyqtSignal(str)
 
     def __init__(self):
         super(Widget1, self).__init__()
+
+        self.setupUi(self)
+        # #todo logger! use it everywhere!
+        self.logger = logging.getLogger('logger')
+        self.logger.addHandler(self.consoleLogger)
+        self.logger.setLevel(logging.DEBUG)
 
         # emitting stream from python terminal
         # sys.stdout = EmittingStream()
@@ -82,22 +62,10 @@ class Widget1(QWidget, Ui_Form):
 
         N = 20
         # todo put it somewhere else?
-        self.casadi_prb = horizon.Problem(N)
+        self.horizon_receiver = gui_receiver.horizonImpl(N, self.logger)
+
 
         self.fun_keywords = list()
-
-        self.fun_dict = dict()
-        # self.gf_dict = dict()  # generic function
-        # self.ct_dict = dict()  # constraint function
-
-        self.sv_dict = dict()  # state variables
-
-        self.setupUi(self)
-
-        # #todo logger! use it everywhere!
-        self.logger = logging.getLogger('logger')
-        self.logger.addHandler(self.consoleLogger)
-        self.logger.setLevel(logging.DEBUG)
 
 
         self._connectActions()
@@ -108,50 +76,44 @@ class Widget1(QWidget, Ui_Form):
         # self.layout_problem.addWidget(self.horizonLine)
 
         self.layout_ct = QVBoxLayout(self.CTPage)
-        self.constraintLine = horizon_line.HorizonLine('constraint', logger=self.logger)
+        self.constraintLine = horizon_line.HorizonLine(self.horizon_receiver, 'constraint', logger=self.logger)
         self.constraintLine.setContentsMargins(0, 40, 0, 0)
         self.layout_ct.addWidget(self.constraintLine)
 
         self.layout_cf = QVBoxLayout(self.CFPage)
-        self.costfunctionLine = horizon_line.HorizonLine('costfunction', logger=self.logger)
+        self.costfunctionLine = horizon_line.HorizonLine(self.horizon_receiver, 'costfunction', logger=self.logger)
         self.costfunctionLine.setContentsMargins(0, 40, 0, 0)
         self.layout_cf.addWidget(self.costfunctionLine)
 
         self.ct_layout = QHBoxLayout(self.funBox)
         self.ct_entry = self.setFunEditor(self.funBox)
 
-        self.fun_type_input = 'generic'
-        self.constraintTypeButton.data = 'constraint'
-        self.costfunctionTypeButton.data = 'costfunction'
-        self.genericTypeButton.data = 'generic'
-
-        self.constraintTypeButton.toggled.connect(self.updateInputFunctionType)
-        self.costfunctionTypeButton.toggled.connect(self.updateInputFunctionType)
-        self.genericTypeButton.toggled.connect(self.updateInputFunctionType)
+        # self.fun_type_input = 'generic'
+        # self.constraintTypeButton.data = 'constraint'
+        # self.costfunctionTypeButton.data = 'costfunction'
+        # self.genericTypeButton.data = 'generic'
+        #
+        # self.constraintTypeButton.toggled.connect(self.updateInputFunctionType)
+        # self.costfunctionTypeButton.toggled.connect(self.updateInputFunctionType)
+        # self.genericTypeButton.toggled.connect(self.updateInputFunctionType)
 
         self.funButton.clicked.connect(self.generateFunction)
-
-        self.funList.itemDoubleClicked.connect(self.openFunction)
-        self.constrList.itemDoubleClicked.connect(self.openFunction)
-        self.costfunList.itemDoubleClicked.connect(self.openFunction)
+        self.funTable.itemDoubleClicked.connect(self.openFunction)
         self.SVTable.itemDoubleClicked.connect(self.openSV)
         self.switchPageButton.clicked.connect(self.switchPage)
+        self.constraintLine.add_fun_horizon.connect(self.horizon_receiver.addFunction)
 
     @pyqtSlot()
     def on_invalid_sv(self, str):
         self.invalid_sv.emit(str)
 
     @pyqtSlot()
-    def on_invalid_ct(self, str):
-        self.invalid_ct.emit(str)
+    def on_invalid_fun(self, str):
+        self.invalid_fun.emit(str)
 
-    def updateInputFunctionType(self):
-
-        rbtn = self.sender()
-
-        if rbtn.isChecked() == True:
-            self.fun_type_input = rbtn.data
-
+    def on_generic_sig(self, str):
+        self.generic_sig.emit(str)
+    # GUI
     def switchPage(self):
         index = self.ProblemMain.currentIndex()
         if index == 0:
@@ -161,34 +123,62 @@ class Widget1(QWidget, Ui_Form):
 
         self.ProblemMain.setCurrentIndex(abs(index-1))
 
+    # GUI
     def openFunction(self, item):
+
+        # regardless of where I click, get the first item of the table
+        item = self.funTable.item(self.funTable.row(item), 0)
 
         # create window that emit a signal when closed
         self.temp_win = on_destroy_signal_window.DestroySignalWindow()
 
         # create a layout for the window
-        self.window_layout = QVBoxLayout()
+        # widget, fromRow, int fromColumn, int rowSpan, int columnSpan, Qt::Alignment alignment = Qt::Alignment()
+        self.window_layout = QGridLayout()
 
         #populate it
         self.label = QLabel("Function:")
-        self.window_layout.addWidget(self.label)
+        self.window_layout.addWidget(self.label, 0, 0, 1, 1)
 
-        # TODO REMOVE CT ADD FUNCTION
+        # todo if i UNWRAP and then edit, I lose the dependency on functions (I cannot return to WRAPPED functions)
+        self.vis_fun_buttons = QWidget()
+        self.vis_fun_buttons_layout = QHBoxLayout()
+        self.wrapped_fun_button = QRadioButton('Wrapped')
+        self.unwrapped_fun_button = QRadioButton('Unwrapped')
+
+        self.wrapped_fun_button.setChecked(True)
+
+        self.wrapped_fun_button.toggled.connect(partial(self.showWrappedFun, item))
+        self.unwrapped_fun_button.toggled.connect(partial(self.showUnwrappedFun, item))
+
+        self.vis_fun_buttons_layout.addWidget(self.wrapped_fun_button)
+        self.vis_fun_buttons_layout.addWidget(self.unwrapped_fun_button)
+        self.vis_fun_buttons.setLayout(self.vis_fun_buttons_layout)
+
+        self.window_layout.addWidget(self.vis_fun_buttons, 0, 1, 1, 1)
+
+
         self.temp_line_edit = line_edit.LineEdit()
-        self.temp_line_edit.setText(str(self.fun_dict[item.text()]['str']))
+        str_fun = self.horizon_receiver.getFunction(item.text())['str']
+        self.temp_line_edit.setText(str_fun)
         self.temp_line_edit.setDisabled(True)
 
         palette = QPalette()
         # palette.setColor(QPalette.Base, Qt.white)
         palette.setColor(QPalette.Text, Qt.black)
         self.temp_line_edit.setPalette(palette)
-        self.window_layout.addWidget(self.temp_line_edit)
+        self.window_layout.addWidget(self.temp_line_edit, 1, 0, 1, 2)
 
         self.edit_button = QPushButton('Edit Function')
         self.edit_button.setCheckable(True)
         # self.edit_button.setStyleSheet("background-color : lightblue")
         self.edit_button.clicked.connect(partial(self.enableFunEdit, item))
-        self.window_layout.addWidget(self.edit_button)
+        self.window_layout.addWidget(self.edit_button, 2, 0, 1, 1)
+
+        self.close_button = QPushButton('Ok')
+        # self.edit_button.setCheckable(True)
+        self.close_button.clicked.connect(self.temp_win.close)
+        self.window_layout.addWidget(self.close_button, 2, 1, 1, 1)
 
         self.temp_win.setWindowTitle(item.text())
         self.temp_win.setLayout(self.window_layout)
@@ -200,6 +190,17 @@ class Widget1(QWidget, Ui_Form):
         # remember that I have to manually destroy it
         self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
 
+    def showWrappedFun(self, item):
+        str_fun = self.horizon_receiver.getFunction(item.text())['str']
+        print(str_fun)
+        self.temp_line_edit.setText(str_fun)
+
+    def showUnwrappedFun(self, item):
+        str_fun = str(self.horizon_receiver.getFunction(item.text())['fun'])
+        print(str_fun)
+        self.temp_line_edit.setText(str_fun)
+
+    # GUI
     def enableFunEdit(self, item):
         if self.edit_button.isChecked():
             # self.edit_button.setStyleSheet("background-color : lightblue")
@@ -212,19 +213,28 @@ class Widget1(QWidget, Ui_Form):
 
             # update ct_dict with edited function
             str_fun = self.temp_line_edit.toPlainText()
-            if not self.fromTxtToFun(item.text(), str_fun):
-                # todo what to do here?
-                print('Failed Editing')
+            flag, signal = self.horizon_receiver.editFunction(item.text(), str_fun)
+
+            if flag:
+                # update text in table of functions if function is updated.
+                fun_displayed = self.funTable.item(self.funTable.row(item), 1)
+                fun_displayed.setText(str_fun)
+                self.logger.info(signal)
+                self.on_generic_sig(signal)
+            else:
+                self.logger.warning(signal)
+                self.on_generic_sig(signal)
+
             self.temp_line_edit.setDisabled(True)
-            # todo repeated label from openFunction
             self.edit_button.setText('Edit Function')
 
-
+    # GUI
     def yieldHighlighter(self):
         # return the highlighter to the funInput
         self.temp_win.destroyCompletely()
         self.highlighter.setDocument(self.funInput.document())
 
+    # GUI
     def openSV(self, item):
 
         # regardless of where I click, get the first item of the table
@@ -259,7 +269,7 @@ class Widget1(QWidget, Ui_Form):
 
         self.display_dim = QLineEdit()
         self.display_dim.setFixedWidth(20)
-        self.display_dim.setText(str(self.sv_dict[item.text()]['dim']))
+        self.display_dim.setText(str(self.horizon_receiver.sv_dict[item.text()]['dim']))
         self.display_dim.setDisabled(True)
         self.display_dim.setPalette(palette)
         self.sv_window_layout.addWidget(self.display_dim, 0, 3, 1, 1)
@@ -268,8 +278,8 @@ class Widget1(QWidget, Ui_Form):
         self.sv_window_layout.addWidget(self.label_fun, 1, 0, 1, 1)
 
         self.display_fun = QLineEdit()
-        width = self.display_fun.fontMetrics().width(str(self.sv_dict[item.text()]['var']))
-        self.display_fun.setText(str(self.sv_dict[item.text()]['var']))
+        width = self.display_fun.fontMetrics().width(str(self.horizon_receiver.sv_dict[item.text()]['var']))
+        self.display_fun.setText(str(self.horizon_receiver.sv_dict[item.text()]['var']))
         self.display_fun.setDisabled(True)
         # todo magic number?
         self.display_fun.setMinimumWidth(width+5)
@@ -296,7 +306,7 @@ class Widget1(QWidget, Ui_Form):
         # # todo add usages (add constraint logic and check if constraint depends on variable)
         # TODO REMOVE CT ADD FUNCTION
 
-        for name, function in self.fun_dict.items():
+        for name, function in self.horizon_receiver.fun_dict.items():
             if item.text() in function['fun'].getVariables():
                 row_pos = self.usages_table.rowCount()
                 self.usages_table.insertRow(row_pos)
@@ -306,17 +316,18 @@ class Widget1(QWidget, Ui_Form):
                 fun_str = QTableWidgetItem(function['str'])
                 fun_str.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
 
-                fun_type = QTableWidgetItem(function['type'])
-                fun_type.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+                # TODO ADD?
+                # fun_type = QTableWidgetItem(function['type'])
+                # fun_type.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
 
                 self.usages_table.setItem(row_pos, 0, fun_name)
                 self.usages_table.setItem(row_pos, 1, fun_str)
-                self.usages_table.setItem(row_pos, 2, fun_type)
+                # self.usages_table.setItem(row_pos, 2, fun_type)
 
 
         self.remove_button = QPushButton('Remove Variable')
         # self.edit_button.setStyleSheet("background-color : lightblue")
-        self.remove_button.clicked.connect(partial(self.removeStateVariable, item))
+        self.remove_button.clicked.connect(partial(self.horizon_receiver.removeStateVariable, item))
 
         self.sv_window_layout.addWidget(self.remove_button)
 
@@ -330,120 +341,49 @@ class Widget1(QWidget, Ui_Form):
         # remember that I have to manually destroy it
         # self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
 
-    def checkFunction(self, name, fun):
-
-        if name in self.fun_dict.keys():
-            self.on_invalid_ct("function already inserted")
-            return False
-        elif name == "":
-            self.on_invalid_ct("empty name of function not allowed")
-            self.funNameInput.setFocus()
-            return False
-
-        if fun == "":
-            self.on_invalid_ct("empty function not allowed")
-            self.funInput.setFocus()
-            return False
-
-        return True
-
-    def checkStateVariable(self, name):
-        if name == "":
-            self.on_invalid_sv("State Variable: Empty Value Not Allowed")
-            self.SVNameInput.setFocus()
-            return False
-        elif name in self.sv_dict.keys():
-            self.on_invalid_sv("State Variable: Already Inserted")
-            self.SVNameInput.setFocus()
-            return False
-        elif name.isnumeric():
-            self.on_invalid_sv("State Variable: Invalid Name")
-            return False
-
-        return True
-
-    def fromTxtToFun(self, str_fun):
-
-        # todo CHECK IF STR_FUN IS CORRECT?
-
-        # todo better approach? the problem is that i should have here a set of variables
-        # i don't want to write on the GUI self.x or worse self.sv_dict[]... better ideas?
-        # is it possible for some of the variables not to be substituted?
-
-        # get from text all variables and substitute them with self.sv_dict[''] ..
-
-        # todo add also generic functions
-        dict_vars = dict()
-        for var in self.sv_dict.keys():
-            dict_vars[var] = "self.sv_dict['{}']['var']".format(var)
-
-        # these are all the state variable found in sv_dict
-        regex_vars = '\\b|'.join(sorted(re.escape(k) for k in self.sv_dict.keys()))
-        # If repl is a function, it is called for every non-overlapping occurrence of pattern.
-        modified_fun = re.sub(regex_vars, lambda m: dict_vars.get(m.group(0)), str_fun, flags=re.IGNORECASE)
-
-        # parse str to code
-        res = parser.expr(modified_fun)
-        code = res.compile()
-
-        # todo add try exception + logger
-        fun = eval(code)
-        # generate function
-
-        return fun
-
 
     def generateFunction(self):
         name = self.funNameInput.text()
+        str_fun = self.funInput.toPlainText()
+        flag, signal = self.horizon_receiver.addFunction(dict(name=name, str=str_fun, type='generic'))
 
-        if self.checkFunction(name, self.funInput.toPlainText()):
+        if flag:
 
-            # get Function from Text
-            str_fun = self.funInput.toPlainText()
-            fun = self.fromTxtToFun(str_fun)
+            # todo add FUNCTION to highlighter and to completer
+            self.highlighter.addKeyword(name)
+            self.fun_keywords.append('{}'.format(name))
+            model = self.completer.model()
+            model.setStringList(self.fun_keywords)
 
+            row_pos = self.funTable.rowCount()
+            self.funTable.insertRow(row_pos)
 
-            # TODO I can probably do a wrapper function in casadi self.crateFunction(name, fun, type)
-            # TODO HOW ABOUT GENERIC FUNCTION? Should i do a casadi function for them?
-            if self.fun_type_input == 'constraint':
-                try:
-                    fun_impl = self.casadi_prb.createConstraint(name, fun)
-                    fun_list = self.constrList
-                except Exception as e:
-                    self.logger.warning(e)
-            elif self.fun_type_input == 'costfunction':
-                try:
-                    fun_impl = self.casadi_prb.createCostFunction(name, fun)
-                    fun_list = self.costfunList
-                except Exception as e:
-                    self.logger.warning(e)
-            elif self.fun_type_input == 'generic':
-                fun_impl = fun
-                fun_list = self.funList
+            name_table = QTableWidgetItem(name)
+            name_table.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
+            name_table.setData(Qt.UserRole, str_fun)
 
-            # fill fun_dict and funList
-            self.fun_dict[name] = dict(fun=fun_impl, str=str_fun, type=self.fun_type_input)
+            str_table = QTableWidgetItem(str_fun)
+            str_table.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
 
-            item_to_add = QListWidgetItem()
-            item_to_add.setText(name)
-            item_to_add.setData(Qt.UserRole, {'type': self.fun_type_input, 'fun': self.funInput.toPlainText()})
-            fun_list.addItem(item_to_add)
+            self.funTable.setItem(row_pos, 0, name_table)
+            self.funTable.setItem(row_pos, 1, str_table)
 
-            print(self.fun_dict)
             # clear mask
             self.funNameInput.clear()
             self.funInput.clear()
 
+            self.logger.info(signal)
+
         else:
+            # todo signal mean something: 1 is nameinput missing, 2 is ..., not only info
             self.funNameInput.clear()
+            self.funNameInput.setFocus()
             self.funInput.clear()
 
-    def removeConstraint(self, item):
-        print('Yet to implement')
+            self.logger.warning(signal)
+            self.on_generic_sig(signal)
 
-    def removeStateVariable(self, item):
-        print('Yet to implement')
-
+    # GUI
     def setFunEditor(self, parent):
         font = QFont()
         font.setFamily('Courier')
@@ -459,6 +399,7 @@ class Widget1(QWidget, Ui_Form):
         self.completer.setWrapAround(False)
         self.funInput.setCompleter(self.completer)
 
+    # GUI
     def generateStateVariable(self):
 
         default_dim = 1
@@ -468,20 +409,11 @@ class Widget1(QWidget, Ui_Form):
         sv_dim = self.SVDimInput.value()
         sv_nodes = self.SVNodeInput.value()
 
-        if self.checkStateVariable(sv_name):
-            if sv_nodes == 0:
-                var = self.casadi_prb.createStateVariable(sv_name, sv_dim)
-            else:
-                var = self.casadi_prb.createStateVariable(sv_name, sv_dim, sv_nodes)
+        # todo put in gui_receiver?
 
+        flag, signal = self.horizon_receiver.addStateVariable(dict(name=sv_name, dim=sv_dim, prev=sv_nodes))
 
-            self.sv_dict[sv_name] = dict(var=var, dim=sv_dim)
-
-            # print('state variable {} added.'.format(sv_name))
-            # print('dimension: {}'.format(sv_dim))
-            # print('previous node: {}'.format(sv_nodes))
-            # print('function: {}'.format(var))
-
+        if flag:
             self._addRowToSVTable(sv_name)
             # add variable to highlighter and to completer
             self.highlighter.addKeyword(sv_name)
@@ -493,18 +425,28 @@ class Widget1(QWidget, Ui_Form):
             self.SVDimInput.setValue(default_dim)
             self.SVNodeInput.setValue(default_past_node)
 
+            self.logger.info(signal)
+            self.on_generic_sig(signal)
 
+        else:
+            self.SVNameInput.setFocus()
+            self.logger.warning(signal)
+            self.on_generic_sig(signal)
+
+    # GUI
     def _connectActions(self):
 
+        # todo PUTT ALL OTHER CONNECT
         self.SVAddButton.clicked.connect(self.generateStateVariable)
 
+    # GUI
     def _addRowToSVTable(self, name):
 
         row_pos = self.SVTable.rowCount()
         self.SVTable.insertRow(row_pos)
 
         self.SVTable.setItem(row_pos, 0, QTableWidgetItem(name))
-        self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.sv_dict[name]['dim'])))
+        self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.horizon_receiver.sv_dict[name]['dim'])))
 
         # self.SVTable.setCellWidget(row_pos, 2, scroll)
 
@@ -629,8 +571,9 @@ class HorizonGUI(QMainWindow):
         # basically horizonLine in widget1 sends a signal with a msg, which I connect to the status bar
         self.widget1.constraintLine.repeated_fun.connect(self.writeInStatusBar)
         self.widget1.costfunctionLine.repeated_fun.connect(self.writeInStatusBar)
-        self.widget1.invalid_ct.connect(self.writeInStatusBar)
+        self.widget1.invalid_fun.connect(self.writeInStatusBar)
         self.widget1.invalid_sv.connect(self.writeInStatusBar)
+        self.widget1.generic_sig.connect(self.writeInStatusBar)
 
     def _createContextMenu(self):
         # Setting contextMenuPolicy

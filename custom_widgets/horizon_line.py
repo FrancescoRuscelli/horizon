@@ -47,23 +47,25 @@ class FunctionTab(QWidget):
         # self.ct_tab.tabBar().setTabButton(0, self.ct_tab.tabBar().RightSide, TabButtonWidget())
 
 class HorizonLine(QWidget):
+    add_fun_horizon = pyqtSignal(dict)
+    remove_fun_horizon = pyqtSignal(dict)
     repeated_fun = pyqtSignal(str)
 
-    def __init__(self, fun_type, logger=None, parent=None):
+    def __init__(self, horizon, fun_type, logger=None, parent=None):
         QWidget.__init__(self, parent)
         self.setAcceptDrops(True)
+
+        self.horizon_receiver = horizon
 
         if logger:
             self.logger = logger
         # can be Constraint or Cost Function
+
         self.fun_type = fun_type
         self.n_nodes = 25
-        self.fun_active = dict()
 
         self.setWindowState(Qt.WindowMaximized)
         self.showMaximized()
-
-        self.functions = dict()
 
         self.main_layout = QHBoxLayout(self)
 
@@ -93,13 +95,15 @@ class HorizonLine(QWidget):
             n_i = QPushButton("{}".format(i), self)
             self.fun_tab_layout.addWidget(n_i, 0, i, 1, 1, alignment=Qt.AlignTop)
 
-        self.fun_tab.tabCloseRequested.connect(self.removeActiveFunction)
+        self.fun_tab.tabCloseRequested.connect(self.removeActiveFunctionRequest)
 
-    def removeActiveFunction(self, index):
+    def removeActiveFunctionRequest(self, index):
 
         print(self.fun_tab.tabText(index))
-        self.fun_active.pop(self.fun_tab.tabText(index), None)
+        self.horizon_receiver.fun_active.pop(self.fun_tab.tabText(index), None)
+        # self.horizon_receiver.removeActiveFunction()
         self.fun_tab.removeTab(index)
+        # todo actually remove active function
 
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
@@ -119,56 +123,58 @@ class HorizonLine(QWidget):
         source_item = QStandardItemModel()
         source_item.dropMimeData(event.mimeData(), Qt.CopyAction, 0, 0, QModelIndex())
         fun_name = source_item.item(0, 0).text()
-        fun = source_item.item(0, 0).data(Qt.UserRole)
+        # fun = source_item.item(0, 0).data(Qt.UserRole)
 
-        if fun['type'] == self.fun_type:
-            if self.checkActiveFunction(fun_name):
-                self.addFunctionToHorizon(fun_name, fun)
-        else:
-            if self.logger:
-                self.logger.warning('Cannot insert function of type "{}". Only type "{}" is accepted.'.format(fun['type'], self.fun_type))
+        self.addFunctionToHorizon(fun_name, self.fun_type)
 
     @pyqtSlot()
     def on_repeated_fun(self, str):
         self.repeated_ct.emit(str)
 
-    def checkActiveFunction(self, name):
-        # check if constraint is already active
-        if name in self.fun_active.keys():
-            self.on_repeated_fun("function already active")
-            return False
+    @pyqtSlot()
+    def on_add_fun_horizon(self, data):
+        self.add_fun_horizon.emit(data)
 
-        return True
+    @pyqtSlot()
+    def on_remove_fun_horizon(self, data):
+        self.add_fun_to_casadi.emit(data)
 
     def addFunctionToHorizon(self, name, fun):
 
-        node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
-        self.ct = FunctionTab(name, fun, self.n_nodes)
-        # self.ct_max_lim = spinbox_line.SpinBoxLine(self.n_nodes)
-        # self.ct_min_lim = spinbox_line.SpinBoxLine(self.n_nodes)
-        verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
+        flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
 
-        # todo hardcoded bottom margin
-        # self.ct.setContentsMargins(0, 0, 0, 400)
+        if flag:
 
-        # self.ct.setMaximumHeight(100)
-        self.intab_layout = QVBoxLayout()
+            node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
+            self.ct = FunctionTab(name, fun, self.n_nodes)
+            # self.ct_max_lim = spinbox_line.SpinBoxLine(self.n_nodes)
+            # self.ct_min_lim = spinbox_line.SpinBoxLine(self.n_nodes)
+            verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
 
-        # don't fucking ask me why, these are magic numbers (-2, -5) in margins for alignment
-        self.intab_layout.setContentsMargins(node_box_width / 2 - 2, 20, node_box_width / 2 - 5, 0)
-        self.intab_layout.addWidget(self.ct, stretch=3)
-        # self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
-        # self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
-        self.intab_layout.addSpacerItem(verticalSpacer)
+            # todo hardcoded bottom margin
+            # self.ct.setContentsMargins(0, 0, 0, 400)
 
-        self.tab = QWidget()
-        self.tab.setLayout(self.intab_layout)
+            # self.ct.setMaximumHeight(100)
+            self.intab_layout = QVBoxLayout()
 
-        self.fun_tab.addTab(self.tab, str(name))
+            # don't fucking ask me why, these are magic numbers (-2, -5) in margins for alignment
+            self.intab_layout.setContentsMargins(node_box_width / 2 - 2, 20, node_box_width / 2 - 5, 0)
+            self.intab_layout.addWidget(self.ct, stretch=3)
+            # self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
+            # self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
+            self.intab_layout.addSpacerItem(verticalSpacer)
 
-        self.fun_active[name] = fun
+            self.tab = QWidget()
+            self.tab.setLayout(self.intab_layout)
 
-        print('active fun:', self.fun_active)
+            self.fun_tab.addTab(self.tab, str(name))
+
+            self.logger.info(signal)
+        else:
+
+            self.logger.warning(signal)
+
+
 
     def getFunctions(self, name):
         return self.fun_active[name]
