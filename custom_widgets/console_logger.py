@@ -11,7 +11,8 @@ class ConsoleLogger(logging.Handler, QTextEdit):
 
     def emit(self, record):
         msg = self.format(record)
-        self.textCursor().insertText(msg)
+        # self.textCursor().insertText(msg) # no new line
+        self.append(msg) # new line
 
     def write(self, m):
         pass
