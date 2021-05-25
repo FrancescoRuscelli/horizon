@@ -19,9 +19,9 @@
   <widget class="QGroupBox" name="funBox">
    <property name="geometry">
     <rect>
-     <x>400</x>
+     <x>570</x>
      <y>10</y>
-     <width>811</width>
+     <width>641</width>
      <height>201</height>
     </rect>
    </property>
@@ -38,9 +38,9 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>40</y>
+      <y>30</y>
       <width>291</width>
-      <height>101</height>
+      <height>161</height>
      </rect>
     </property>
     <layout class="QGridLayout" name="CTGrid">
@@ -92,7 +92,7 @@
      </item>
     </layout>
    </widget>
-   <widget class="QListWidget" name="funList">
+   <widget class="BoxFunction" name="funTable">
     <property name="geometry">
      <rect>
       <x>320</x>
@@ -101,128 +101,16 @@
       <height>161</height>
      </rect>
     </property>
-    <property name="editTriggers">
-     <set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed</set>
-    </property>
-    <property name="dragEnabled">
-     <bool>true</bool>
-    </property>
-    <property name="dragDropMode">
-     <enum>QAbstractItemView::DragOnly</enum>
-    </property>
-   </widget>
-   <widget class="QListWidget" name="constrList">
-    <property name="geometry">
-     <rect>
-      <x>640</x>
-      <y>30</y>
-      <width>141</width>
-      <height>70</height>
-     </rect>
-    </property>
-    <property name="editTriggers">
-     <set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed</set>
-    </property>
-    <property name="dragEnabled">
-     <bool>true</bool>
-    </property>
-    <property name="dragDropMode">
-     <enum>QAbstractItemView::DragOnly</enum>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_4">
-    <property name="geometry">
-     <rect>
-      <x>460</x>
-      <y>17</y>
-      <width>47</width>
-      <height>10</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Generic</string>
-    </property>
-   </widget>
-   <widget class="QListWidget" name="costfunList">
-    <property name="geometry">
-     <rect>
-      <x>640</x>
-      <y>121</y>
-      <width>141</width>
-      <height>70</height>
-     </rect>
-    </property>
-    <property name="editTriggers">
-     <set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed</set>
-    </property>
-    <property name="dragEnabled">
-     <bool>true</bool>
-    </property>
-    <property name="dragDropMode">
-     <enum>QAbstractItemView::DragOnly</enum>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_5">
-    <property name="geometry">
-     <rect>
-      <x>680</x>
-      <y>11</y>
-      <width>51</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Constraint</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_6">
-    <property name="geometry">
-     <rect>
-      <x>675</x>
-      <y>101</y>
-      <width>71</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Cost Function</string>
-    </property>
-   </widget>
-   <widget class="QWidget" name="horizontalLayoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>40</x>
-      <y>160</y>
-      <width>235</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QRadioButton" name="genericTypeButton">
-       <property name="text">
-        <string>Generic</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QRadioButton" name="constraintTypeButton">
-       <property name="text">
-        <string>Constraint</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QRadioButton" name="costfunctionTypeButton">
-       <property name="text">
-        <string>Cost Function</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
+    <column>
+     <property name="text">
+      <string>Name</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Function</string>
+     </property>
+    </column>
    </widget>
   </widget>
   <widget class="QGroupBox" name="SV">
@@ -429,6 +317,9 @@
     <attribute name="horizontalHeaderMinimumSectionSize">
      <number>20</number>
     </attribute>
+    <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+     <bool>false</bool>
+    </attribute>
     <attribute name="verticalHeaderDefaultSectionSize">
      <number>21</number>
     </attribute>
@@ -484,6 +375,9 @@
       <widget class="QRadioButton" name="SingleLine">
        <property name="text">
         <string>Single</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -636,6 +530,11 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
    <extends>QTextEdit</extends>
    <header>custom_widgets/console_logger.h</header>
   </customwidget>
+  <customwidget>
+   <class>BoxFunction</class>
+   <extends>QTableWidget</extends>
+   <header>custom_widgets/box_function.h</header>
+  </customwidget>
  </customwidgets>
  <tabstops>
   <tabstop>SVNameInput</tabstop>
@@ -645,7 +544,6 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
   <tabstop>funNameInput</tabstop>
   <tabstop>funInput</tabstop>
   <tabstop>funButton</tabstop>
-  <tabstop>funList</tabstop>
  </tabstops>
  <resources/>
  <connections/>
