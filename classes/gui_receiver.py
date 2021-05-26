@@ -1,6 +1,7 @@
 from classes import problem as horizon
 import parser
 import re
+import sys, os
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -14,7 +15,7 @@ class horizonImpl():
         self.sv_dict = dict()  # state variables
         self.fun_dict = dict() # functions
 
-        self.active_fun_dict = dict()
+        self.active_fun_list = list()
 
     def addStateVariable(self, data):
 
@@ -40,12 +41,11 @@ class horizonImpl():
         # get Function from Text
         name = data['name']
         str_fun = data['str']
-        fun_type = data['type']
 
         flag, signal = self.checkFunction(name, str_fun)
         if flag:
 
-            self._createAndAppendFun(name, str_fun, fun_type)
+            self._createAndAppendFun(name, str_fun)
             return True, signal
         else:
             return False, signal
@@ -55,20 +55,35 @@ class horizonImpl():
         if fun_type == 'constraint':
             try:
                 # self.logger.info('Adding function: {}'.format(self.fun_dict[name]))
-                self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'])
+                active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'])
+                self.active_fun_list.append(active_fun)
+                self.fun_dict[name].update({'active': active_fun})
             except Exception as e:
                 return False, e
 
         elif fun_type == 'costfunction':
             try:
-                self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
+                active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
+                self.active_fun_list.append(active_fun)
+                self.fun_dict[name].update({'active': active_fun})
             except Exception as e:
                 return False, e
 
-        return True, 'Function "{}: {}" activated.'.format(name, self.fun_dict[name]['str'])
+        return True, 'Function "{}: {}" activated as "{}".'.format(name,  active_fun.getFunction(), active_fun.getType())
 
-    def removeFunction(self, data):
-        print('"removeFunction" yet to implement. Data: {}'.format(data))
+    def removeActiveFunction(self, name):
+
+        active_fun_type = self.fun_dict[name]['active'].getType()
+        self.fun_dict[name].pop('active', None)
+
+        if active_fun_type == 'constraint':
+            self.casadi_prb.removeConstraint(name)
+        elif active_fun_type == 'costfunction':
+            self.casadi_prb.removeCostFunction(name)
+        else:
+            return False, 'Function type "{}" not recognized'.format(active_fun_type)
+
+        return True, 'Function "{}" successfully removed.'.format(name)
 
     def removeStateVariable(self, data):
         print('"removeStateVariable" yet to implement. Data: {}'.format(data))
@@ -160,7 +175,7 @@ class horizonImpl():
         fun = self.fromTxtToFun(str_fun)
 
         if name in self.fun_dict.keys():
-            self._createAndAppendFun(name, str_fun, 'generic')
+            self._createAndAppendFun(name, str_fun)
             signal = 'Function "{}" edited with {}. Updated function: {}'.format(name, str_fun, self.fun_dict[name])
             return True, signal
         else:
@@ -171,22 +186,14 @@ class horizonImpl():
         if name in self.fun_dict.keys():
             return self.fun_dict[name]
 
-    def _createAndAppendFun(self, name, str_fun, fun_type):
+    def _createAndAppendFun(self, name, str_fun):
 
         fun = self.fromTxtToFun(str_fun)
         # TODO I can probably do a wrapper function in casadi self.createFunction(name, fun, type)
         # TODO HOW ABOUT GENERIC FUNCTION? Should i do a casadi function for them?
         # fill horizon_receiver.fun_dict and funList
         # TODO add fun type??
-        self.fun_dict[name] = dict(fun=fun, str=str_fun, type=fun_type)
-
-        # todo what to do with fun of fun
-
-        # if constraint has also a type, this:
-        if fun_type == 'constraint':
-            self.addConstraintFunction(name, fun)
-        elif fun_type == 'costfunction':
-            self.addCostFunction(name, fun)
+        self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None)
 
 
 

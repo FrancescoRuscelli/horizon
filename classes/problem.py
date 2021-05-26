@@ -39,36 +39,63 @@ class Problem:
     #             return var
     #     return None
 
-    def createFunction(self, container, name, f, nodes=None):
-
+    def _getUsedVar(self, f):
         used_var = dict()
-        if not nodes:
-            nodes = [0, self.N]
         for name_var, value_var in self.state_var_container.getVarAbstrDict().items():
             if cs.depends_on(f, value_var):
                 used_var[name_var] = value_var
 
-        temp_fun = fc.Constraint(name, f, used_var, nodes)
-        container.append(temp_fun)
+        return used_var
 
-        return temp_fun
+    # @classmethod
+    # def createFunction(self, fun_type, **kwargs):
+    #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
 
         container = self.cnstr_container
-        fun = self.createFunction(container, name, g, nodes)
+
+        if not nodes:
+            nodes = [0, self.N]
+
+        used_var = self._getUsedVar(g)
+
+        fun = fc.Constraint(name, g, used_var, nodes)
+        container.append(fun)
 
         return fun
 
     def createCostFunction(self, name, j, nodes=None):
 
         container = self.costfun_container
-        fun = self.createFunction(container, name, j, nodes)
+        if not nodes:
+            nodes = [0, self.N]
+
+        used_var = self._getUsedVar(j)
+
+        fun = fc.CostFunction(name, j, used_var, nodes)
+        container.append(fun)
 
         return fun
 
+    def removeCostFunction(self, name):
+
+        print(self.costfun_container)
+        for fun in self.costfun_container:
+            if fun.getName() == name:
+                self.costfun_container.remove(fun)
+
+        print(self.costfun_container)
+
+    def removeConstraint(self, name):
+        for fun in self.cnstr_container:
+            if fun.getName() == name:
+                self.cnstr_container.remove(fun)
+
     def _implementFunctions(self, container, node):
         f_impl = list()
+
+        # TODO be careful about ordering
         for fun in container:
             f = fun.getFunction()
             # implement constraint only if constraint is present in node k
@@ -124,6 +151,10 @@ class Problem:
         print('----------------------------------------------------')
         self.state_var_container.getVarImplList()
 
+# Problem.function = {
+#     'constraint': Problem.createConstraint,
+#     'cost_function': Problem.createCostFunction,
+# }
     # def setConstraint(self, cnstr):
     #     assert(isinstance(cnstr, fc.Constraint))
     #     self.cnstr_container.append(cnstr.getName())

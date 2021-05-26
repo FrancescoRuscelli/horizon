@@ -32,15 +32,16 @@ from custom_widgets.multi_slider import QMultiSlider
 #         self.setLayout(self.layout)
 
 class FunctionTab(QWidget):
-    def __init__(self, name, fun, n_nodes, parent=None):
+    def __init__(self, name, fun, n_nodes, options=None, parent=None):
         super().__init__(parent)
 
+        print(options)
         self.name = name
         self.fun = fun
         self.n_nodes = n_nodes
 
         self.hlayout = QHBoxLayout(self)
-        self.slider = QMultiSlider(slider_range=[0, self.n_nodes - 1, 1], values=[2, 3])
+        self.slider = QMultiSlider(slider_range=[0, self.n_nodes - 1, 1], values=[2, 3], options=options)
         self.hlayout.addWidget(self.slider)
 
         # adding + - push button to tab
@@ -62,6 +63,19 @@ class HorizonLine(QWidget):
         # can be Constraint or Cost Function
 
         self.fun_type = fun_type
+
+        self.options = dict()
+        if self.fun_type == 'constraint':
+            self.options['background_color'] = Qt.darkGreen
+            self.options['slice_color'] = Qt.green
+            self.options['minmax_color'] = Qt.darkRed
+            self.options['ticks_color'] = Qt.darkCyan
+        elif self.fun_type == 'costfunction':
+            self.options['background_color'] = Qt.darkBlue
+            self.options['slice_color'] = Qt.blue
+            self.options['minmax_color'] = Qt.darkRed
+            self.options['ticks_color'] = Qt.darkCyan
+
         self.n_nodes = 25
 
         self.setWindowState(Qt.WindowMaximized)
@@ -99,10 +113,14 @@ class HorizonLine(QWidget):
 
     def removeActiveFunctionRequest(self, index):
 
-        print(self.fun_tab.tabText(index))
-        self.horizon_receiver.fun_active.pop(self.fun_tab.tabText(index), None)
+
+        flag, signal = self.horizon_receiver.removeActiveFunction(self.fun_tab.tabText(index))
+        # self.horizon_receiver.fun_active.pop(self.fun_tab.tabText(index), None)
         # self.horizon_receiver.removeActiveFunction()
-        self.fun_tab.removeTab(index)
+        if flag:
+            self.fun_tab.removeTab(index)
+
+        self.logger.info(signal)
         # todo actually remove active function
 
     def dragEnterEvent(self, event):
@@ -131,14 +149,6 @@ class HorizonLine(QWidget):
     def on_repeated_fun(self, str):
         self.repeated_ct.emit(str)
 
-    @pyqtSlot()
-    def on_add_fun_horizon(self, data):
-        self.add_fun_horizon.emit(data)
-
-    @pyqtSlot()
-    def on_remove_fun_horizon(self, data):
-        self.add_fun_to_casadi.emit(data)
-
     def addFunctionToHorizon(self, name, fun):
 
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
@@ -146,7 +156,7 @@ class HorizonLine(QWidget):
         if flag:
 
             node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
-            self.ct = FunctionTab(name, fun, self.n_nodes)
+            self.ct = FunctionTab(name, fun, self.n_nodes, options=self.options)
             # self.ct_max_lim = spinbox_line.SpinBoxLine(self.n_nodes)
             # self.ct_min_lim = spinbox_line.SpinBoxLine(self.n_nodes)
             verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)

@@ -126,6 +126,9 @@ class Widget1(QWidget, Ui_Form):
     # GUI
     def openFunction(self, item):
 
+        # todo ADD USAGES: if active and where is active!!
+
+
         # regardless of where I click, get the first item of the table
         item = self.funTable.item(self.funTable.row(item), 0)
 
@@ -192,12 +195,10 @@ class Widget1(QWidget, Ui_Form):
 
     def showWrappedFun(self, item):
         str_fun = self.horizon_receiver.getFunction(item.text())['str']
-        print(str_fun)
         self.temp_line_edit.setText(str_fun)
 
     def showUnwrappedFun(self, item):
         str_fun = str(self.horizon_receiver.getFunction(item.text())['fun'])
-        print(str_fun)
         self.temp_line_edit.setText(str_fun)
 
     # GUI
@@ -305,24 +306,25 @@ class Widget1(QWidget, Ui_Form):
         self.sv_window_layout.addWidget(self.usages_table, 3, 0, 1, 4)
         # # todo add usages (add constraint logic and check if constraint depends on variable)
         # TODO REMOVE CT ADD FUNCTION
+        # get only active function
+        active_fun_list = [i for i in [(elem['str'], elem['active']) for name, elem in self.horizon_receiver.fun_dict.items() if 'active' in elem] if i[1]]
 
-        for name, function in self.horizon_receiver.fun_dict.items():
-            if item.text() in function['fun'].getVariables():
+        for str_function, function in active_fun_list:
+            if item.text() in function.getVariables():
                 row_pos = self.usages_table.rowCount()
                 self.usages_table.insertRow(row_pos)
-                fun_name = QTableWidgetItem(function['fun'].getName())
-                fun_name.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+                fun_name = QTableWidgetItem(function.getName())
+                fun_name.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
 
-                fun_str = QTableWidgetItem(function['str'])
-                fun_str.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+                fun_str = QTableWidgetItem(str_function)
+                fun_str.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
 
-                # TODO ADD?
-                # fun_type = QTableWidgetItem(function['type'])
-                # fun_type.setFlags(Qt.ItemIsEnabled|Qt.ItemIsSelectable)
+                fun_type = QTableWidgetItem(function.getType())
+                fun_type.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
 
                 self.usages_table.setItem(row_pos, 0, fun_name)
                 self.usages_table.setItem(row_pos, 1, fun_str)
-                # self.usages_table.setItem(row_pos, 2, fun_type)
+                self.usages_table.setItem(row_pos, 2, fun_type)
 
 
         self.remove_button = QPushButton('Remove Variable')
@@ -345,7 +347,7 @@ class Widget1(QWidget, Ui_Form):
     def generateFunction(self):
         name = self.funNameInput.text()
         str_fun = self.funInput.toPlainText()
-        flag, signal = self.horizon_receiver.addFunction(dict(name=name, str=str_fun, type='generic'))
+        flag, signal = self.horizon_receiver.addFunction(dict(name=name, str=str_fun, active=None))
 
         if flag:
 
