@@ -55,6 +55,9 @@ class Function:
         return self.vars
         # return [var for name, var in self.var]
 
+    def getType(self):
+        return 'generic'
+
 class Constraint(Function):
     def __init__(self, name, f, used_vars, nodes, bounds=None):
         super().__init__(name, f, used_vars, nodes)
@@ -63,12 +66,19 @@ class Constraint(Function):
         # todo setBounds
         # self.setBounds(bounds)
 
+    # todo transform string in typeFun "ConstraintType"
+    def getType(self):
+        return 'constraint'
+
     def setBounds(self):
         print('wip')
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):
         super().__init__(name, f, used_vars, nodes)
+
+    def getType(self):
+        return 'costfunction'
 
 
 
