@@ -2,6 +2,7 @@ import casadi as cs
 from classes import function as fc
 from classes import nodes as nd
 from classes import state_variables as sv
+import numpy as np
 
 class Problem:
 
@@ -140,16 +141,54 @@ class Problem:
             self.state_var_container.update(k)
             # implement the constraint
             self._updateConstraints(k) #todo not sure but ok, maybe better a constraint class container that updates takin state_var_container?
-
             self._updateCostFunctions(k)
+
+
             self.costfun_sum = cs.sum1(cs.vertcat(*self.costfun_impl))
 
         # print('state var unraveled:', self.state_var_container.getVarImplList())
         # print('constraints unraveled:', cs.vertcat(*self.cnstr_impl))
         # print('cost functions unraveled:', cs.vertcat(*self.costfun_impl))
         # print('cost function summed:', self.costfun_sum)
-        print('----------------------------------------------------')
+        # print('----------------------------------------------------')
         self.state_var_container.getVarImplList()
+
+    def solveProblem(self):
+        w = self.state_var_container.getVarImplList()
+        w0 = np.zeros((w.shape[0]))
+        g = cs.vertcat(*self.cnstr_impl)
+        j = self.costfun_sum
+        print('================')
+        print('len w:', w.shape)
+        # print('len lbw:', len(self.lbw))
+        # print('len ubw:', len(self.ubw))
+        print('len w0:', len(w0))
+        print('len g:', g.shape)
+        # print('len lbg:', len(self.ct.lbg))
+        # print('len ubg:', len(self.ct.ubg))
+
+        print('================')
+        print('w:', w)
+        # print('lbw:', self.lbw)
+        # print('ubw:', self.ubw)
+        print('g:', g)
+        # print('lbg:', self.ct.lbg)
+        # print('ubg:', self.ct.ubg)
+        print('j:', j)
+
+
+        # print(self.)
+        # sol = self.solver(x0=self.w0, lbx=self.lbw, ubx=self.ubw, lbg=self.ct.lbg, ubg=self.ct.ubg)
+        #
+        # if self.crash_if_suboptimal:
+        #     if not self.solver.stats()['success']:
+        #         raise Exception('Optimal solution NOT found.')
+        #
+        # w_opt = sol['x'].full().flatten()
+        #
+        # return w_opt
+
+
 
 # Problem.function = {
 #     'constraint': Problem.createConstraint,
