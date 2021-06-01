@@ -12,7 +12,7 @@ class Problem:
 
         self.N = N
         # state variable to optimize
-        self.state_var_container = sv.StateVariables()
+        self.state_var_container = sv.StateVariables(self.N)
 
         # just variables
         self.var_container = list()
@@ -61,6 +61,7 @@ class Problem:
 
         used_var = self._getUsedVar(g)
 
+        print('Creating function {} with abstract variables {}'.format(g, used_var))
         fun = fc.Constraint(name, g, used_var, nodes)
         container.append(fun)
 
@@ -99,19 +100,19 @@ class Problem:
         # TODO be careful about ordering
         for fun in container:
             f = fun.getFunction()
+            # print('var in fun', fun.getVariables())
+            # print('fun', fun.getFunction())
+
             # implement constraint only if constraint is present in node k
             if node in fun.getNodes():
+                print('Node {}:'.format(node))
                 f_impl.append(f(*[self.state_var_container.getVarImpl(name, node) for name, val in fun.getVariables().items()]))
-
+                print('Implemented function {} at node {}: {}'.format(fun.getName(), node, f_impl,))
+                print('Used variables: {}'.format([self.state_var_container.getVarImpl(name, node) for name, val in fun.getVariables().items()]))
+                print('===========================================')
         return f_impl
 
     def _updateConstraints(self, node):
-
-        # print('name:', name)
-        # print('f:', self.g_dict[name]['constraint'])
-        # print('var_opt:', self.var_opt)
-        # print('vars:', [self.var_opt[x] for x in self.g_dict[name]['var']])
-        # print('g_dict:', self.g_dict[name])
         temp_cnsrt_impl = self._implementFunctions(self.cnstr_container, node)
         if temp_cnsrt_impl:
             # add implemented constraints in list
@@ -160,8 +161,8 @@ class Problem:
         j = self.costfun_sum
         print('================')
         print('len w:', w.shape)
-        # print('len lbw:', len(self.lbw))
-        # print('len ubw:', len(self.ubw))
+        print('len lbw:', self.state_var_container.getBoundsMinList().shape)
+        print('len ubw:', self.state_var_container.getBoundsMaxList().shape)
         print('len w0:', len(w0))
         print('len g:', g.shape)
         # print('len lbg:', len(self.ct.lbg))
@@ -169,8 +170,8 @@ class Problem:
 
         print('================')
         print('w:', w)
-        # print('lbw:', self.lbw)
-        # print('ubw:', self.ubw)
+        print('lbw:', self.state_var_container.getBoundsMinList())
+        print('ubw:', self.state_var_container.getBoundsMaxList())
         print('g:', g)
         # print('lbg:', self.ct.lbg)
         # print('ubg:', self.ct.ubg)
@@ -197,3 +198,6 @@ class Problem:
     # def setConstraint(self, cnstr):
     #     assert(isinstance(cnstr, fc.Constraint))
     #     self.cnstr_container.append(cnstr.getName())
+
+if __name__ == '__main__':
+    prb = Problem(10)

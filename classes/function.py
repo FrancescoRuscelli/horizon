@@ -21,7 +21,7 @@ class Function:
     def getNodes(self):
         return self.nodes
 
-    def setNodes(self, nodes):
+    def setNodes(self, nodes, erasing=False):
 
         # todo check this logic
         # check if  int, list or list of list
@@ -40,7 +40,10 @@ class Function:
             for item in temp:
                 unraveled_nodes.append(item)
 
+        if erasing:
+            self.nodes.clear()
 
+        # adding to function nodes
         if isinstance(unraveled_nodes, int):
             if unraveled_nodes not in self.nodes:
                 self.nodes.append(unraveled_nodes)

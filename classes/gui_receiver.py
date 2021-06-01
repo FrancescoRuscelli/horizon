@@ -52,24 +52,29 @@ class horizonImpl():
 
     def activateFunction(self, name, fun_type):
 
-        if fun_type == 'constraint':
-            try:
-                # self.logger.info('Adding function: {}'.format(self.fun_dict[name]))
-                active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'])
-                self.active_fun_list.append(active_fun)
-                self.fun_dict[name].update({'active': active_fun})
-            except Exception as e:
-                return False, e
+        flag, signal = self.checkActiveFunction(name)
 
-        elif fun_type == 'costfunction':
-            try:
-                active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
-                self.active_fun_list.append(active_fun)
-                self.fun_dict[name].update({'active': active_fun})
-            except Exception as e:
-                return False, e
+        if flag:
+            if fun_type == 'constraint':
+                try:
+                    # self.logger.info('Adding function: {}'.format(self.fun_dict[name]))
+                    active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'])
+                    self.active_fun_list.append(active_fun)
+                    self.fun_dict[name].update({'active': active_fun})
+                except Exception as e:
+                    return False, e
 
-        return True, 'Function "{}: {}" activated as "{}".'.format(name,  active_fun.getFunction(), active_fun.getType())
+            elif fun_type == 'costfunction':
+                try:
+                    active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
+                    self.active_fun_list.append(active_fun)
+                    self.fun_dict[name].update({'active': active_fun})
+                except Exception as e:
+                    return False, e
+
+            return True, signal + 'Function "{}: {}" activated as "{}".'.format(name,  active_fun.getFunction(), active_fun.getType())
+        else:
+            return False, signal
 
     def removeActiveFunction(self, name):
 
@@ -93,11 +98,11 @@ class horizonImpl():
 
     def checkActiveFunction(self, name): # fun, name
 
-        if name in self.active_fun_dict.keys():
+        if self.fun_dict[name]['active'] is not None:
             signal = "active function already inserted"
             return False, signal
 
-        return True, 'Function "{}" can be activated. Adding.'
+        return True, 'Function "{}" can be activated. Adding. '.format(name)
 
     def checkFunction(self, name, fun): # fun, name
 
@@ -172,8 +177,6 @@ class horizonImpl():
 
     def editFunction(self, name, str_fun):
 
-        fun = self.fromTxtToFun(str_fun)
-
         if name in self.fun_dict.keys():
             self._createAndAppendFun(name, str_fun)
             signal = 'Function "{}" edited with {}. Updated function: {}'.format(name, str_fun, self.fun_dict[name])
@@ -181,6 +184,14 @@ class horizonImpl():
         else:
             signal = 'Failed editing of function "{}".'.format(name)
             return False, signal
+
+    def updateFunctionNodes(self, name, nodes):
+        # small hack to include also the max for each couple of min/max --> [0, 3] --> 0, 1, 2, 3. Not 0, 1, 2
+        for couples in nodes:
+            couples[1] = couples[1]+1
+
+        self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
+
 
     def getFunction(self, name):
         if name in self.fun_dict.keys():
