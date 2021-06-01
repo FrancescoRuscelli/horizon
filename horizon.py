@@ -5,6 +5,7 @@ import warnings
 from collections import OrderedDict
 import math
 import time
+import pprint
 
 def ordered_dict_prepend(dct, key, value, dict_setitem=dict.__setitem__):
     root = dct._OrderedDict__root
@@ -247,7 +248,9 @@ class Problem:
         self.ct.addConstraintBounds()
 
         self.addInitialGuess()
-        w = cs.vertcat(*[item['var'] for sublist in self.state_var for item in sublist])
+        pprint.pprint(self.state_var)
+        pprint.pprint(self.var_opt)
+        self.all_w = cs.vertcat(*[item['var'] for sublist in self.state_var for item in sublist])
 
         self.lbw = [item for sublist in [item['lbw'] for sublist in self.state_var for item in sublist] for item in sublist]
         self.ubw = [item for sublist in [item['ubw'] for sublist in self.state_var for item in sublist] for item in sublist]
@@ -258,37 +261,37 @@ class Problem:
         # w[0::2] = X
         # w[1::2] = U
         print('getConstraints', self.ct.getConstraints())
-        g = self.ct.getConstraints()
+        self.all_g = self.ct.getConstraints()
 
         J = self.j
 
-        prob = {'f': J, 'x': w, 'g': g}
+        prob = {'f': J, 'x': self.all_w, 'g': self.all_g}
         self.solver = cs.nlpsol('solver', 'ipopt', prob,
                            {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
                             'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
-        return w, g
+        return self.all_w, self.all_g
 
     def solveProblem(self):
 
-        # print('================')
-        # print('w:', w.shape)
-        # print('lbw:', len(self.lbw))
-        # print('ubw:', len(self.ubw))
-        # print('w0:', len(self.w0))
-        #
-        # print('g:', g.shape)
-        # print('lbg:', len(self.ct.lbg))
-        # print('ubg:', len(self.ct.ubg))
-        #
-        # print('================')
-        # print('w:', w)
+        print('================')
+        print('len w:', self.all_w.shape)
+        # print('len lbw:', len(self.lbw))
+        # print('len ubw:', len(self.ubw))
+        print('len w0:', len(self.w0))
+
+        print('len g:', self.all_g.shape)
+        # print('len lbg:', len(self.ct.lbg))
+        # print('len ubg:', len(self.ct.ubg))
+
+        print('================')
+        print('w:', self.all_w)
         # print('lbw:', self.lbw)
         # print('ubw:', self.ubw)
-        # print('g:', g)
+        print('g:', self.all_g)
         # print('lbg:', self.ct.lbg)
         # print('ubg:', self.ct.ubg)
-        # print('j:', self.j)
+        print('j:', self.j)
 
         # Solve the NLP
         sol = self.solver(x0=self.w0, lbx=self.lbw, ubx=self.ubw, lbg=self.ct.lbg, ubg=self.ct.ubg)
@@ -308,7 +311,7 @@ class Problem:
 
         for elem in self.var_opt:
             # search for past variables. If found, put it in 'self.var_opt_prev'
-            # var opt prev keep track of all the past variables
+            # var_opt_prev keep track of all the past variables
             if elem.find('-') != -1:
                 if k > 0:
                     name = elem[:elem.index('-')]
@@ -517,6 +520,7 @@ class Constraint:
                                             'can only be added from node n:',
                                             int(name_var[name_var.index('-') + len('-'):]))
 
+        print('used var in constraint:', used_var)
         # create function and add it to dictionary of constraint function
         f = cs.Function(name, list(used_var.values()), [g])
 
@@ -705,7 +709,7 @@ class Constraint:
 
 
 if __name__ == '__main__':
-    N = 10
+    N = 5
     prb = Problem(N, crash_if_suboptimal=False)
     h = 1
     grav = 9.8
@@ -749,9 +753,9 @@ if __name__ == '__main__':
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0,2], [3,4]], bounds=(dict(lbg=[-1,-1], ubg=[1,1])))
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(nodes=[0,2]))) # should be wrong
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(ubg=[1, 1])))
-    prb.ct.setConstraintFunction('generic_constraint1', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
+    # prb.ct.setConstraintFunction('generic_constraint1', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
     # prb.ct.setConstraintFunction('generic_constraint2', var_opt['u'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
-
+    prb.ct.setConstraintFunction('generic_constraint3', var_opt['x-2'][0:2] - var_opt['x'][4:6], nodes=[2, 4])
 
     # prb.ct.setConstraintFunction('generic_constraint',
     #                              var_opt['x'][0:2] - var_opt['x'][4:6],
