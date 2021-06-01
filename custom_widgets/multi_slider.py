@@ -4,6 +4,7 @@ Qt Widget Multiple Slider widget.
 """
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 from functools import partial
 
 class Slice(QtWidgets.QWidget):
@@ -24,8 +25,6 @@ class Slice(QtWidgets.QWidget):
             self.rangeChanged.emit(self.min, self.max)
             self.old_min = self.min
             self.old_max = self.max
-            if 1:
-                print("Range change:", self.min, self.max)
 
     def setValues(self, values):
         self.min = values[0]
@@ -39,7 +38,9 @@ class Slice(QtWidgets.QWidget):
         self.max = max
 
     def getValues(self):
-        return [self.min, self.max]
+        int_min = int(self.min)
+        int_max = int(self.max)
+        return [int_min, int_max]
 
     def checkMinMax(self):
         if self.min > self.max:
@@ -51,8 +52,7 @@ class QMultiSlider(QtWidgets.QWidget):
     """
     Range Slider super class.
     """
-    doubleClick = QtCore.pyqtSignal()
-    rangeChanged = QtCore.pyqtSignal(float, float)
+    slicesChanged = QtCore.pyqtSignal(list)
 
     def __init__(self, slider_range, values, parent=None, options=None):
 
@@ -87,10 +87,10 @@ class QMultiSlider(QtWidgets.QWidget):
         if values:
             # add a slice of the given range for each list
             # todo add more slices in constructor
-            intial_slice = Slice(values[0], values[1])
-            self.slices.append(intial_slice)
+            initial_slice = Slice(values[0], values[1])
+            self.addSlice(initial_slice)
         else:
-            self.slices.append(Slice(0.3, 0.6))
+            self.addSlice()
 
         self._connectActions()
 
@@ -106,8 +106,8 @@ class QMultiSlider(QtWidgets.QWidget):
         self.newSliceAction.setIcon(QtGui.QIcon("../resources/slice.png"))
 
         val = self.fromDisplayToRange(event.pos().x())
-
-        self.newSliceAction.triggered.connect(partial(self.addSlice, [val, val+1]))
+        new_slice = Slice(val, val+1)
+        self.newSliceAction.triggered.connect(partial(self.addSlice, new_slice))
         menu.addAction(self.newSliceAction)
 
         for slice in self.slices:
@@ -132,17 +132,20 @@ class QMultiSlider(QtWidgets.QWidget):
     #     menu.addAction(self.newSliceAction)
     #     menu.exec_(QtGui.QCursor.pos())
 
-    def addSlice(self, range=None):
-        if range is None:
-            slice_to_append = Slice(0, self.scale + self.start)
-        else:
-            slice_to_append = Slice(range[0], range[1])
-        self.slices.append(slice_to_append)
+    def addSlice(self, slice=None):
 
+        if slice is None:
+            slice = Slice(0, self.scale + self.start)
+
+
+        self.slices.append(slice)
         # set as active slice the one created
-        self.active_slice = slice_to_append
+        self.active_slice = slice
+        self.display_min = self.fromValueToDisplay(self.active_slice)[0]
+        self.display_max = self.fromValueToDisplay(self.active_slice)[1]
 
         # run merge slider if new slider is over one slider already created
+        self.emitRanges()
         self.mergeSlider()
         self.update()
 
@@ -270,34 +273,51 @@ class QMultiSlider(QtWidgets.QWidget):
         #                                    self.top_margin, self.right_margin,
         #                                    self.bottom_margin)
 
-
-
-
     def mergeSlider(self):
         active_display_min, active_display_max = self.fromValueToDisplay(self.active_slice)
-
+        # print('entered merge')
+        # print('all slices', self.slices)
+        # print('current slice', self.active_slice)
         for slice in self.slices:
             if slice is not self.active_slice:
                 display_min, display_max = self.fromValueToDisplay(slice)
 
                 if active_display_min <= display_max and active_display_max > display_max:
-                    self.slices.remove(slice)
-                    self.slices.remove(self.active_slice)
-                    self.slices.append(Slice(slice.getValues()[0], self.active_slice.getValues()[1]))
+                    self.removeSlice(slice)
+                    self.removeSlice(self.active_slice)
+                    # self.slices.remove(slice)
+                    # self.slices.remove(self.active_slice)
+                    new_slice = Slice(slice.getValues()[0], self.active_slice.getValues()[1])
+                    self.addSlice(new_slice)
+                    # self.slices.append(new_slice)
                     self.moving = "none"
                     QtWidgets.QApplication.restoreOverrideCursor()
+
+                    # self.active_slice = new_slice
                 elif active_display_max >= display_min and active_display_min < display_min:
-                    self.slices.remove(slice)
-                    self.slices.remove(self.active_slice)
-                    self.slices.append(Slice(self.active_slice.getValues()[0], slice.getValues()[1]))
+                    self.removeSlice(slice)
+                    self.removeSlice(self.active_slice)
+                    # self.slices.remove(slice)
+                    # self.slices.remove(self.active_slice)
+                    new_slice = Slice(self.active_slice.getValues()[0], slice.getValues()[1])
+                    self.addSlice(new_slice)
+                    # self.slices.append(new_slice)
                     self.moving = "none"
                     QtWidgets.QApplication.restoreOverrideCursor()
+
+                    # self.active_slice = new_slice
                 elif active_display_max <= display_max and active_display_min >= display_min:
-                    self.slices.remove(slice)
-                    self.slices.remove(self.active_slice)
-                    self.slices.append(Slice(slice.getValues()[0], slice.getValues()[1]))
+                    self.removeSlice(slice)
+                    self.removeSlice(self.active_slice)
+                    # self.slices.remove(slice)
+                    # self.slices.remove(self.active_slice)
+                    new_slice = Slice(slice.getValues()[0], slice.getValues()[1])
+                    self.addSlice(new_slice)
+                    # self.slices.append(new_slice)
                     self.moving = "none"
                     QtWidgets.QApplication.restoreOverrideCursor()
+
+                    # self.active_slice = new_slice
 
 
     def mousePressEvent(self, event):
@@ -374,7 +394,7 @@ class QMultiSlider(QtWidgets.QWidget):
                         self.display_max = temp
 
                     if self.emit_while_moving:
-                        self.active_slice.emitRange()
+                        self.emitRanges()
 
             elif self.moving == "max":
                 temp = self.display_max - diff
@@ -390,7 +410,8 @@ class QMultiSlider(QtWidgets.QWidget):
                         self.display_min = temp
 
                     if self.emit_while_moving:
-                        self.active_slice.emitRange()
+                        self.emitRanges()
+
             elif self.moving == "bar":
                 temp = self.display_min - diff
                 if (temp >= self.bar_width) and (temp < size - self.bar_width - (self.display_max - self.display_min)):
@@ -399,12 +420,21 @@ class QMultiSlider(QtWidgets.QWidget):
                     self.updateCurrentSlice()
 
                     if self.emit_while_moving:
-                        self.active_slice.emitRange()
+                        self.emitRanges()
+
+    def emitRanges(self):
+        all_ranges = [slice.getValues() for slice in self.slices]
+        self.on_slices_changed(all_ranges)
+        # self.active_slice.emitRange()
 
     def mouseReleaseEvent(self, event):
         if not (self.moving == "none"):
-            self.active_slice.emitRange()
+            self.emitRanges()
         self.moving = "none"
+
+    @QtCore.pyqtSlot()
+    def on_slices_changed(self, ranges):
+        self.slicesChanged.emit(ranges)
 
 if (__name__ == "__main__"):
     import sys

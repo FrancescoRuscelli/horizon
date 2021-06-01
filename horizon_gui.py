@@ -43,8 +43,6 @@ import qrc_resources
 #         pass
 
 class Widget1(QWidget, Ui_Form):
-    invalid_sv = pyqtSignal(str)
-    invalid_fun = pyqtSignal(str)
     generic_sig = pyqtSignal(str)
 
     def __init__(self):
@@ -102,15 +100,10 @@ class Widget1(QWidget, Ui_Form):
         self.SVTable.itemDoubleClicked.connect(self.openSV)
         self.switchPageButton.clicked.connect(self.switchPage)
         self.constraintLine.add_fun_horizon.connect(self.horizon_receiver.addFunction)
+        self.constraintLine.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
+        self.costfunctionLine.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
 
     @pyqtSlot()
-    def on_invalid_sv(self, str):
-        self.invalid_sv.emit(str)
-
-    @pyqtSlot()
-    def on_invalid_fun(self, str):
-        self.invalid_fun.emit(str)
-
     def on_generic_sig(self, str):
         self.generic_sig.emit(str)
     # GUI
@@ -573,8 +566,6 @@ class HorizonGUI(QMainWindow):
         # basically horizonLine in widget1 sends a signal with a msg, which I connect to the status bar
         self.widget1.constraintLine.repeated_fun.connect(self.writeInStatusBar)
         self.widget1.costfunctionLine.repeated_fun.connect(self.writeInStatusBar)
-        self.widget1.invalid_fun.connect(self.writeInStatusBar)
-        self.widget1.invalid_sv.connect(self.writeInStatusBar)
         self.widget1.generic_sig.connect(self.writeInStatusBar)
 
     def _createContextMenu(self):

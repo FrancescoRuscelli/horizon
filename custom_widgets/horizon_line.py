@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QWidget, QGridLayout, QRubberBand, QPushButton, QTab
 from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSignal, pyqtSlot, QMimeData, QDataStream, QIODevice, QModelIndex
 from PyQt5.QtGui import QStandardItemModel
 
+from functools import partial
 from custom_widgets import spinbox_line
 
 import os
@@ -32,18 +33,23 @@ from custom_widgets.multi_slider import QMultiSlider
 #         self.setLayout(self.layout)
 
 class FunctionTab(QWidget):
+    nodesChanged = pyqtSignal(str, list)
+
     def __init__(self, name, fun, n_nodes, options=None, parent=None):
         super().__init__(parent)
 
-        print(options)
         self.name = name
         self.fun = fun
         self.n_nodes = n_nodes
 
         self.hlayout = QHBoxLayout(self)
-        self.slider = QMultiSlider(slider_range=[0, self.n_nodes - 1, 1], values=[2, 3], options=options)
+        self.slider = QMultiSlider(slider_range=[0, self.n_nodes - 1, 1], values=[0, self.n_nodes-1], options=options)
         self.hlayout.addWidget(self.slider)
 
+        self.slider.slicesChanged.connect(self.on_nodes_changed)
+
+    def on_nodes_changed(self, range_list):
+        self.nodesChanged.emit(self.name, range_list)
         # adding + - push button to tab
         # self.ct_tab.tabBar().setTabButton(0, self.ct_tab.tabBar().RightSide, TabButtonWidget())
 
@@ -51,6 +57,7 @@ class HorizonLine(QWidget):
     add_fun_horizon = pyqtSignal(dict)
     remove_fun_horizon = pyqtSignal(dict)
     repeated_fun = pyqtSignal(str)
+    funNodesChanged = pyqtSignal(str, list)
 
     def __init__(self, horizon, fun_type, logger=None, parent=None):
         QWidget.__init__(self, parent)
@@ -113,15 +120,12 @@ class HorizonLine(QWidget):
 
     def removeActiveFunctionRequest(self, index):
 
-
         flag, signal = self.horizon_receiver.removeActiveFunction(self.fun_tab.tabText(index))
-        # self.horizon_receiver.fun_active.pop(self.fun_tab.tabText(index), None)
-        # self.horizon_receiver.removeActiveFunction()
+
         if flag:
             self.fun_tab.removeTab(index)
 
         self.logger.info(signal)
-        # todo actually remove active function
 
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
@@ -149,14 +153,21 @@ class HorizonLine(QWidget):
     def on_repeated_fun(self, str):
         self.repeated_ct.emit(str)
 
-    def addFunctionToHorizon(self, name, fun):
+    @pyqtSlot()
+    def on_fun_nodes_changed(self, name, ranges):
+        self.funNodesChanged.emit(name, ranges)
 
+    def emitFunctionNodes(self, name, ranges):
+        self.on_fun_nodes_changed(name, ranges)
+
+    def addFunctionToHorizon(self, name, fun):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
 
         if flag:
 
             node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
-            self.ct = FunctionTab(name, fun, self.n_nodes, options=self.options)
+            self.ft = FunctionTab(name, fun, self.n_nodes, options=self.options)
+            self.ft.nodesChanged.connect(self.emitFunctionNodes)
             # self.ct_max_lim = spinbox_line.SpinBoxLine(self.n_nodes)
             # self.ct_min_lim = spinbox_line.SpinBoxLine(self.n_nodes)
             verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
@@ -169,7 +180,7 @@ class HorizonLine(QWidget):
 
             # don't fucking ask me why, these are magic numbers (-2, -5) in margins for alignment
             self.intab_layout.setContentsMargins(node_box_width / 2 - 2, 20, node_box_width / 2 - 5, 0)
-            self.intab_layout.addWidget(self.ct, stretch=3)
+            self.intab_layout.addWidget(self.ft, stretch=3)
             # self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
             # self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
             self.intab_layout.addSpacerItem(verticalSpacer)
@@ -184,10 +195,16 @@ class HorizonLine(QWidget):
 
             self.logger.warning(signal)
 
+    def getFunctionNodes(self, name):
+
+        for i in range(self.fun_tab.count()):
+            if self.fun_tab.tabText(i) == name:
+                print('diocane {}'.format(self.fun_tab.widget(i).getNodes()))
+                return self.fun_tab.widget(i).getNodes()
+            else:
+                pass
 
 
-    def getFunctions(self, name):
-        return self.fun_active[name]
 
     # def mousePressEvent(self, event):
     #     self.origin = event.pos()
