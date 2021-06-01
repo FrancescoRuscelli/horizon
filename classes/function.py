@@ -1,4 +1,6 @@
 import casadi as cs
+import numpy as np
+
 
 class Function:
     def __init__(self, name, f, used_vars, nodes):
@@ -6,6 +8,7 @@ class Function:
         self.f = f
         self.name = name
         self.nodes = []
+
         self.vars = used_vars #todo isn't there another way to get the variables from the function g?
 
         self.fun = cs.Function(name, list(self.vars.values()), [self.f])
@@ -61,20 +64,46 @@ class Function:
     def getType(self):
         return 'generic'
 
+
 class Constraint(Function):
     def __init__(self, name, f, used_vars, nodes, bounds=None):
         super().__init__(name, f, used_vars, nodes)
 
-        self.bounds = []
+        self.bounds = dict()
+        for node in self.nodes:
+            self.bounds['n' + str(node)] = dict(lb=-np.inf, ub=np.inf)
+
         # todo setBounds
-        # self.setBounds(bounds)
+        self.setBoundsMin(nodes, -np.inf)
 
     # todo transform string in typeFun "ConstraintType"
     def getType(self):
         return 'constraint'
 
-    def setBounds(self):
-        print('wip')
+    def setBoundsMin(self, nodes, bounds):
+        for node in range(nodes[0], nodes[1]):
+            if node in self.nodes:
+                self.bounds['n' + str(node)].update({'lb': bounds})
+
+    def setBoundMax(self, nodes, bounds):
+        for node in range(nodes[0], nodes[1]):
+            if node in self.nodes:
+                self.bounds['n' + str(node)].update({'ub': bounds})
+
+    def setBounds(self, nodes, lb, ub):
+        self.setBoundsMin(nodes, lb)
+        self.setBoundMax(nodes, ub)
+
+    def getBoundsMin(self, node):
+        lb = self.bounds['n' + str(node)]['lb']
+        return lb
+
+    def getBoundsMax(self, node):
+        ub = self.bounds['n' + str(node)]['ub']
+        return ub
+
+    def getBounds(self, nodes):
+        return [self.getBoundsMin(nodes), self.getBoundsMax(nodes)]
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):

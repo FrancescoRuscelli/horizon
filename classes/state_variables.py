@@ -1,3 +1,5 @@
+import pprint
+
 import casadi as cs
 from collections import OrderedDict
 
@@ -14,7 +16,6 @@ class StateVariable(cs.SX):
 
         # self.var = cs.SX.sym(tag, dim)
         self.var_impl = dict()
-        self.bounds = list()
 
         self._project()
 
@@ -91,16 +92,19 @@ class StateVariables:
         else:
             raise Exception('Yet to declare the present variable!')
 
-    def getVarImpl(self, names, k):
-        # todo isn't it better to do StateVariables[k][name]?
+
+    def getVarImpl(self, name, k):
         node_name = 'n' + str(k)
-        if isinstance(names, list):
-            var_list = list()
-            for name in names:
-                var_list.append(self.state_var_impl[node_name][name]['var'])
-            return var_list
+
+        if name.find('-') == -1:
+            var = self.state_var_impl[node_name][name]['var']
         else:
-            return self.state_var_impl[node_name][names]['var']
+            var_name = name[:name.index('-')]
+            k_prev = int(name[name.index('-'):])
+            node_prev = 'n' + str(k+k_prev)
+            var = self.state_var_impl[node_prev][var_name]['var']
+
+        return var
 
     def getVarImplDict(self):
         return self.state_var_impl
@@ -160,12 +164,14 @@ class StateVariables:
             var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max)
             self.state_var_impl['n' + str(k)].update({name : var_dict})
 
-        # implementation of past state variable, getting it from past nodes
-        for name, val in self.state_var_prev.items():
-            k_prev = int(name[name.index('-'):])
-            if k >= -k_prev:
-                var_name = name[:name.index('-')]
-                self.state_var_impl['n' + str(k)].update({name: self.state_var_impl['n' + str(k + k_prev)][var_name]})
+    def updateBounds(self):
+
+        for node in self.state_var_impl.keys():
+            for name, state_var in self.state_var_impl[node].items():
+                k = node[node.index('n') + 1:]
+                state_var['lb'] = self.state_var[name].getBoundMin(k)
+                state_var['ub'] = self.state_var[name].getBoundMax(k)
+            # self.state_var_impl
 
 
 if __name__ == '__main__':

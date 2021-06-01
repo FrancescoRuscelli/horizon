@@ -42,6 +42,7 @@ class Problem:
 
     def _getUsedVar(self, f):
         used_var = dict()
+
         for name_var, value_var in self.state_var_container.getVarAbstrDict().items():
             if cs.depends_on(f, value_var):
                 used_var[name_var] = value_var
@@ -105,10 +106,14 @@ class Problem:
 
             # implement constraint only if constraint is present in node k
             if node in fun.getNodes():
-                print('Node {}:'.format(node))
-                f_impl.append(f(*[self.state_var_container.getVarImpl(name, node) for name, val in fun.getVariables().items()]))
-                print('Implemented function {} at node {}: {}'.format(fun.getName(), node, f_impl,))
-                print('Used variables: {}'.format([self.state_var_container.getVarImpl(name, node) for name, val in fun.getVariables().items()]))
+                used_vars = list()
+                for name, val in fun.getVariables().items():
+                    var = self.state_var_container.getVarImpl(name, node)
+                    used_vars.append(var)
+
+                f_impl.append(f(*used_vars))
+                print('Implemented function {} at node {}: {}'.format(fun.getName(), node, f_impl))
+                print('Used variables: {}'.format(used_vars))
                 print('===========================================')
         return f_impl
 
@@ -152,9 +157,16 @@ class Problem:
         # print('cost functions unraveled:', cs.vertcat(*self.costfun_impl))
         # print('cost function summed:', self.costfun_sum)
         # print('----------------------------------------------------')
-        self.state_var_container.getVarImplList()
+
+        j = self.costfun_sum
+        w = self.state_var_container.getVarImplList()
+        g = cs.vertcat(*self.cnstr_impl)
+        self.prob = {'f': j, 'x': w, 'g': g}
 
     def solveProblem(self):
+
+        self.state_var_container.updateBounds()
+
         w = self.state_var_container.getVarImplList()
         w0 = np.zeros((w.shape[0]))
         g = cs.vertcat(*self.cnstr_impl)
@@ -168,26 +180,40 @@ class Problem:
         # print('len lbg:', len(self.ct.lbg))
         # print('len ubg:', len(self.ct.ubg))
 
+        lbg = []
+        ubg = []
+
+        for node in range(self.N):
+            for cnstr in self.cnstr_container:
+                if node in cnstr.getNodes():
+                    lbg.append(cnstr.getBoundsMin(node))
+                    ubg.append(cnstr.getBoundsMax(node))
+
+
+        lbw = self.state_var_container.getBoundsMinList()
+        ubw = self.state_var_container.getBoundsMaxList()
         print('================')
         print('w:', w)
-        print('lbw:', self.state_var_container.getBoundsMinList())
-        print('ubw:', self.state_var_container.getBoundsMaxList())
+        print('lbw:', lbw)
+        print('ubw:', ubw)
         print('g:', g)
-        # print('lbg:', self.ct.lbg)
-        # print('ubg:', self.ct.ubg)
+        print('lbg:', lbg)
+        print('ubg:', ubg)
         print('j:', j)
 
+        self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
+                           {'ipopt': {'linear_solver': 'ma57', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                            'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
-        # print(self.)
-        # sol = self.solver(x0=self.w0, lbx=self.lbw, ubx=self.ubw, lbg=self.ct.lbg, ubg=self.ct.ubg)
-        #
-        # if self.crash_if_suboptimal:
-        #     if not self.solver.stats()['success']:
-        #         raise Exception('Optimal solution NOT found.')
-        #
-        # w_opt = sol['x'].full().flatten()
-        #
-        # return w_opt
+        sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+
+        if self.crash_if_suboptimal:
+            if not self.solver.stats()['success']:
+                raise Exception('Optimal solution NOT found.')
+
+        w_opt = sol['x'].full().flatten()
+
+        return w_opt
 
 
 

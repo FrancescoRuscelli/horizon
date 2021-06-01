@@ -60,28 +60,11 @@ if __name__ == '__main__':
     # print('cost function nodes:', costfun_x.getNodes())
     # print('cost function function:', costfun_x.getFunction())
     # print('cost function variables:', costfun_x.getVariables())
+    prb.createProblem()
 
     # x.setLowerBounds(node=4, bounds= [-2, -2, -2, -2, -2, -2])
     x.setBounds(node=[0, 3], lb=[0, 0, 0, 0, 0, 0], ub=[0, 0, 0, 0, 0, 0])
+    cnsrt_x.setBounds(nodes=[2, 5], lb=0, ub=5)
 
-    prb.createProblem()
+    print('SOLVING:')
     prb.solveProblem()
-
-
-    # len w: (46, 1)
-    # len w0: 46
-    # len g: (6, 1)
-    # ================
-
-    # w: [x_0_0, x_0_1, x_0_2, x_0_3, x_0_4, x_0_5, u_0_0, u_0_1, x_1_0, x_1_1, x_1_2, x_1_3, x_1_4, x_1_5, u_1_0, u_1_1, x_2_0, x_2_1, x_2_2, x_2_3, x_2_4, x_2_5, u_2_0, u_2_1, x_3_0, x_3_1, x_3_2, x_3_3, x_3_4, x_3_5, u_3_0, u_3_1, x_4_0, x_4_1, x_4_2, x_4_3, x_4_4, x_4_5, u_4_0, u_4_1]
-    # w: [x_0_0, x_0_1, x_0_2, x_0_3, x_0_4, x_0_5, u_0_0, u_0_1, x_1_0, x_1_1, x_1_2, x_1_3, x_1_4, x_1_5, u_1_0, u_1_1, x_2_0, x_2_1, x_2_2, x_2_3, x_2_4, x_2_5, u_2_0, u_2_1, x_3_0, x_3_1, x_3_2, x_3_3, x_3_4, x_3_5, u_3_0, u_3_1, x_4_0, x_4_1, x_4_2, x_4_3, x_4_4, x_4_5, u_4_0, u_4_1, x_5_0, x_5_1, x_5_2, x_5_3, x_5_4, x_5_5]
-
-
-    # g: [(x_0_0-x_0_4), (x_0_1-x_0_5), (x_1_0-x_1_4), (x_1_1-x_1_5), (x_3_0-x_3_4), (x_3_1-x_3_5)]
-    # g: [(x_0_0-x_0_4), (x_0_1-x_0_5), (x_1_0-x_1_4), (x_1_1-x_1_5), (x_3_0-x_3_4), (x_3_1-x_3_5)]
-
-    # j: ((((((x_0_0-x_0_4)-x_0_2)+((x_1_0-x_1_4)-x_1_2))+((x_2_0-x_2_4)-x_2_2))+((x_3_0-x_3_4)-x_3_2))+((x_4_0-x_4_4)-x_4_2))
-    # j: (((((((x_0_0-x_0_4)-x_0_2)+((x_1_0-x_1_4)-x_1_2))+((x_2_0-x_2_4)-x_2_2))+((x_3_0-x_3_4)-x_3_2))+((x_4_0-x_4_4)-x_4_2))+((x_5_0-x_5_4)-x_5_2))
-
-    # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(nodes=[0,2]))) # should be wrong
-    # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(ubg=[1, 1])))
