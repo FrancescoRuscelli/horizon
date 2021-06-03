@@ -35,15 +35,15 @@ if __name__ == '__main__':
     # prb.setVariable('fun', fun)
     zmp_old = x_prev[0:2] - x_prev[4:6]  # * (h / grav)
 
-    # cnsrt_x = prb.createConstraint('generic_constraint', x[0:2] - x[4:6], nodes=[[0, 2], [3, 4]])
-    cnsrt_x = prb.createConstraint('another_constraint', x_prev[2] - x[4], nodes=[2, 5])
+    cnsrt_x = prb.createConstraint('generic_constraint', x_prev[0:2] - x[4:6], nodes=[[0, 2], [3, 4]])
+    # cnsrt_x = prb.createConstraint('another_constraint', x_prev[2] - x[4], nodes=[2, 5])
     # cnsrt_z = prb.createConstraint('yet_another_constraint', z - x[2:4], nodes=5)
     # cnsrt_x.setNodes(5)
 
 
     zmp = x[0:2] - x[4:6]  # * (h / grav)
 
-    # costfun_x = prb.createCostFunction('one_cost_function', zmp[0] - x[2])
+    costfun_x = prb.createCostFunction('one_cost_function', zmp[0] - x[2])
 
 
     # print('constraint name:', cnsrt_x.getName())

@@ -729,12 +729,12 @@ if __name__ == '__main__':
     prb.setVariable('x', 6)
     prb.setVariable('u', 2)
     # todo check if dimension of past x is the same as x or change api
-    prb.setVariable('x', 6, -2) # get x-2, which is x two nodes before
+    prb.setVariable('x', 6, -1) # get x-2, which is x two nodes before
 
     # prb.setVariable('k', 9)
     var_opt = prb.getVariable()
 
-    zmp_old = var_opt['x-2'][0:2] - var_opt['x-2'][4:6]  # * (h / grav)
+    zmp_old = var_opt['x-1'][0:2] - var_opt['x-1'][4:6]  # * (h / grav)
     zmp = var_opt['x'][0:2] - var_opt['x'][4:6]  # * (h / grav)
 
     prb.setFunction('zmp', zmp)
@@ -753,9 +753,9 @@ if __name__ == '__main__':
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0,2], [3,4]], bounds=(dict(lbg=[-1,-1], ubg=[1,1])))
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(nodes=[0,2]))) # should be wrong
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(ubg=[1, 1])))
-    # prb.ct.setConstraintFunction('generic_constraint1', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
+    prb.ct.setConstraintFunction('generic_constraint1', var_opt['x-1'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
     # prb.ct.setConstraintFunction('generic_constraint2', var_opt['u'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
-    prb.ct.setConstraintFunction('generic_constraint3', var_opt['x-2'][0:2] - var_opt['x'][4:6], nodes=[2, 4])
+    # prb.ct.setConstraintFunction('generic_constraint3', var_opt['x-2'][0:2] - var_opt['x'][4:6], nodes=[2, 4])
 
     # prb.ct.setConstraintFunction('generic_constraint',
     #                              var_opt['x'][0:2] - var_opt['x'][4:6],

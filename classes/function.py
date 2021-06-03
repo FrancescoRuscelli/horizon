@@ -1,5 +1,6 @@
 import casadi as cs
 import numpy as np
+from classes import misc_function as misc
 
 
 class Function:
@@ -28,20 +29,7 @@ class Function:
 
         # todo check this logic
         # check if  int, list or list of list
-        if isinstance(nodes, int):
-            unraveled_nodes = nodes
-            pass
-        elif any(isinstance(el, list) for el in nodes):
-            unraveled_nodes = list()
-            for el in nodes:
-                temp = list(range(el[0], el[1]))
-                for item in temp:
-                    unraveled_nodes.append(item)
-        elif isinstance(nodes, list):
-            unraveled_nodes = list()
-            temp = list(range(nodes[0], nodes[1]))
-            for item in temp:
-                unraveled_nodes.append(item)
+        unraveled_nodes = misc.unravelElements(nodes)
 
         if erasing:
             self.nodes.clear()
@@ -74,19 +62,22 @@ class Constraint(Function):
             self.bounds['n' + str(node)] = dict(lb=-np.inf, ub=np.inf)
 
         # todo setBounds
-        self.setBoundsMin(nodes, -np.inf)
 
+        self.setBoundsMin(nodes, -np.inf)
+        self.setBoundsMax(nodes, np.inf)
     # todo transform string in typeFun "ConstraintType"
     def getType(self):
         return 'constraint'
 
     def setBoundsMin(self, nodes, bounds):
-        for node in range(nodes[0], nodes[1]):
+        unraveled_nodes = misc.unravelElements(nodes)
+        for node in unraveled_nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
 
     def setBoundMax(self, nodes, bounds):
-        for node in range(nodes[0], nodes[1]):
+        unraveled_nodes = misc.unravelElements(nodes)
+        for node in unraveled_nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'ub': bounds})
 
