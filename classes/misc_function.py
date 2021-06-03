@@ -1,6 +1,6 @@
 def unravelElements(elements):
     if isinstance(elements, int):
-        unraveled_elem = elements
+        unraveled_elem = [elements]
         pass
     elif any(isinstance(el, list) for el in elements):
         unraveled_elem = list()

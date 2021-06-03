@@ -1,6 +1,6 @@
 import casadi as cs
 import numpy as np
-
+from classes import misc_function as misc
 
 class Function:
     def __init__(self, name, f, used_vars, nodes):
@@ -26,36 +26,16 @@ class Function:
 
     def setNodes(self, nodes, erasing=False):
 
-        # todo check this logic
-        # check if  int, list or list of list
-        if isinstance(nodes, int):
-            unraveled_nodes = nodes
-            pass
-        elif any(isinstance(el, list) for el in nodes):
-            unraveled_nodes = list()
-            for el in nodes:
-                temp = list(range(el[0], el[1]))
-                for item in temp:
-                    unraveled_nodes.append(item)
-        elif isinstance(nodes, list):
-            unraveled_nodes = list()
-            temp = list(range(nodes[0], nodes[1]))
-            for item in temp:
-                unraveled_nodes.append(item)
+        unraveled_nodes = misc.unravelElements(nodes)
 
         if erasing:
             self.nodes.clear()
 
         # adding to function nodes
-        if isinstance(unraveled_nodes, int):
-            if unraveled_nodes not in self.nodes:
-                self.nodes.append(unraveled_nodes)
+        for i in unraveled_nodes:
+            if i not in self.nodes:
+                self.nodes.append(i)
                 self.nodes.sort()
-        else:
-            for i in unraveled_nodes:
-                if i not in self.nodes:
-                    self.nodes.append(i)
-                    self.nodes.sort()
 
     def getVariables(self):
         return self.vars
@@ -81,12 +61,14 @@ class Constraint(Function):
         return 'constraint'
 
     def setBoundsMin(self, nodes, bounds):
-        for node in range(nodes[0], nodes[1]):
+        unraveled_nodes = misc.unravelElements(nodes)
+        for node in unraveled_nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
 
     def setBoundMax(self, nodes, bounds):
-        for node in range(nodes[0], nodes[1]):
+        unraveled_nodes = misc.unravelElements(nodes)
+        for node in unraveled_nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'ub': bounds})
 
