@@ -63,6 +63,20 @@ class StateVariable(cs.SX):
     def getBounds(self, node):
         return [self.getBoundMin(node), self.getBoundMax(node)]
 
+class InputVariable(StateVariable):
+    def __init__(self, tag, dim, nodes):
+        super(InputVariable, self).__init__(tag, dim, nodes)
+
+    def _project(self):
+        # state_var_impl --> dict
+        #  - key: nodes (n0, n1, ...)
+        #  - val: dict with name and value of implemented variable
+        for n in range(self.nodes-1):
+            var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
+            self.var_impl['n' + str(n)] = dict()
+            self.var_impl['n' + str(n)]['var'] = var_impl
+            self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
+            self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
 
 class StateVariables:
 
@@ -75,7 +89,7 @@ class StateVariables:
 
         self.state_var_impl = OrderedDict()
 
-    def setVar(self, name, dim, prev_nodes=None):
+    def setVar(self, var_type, name, dim, prev_nodes):
 
         # todo what if 'prev_nodes' it is a list
         createTag = lambda name, node: name + str(node) if node is not None else name
@@ -83,7 +97,7 @@ class StateVariables:
         tag = createTag(name, prev_nodes)
 
         if checkExistence(name, prev_nodes):
-            var = StateVariable(tag, dim, self.nodes)
+            var = var_type(tag, dim, self.nodes)
             if prev_nodes is None:
                 self.state_var[tag] = var
             else:
@@ -92,6 +106,13 @@ class StateVariables:
         else:
             raise Exception('Yet to declare the present variable!')
 
+    def setStateVar(self, name, dim, prev_nodes=None):
+        var = self.setVar(StateVariable, name, dim, prev_nodes)
+        return var
+
+    def setInputVar(self, name, dim, prev_nodes=None):
+        var = self.setVar(InputVariable, name, dim, prev_nodes)
+        return var
 
     def getVarImpl(self, name, k):
         node_name = 'n' + str(k)
@@ -114,9 +135,15 @@ class StateVariables:
         state_var_impl_list = list()
 
         for node, val in self.state_var_impl.items():
-            for var_abstract in self.state_var:
+            print(node)
+            print(val)
+            print(val.keys())
+
+            for var_abstract in val.keys():
                 # get from state_var_impl the relative var
+
                 # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
+
                 state_var_impl_list.append(val[var_abstract]['var'])
 
         return cs.vertcat(*state_var_impl_list)
@@ -126,9 +153,8 @@ class StateVariables:
         state_var_bound_list = list()
 
         for node, val in self.state_var_impl.items():
-            for var_abstract in self.state_var:
-                # get from state_var_impl the relative var
-                # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
+            for var_abstract in val.keys():
+
                 state_var_bound_list.append(val[var_abstract]['lb'])
 
         return cs.vertcat(*state_var_bound_list)
@@ -138,7 +164,7 @@ class StateVariables:
         state_var_bound_list = list()
 
         for node, val in self.state_var_impl.items():
-            for var_abstract in self.state_var:
+            for var_abstract in val.keys():
                 # get from state_var_impl the relative var
                 # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
                 state_var_bound_list.append(val[var_abstract]['ub'])
@@ -158,6 +184,9 @@ class StateVariables:
         self.state_var_impl['n' + str(k)] = dict()
         # implementation of current state variable
         for name, val in self.state_var.items():
+            if isinstance(val, InputVariable) and k == self.nodes-1:
+                break
+
             var_impl = self.state_var[name].getImpl(k)
             var_bound_min = self.state_var[name].getBoundMin(k)
             var_bound_max = self.state_var[name].getBoundMax(k)

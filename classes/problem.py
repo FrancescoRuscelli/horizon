@@ -10,9 +10,9 @@ class Problem:
 
         self.crash_if_suboptimal = crash_if_suboptimal
 
-        self.N = N
+        self.nodes = N + 1
         # state variable to optimize
-        self.state_var_container = sv.StateVariables(self.N)
+        self.state_var_container = sv.StateVariables(self.nodes)
 
         # just variables
         self.var_container = list()
@@ -24,7 +24,11 @@ class Problem:
         self.costfun_impl = list()
 
     def createStateVariable(self, name, dim, prev_nodes=None):
-        var = self.state_var_container.setVar(name, dim, prev_nodes)
+        var = self.state_var_container.setStateVar(name, dim, prev_nodes)
+        return var
+
+    def createInputVariable(self, name, dim):
+        var = self.state_var_container.setInputVar(name, dim)
         return var
 
     # def setVariable(self, name, var):
@@ -58,7 +62,7 @@ class Problem:
         container = self.cnstr_container
 
         if not nodes:
-            nodes = [0, self.N]
+            nodes = [0, self.nodes]
 
         used_var = self._getUsedVar(g)
 
@@ -72,7 +76,7 @@ class Problem:
 
         container = self.costfun_container
         if not nodes:
-            nodes = [0, self.N]
+            nodes = [0, self.nodes]
 
         used_var = self._getUsedVar(j)
 
@@ -142,7 +146,7 @@ class Problem:
 
     def createProblem(self):
 
-        for k in range(self.N):  # todo decide if N or N+1
+        for k in range(self.nodes):  # todo decide if N or N+1
             # implement the abstract state variable with the current node
             self.state_var_container.update(k)
             # implement the constraint
@@ -171,23 +175,26 @@ class Problem:
         w0 = np.zeros((w.shape[0]))
         g = cs.vertcat(*self.cnstr_impl)
         j = self.costfun_sum
+
+        lbg = []
+        ubg = []
+
+        for node in range(self.nodes):
+            for cnstr in self.cnstr_container:
+                if node in cnstr.getNodes():
+                    lbg += cnstr.getBoundsMin(node)
+                    ubg += cnstr.getBoundsMax(node)
+
         print('================')
         print('len w:', w.shape)
         print('len lbw:', self.state_var_container.getBoundsMinList().shape)
         print('len ubw:', self.state_var_container.getBoundsMaxList().shape)
         print('len w0:', len(w0))
         print('len g:', g.shape)
-        # print('len lbg:', len(self.ct.lbg))
-        # print('len ubg:', len(self.ct.ubg))
+        print('len lbg:', len(lbg))
+        print('len ubg:', len(ubg))
 
-        lbg = []
-        ubg = []
 
-        for node in range(self.N):
-            for cnstr in self.cnstr_container:
-                if node in cnstr.getNodes():
-                    lbg.append(cnstr.getBoundsMin(node))
-                    ubg.append(cnstr.getBoundsMax(node))
 
 
         lbw = self.state_var_container.getBoundsMinList()

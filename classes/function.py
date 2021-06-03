@@ -71,10 +71,10 @@ class Constraint(Function):
 
         self.bounds = dict()
         for node in self.nodes:
-            self.bounds['n' + str(node)] = dict(lb=-np.inf, ub=np.inf)
+            self.bounds['n' + str(node)] = dict(lb=[-np.inf] * f.shape[0], ub=[np.inf] * f.shape[0])
 
         # todo setBounds
-        self.setBoundsMin(nodes, -np.inf)
+        # self.setBoundsMin(nodes, -np.inf)
 
     # todo transform string in typeFun "ConstraintType"
     def getType(self):
