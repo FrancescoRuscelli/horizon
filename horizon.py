@@ -770,7 +770,7 @@ if __name__ == '__main__':
     # prb.ct.setConstraintFunction('zmp_constraint', fun_opt['zmp_old'] - var_opt['u'], nodes=[2, prb.N])
 
     # 1000. * sumsqr((Lk[1] - Rk[1]) - self.min_stride_y)
-    # prb.setCostFunction('one_cost_function', fun_opt['zmp'][0] - var_opt['x'][2])
+    prb.setCostFunction('one_cost_function', fun_opt['zmp'][0] - var_opt['x'][2])
 
     problem = prb.buildProblem()
 
@@ -795,4 +795,3 @@ if __name__ == '__main__':
     # x and u should be always present
 
     w_opt = prb.solveProblem()
-

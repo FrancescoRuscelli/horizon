@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
 
 
-    # costfun_x = prb.createCostFunction('one_cost_function', zmp[0] - x[2])
+    costfun_x = prb.createCostFunction('one_cost_function', zmp[0] - x[2])
 
 
     # print('constraint name:', cnsrt_x.getName())

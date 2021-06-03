@@ -209,7 +209,7 @@ class Problem:
         print('j:', j)
 
         self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
-                           {'ipopt': {'linear_solver': 'ma57', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                           {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
                             'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
         sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
