@@ -248,8 +248,7 @@ class Problem:
         self.ct.addConstraintBounds()
 
         self.addInitialGuess()
-        pprint.pprint(self.state_var)
-        pprint.pprint(self.var_opt)
+
         self.all_w = cs.vertcat(*[item['var'] for sublist in self.state_var for item in sublist])
 
         self.lbw = [item for sublist in [item['lbw'] for sublist in self.state_var for item in sublist] for item in sublist]
@@ -276,21 +275,21 @@ class Problem:
 
         print('================')
         print('len w:', self.all_w.shape)
-        # print('len lbw:', len(self.lbw))
-        # print('len ubw:', len(self.ubw))
+        print('len lbw:', len(self.lbw))
+        print('len ubw:', len(self.ubw))
         print('len w0:', len(self.w0))
 
         print('len g:', self.all_g.shape)
-        # print('len lbg:', len(self.ct.lbg))
-        # print('len ubg:', len(self.ct.ubg))
+        print('len lbg:', len(self.ct.lbg))
+        print('len ubg:', len(self.ct.ubg))
 
         print('================')
         print('w:', self.all_w)
-        # print('lbw:', self.lbw)
-        # print('ubw:', self.ubw)
+        print('lbw:', self.lbw)
+        print('ubw:', self.ubw)
         print('g:', self.all_g)
-        # print('lbg:', self.ct.lbg)
-        # print('ubg:', self.ct.ubg)
+        print('lbg:', self.ct.lbg)
+        print('ubg:', self.ct.ubg)
         print('j:', self.j)
 
         # Solve the NLP
@@ -729,12 +728,13 @@ if __name__ == '__main__':
     prb.setVariable('x', 6)
     prb.setVariable('u', 2)
     # todo check if dimension of past x is the same as x or change api
-    prb.setVariable('x', 6, -2) # get x-2, which is x two nodes before
+    prb.setVariable('x', 6, -1)  # get x-2, which is x two nodes before
+    # prb.setVariable('x', 6, -2) # get x-2, which is x two nodes before
 
     # prb.setVariable('k', 9)
     var_opt = prb.getVariable()
 
-    zmp_old = var_opt['x-2'][0:2] - var_opt['x-2'][4:6]  # * (h / grav)
+    zmp_old = var_opt['x-1'][0:2] - var_opt['x-1'][4:6]  # * (h / grav)
     zmp = var_opt['x'][0:2] - var_opt['x'][4:6]  # * (h / grav)
 
     prb.setFunction('zmp', zmp)
@@ -755,7 +755,7 @@ if __name__ == '__main__':
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(ubg=[1, 1])))
     # prb.ct.setConstraintFunction('generic_constraint1', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
     # prb.ct.setConstraintFunction('generic_constraint2', var_opt['u'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
-    prb.ct.setConstraintFunction('generic_constraint3', var_opt['x-2'][0:2] - var_opt['x'][4:6], nodes=[2, 4])
+    prb.ct.setConstraintFunction('generic_constraint3', var_opt['x-1'][0:2] - var_opt['x'][4:6], nodes=[2, 5])
 
     # prb.ct.setConstraintFunction('generic_constraint',
     #                              var_opt['x'][0:2] - var_opt['x'][4:6],
@@ -770,13 +770,13 @@ if __name__ == '__main__':
     # prb.ct.setConstraintFunction('zmp_constraint', fun_opt['zmp_old'] - var_opt['u'], nodes=[2, prb.N])
 
     # 1000. * sumsqr((Lk[1] - Rk[1]) - self.min_stride_y)
-    prb.setCostFunction('one_cost_function', fun_opt['zmp'][0] - var_opt['x'][2])
+    # prb.setCostFunction('one_cost_function', fun_opt['zmp'][0] - var_opt['x'][2])
 
     problem = prb.buildProblem()
 
     # todo add check for lenght of value inserted
     # todo add check for lenght of nodes inserted
-    prb.setInitialGuess('u', [0,N], [1, 1])
+    # prb.setInitialGuess('u', [0,N], [1, 1])
 
     prb.setStateBoundsFromName(name='x', nodes=[0, 3], lbw=[0, 0, 0, 0, 0, 0], ubw=[0, 0, 0, 0, 0, 0])
 
@@ -786,7 +786,7 @@ if __name__ == '__main__':
     # print(prb.ct.lbg)
     # print(prb.ct.ubg)
     # print('=======================')
-    # prb.ct.setConstraintBoundsFromName('generic_constraint', nodes=3, lbg=[-7.5, -7.5], ubg=[7.5, 7.5])
+    prb.ct.setConstraintBoundsFromName('generic_constraint3', nodes=2, lbg=[-7.5, -7.5], ubg=[7.5, 7.5])
     # print('=======================')
     # print(prb.ct.g)
     # print(prb.ct.lbg)
