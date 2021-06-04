@@ -19,23 +19,31 @@ class StateVariable(cs.SX):
 
         self._project()
 
-    def setLowerBounds(self, node, bounds):
-        if isinstance(node, list):
-            for n in range(node[0], node[1]):
+    def setLowerBounds(self, bounds, nodes=None):
+
+        if nodes is None:
+            nodes = [0, self.nodes]
+
+        if isinstance(nodes, list):
+            for n in range(nodes[0], nodes[1]):
                 self.var_impl['n' + str(n)]['lb'] = bounds
         else:
-            self.var_impl['n' + str(node)]['lb'] = bounds
+            self.var_impl['n' + str(nodes)]['lb'] = bounds
         
-    def setUpperBounds(self, node, bounds):
-        if isinstance(node, list):
-            for n in range(node[0], node[1]):
+    def setUpperBounds(self, bounds, nodes=None):
+
+        if nodes is None:
+            nodes = [0, self.nodes]
+
+        if isinstance(nodes, list):
+            for n in range(nodes[0], nodes[1]):
                 self.var_impl['n' + str(n)]['ub'] = bounds
         else:
-            self.var_impl['n' + str(node)]['ub'] = bounds
+            self.var_impl['n' + str(nodes)]['ub'] = bounds
 
-    def setBounds(self, node, lb, ub):
-        self.setLowerBounds(node, lb)
-        self.setUpperBounds(node, ub)
+    def setBounds(self, lb, ub, nodes=None):
+        self.setLowerBounds(lb, nodes)
+        self.setUpperBounds(ub, nodes)
 
     def _project(self):
         # state_var_impl --> dict
@@ -135,9 +143,9 @@ class StateVariables:
         state_var_impl_list = list()
 
         for node, val in self.state_var_impl.items():
-            print(node)
-            print(val)
-            print(val.keys())
+            # print('node:', node)
+            # print('var:', list(val))
+            # print('var', list(val.keys()))
 
             for var_abstract in val.keys():
                 # get from state_var_impl the relative var
@@ -155,9 +163,9 @@ class StateVariables:
         for node, val in self.state_var_impl.items():
             for var_abstract in val.keys():
 
-                state_var_bound_list.append(val[var_abstract]['lb'])
+                state_var_bound_list += val[var_abstract]['lb']
 
-        return cs.vertcat(*state_var_bound_list)
+        return state_var_bound_list
 
     def getBoundsMaxList(self):
 
@@ -167,9 +175,9 @@ class StateVariables:
             for var_abstract in val.keys():
                 # get from state_var_impl the relative var
                 # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
-                state_var_bound_list.append(val[var_abstract]['ub'])
+                state_var_bound_list += val[var_abstract]['ub']
 
-        return cs.vertcat(*state_var_bound_list)
+        return state_var_bound_list
 
     def getVarAbstrDict(self):
         # this is used to check the variable existing in the function. It requires all the variables and the previous variables

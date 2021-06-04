@@ -27,8 +27,8 @@ class Problem:
         var = self.state_var_container.setStateVar(name, dim, prev_nodes)
         return var
 
-    def createInputVariable(self, name, dim):
-        var = self.state_var_container.setInputVar(name, dim)
+    def createInputVariable(self, name, dim, prev_nodes=None):
+        var = self.state_var_container.setInputVar(name, dim, prev_nodes)
         return var
 
     # def setVariable(self, name, var):
@@ -66,8 +66,8 @@ class Problem:
 
         used_var = self._getUsedVar(g)
 
-        print('Creating function {} with abstract variables {}'.format(g, used_var))
-        fun = fc.Constraint(name, g, used_var, nodes)
+        print('Creating function {}: {} with abstract variables {}'.format(name, g, used_var))
+        fun = fc.Constraint(name, g, used_var, nodes, bounds)
         container.append(fun)
 
         return fun
@@ -185,20 +185,20 @@ class Problem:
                     lbg += cnstr.getBoundsMin(node)
                     ubg += cnstr.getBoundsMax(node)
 
+        lbw = self.state_var_container.getBoundsMinList()
+        ubw = self.state_var_container.getBoundsMaxList()
+
+
         print('================')
         print('len w:', w.shape)
-        print('len lbw:', self.state_var_container.getBoundsMinList().shape)
-        print('len ubw:', self.state_var_container.getBoundsMaxList().shape)
+        print('len lbw:', len(lbw))
+        print('len ubw:', len(ubw))
         print('len w0:', len(w0))
         print('len g:', g.shape)
         print('len lbg:', len(lbg))
         print('len ubg:', len(ubg))
 
 
-
-
-        lbw = self.state_var_container.getBoundsMinList()
-        ubw = self.state_var_container.getBoundsMaxList()
         print('================')
         print('w:', w)
         print('lbw:', lbw)
@@ -208,9 +208,9 @@ class Problem:
         print('ubg:', ubg)
         print('j:', j)
 
-        self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
-                           {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                            'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+        self.solver = cs.nlpsol('solver', 'ipopt', self.prob)#,
+                           # {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                           #  'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
         sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
 

@@ -54,27 +54,45 @@ class Constraint(Function):
             self.bounds['n' + str(node)] = dict(lb=[-np.inf] * f.shape[0], ub=[np.inf] * f.shape[0])
 
         # todo setBounds
-        # self.setBoundsMin(nodes, -np.inf)
+        if bounds is not None:
+
+            if 'nodes' not in bounds:
+                bounds['nodes'] = None
+
+            self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
+
+
 
     # todo transform string in typeFun "ConstraintType"
     def getType(self):
         return 'constraint'
 
-    def setBoundsMin(self, nodes, bounds):
-        unraveled_nodes = misc.unravelElements(nodes)
+    def setBoundsMin(self, bounds, nodes=None):
+
+        if nodes is None:
+            unraveled_nodes = self.nodes
+        else:
+            unraveled_nodes = misc.unravelElements(nodes)
+
         for node in unraveled_nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
 
-    def setBoundMax(self, nodes, bounds):
-        unraveled_nodes = misc.unravelElements(nodes)
+    def setBoundsMax(self, bounds, nodes=None):
+
+        if nodes is None:
+            unraveled_nodes = self.nodes
+        else:
+            unraveled_nodes = misc.unravelElements(nodes)
+
         for node in unraveled_nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'ub': bounds})
 
-    def setBounds(self, nodes, lb, ub):
-        self.setBoundsMin(nodes, lb)
-        self.setBoundMax(nodes, ub)
+    def setBounds(self, lb, ub, nodes=None):
+
+        self.setBoundsMin(lb, nodes)
+        self.setBoundsMax(ub, nodes)
 
     def getBoundsMin(self, node):
         lb = self.bounds['n' + str(node)]['lb']
