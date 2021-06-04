@@ -1,12 +1,7 @@
 from classes import problem as csprb
 
 import casadi as cs
-# def flatten(l):
-#     if isinstance(l, list):
-#         for e in l:
-#             yield from flatten(e)
-#     else:
-#         yield l
+import numpy as np
 
 if __name__ == '__main__':
 
@@ -62,7 +57,7 @@ if __name__ == '__main__':
     prb.createProblem()
 
     # x.setLowerBounds(node=4, bounds= [-2, -2, -2, -2, -2, -2])
-    x.setBounds(node=[0, 3], lb=[0, 0, 0, 0, 0, 0], ub=[0, 0, 0, 0, 0, 0])
+    x.setBounds(nodes=[0, 3], lb=[0, 0, 0, 0, 0, 0], ub=[0, 0, 0, 0, 0, 0])
     cnsrt_x.setBounds(nodes=2, lb=[-7.5, -7.5], ub=[7.5, 7.5])
 
     print('SOLVING:')
