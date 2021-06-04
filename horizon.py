@@ -105,6 +105,7 @@ def RK4(M, L, x, u, xdot, dt):
     """
 
     f = cs.Function('f', [x, u], [xdot, L])
+
     X0 = cs.SX.sym('X0', x.size()[0])
     U = cs.SX.sym('U', u.size()[0])
     X = X0
@@ -249,6 +250,7 @@ class Problem:
 
         self.addInitialGuess()
 
+        # print([item['var'] for sublist in self.state_var for item in sublist])
         self.all_w = cs.vertcat(*[item['var'] for sublist in self.state_var for item in sublist])
 
         self.lbw = [item for sublist in [item['lbw'] for sublist in self.state_var for item in sublist] for item in sublist]
@@ -265,9 +267,9 @@ class Problem:
         J = self.j
 
         prob = {'f': J, 'x': self.all_w, 'g': self.all_g}
-        self.solver = cs.nlpsol('solver', 'ipopt', prob,
-                           {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                            'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+        self.solver = cs.nlpsol('solver', 'ipopt', prob)#,
+                           # {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                           #  'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
         return self.all_w, self.all_g
 
@@ -707,11 +709,259 @@ class Constraint:
         self.var_opt = var
 
 
+class StepSolver:
+
+    def __init__(self):
+
+        self.n_duration = 0.02
+
+        self.initial_ds_t = 0.2  # 0.2
+        self.ss_1_t = 0.5  # 0.5
+        self.ds_1_t = 0.
+        self.ss_2_t = 0.
+        self.final_ds_t = 0.4  # 0.4
+
+        self.T_total = self.initial_ds_t + self.ss_1_t + self.ds_1_t + self.ss_2_t + self.final_ds_t
+        self.N = int(self.T_total / self.n_duration)  # number of control intervals
+
+        self.height_com = 1
+
+        print('duration of initial_ds_t: {}'.format(self.initial_ds_t))
+        print('duration of ss_1_t: {}'.format(self.ss_1_t))
+        print('duration of ds_1_t: {}'.format(self.ds_1_t))
+        print('duration of ss_2_t: {}'.format(self.ss_2_t))
+        print('duration of final_ds_t: {}'.format(self.final_ds_t))
+        print('T: {}'.format(self.T_total))
+        print('N: {}'.format(self.N))
+        print('duration of a single node: {}'.format(self.n_duration))
+
+        self.initial_ds_n = int(self.initial_ds_t / self.n_duration)
+        self.ss_1_n = int(self.ss_1_t / self.n_duration)
+        self.ds_1_n = int(self.ds_1_t / self.n_duration)
+        self.ss_2_n = int(self.ss_2_t / self.n_duration)
+        self.final_ds_n = int(self.final_ds_t / self.n_duration)
+
+        # print('duration (in nodes) of initial ds: {}'.format(initial_ds_n))
+        # print('duration (in nodes) of first ss: {}'.format(ss_1_n))
+        # print('duration (in nodes) of middle ds: {}'.format(ds_1_n))
+        # print('duration (in nodes) of second ss: {}'.format(ss_2_n))
+        # print('duration (in nodes) of final ds: {}'.format(final_ds_n))
+
+        self.ds_1 = self.initial_ds_n
+        self.ss_1 = self.ds_1 + self.ss_1_n
+        self.ds_2 = self.ss_1 + self.ds_1_n
+        self.ss_2 = self.ds_2 + self.ss_2_n
+        ds_3 = self.ss_2 + self.final_ds_n
+
+        self.sym_c = cs.SX
+
+        # state variables
+        self.p = self.sym_c.sym('p', 2)  # com position
+        self.v = self.sym_c.sym('v', 2)  # com velocity
+        self.a = self.sym_c.sym('a', 2)  # com acceleration
+        self.x = cs.vertcat(self.p, self.v, self.a)  # , l, r, alpha_l, alpha_r # state
+        # control variables
+        self.j = self.sym_c.sym('j', 2)  # com jerk
+        self.u = self.j  # control
+        # model equation
+        self.xdot = cs.vertcat(self.v, self.a, self.j)
+
+        # Objective terms
+        self.L = cs.sumsqr(self.u)
+        # Formulate discrete time dynamics
+        # Fixed step Runge-Kutta 4 integrator
+        self.M = 1  # RK4 steps per interval
+        self.dt = self.T_total / self.N / self.M
+
+        margin = 0.0
+        self.width_foot = 0.1 - margin
+        self.length_foot = 0.2 - margin
+
+        self.max_stride_x = 0.4
+        self.max_stride_y = self.width_foot / 2. + 0.5 #0.3 #
+        self.min_stride_y = self.width_foot / 2. + 0.15
+
+        self.grav = 9.81
+
+    def getEdges(self, p):  # lu, ru, rh, lh
+
+        lu = cs.DM([+ self.length_foot / 2., + self.width_foot / 2.])
+        ru = cs.DM([+ self.length_foot / 2., - self.width_foot / 2.])
+        rh = cs.DM([- self.length_foot / 2., - self.width_foot / 2.])
+        lh = cs.DM([- self.length_foot / 2., + self.width_foot / 2.])
+
+        ft_vert = cs.horzcat(p + lu, p + ru, p + rh, p + lh).T
+
+        return ft_vert
+
+    def stepPattern(self, prb_vars, prb_funs, initial_n, final_n, type_leg):
+
+        if type_leg == 'D':
+            self.prb.ct.setConstraintFunction(type_leg + '_' + str(final_n) + '_zmp_stab', prb_funs['zmp'] - (
+                    casadi_sum(prb_funs['wl_vert'], 0).T + casadi_sum(prb_funs['wr_vert'], 0).T),
+                                              nodes=[initial_n, final_n], bounds=dict(lbg=[0., 0.], ubg=[0., 0.]))
+
+            self.prb.ct.setConstraintFunction(type_leg + '_' + str(final_n) + '_contacts',
+                                              casadi_sum(prb_vars['alpha_l'], 0).T + casadi_sum(prb_vars['alpha_r'], 0).T,
+                                              nodes=[initial_n, final_n], bounds=dict(lbg=[1.], ubg=[1.]))
+            if initial_n == 0:
+                initial_n = 1
+
+            self.prb.ct.setConstraintFunction(type_leg + '_' + str(final_n) + '_l_foot', prb_vars['l'] - prb_vars['l-1'], nodes=[initial_n, final_n],
+                                              bounds=dict(lbg=[0., 0.], ubg=[0., 0.]))
+            self.prb.ct.setConstraintFunction(type_leg + '_' + str(final_n) + '_r_foot', prb_vars['r'] - prb_vars['r-1'], nodes=[initial_n, final_n],
+                                              bounds=dict(lbg=[0., 0.], ubg=[0., 0.]))
+
+        else:
+            if type_leg.lower() == 'r':
+                other_leg = 'l'
+            else:
+                other_leg = 'r'
+
+            stance_w_vert = 'w' + other_leg + '_vert'
+            stance_alpha = 'alpha_' + type_leg.lower()
+            swing_alpha = 'alpha_' + other_leg
+            fixed_foot = other_leg
+
+            self.prb.ct.setConstraintFunction(type_leg + '_' + str(final_n) + '_zmp_stab', prb_funs['zmp'] - casadi_sum(prb_funs[stance_w_vert], 0).T,
+                                              nodes=[initial_n, final_n], bounds=dict(lbg=[0., 0.], ubg=[0., 0.]))
+
+            self.prb.ct.setConstraintFunction(type_leg + '_' + str(final_n) + '_contacts_' + stance_alpha, casadi_sum(prb_vars[stance_alpha], 0).T,
+                                              nodes=[initial_n, final_n], bounds=dict(lbg=[0.], ubg=[0.]))
+
+            self.prb.ct.setConstraintFunction(type_leg + '_' + str(final_n) + '_contacts_' + swing_alpha, casadi_sum(prb_vars[swing_alpha], 0).T,
+                                              nodes=[initial_n, final_n], bounds=dict(lbg=[1.], ubg=[1.]))
+
+            self.prb.ct.setConstraintFunction(type_leg + '_' + str(final_n) + '_r_foot', prb_vars[fixed_foot] - prb_vars[fixed_foot + '-1'],
+                                              nodes=[initial_n, final_n], bounds=dict(lbg=[0., 0.], ubg=[0., 0.]))
+
+
+    def buildProblemStep(self):
+
+        self.prb = Problem(self.N, crash_if_suboptimal=True)
+
+        self.prb.setVariable('x', 6)
+        self.prb.setVariable('x-1', 6)
+
+        self.prb.setVariable('l', 2)
+        self.prb.setVariable('r', 2)
+
+        self.prb.setVariable('l-1', 2)
+        self.prb.setVariable('r-1', 2)
+
+        self.prb.setVariable('alpha_l', 4)
+        self.prb.setVariable('alpha_r', 4)
+
+        self.prb.setVariable('u', 2)
+        self.prb.setVariable('u-1', 2)
+        prb_vars = self.prb.getVariable()
+
+        # zmp variable
+        zmp = prb_vars['x'][0:2] - prb_vars['x'][4:6] * (self.height_com / self.grav)
+        self.prb.setFunction('zmp', zmp)
+
+        # integrator for multiple shooting
+        integrator = RK4(self.M, self.L, self.x, self.u, self.xdot, self.dt)
+        x_int = integrator(x0=prb_vars['x-1'], p=prb_vars['u-1'])
+
+        self.prb.setFunction('x_int', x_int)
+
+        wl_vert = prb_vars['alpha_l'] * self.getEdges(prb_vars['l'])
+        wr_vert = prb_vars['alpha_r'] * self.getEdges(prb_vars['r'])
+
+        self.prb.setFunction('wl_vert', wl_vert)
+        self.prb.setFunction('wr_vert', wr_vert)
+
+        prb_funs = self.prb.getFunction()
+
+        ds_n_1 = self.initial_ds_n + 1
+        ss_n_1 = self.ds_1 + self.ss_1_n + 1
+        ds_n_2 = self.ss_1 + self.ds_1_n + 1
+        ss_n_2 = self.ds_2 + self.ss_2_n + 1
+        ds_n_3 = self.N + 1
+
+        # todo remember that the last node is N+1! change something
+        # add constraints
+        self.prb.ct.setConstraintFunction('multiple_shooting', prb_funs['x_int']['xf'] - prb_vars['x'], nodes=[1, self.N + 1],
+                                     bounds=dict(ubg=[0., 0., 0., 0., 0., 0.], lbg=[0., 0., 0., 0., 0., 0.]))
+        # self.prb.ct.setConstraintFunction('stride', prb_vars['l'] - prb_vars['r'],
+        #                              bounds=dict(lbg=[-self.max_stride_x, -self.max_stride_y], ubg=[self.max_stride_x, self.max_stride_y]))
+
+        # self.stepPattern(prb_vars, prb_funs, 0, ds_n_3, 'D')
+        # # step pattern
+        self.stepPattern(prb_vars, prb_funs, 0, ds_n_1, 'D')
+        self.stepPattern(prb_vars, prb_funs, ds_n_1, ss_n_1, 'L')
+        self.stepPattern(prb_vars, prb_funs, ss_n_1, ds_n_2, 'D') # this is zero right now
+        self.stepPattern(prb_vars, prb_funs, ds_n_2, ss_n_2, 'R') # this is zero right now
+        self.stepPattern(prb_vars, prb_funs, ss_n_2, ds_n_3, 'D')
+
+        # add cost functions
+        # self.prb.setCostFunction('minimize_input', 0.001 * cs.sumsqr(prb_vars['u']), nodes=[0, self.N]) # todo trim to lenght of specific node (here 'u')
+        self.prb.setCostFunction('minimize_l_motion', cs.sumsqr(prb_vars['l'] - prb_vars['l-1']), nodes=[1, self.N+1])
+        self.prb.setCostFunction('minimize_r_motion', cs.sumsqr(prb_vars['r'] - prb_vars['r-1']), nodes=[1, self.N+1])
+        # self.prb.setCostFunction('minimize_velocity', cs.sumsqr(prb_vars['x'][2:4]))
+        # self.prb.setCostFunction('minimize_zmp', 1000 * cs.sumsqr(prb_funs['zmp']))
+        # self.prb.setCostFunction('minimize_alpha', cs.sumsqr(prb_vars['alpha_l']) + cs.sumsqr(prb_vars['alpha_r']))
+        # self.prb.setCostFunction('minimize_stride_y', 1000. * cs.sumsqr((prb_vars['l'][1] - prb_vars['r'][1]) - self.min_stride_y))
+
+        self.w, self.g = self.prb.buildProblem()
+
+    def solveProblemStep(self, initial_com, initial_l_foot, initial_r_foot):
+
+        initial_lbw_com = [initial_com[0, 0], initial_com[0, 1],  # com pos
+                           initial_com[1, 0], initial_com[1, 1],  # com vel
+                           initial_com[2, 0], initial_com[2, 1]]
+
+        initial_ubw_com = [initial_com[0, 0], initial_com[0, 1],
+                           initial_com[1, 0], initial_com[1, 1],
+                           initial_com[2, 0], initial_com[2, 1]]
+
+        final_lbw_com = [-cs.inf, -cs.inf,
+                         0.0, 0.0,
+                         0.0, 0.0]
+
+        final_ubw_com = [cs.inf, cs.inf,
+                         0.0, 0.0,
+                         0.0, 0.0]
+
+        # todo check if lenght of ubw and lbw are of the right size
+
+        self.prb.setStateBoundsFromName('x', nodes=0, lbw=initial_lbw_com, ubw=initial_ubw_com)
+
+        self.prb.setStateBoundsFromName('l', nodes=0, lbw=[initial_l_foot[0], initial_l_foot[1]],
+                                         ubw=[initial_l_foot[0], initial_l_foot[1]])
+        self.prb.setStateBoundsFromName('r', nodes=0, lbw=[initial_r_foot[0], initial_r_foot[1]],
+                                        ubw=[initial_r_foot[0], initial_r_foot[1]])
+
+        self.prb.setStateBoundsFromName('x', nodes= self.N, lbw=final_lbw_com, ubw=final_ubw_com)
+
+        self.prb.setStateBoundsFromName('alpha_l', lbw=[0., 0., 0., 0.], ubw=[1., 1., 1., 1.])
+        self.prb.setStateBoundsFromName('alpha_r', lbw=[0., 0., 0., 0.], ubw=[1., 1., 1., 1.])
+
+        self.prb.setStateBoundsFromName('u', nodes=[0, self.N], lbw=[-1000., -1000.], ubw=[1000., 1000.])
+
+        # self.prb.setInitialGuess('l', nodes=[0, self.N+1], vals=[initial_l_foot[0], initial_l_foot[1]])
+        # self.prb.setInitialGuess('r', nodes=[0, self.N+1], vals=[initial_r_foot[0], initial_r_foot[1]])
+
+        w_opt = self.prb.solveProblem()
+
+        return w_opt
+
 if __name__ == '__main__':
-    N = 5
-    prb = Problem(N, crash_if_suboptimal=False)
-    h = 1
-    grav = 9.8
+
+    solver = StepSolver()
+    solver.buildProblemStep()
+
+    a = np.array([[0, 0], [0, 0], [0, 0]])
+    b = np.array([-0.2, 0, 0])
+    c = np.array([0.2, 0, 0])
+    opt_values = solver.solveProblemStep(a, b, c)
+
+    print(opt_values)
+    # N = 5
+    # prb = Problem(N, crash_if_suboptimal=False)
+    # h = 1
+    # grav = 9.8
 
     # a = cs.SX.sym('a', 2)  # com acceleration
     # define state variables
@@ -725,24 +975,24 @@ if __name__ == '__main__':
 
     # integrator = RK4(1, 1, x, u, xdot, 0.01)
 
-    prb.setVariable('x', 6)
-    prb.setVariable('u', 2)
+    # prb.setVariable('x', 6)
+    # prb.setVariable('u', 2)
     # todo check if dimension of past x is the same as x or change api
-    prb.setVariable('x', 6, -1)  # get x-2, which is x two nodes before
+    # prb.setVariable('x', 6, -1)  # get x-2, which is x two nodes before
     # prb.setVariable('x', 6, -2) # get x-2, which is x two nodes before
 
     # prb.setVariable('k', 9)
-    var_opt = prb.getVariable()
+    # var_opt = prb.getVariable()
 
-    zmp_old = var_opt['x-1'][0:2] - var_opt['x-1'][4:6]  # * (h / grav)
-    zmp = var_opt['x'][0:2] - var_opt['x'][4:6]  # * (h / grav)
-
-    prb.setFunction('zmp', zmp)
-    prb.setFunction('zmp_old', zmp_old)
-
+    # zmp_old = var_opt['x-1'][0:2] - var_opt['x-1'][4:6]  # * (h / grav)
+    # zmp = var_opt['x'][0:2] - var_opt['x'][4:6]  # * (h / grav)
+    #
+    # prb.setFunction('zmp', zmp)
+    # prb.setFunction('zmp_old', zmp_old)
+    #
     # Fk = integrator(x0=var_opt['x-1'][0:6], p=var_opt['u-1'])
 
-    fun_opt = prb.getFunction()
+    # fun_opt = prb.getFunction()
 
     # print(fun_opt)
     # if k > 0:
@@ -755,7 +1005,7 @@ if __name__ == '__main__':
     # prb.ct.setConstraintFunction('generic_constraint', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]], bounds=(dict(ubg=[1, 1])))
     # prb.ct.setConstraintFunction('generic_constraint1', var_opt['x'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
     # prb.ct.setConstraintFunction('generic_constraint2', var_opt['u'][0:2] - var_opt['x'][4:6], nodes=[[0, 2], [3, 4]])
-    prb.ct.setConstraintFunction('generic_constraint3', var_opt['x-1'][0:2] - var_opt['x'][4:6], nodes=[2, 5])
+    # prb.ct.setConstraintFunction('generic_constraint3', var_opt['x-1'][0:2] - var_opt['x'][4:6], nodes=[2, 5])
 
     # prb.ct.setConstraintFunction('generic_constraint',
     #                              var_opt['x'][0:2] - var_opt['x'][4:6],
@@ -770,15 +1020,15 @@ if __name__ == '__main__':
     # prb.ct.setConstraintFunction('zmp_constraint', fun_opt['zmp_old'] - var_opt['u'], nodes=[2, prb.N])
 
     # 1000. * sumsqr((Lk[1] - Rk[1]) - self.min_stride_y)
-    prb.setCostFunction('one_cost_function', fun_opt['zmp'][0] - var_opt['x'][2])
-
-    problem = prb.buildProblem()
-
+    # prb.setCostFunction('one_cost_function', fun_opt['zmp'][0] - var_opt['x'][2])
+    #
+    # problem = prb.buildProblem()
+    #
     # todo add check for lenght of value inserted
     # todo add check for lenght of nodes inserted
     # prb.setInitialGuess('u', [0,N], [1, 1])
 
-    prb.setStateBoundsFromName(name='x', nodes=[0, 3], lbw=[0, 0, 0, 0, 0, 0], ubw=[0, 0, 0, 0, 0, 0])
+    # prb.setStateBoundsFromName(name='x', nodes=[0, 3], lbw=[0, 0, 0, 0, 0, 0], ubw=[0, 0, 0, 0, 0, 0])
 
     # print(w)
     # prb.ct.setConstraintBounds(-5, 5, [3, 4])
@@ -786,7 +1036,7 @@ if __name__ == '__main__':
     # print(prb.ct.lbg)
     # print(prb.ct.ubg)
     # print('=======================')
-    prb.ct.setConstraintBoundsFromName('generic_constraint3', nodes=2, lbg=[-7.5, -7.5], ubg=[7.5, 7.5])
+    # prb.ct.setConstraintBoundsFromName('generic_constraint3', nodes=2, lbg=[-7.5, -7.5], ubg=[7.5, 7.5])
     # print('=======================')
     # print(prb.ct.g)
     # print(prb.ct.lbg)
@@ -794,4 +1044,4 @@ if __name__ == '__main__':
 
     # x and u should be always present
 
-    w_opt = prb.solveProblem()
+    # w_opt = prb.solveProblem()
