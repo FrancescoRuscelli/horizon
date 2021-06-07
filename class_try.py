@@ -12,14 +12,14 @@ if __name__ == '__main__':
     # x_prev = prb.createStateVariable('x', 6, prev_nodes=-1) # how to do for previous nodes?
     x_prev = prb.createStateVariable('x', 6, prev_nodes=-1) # how to do for previous nodes?
     u = prb.createInputVariable('u', 2)
-    # z = prb.createStateVariable('z', 2)
+    z = prb.createStateVariable('z', 2)
 
     # todo saving a variable (or a function) inside the problem is probably completely useless if it's not a STATE variable
 
     # todo how to check if a function has variable that are not defined in the problem? (they are not in state_var)
 
-    # todo add logic for input variables and state variables
-    # todo add bounds
+    # todo ADD GETTER FOR NODES IN CASADI
+
     # start how to choose horizon? N? N-1?
 
     # state_fun = x_prev[2:6] + u
@@ -32,12 +32,11 @@ if __name__ == '__main__':
 
     # cnsrt_x = prb.createConstraint('generic_constraint', x[0:2] - x[4:6], nodes=[[0, 2], [3, 4]])
     cnsrt_x = prb.createConstraint('another_constraint', x_prev[0:2] - x[4:6], nodes=[2, 5])
-    # cnsrt_z = prb.createConstraint('yet_another_constraint', z - x[2:4], nodes=5)
-    # cnsrt_x.setNodes(5)
-
-
+    cnsrt_z = prb.createConstraint('yet_another_constraint', z - x[2:4], nodes=4, bounds=dict(lb=[-1, -1], ub=[0, 0]))
 
     costfun_x = prb.createCostFunction('one_cost_function', zmp[0] - x[2])
+
+    # cnsrt_x.setNodes(5)
 
 
     # print('constraint name:', cnsrt_x.getName())

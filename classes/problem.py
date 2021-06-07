@@ -156,6 +156,7 @@ class Problem:
 
             self.costfun_sum = cs.sum1(cs.vertcat(*self.costfun_impl))
 
+
         # print('state var unraveled:', self.state_var_container.getVarImplList())
         # print('constraints unraveled:', cs.vertcat(*self.cnstr_impl))
         # print('cost functions unraveled:', cs.vertcat(*self.costfun_impl))
@@ -221,6 +222,8 @@ class Problem:
         w_opt = sol['x'].full().flatten()
 
         return w_opt
+
+    def getNode(self, n):
 
 
 

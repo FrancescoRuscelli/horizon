@@ -15,7 +15,3 @@ def unravelElements(elements):
             unraveled_elem.append(item)
 
     return unraveled_elem
-
-
-result = unravelElements([[1, 3], [5, 9]])
-print(result)
