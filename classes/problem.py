@@ -174,6 +174,9 @@ class Problem:
 
         w = self.state_var_container.getVarImplList()
         w0 = np.zeros((w.shape[0]))
+        print(w0)
+
+        print(self.state_var_container.getInitialGuessList())
         g = cs.vertcat(*self.cnstr_impl)
         j = self.costfun_sum
 
@@ -223,7 +226,7 @@ class Problem:
 
         return w_opt
 
-    def getNode(self, n):
+    # def getNode(self, n):
 
 
 

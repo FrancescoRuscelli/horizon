@@ -45,6 +45,16 @@ class StateVariable(cs.SX):
         self.setLowerBounds(lb, nodes)
         self.setUpperBounds(ub, nodes)
 
+    def setInitialGuess(self, val, nodes=None):
+        if nodes is None:
+            nodes = [0, self.nodes]
+
+        if isinstance(nodes, list):
+            for n in range(nodes[0], nodes[1]):
+                self.var_impl['n' + str(n)]['w0'] = val
+        else:
+            self.var_impl['n' + str(nodes)]['w0'] = val
+
     def _project(self):
         # state_var_impl --> dict
         #  - key: nodes (n0, n1, ...)
@@ -55,6 +65,7 @@ class StateVariable(cs.SX):
             self.var_impl['n' + str(n)]['var'] = var_impl
             self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
             self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
+            self.var_impl['n' + str(n)]['w0'] = np.zeros(self.dim)
 
     def getImpl(self, node):
         var_impl = self.var_impl['n' + str(node)]['var']
@@ -70,6 +81,11 @@ class StateVariable(cs.SX):
 
     def getBounds(self, node):
         return [self.getBoundMin(node), self.getBoundMax(node)]
+
+    def getInitialGuess(self, node):
+        initial_guess = self.var_impl['n' + str(node)]['w0']
+        return initial_guess
+
 
 class InputVariable(StateVariable):
     def __init__(self, tag, dim, nodes):
@@ -183,6 +199,18 @@ class StateVariables:
         # this is used to check the variable existing in the function. It requires all the variables and the previous variables
         var_abstr_dict = {**self.state_var, **self.state_var_prev}
         return var_abstr_dict
+
+    def getInitialGuessList(self):
+
+        initial_guess_list = list()
+
+        for node, val in self.state_var_impl.items():
+            for var_abstract in val.keys():
+                # get from state_var_impl the relative var
+                # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
+                initial_guess_list += val[var_abstract]['w0']
+
+        return initial_guess_list
 
     def update(self, k):
         # state_var_impl --> dict
