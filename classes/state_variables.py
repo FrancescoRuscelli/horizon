@@ -46,6 +46,7 @@ class StateVariable(cs.SX):
         self.setUpperBounds(ub, nodes)
 
     def setInitialGuess(self, val, nodes=None):
+
         if nodes is None:
             nodes = [0, self.nodes]
 
@@ -65,7 +66,7 @@ class StateVariable(cs.SX):
             self.var_impl['n' + str(n)]['var'] = var_impl
             self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
             self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
-            self.var_impl['n' + str(n)]['w0'] = np.zeros(self.dim)
+            self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
 
     def getImpl(self, node):
         var_impl = self.var_impl['n' + str(node)]['var']
@@ -101,11 +102,13 @@ class InputVariable(StateVariable):
             self.var_impl['n' + str(n)]['var'] = var_impl
             self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
             self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
+            self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
 
 class StateVariables:
 
-    def __init__(self, nodes):
+    def __init__(self, nodes, logger=None):
 
+        self.logger = logger
         self.nodes = nodes
 
         self.state_var = OrderedDict()
@@ -120,7 +123,9 @@ class StateVariables:
         checkExistence = lambda name, node: True if prev_nodes is None else True if name in self.state_var else False
         tag = createTag(name, prev_nodes)
 
-        print('Setting variable {} with tag {} as {}'.format(name, tag, var_type))
+        if self.logger:
+            self.logger.debug('Setting variable {} with tag {} as {}'.format(name, tag, var_type))
+
         if checkExistence(name, prev_nodes):
             var = var_type(tag, dim, self.nodes)
             if prev_nodes is None:
@@ -160,10 +165,6 @@ class StateVariables:
         state_var_impl_list = list()
 
         for node, val in self.state_var_impl.items():
-            # print('node:', node)
-            # print('var:', list(val))
-            # print('var', list(val.keys()))
-
             for var_abstract in val.keys():
                 # get from state_var_impl the relative var
 
@@ -229,12 +230,15 @@ class StateVariables:
                 continue
 
             var_impl = self.state_var[name].getImpl(k)
-            print('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
+
+            if self.logger:
+                self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
             # todo this is not necessary right?
             var_bound_min = self.state_var[name].getBoundMin(k)
             var_bound_max = self.state_var[name].getBoundMax(k)
-            var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max)
+            initial_guess = self.state_var[name].getInitialGuess(k)
+            var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
             self.state_var_impl['n' + str(k)].update({name : var_dict})
 
     def updateBounds(self):
@@ -246,6 +250,13 @@ class StateVariables:
                 state_var['ub'] = self.state_var[name].getBoundMax(k)
             # self.state_var_impl
 
+    def updateInitialGuess(self):
+
+        for node in self.state_var_impl.keys():
+            for name, state_var in self.state_var_impl[node].items():
+                k = node[node.index('n') + 1:]
+                state_var['w0'] = self.state_var[name].getInitialGuess(k)
+
 
 if __name__ == '__main__':
 
@@ -254,9 +265,6 @@ if __name__ == '__main__':
     x = sv.setVar('x', 2)
     # sv.setVar('y', 2)
     x_prev = sv.setVar('x', 2, -2)
-
-    # print(x.bounds)
-    # print(x_prev)
 
     for i in range(4):
         sv.update(i)

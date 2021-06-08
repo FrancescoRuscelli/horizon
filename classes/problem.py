@@ -3,10 +3,17 @@ from classes import function as fc
 from classes import nodes as nd
 from classes import state_variables as sv
 import numpy as np
-
+import logging
+import sys
 class Problem:
 
     def __init__(self, N, crash_if_suboptimal=False):
+
+        self.logger = logging.getLogger('logger')
+        # self.logger.setLevel(level=logging.DEBUG)
+
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        self.logger.addHandler(stdout_handler)
 
         self.crash_if_suboptimal = crash_if_suboptimal
 
@@ -66,7 +73,7 @@ class Problem:
 
         used_var = self._getUsedVar(g)
 
-        print('Creating function {}: {} with abstract variables {}'.format(name, g, used_var))
+        self.logger.debug('Creating function {}: {} with abstract variables {}'.format(name, g, used_var))
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
         container.append(fun)
 
@@ -87,12 +94,12 @@ class Problem:
 
     def removeCostFunction(self, name):
 
-        print(self.costfun_container)
+        self.logger.debug('Functions before removal:', self.costfun_container)
         for fun in self.costfun_container:
             if fun.getName() == name:
                 self.costfun_container.remove(fun)
 
-        print(self.costfun_container)
+        self.logger.debug('Function after removal:', self.costfun_container)
 
     def removeConstraint(self, name):
         for fun in self.cnstr_container:
@@ -105,8 +112,6 @@ class Problem:
         # TODO be careful about ordering
         for fun in container:
             f = fun.getFunction()
-            # print('var in fun', fun.getVariables())
-            # print('fun', fun.getFunction())
 
             # implement constraint only if constraint is present in node k
             if node in fun.getNodes():
@@ -116,7 +121,7 @@ class Problem:
                     used_vars.append(var)
 
                 f_impl.append(f(*used_vars))
-                print('Implemented function "{}": {} with vars {}'.format(fun.getName(), f_impl, used_vars))
+                self.logger.debug('Implemented function "{}": {} with vars {}'.format(fun.getName(), f_impl, used_vars))
         return f_impl
 
     def _updateConstraints(self, node):
@@ -125,9 +130,6 @@ class Problem:
             # add implemented constraints in list
             self.cnstr_impl += temp_cnsrt_impl
 
-        # print('g: {} {}'.format(name, g.shape))
-        # print('value:', g)
-        # print('bounds: {}'.format(self.g_dict[name]['bounds']))
 
     # def getVariablesName(self):
     #     return [name for name, var in self.var]
@@ -145,22 +147,22 @@ class Problem:
     def createProblem(self):
 
         for k in range(self.nodes):  # todo decide if N or N+1
-            print('Node {}:'.format(k))
+            self.logger.debug('Node {}:'.format(k))
             # implement the abstract state variable with the current node
             self.state_var_container.update(k)
             # implement the constraint
             self._updateConstraints(k) #todo not sure but ok, maybe better a constraint class container that updates takin state_var_container?
             self._updateCostFunctions(k)
-            print('===========================================')
+            self.logger.debug('===========================================')
 
             self.costfun_sum = cs.sum1(cs.vertcat(*self.costfun_impl))
 
 
-        # print('state var unraveled:', self.state_var_container.getVarImplList())
-        # print('constraints unraveled:', cs.vertcat(*self.cnstr_impl))
-        # print('cost functions unraveled:', cs.vertcat(*self.costfun_impl))
-        # print('cost function summed:', self.costfun_sum)
-        # print('----------------------------------------------------')
+        # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
+        # self.logger.debug('constraints unraveled:', cs.vertcat(*self.cnstr_impl))
+        # self.logger.debug('cost functions unraveled:', cs.vertcat(*self.costfun_impl))
+        # self.logger.debug('cost function summed:', self.costfun_sum)
+        # self.logger.debug('----------------------------------------------------')
 
         j = self.costfun_sum
         w = self.state_var_container.getVarImplList()
@@ -170,12 +172,12 @@ class Problem:
     def solveProblem(self):
 
         self.state_var_container.updateBounds()
+        self.state_var_container.updateInitialGuess()
 
         w = self.state_var_container.getVarImplList()
-        w0 = np.zeros((w.shape[0]))
-        print(w0)
+        w0 = self.state_var_container.getInitialGuessList()
+        self.logger.debug('Initial guess vector for variables:'.format(self.state_var_container.getInitialGuessList()))
 
-        print(self.state_var_container.getInitialGuessList())
         g = cs.vertcat(*self.cnstr_impl)
         j = self.costfun_sum
 
@@ -192,24 +194,24 @@ class Problem:
         ubw = self.state_var_container.getBoundsMaxList()
 
 
-        print('================')
-        print('len w:', w.shape)
-        print('len lbw:', len(lbw))
-        print('len ubw:', len(ubw))
-        print('len w0:', len(w0))
-        print('len g:', g.shape)
-        print('len lbg:', len(lbg))
-        print('len ubg:', len(ubg))
+        self.logger.debug('================')
+        self.logger.debug('len w: {}'.format(w.shape))
+        self.logger.debug('len lbw: {}'.format(len(lbw)))
+        self.logger.debug('len ubw: {}'.format(len(ubw)))
+        self.logger.debug('len w0: {}'.format(len(w0)))
+        self.logger.debug('len g: {}'.format(g.shape))
+        self.logger.debug('len lbg: {}'.format(len(lbg)))
+        self.logger.debug('len ubg: {}'.format(len(ubg)))
 
 
-        print('================')
-        print('w:', w)
-        print('lbw:', lbw)
-        print('ubw:', ubw)
-        print('g:', g)
-        print('lbg:', lbg)
-        print('ubg:', ubg)
-        print('j:', j)
+        self.logger.debug('================')
+        self.logger.debug('w: {}'.format(w))
+        self.logger.debug('lbw: {}'.format(lbw))
+        self.logger.debug('ubw: {}'.format(ubw))
+        self.logger.debug('g: {}'.format(g))
+        self.logger.debug('lbg: {}'.format(lbg))
+        self.logger.debug('ubg: {}'.format(ubg))
+        self.logger.debug('j: {}'.format(j))
 
         self.solver = cs.nlpsol('solver', 'ipopt', self.prob)#,
                            # {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
@@ -230,19 +232,20 @@ class Problem:
         pos = 0
 
         for node, val in self.state_var_container.getVarImplDict().items():
-            print('Node:', node)
-            # print('val:', val)
+            self.logger.debug('Node: {}'.format(node))
+
             for name, var in val.items():
                 dim = var['var'].shape[0]
                 sol = w_opt[pos:pos + dim]
 
-                print('var {} of dim {}'.format(name, var['var'].shape[0]))
-                print('Previous state: {}'.format(solution_dict))
-                print('Var state:', solution_dict[name])
-                print('Appending to {} opt sol [{}-{}]: {}'.format(name, pos, pos + dim, sol))
+                self.logger.debug('var {} of dim {}'.format(name, var['var'].shape[0]))
+                # self.logger.debug('var {} of dim {}'.format(name, var['var'].shape[0]))
+                self.logger.debug('Previous state: {}'.format(solution_dict))
+                self.logger.debug('Var state: {}'.format(solution_dict[name]))
+                self.logger.debug('Appending to {} opt sol [{}-{}]: {}'.format(name, pos, pos + dim, sol))
                 solution_dict[name].extend(sol)
-                print('Current state: {}'.format(solution_dict))
-                print('~~~~~~~~~~~~~')
+                self.logger.debug('Current state: {}'.format(solution_dict))
+                self.logger.debug('~~~~~~~~~~~~~')
                 pos = pos + dim
 
         return solution_dict

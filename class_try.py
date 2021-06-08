@@ -43,23 +43,24 @@ if __name__ == '__main__':
     # print('constraint nodes:', cnsrt_x.getNodes())
     # print('constraint function:', cnsrt_x.getFunction())
     # print('constraint variables:', cnsrt_x.getVariables())
-    print('----------------------------------------------')
+    # print('----------------------------------------------')
     # print('cost function name:', cnsrt_z.getName())
     # print('cost function nodes:', cnsrt_z.getNodes())
     # print('cost function function:', cnsrt_z.getFunction())
     # print('cost function variables:', cnsrt_z.getVariables())
-    print('----------------------------------------------')
+    # print('----------------------------------------------')
     # print('cost function name:', costfun_x.getName())
     # print('cost function nodes:', costfun_x.getNodes())
     # print('cost function function:', costfun_x.getFunction())
     # print('cost function variables:', costfun_x.getVariables())
-    prb.createProblem()
 
+    prb.createProblem()
     # x.setLowerBounds(node=4, bounds= [-2, -2, -2, -2, -2, -2])
     x.setBounds(nodes=[0, 3], lb=[0, 0, 0, 0, 0, 0], ub=[0, 0, 0, 0, 0, 0])
     cnsrt_x.setBounds(nodes=2, lb=[-7.5, -7.5], ub=[7.5, 7.5])
 
-    print('SOLVING:')
+    x.setInitialGuess(nodes=[2, 4], val=[2, 2, 2, 2, 2, 2])
+
     sol = prb.solveProblem()
 
 
