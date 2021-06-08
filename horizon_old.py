@@ -940,7 +940,7 @@ class StepSolver:
 
         self.prb.setStateBoundsFromName('u', nodes=[0, self.N], lbw=[-1000., -1000.], ubw=[1000., 1000.])
 
-        # self.prb.setInitialGuess('l', nodes=[0, self.N+1], vals=[initial_l_foot[0], initial_l_foot[1]])
+        self.prb.setInitialGuess('l', nodes=[0, self.N+1], vals=[initial_l_foot[0], initial_l_foot[1]])
         # self.prb.setInitialGuess('r', nodes=[0, self.N+1], vals=[initial_r_foot[0], initial_r_foot[1]])
 
         w_opt = self.prb.solveProblem()

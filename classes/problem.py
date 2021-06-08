@@ -173,6 +173,9 @@ class Problem:
 
         w = self.state_var_container.getVarImplList()
         w0 = np.zeros((w.shape[0]))
+        print(w0)
+
+        print(self.state_var_container.getInitialGuessList())
         g = cs.vertcat(*self.cnstr_impl)
         j = self.costfun_sum
 
@@ -245,11 +248,6 @@ class Problem:
         return solution_dict
 
     # def getNode(self, n):
-
-
-
-
-
 
 # Problem.function = {
 #     'constraint': Problem.createConstraint,
