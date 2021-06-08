@@ -116,9 +116,7 @@ class Problem:
                     used_vars.append(var)
 
                 f_impl.append(f(*used_vars))
-                print('Implemented function {} at node {}: {}'.format(fun.getName(), node, f_impl))
-                print('Used variables: {}'.format(used_vars))
-                print('===========================================')
+                print('Implemented function "{}": {} with vars {}'.format(fun.getName(), f_impl, used_vars))
         return f_impl
 
     def _updateConstraints(self, node):
@@ -147,12 +145,13 @@ class Problem:
     def createProblem(self):
 
         for k in range(self.nodes):  # todo decide if N or N+1
+            print('Node {}:'.format(k))
             # implement the abstract state variable with the current node
             self.state_var_container.update(k)
             # implement the constraint
             self._updateConstraints(k) #todo not sure but ok, maybe better a constraint class container that updates takin state_var_container?
             self._updateCostFunctions(k)
-
+            print('===========================================')
 
             self.costfun_sum = cs.sum1(cs.vertcat(*self.costfun_impl))
 
@@ -221,9 +220,34 @@ class Problem:
 
         w_opt = sol['x'].full().flatten()
 
-        return w_opt
+        # split solution for each variable
+        abstract_vars = list(self.state_var_container.getVarAbstrDict(past=False).keys())
+        solution_dict = {k: [] for k in abstract_vars}
 
-    def getNode(self, n):
+        pos = 0
+
+        for node, val in self.state_var_container.getVarImplDict().items():
+            print('Node:', node)
+            # print('val:', val)
+            for name, var in val.items():
+                dim = var['var'].shape[0]
+                sol = w_opt[pos:pos + dim]
+
+                print('var {} of dim {}'.format(name, var['var'].shape[0]))
+                print('Previous state: {}'.format(solution_dict))
+                print('Var state:', solution_dict[name])
+                print('Appending to {} opt sol [{}-{}]: {}'.format(name, pos, pos + dim, sol))
+                solution_dict[name].extend(sol)
+                print('Current state: {}'.format(solution_dict))
+                print('~~~~~~~~~~~~~')
+                pos = pos + dim
+
+        return solution_dict
+
+    # def getNode(self, n):
+
+
+
 
 
 

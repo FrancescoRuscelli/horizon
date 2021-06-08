@@ -104,6 +104,7 @@ class StateVariables:
         checkExistence = lambda name, node: True if prev_nodes is None else True if name in self.state_var else False
         tag = createTag(name, prev_nodes)
 
+        print('Setting variable {} with tag {} as {}'.format(name, tag, var_type))
         if checkExistence(name, prev_nodes):
             var = var_type(tag, dim, self.nodes)
             if prev_nodes is None:
@@ -179,9 +180,13 @@ class StateVariables:
 
         return state_var_bound_list
 
-    def getVarAbstrDict(self):
+    def getVarAbstrDict(self, past=True):
         # this is used to check the variable existing in the function. It requires all the variables and the previous variables
-        var_abstr_dict = {**self.state_var, **self.state_var_prev}
+        if past:
+            var_abstr_dict = {**self.state_var, **self.state_var_prev}
+        else:
+            var_abstr_dict = self.state_var
+
         return var_abstr_dict
 
     def update(self, k):
@@ -193,9 +198,12 @@ class StateVariables:
         # implementation of current state variable
         for name, val in self.state_var.items():
             if isinstance(val, InputVariable) and k == self.nodes-1:
-                break
+                continue
 
             var_impl = self.state_var[name].getImpl(k)
+            print('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
+
+            # todo this is not necessary right?
             var_bound_min = self.state_var[name].getBoundMin(k)
             var_bound_max = self.state_var[name].getBoundMax(k)
             var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max)
