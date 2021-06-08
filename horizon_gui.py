@@ -1,6 +1,6 @@
 import sys
 from functools import partial
-from classes import gui_receiver
+from horizon import gui_receiver
 import logging
 
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,

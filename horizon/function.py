@@ -1,6 +1,6 @@
 import casadi as cs
 import numpy as np
-from classes import misc_function as misc
+from horizon import misc_function as misc
 
 class Function:
     def __init__(self, name, f, used_vars, nodes):

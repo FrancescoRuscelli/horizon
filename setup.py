@@ -19,8 +19,8 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "Operating System :: Ubuntu",
     ],
-    # package_dir={"": "classes"},
-    packages=['classes', 'custom_css'],
-    # packages=setuptools.find_packages(where="classes"),
+    # package_dir={"": "horizon"},
+    packages=['horizon', 'custom_css'],
+    # packages=setuptools.find_packages(where="horizon"),
     python_requires=">=3.6",
 )

@@ -1,4 +1,4 @@
-from classes import problem as horizon
+from horizon import problem as horizon
 import parser
 import re
 import sys, os

@@ -1,7 +1,7 @@
 import casadi as cs
-from classes import function as fc
-from classes import nodes as nd
-from classes import state_variables as sv
+from horizon import function as fc
+from horizon import nodes as nd
+from horizon import state_variables as sv
 import numpy as np
 import logging
 import sys
