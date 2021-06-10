@@ -4,11 +4,11 @@ import setuptools
 #     long_description = fh.read()
 
 setuptools.setup(
-    name="horizon_diocane",
+    name="casadi_horizon",
     version="0.0.1",
     author="Francesco Ruscelli",
     author_email="francesco.ruscelli@iit.it",
-    description="Beh",
+    description="Library for Direct Multiple Shooting with CasADi",
     # long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/FrancescoRuscelli/horizon_gui",
@@ -20,7 +20,7 @@ setuptools.setup(
         "Operating System :: Ubuntu",
     ],
     # package_dir={"": "horizon"},
-    packages=['horizon', 'custom_css'],
+    packages=['horizon', 'horizon_gui'],
     # packages=setuptools.find_packages(where="horizon"),
     python_requires=">=3.6",
 )
