@@ -2,7 +2,7 @@ import pprint
 
 import casadi as cs
 from collections import OrderedDict
-
+import logging
 import numpy as np
 import types
 
@@ -87,10 +87,15 @@ class StateVariable(cs.SX):
         initial_guess = self.var_impl['n' + str(node)]['w0']
         return initial_guess
 
+    def getNNodes(self):
+        return self.nodes
 
 class InputVariable(StateVariable):
     def __init__(self, tag, dim, nodes):
         super(InputVariable, self).__init__(tag, dim, nodes)
+
+    def getNNodes(self):
+        return self.nodes-1
 
     def _project(self):
         # state_var_impl --> dict
@@ -124,7 +129,8 @@ class StateVariables:
         tag = createTag(name, prev_nodes)
 
         if self.logger:
-            self.logger.debug('Setting variable {} with tag {} as {}'.format(name, tag, var_type))
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug('Setting variable {} with tag {} as {}'.format(name, tag, var_type))
 
         if checkExistence(name, prev_nodes):
             var = var_type(tag, dim, self.nodes)
@@ -232,7 +238,8 @@ class StateVariables:
             var_impl = self.state_var[name].getImpl(k)
 
             if self.logger:
-                self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
             # todo this is not necessary right?
             var_bound_min = self.state_var[name].getBoundMin(k)

@@ -5,7 +5,7 @@ import numpy as np
 
 if __name__ == '__main__':
 
-
+    np.set_printoptions(precision=3, suppress=True)
     prb = csprb.Problem(5) # so it's 6 nodes
 
     x = prb.createStateVariable('x', 6)
@@ -61,6 +61,7 @@ if __name__ == '__main__':
     x.setInitialGuess(nodes=[2, 4], val=[2, 2, 2, 2, 2, 2])
 
     sol = prb.solveProblem()
+
 
 
 

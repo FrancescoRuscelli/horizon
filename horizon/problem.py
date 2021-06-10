@@ -5,13 +5,15 @@ from horizon import state_variables as sv
 import numpy as np
 import logging
 import sys
+import time
+
 class Problem:
 
     def __init__(self, N, crash_if_suboptimal=False):
 
         self.logger = logging.getLogger('logger')
         # self.logger.setLevel(level=logging.DEBUG)
-
+        self.debug_mode = self.logger.isEnabledFor(logging.DEBUG)
         stdout_handler = logging.StreamHandler(sys.stdout)
         self.logger.addHandler(stdout_handler)
 
@@ -72,8 +74,8 @@ class Problem:
             nodes = [0, self.nodes]
 
         used_var = self._getUsedVar(g)
-
-        self.logger.debug('Creating function {}: {} with abstract variables {}'.format(name, g, used_var))
+        if self.debug_mode:
+            self.logger.debug('Creating function "{}": {} with abstract variables {}'.format(name, g, used_var))
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
         container.append(fun)
 
@@ -94,12 +96,13 @@ class Problem:
 
     def removeCostFunction(self, name):
 
-        self.logger.debug('Functions before removal:', self.costfun_container)
+        if self.debug_mode:
+            self.logger.debug('Functions before removal:', self.costfun_container)
         for fun in self.costfun_container:
             if fun.getName() == name:
                 self.costfun_container.remove(fun)
-
-        self.logger.debug('Function after removal:', self.costfun_container)
+        if self.debug_mode:
+            self.logger.debug('Function after removal:', self.costfun_container)
 
     def removeConstraint(self, name):
         for fun in self.cnstr_container:
@@ -121,7 +124,8 @@ class Problem:
                     used_vars.append(var)
 
                 f_impl.append(f(*used_vars))
-                self.logger.debug('Implemented function "{}": {} with vars {}'.format(fun.getName(), f_impl, used_vars))
+                if self.debug_mode:
+                    self.logger.debug('Implemented function "{}": {} with vars {}'.format(fun.getName(), f_impl, used_vars))
         return f_impl
 
     def _updateConstraints(self, node):
@@ -169,85 +173,97 @@ class Problem:
         g = cs.vertcat(*self.cnstr_impl)
         self.prob = {'f': j, 'x': w, 'g': g}
 
+        self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
+                           {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                            'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+
     def solveProblem(self):
 
+        # t_start = time.time()
         self.state_var_container.updateBounds()
         self.state_var_container.updateInitialGuess()
 
         w = self.state_var_container.getVarImplList()
-        w0 = self.state_var_container.getInitialGuessList()
-        self.logger.debug('Initial guess vector for variables:'.format(self.state_var_container.getInitialGuessList()))
+        self.w0 = self.state_var_container.getInitialGuessList()
+
+        if self.debug_mode:
+            self.logger.debug('Initial guess vector for variables:'.format(self.state_var_container.getInitialGuessList()))
 
         g = cs.vertcat(*self.cnstr_impl)
         j = self.costfun_sum
 
-        lbg = []
-        ubg = []
+        self.lbg = []
+        self.ubg = []
 
         for node in range(self.nodes):
             for cnstr in self.cnstr_container:
                 if node in cnstr.getNodes():
-                    lbg += cnstr.getBoundsMin(node)
-                    ubg += cnstr.getBoundsMax(node)
+                    self.lbg += cnstr.getBoundsMin(node)
+                    self.ubg += cnstr.getBoundsMax(node)
 
-        lbw = self.state_var_container.getBoundsMinList()
-        ubw = self.state_var_container.getBoundsMaxList()
+        self.lbw = self.state_var_container.getBoundsMinList()
+        self.ubw = self.state_var_container.getBoundsMaxList()
+
+        if self.debug_mode:
+            self.logger.debug('================')
+            self.logger.debug('len w: {}'.format(w.shape))
+            self.logger.debug('len lbw: {}'.format(len(self.lbw)))
+            self.logger.debug('len ubw: {}'.format(len(self.ubw)))
+            self.logger.debug('len w0: {}'.format(len(self.w0)))
+            self.logger.debug('len g: {}'.format(g.shape))
+            self.logger.debug('len lbg: {}'.format(len(self.lbg)))
+            self.logger.debug('len ubg: {}'.format(len(self.ubg)))
 
 
-        self.logger.debug('================')
-        self.logger.debug('len w: {}'.format(w.shape))
-        self.logger.debug('len lbw: {}'.format(len(lbw)))
-        self.logger.debug('len ubw: {}'.format(len(ubw)))
-        self.logger.debug('len w0: {}'.format(len(w0)))
-        self.logger.debug('len g: {}'.format(g.shape))
-        self.logger.debug('len lbg: {}'.format(len(lbg)))
-        self.logger.debug('len ubg: {}'.format(len(ubg)))
+            self.logger.debug('================')
+            self.logger.debug('w: {}'.format(w))
+            self.logger.debug('lbw: {}'.format(self.lbw))
+            self.logger.debug('ubw: {}'.format(self.ubw))
+            self.logger.debug('g: {}'.format(g))
+            self.logger.debug('lbg: {}'.format(self.lbg))
+            self.logger.debug('ubg: {}'.format(self.ubg))
+            self.logger.debug('j: {}'.format(j))
 
+        # t_to_set_up = time.time() - t_start
+        # print('T to set up:', t_to_set_up)
+        # t_start = time.time()
+        sol = self.solver(x0=self.w0, lbx=self.lbw, ubx=self.ubw, lbg=self.lbg, ubg=self.ubg)
 
-        self.logger.debug('================')
-        self.logger.debug('w: {}'.format(w))
-        self.logger.debug('lbw: {}'.format(lbw))
-        self.logger.debug('ubw: {}'.format(ubw))
-        self.logger.debug('g: {}'.format(g))
-        self.logger.debug('lbg: {}'.format(lbg))
-        self.logger.debug('ubg: {}'.format(ubg))
-        self.logger.debug('j: {}'.format(j))
-
-        self.solver = cs.nlpsol('solver', 'ipopt', self.prob)#,
-                           # {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                           #  'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
-
-        sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+        # t_to_solve = time.time() - t_start
+        # print('T to solve:', t_to_solve)
+        # t_start = time.time()
 
         if self.crash_if_suboptimal:
             if not self.solver.stats()['success']:
                 raise Exception('Optimal solution NOT found.')
 
-        w_opt = sol['x'].full().flatten()
+        self.w_opt = sol['x'].full().flatten()
 
         # split solution for each variable
-        abstract_vars = list(self.state_var_container.getVarAbstrDict(past=False).keys())
-        solution_dict = {k: [] for k in abstract_vars}
+        solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.state_var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
 
         for node, val in self.state_var_container.getVarImplDict().items():
-            self.logger.debug('Node: {}'.format(node))
+            if self.debug_mode:
+                self.logger.debug('Node: {}'.format(node))
 
             for name, var in val.items():
                 dim = var['var'].shape[0]
-                sol = w_opt[pos:pos + dim]
+                node_number = int(node[node.index('n') + 1:])
+                solution_dict[name][:, node_number] = self.w_opt[pos:pos + dim]
 
-                self.logger.debug('var {} of dim {}'.format(name, var['var'].shape[0]))
-                # self.logger.debug('var {} of dim {}'.format(name, var['var'].shape[0]))
-                self.logger.debug('Previous state: {}'.format(solution_dict))
-                self.logger.debug('Var state: {}'.format(solution_dict[name]))
-                self.logger.debug('Appending to {} opt sol [{}-{}]: {}'.format(name, pos, pos + dim, sol))
-                solution_dict[name].extend(sol)
-                self.logger.debug('Current state: {}'.format(solution_dict))
-                self.logger.debug('~~~~~~~~~~~~~')
+                if self.debug_mode:
+                    self.logger.debug('var {} of dim {}'.format(name, var['var'].shape[0]))
+                    self.logger.debug('Previous state: {}'.format(solution_dict))
+                    self.logger.debug('Var state: {}'.format(solution_dict[name]))
+                    self.logger.debug('Appending to {} opt sol [{}-{}]: {}'.format(name, pos, pos + dim, sol['x']))
+                    self.logger.debug('Current state: {}'.format(solution_dict))
+                    # self.logger.debug('~~~~~~~~~~~~~')
                 pos = pos + dim
 
+        # t_to_finish = time.time() - t_start
+        # print('T to finish:', t_to_finish)
         return solution_dict
 
     # def getNode(self, n):
