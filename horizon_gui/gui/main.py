@@ -1,20 +1,19 @@
 import sys
 from functools import partial
-from horizon import gui_receiver
+import gui_receiver
 import logging
 
-from PyQt5.QtWidgets import (QMainWindow, QApplication, QSplitter, QCheckBox, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
-                             QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QDesktopWidget, QMenuBar, QStyle,
-                             QSpinBox, QStyleFactory, QFrame, QTabWidget, QProgressBar, QDialog, QButtonGroup, QLayout, QLineEdit, QTextEdit, QTableWidgetItem,
-                             QRubberBand, QComboBox, QScrollArea, QTableWidget, QCompleter, QToolButton, QMessageBox, QListWidgetItem, QHeaderView, QAbstractItemView)
+from PyQt5.QtWidgets import (QMainWindow, QApplication, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
+                             QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QMenuBar, QStyle,
+                             QSpinBox, QProgressBar, QLineEdit, QTableWidgetItem,
+                             QTableWidget, QCompleter, QHeaderView)
 
-from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent, QPalette, QColor, QDrag, QTextCursor, QPainter, QCursor, QBrush, QTextCharFormat, QSyntaxHighlighter, QFont, QFontMetrics
-from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMimeData, QPoint, QSize, QRegExp, pyqtSlot, QObject
+from PyQt5.QtGui import QIcon, QPalette, QFont
+from PyQt5.QtCore import Qt, pyqtSignal, QRect, pyqtSlot
 
 from widget1_ui import Ui_Form
-from custom_functions import highlighter
-from custom_widgets import horizon_line, line_edit, on_destroy_signal_window, box_state_var, highlight_delegate
-import qrc_resources
+from horizon_gui.custom_functions import highlighter
+from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate
 
 # todo:
 # SCREEN WITH ERRORS from casadi and python                           DONE
@@ -642,7 +641,7 @@ class HorizonGUI(QMainWindow):
         menuBar.addMenu(fileMenu)
         # Creating menus using a title
         editMenu = menuBar.addMenu("&Porco")
-        helpMenu = menuBar.addMenu(QIcon(":/resources/info.svg"), "&Dio")
+        helpMenu = menuBar.addMenu(QIcon("../resources/info.svg"), "&Dio")
         saveMenu = menuBar.addMenu(self.style().standardIcon(QStyle.SP_DialogSaveButton), "&Save")
         aboutMenu = menuBar.addMenu("&Menu")
         newMenu = menuBar.addMenu('&New')

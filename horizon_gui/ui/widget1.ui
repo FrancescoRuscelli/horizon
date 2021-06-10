@@ -306,16 +306,16 @@
     <property name="geometry">
      <rect>
       <x>190</x>
-      <y>20</y>
-      <width>161</width>
-      <height>171</height>
+      <y>30</y>
+      <width>181</width>
+      <height>161</height>
      </rect>
     </property>
-    <attribute name="horizontalHeaderDefaultSectionSize">
-     <number>57</number>
-    </attribute>
     <attribute name="horizontalHeaderMinimumSectionSize">
      <number>20</number>
+    </attribute>
+    <attribute name="horizontalHeaderDefaultSectionSize">
+     <number>57</number>
     </attribute>
     <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
      <bool>false</bool>
@@ -481,7 +481,7 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
   <action name="actionExit">
    <property name="icon">
     <iconset>
-     <normaloff>../../../../.designer/resources/rocket.svg</normaloff>../../../../.designer/resources/rocket.svg</iconset>
+     <normaloff>../../../../../../../.designer/resources/rocket.svg</normaloff>../../../../../../../.designer/resources/rocket.svg</iconset>
    </property>
    <property name="text">
     <string>Exit</string>
@@ -496,7 +496,7 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
   <action name="actionAbout">
    <property name="icon">
     <iconset>
-     <normaloff>../../../../.designer/resources/info.svg</normaloff>../../../../.designer/resources/info.svg</iconset>
+     <normaloff>../../../../../../../.designer/resources/info.svg</normaloff>../../../../../../../.designer/resources/info.svg</iconset>
    </property>
    <property name="text">
     <string>About</string>
@@ -513,27 +513,27 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
   <customwidget>
    <class>NodesSpinBox</class>
    <extends>QSpinBox</extends>
-   <header>custom_widgets/nodes_spinbox.h</header>
+   <header>horizon_gui/custom_widgets/nodes_spinbox.h</header>
   </customwidget>
   <customwidget>
    <class>LineEdit</class>
    <extends>QLineEdit</extends>
-   <header>custom_widgets/line_edit.h</header>
+   <header>horizon_gui/custom_widgets/line_edit.h</header>
   </customwidget>
   <customwidget>
    <class>BoxStateVar</class>
    <extends>QTableWidget</extends>
-   <header>custom_widgets/box_state_var.h</header>
+   <header>horizon_gui/custom_widgets/box_state_var.h</header>
   </customwidget>
   <customwidget>
    <class>ConsoleLogger</class>
    <extends>QTextEdit</extends>
-   <header>custom_widgets/console_logger.h</header>
+   <header>horizon_gui/custom_widgets/console_logger.h</header>
   </customwidget>
   <customwidget>
    <class>BoxFunction</class>
    <extends>QTableWidget</extends>
-   <header>custom_widgets/box_function.h</header>
+   <header>horizon_gui/custom_widgets/box_function.h</header>
   </customwidget>
  </customwidgets>
  <tabstops>

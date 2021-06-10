@@ -1,13 +1,7 @@
-import sys
-from functools import partial
-
-from PyQt5.QtWidgets import QApplication, QSpinBox, QDoubleSpinBox, QLineEdit, QPushButton, QVBoxLayout, QWidget, QHBoxLayout
-from PyQt5.QtGui import QKeyEvent, QValidator, QIntValidator, QDoubleValidator, QRegExpValidator, QRegularExpressionValidator
+from PyQt5.QtWidgets import QApplication, QSpinBox, QDoubleSpinBox, QVBoxLayout, QWidget, QHBoxLayout
+from PyQt5.QtGui import QKeyEvent, QValidator, QDoubleValidator, QRegExpValidator, QRegularExpressionValidator
 from PyQt5.QtCore import Qt, QRegExp
 
-from widget1_ui import Ui_Form
-from custom_functions import highlighter
-from custom_widgets import horizon_line, line_edit, on_destroy_signal_window
 import numpy as np
 import re
 

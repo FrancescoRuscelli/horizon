@@ -1,12 +1,9 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QRubberBand, QPushButton, QTabWidget, QHBoxLayout, QVBoxLayout, QCheckBox, QSpacerItem, QSizePolicy
-from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSignal, pyqtSlot, QMimeData, QDataStream, QIODevice, QModelIndex
+from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QTabWidget, QHBoxLayout, QVBoxLayout, QSpacerItem, QSizePolicy
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex
 from PyQt5.QtGui import QStandardItemModel
 
-from functools import partial
-from custom_widgets import spinbox_line
-
 import os
-from custom_widgets.multi_slider import QMultiSlider
+from horizon_gui.custom_widgets.multi_slider import QMultiSlider
 
 #
 # class TabButtonWidget(QWidget):
@@ -93,10 +90,10 @@ class HorizonLine(QWidget):
         self.fun_tab = QTabWidget(self)
 
         if os.name == 'posix':
-            with open('custom_css/tab.css', 'r') as f:
+            with open('../custom_css/tab.css', 'r') as f:
                 self.fun_tab.setStyleSheet(f.read())
         elif os.name == 'nt':
-            with open('custom_css\\tab.css', 'r') as f:
+            with open('..\\custom_css\\tab.css', 'r') as f:
                 self.fun_tab.setStyleSheet(f.read())
 
         self.fun_tab.setTabPosition(1)
