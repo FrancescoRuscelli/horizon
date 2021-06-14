@@ -264,6 +264,28 @@ class StateVariables:
                 k = node[node.index('n') + 1:]
                 state_var['w0'] = self.state_var[name].getInitialGuess(k)
 
+    def serialize(self):
+
+        for name, value in self.state_var.items():
+            self.state_var[name] = value.serialize()
+
+        for name, value in self.state_var_prev.items():
+            self.state_var_prev[name] = value.serialize()
+
+        for name, value in self.state_var_impl.items():
+            self.state_var_impl[name] = value.serialize()
+
+    def deserialize(self):
+
+        for name, value in self.state_var.items():
+            self.state_var[name] = cs.SX.deserialize(value)
+
+        for name, value in self.state_var_prev.items():
+            self.state_var_prev[name] = cs.SX.deserialize(value)
+
+        for name, value in self.state_var_impl.items():
+            self.state_var_impl[name] = cs.SX.deserialize(value)
+
 
 if __name__ == '__main__':
 

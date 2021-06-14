@@ -15,12 +15,12 @@ setuptools.setup(
     # project_urls={
     #     "Bug Tracker": "no",
     # },
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "Operating System :: Ubuntu",
-    ],
+    # classifiers=[
+    #     "Programming Language :: Python :: 3",
+    #     "Operating System :: Ubuntu",
+    # ],
     # package_dir={"": "horizon"},
     packages=['horizon', 'horizon_gui'],
-    # packages=setuptools.find_packages(where="horizon"),
-    python_requires=">=3.6",
+    # packages=setuptools.find_packages(),
+    python_requires=">=3.6"
 )

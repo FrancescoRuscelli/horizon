@@ -44,6 +44,28 @@ class Function:
     def getType(self):
         return 'generic'
 
+    def serialize(self):
+
+        self.f = self.f.serialize()
+
+        for name, data in self.vars.items():
+            self.vars[name] = data.serialize()
+
+
+        self.fun = self.fun.serialize()
+
+        return self
+
+    def deserialize(self):
+
+        self.f = cs.SX.deserialize(self.f)
+
+        for name, data in self.vars.items():
+            self.vars[name] = cs.SX.deserialize(data)
+
+        self.fun = cs.Function.deserialize(self.fun)
+
+        return self
 
 class Constraint(Function):
     def __init__(self, name, f, used_vars, nodes, bounds=None):

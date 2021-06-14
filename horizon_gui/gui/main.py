@@ -2,11 +2,13 @@ import sys
 from functools import partial
 import gui_receiver
 import logging
+import pickle
+from horizon_gui.definitions import ROOT_DIR
 
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QGridLayout, QGroupBox, QLabel, QToolBar, QAction, qApp,
                              QMenu, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QMenuBar, QStyle,
                              QSpinBox, QProgressBar, QLineEdit, QTableWidgetItem,
-                             QTableWidget, QCompleter, QHeaderView)
+                             QTableWidget, QCompleter, QHeaderView, QTextEdit)
 
 from PyQt5.QtGui import QIcon, QPalette, QFont
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, pyqtSlot
@@ -45,7 +47,7 @@ from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signa
 class Widget1(QWidget, Ui_Form):
     generic_sig = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, setup_info):
         super(Widget1, self).__init__()
 
         self.setupUi(self)
@@ -58,8 +60,10 @@ class Widget1(QWidget, Ui_Form):
         # sys.stdout = EmittingStream()
         # sys.stdout.textWritten.connect(self.normalOutputWritten)
 
-        N = 20
+        N = setup_info['nodes']
         # todo put it somewhere else?
+        # self._init()
+        # self.horizon_receiver = None
         self.horizon_receiver = gui_receiver.horizonImpl(N, self.logger)
 
 
@@ -103,10 +107,18 @@ class Widget1(QWidget, Ui_Form):
         self.constraintLine.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
         self.costfunctionLine.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
 
+
     @pyqtSlot()
     def on_generic_sig(self, str):
         self.generic_sig.emit(str)
-    # GUI
+
+    # def _init(self, horizon_prb):
+
+
+    # def loadProblem(self, horizon_prb):
+
+        # self._init(horizon_prb)
+
     def switchPage(self):
         index = self.ProblemMain.currentIndex()
         if index == 0:
@@ -116,7 +128,6 @@ class Widget1(QWidget, Ui_Form):
 
         self.ProblemMain.setCurrentIndex(abs(index-1))
 
-    # GUI
     def openFunction(self, item):
 
         # todo ADD USAGES: if active and where is active!!
@@ -185,6 +196,7 @@ class Widget1(QWidget, Ui_Form):
         # temp_win emits a message when it is closed, before being destroyed.
         # remember that I have to manually destroy it
         self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
+    # GUI
 
     def showWrappedFun(self, item):
         str_fun = self.horizon_receiver.getFunction(item.text())['str']
@@ -263,7 +275,7 @@ class Widget1(QWidget, Ui_Form):
 
         self.display_dim = QLineEdit()
         self.display_dim.setFixedWidth(20)
-        self.display_dim.setText(str(self.horizon_receiver.sv_dict[item.text()]['dim']))
+        self.display_dim.setText(str(self.horizon_receiver.getVar(item.text())['dim']))
         self.display_dim.setDisabled(True)
         self.display_dim.setPalette(palette)
         self.sv_window_layout.addWidget(self.display_dim, 0, 3, 1, 1)
@@ -272,8 +284,8 @@ class Widget1(QWidget, Ui_Form):
         self.sv_window_layout.addWidget(self.label_fun, 1, 0, 1, 1)
 
         self.display_fun = QLineEdit()
-        width = self.display_fun.fontMetrics().width(str(self.horizon_receiver.sv_dict[item.text()]['var']))
-        self.display_fun.setText(str(self.horizon_receiver.sv_dict[item.text()]['var']))
+        width = self.display_fun.fontMetrics().width(str(self.horizon_receiver.getVar(item.text())['var']))
+        self.display_fun.setText(str(self.horizon_receiver.getVar(item.text())['var']))
         self.display_fun.setDisabled(True)
         # todo magic number?
         self.display_fun.setMinimumWidth(width+5)
@@ -300,7 +312,7 @@ class Widget1(QWidget, Ui_Form):
         # # todo add usages (add constraint logic and check if constraint depends on variable)
         # TODO REMOVE CT ADD FUNCTION
         # get only active function
-        active_fun_list = [i for i in [(elem['str'], elem['active']) for name, elem in self.horizon_receiver.fun_dict.items() if 'active' in elem] if i[1]]
+        active_fun_list = [i for i in [(elem['str'], elem['active']) for name, elem in self.horizon_receiver.getFunctionDict().items() if 'active' in elem] if i[1]]
 
         for str_function, function in active_fun_list:
             if item.text() in function.getVariables():
@@ -441,7 +453,7 @@ class Widget1(QWidget, Ui_Form):
         self.SVTable.insertRow(row_pos)
 
         self.SVTable.setItem(row_pos, 0, QTableWidgetItem(name))
-        self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.horizon_receiver.sv_dict[name]['dim'])))
+        self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.horizon_receiver.getVar(name)['dim'])))
 
         # self.SVTable.setCellWidget(row_pos, 2, scroll)
 
@@ -467,41 +479,21 @@ class HorizonGUI(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # widget generated with qt designer
-        widget1 = Widget1()
-
-        # another qwidget
-        # self.red_widget = QWidget(self)
-        # self.red_widget.setAutoFillBackground(True)
-        #
-        # palette = self.red_widget.palette()
-        # palette.setColor(QPalette.Window, QColor('red'))
-        # self.red_widget.setPalette(palette)
 
         # yet another qwidget
         self.text_widget = QLabel("Hello, World")
-        self.text_widget.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        # self.text_widget.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.n_nodes_input = QSpinBox()
+        self.init_button = QPushButton("Start everything")
 
-        # generate a layout for a widget, I can populate the layout with more widget
-        self.main_layout = QVBoxLayout()
-        # self.main_layout.addWidget(self.red_widget,1)
-        self.widget1 = widget1
-        self.main_layout.addWidget(self.widget1, 4)
-        # self.main_layout.addWidget(self.text_widget,1)
+        self.main_layout = QHBoxLayout()
+        self.main_layout.addWidget(self.text_widget)
+        self.main_layout.addWidget(self.n_nodes_input)
+        self.main_layout.addWidget(self.init_button)
 
-        # generate a main widget to assign to centralwidget
-        self.main_widget = QWidget()
-        self.main_widget.setLayout(self.main_layout)
-        self.setCentralWidget(self.main_widget)
-        self.setWindowTitle("Horizon GUI")
-        # setting geometry
-        # self.setGeometry(1000, 200, 300, 200)
-        self.showMaximized()
-        # miniwindow = TimeLine()
-
-        # self.setCentralWidget(self.centralWidget)
-
-
+        self.setup_widget = QWidget()
+        self.setup_widget.setLayout(self.main_layout)
+        self.setCentralWidget(self.setup_widget)
         self._createActions()
         self._createMenuBar()
         self._createToolBars()
@@ -510,12 +502,40 @@ class HorizonGUI(QMainWindow):
         self._connectActions()
         self._createStatusBar()
 
+        self.showMaximized()
+
+
+    def initializeGui(self, setup_info):
+
+        widget1 = Widget1(setup_info)
+        # generate a layout for a widget, I can populate the layout with more widget
+        self.main_layout = QVBoxLayout()
+        # self.main_layout.addWidget(self.red_widget,1)
+        self.widget1 = widget1
+        self.main_layout.addWidget(self.widget1)
+        # self.main_layout.addWidget(self.text_widget,1)
+
+        # generate a main widget to assign to centralwidget
+        self.main_widget = QWidget()
+        self.main_widget.setLayout(self.main_layout)
+        self.setCentralWidget(self.main_widget)
+        self.setWindowTitle("Horizon GUI")
+
+        self._connectGuiActions()
+
+
     def newFile(self):
         # Logic for creating a new file goes here...
         self.text_widget.setText("<b>File > New</b> clicked")
 
-    def openFile(self):
-        # Logic for opening an existing file goes here...
+    def openFile(self, file):
+
+        with open(file, 'rb') as f:
+            loaded_horizon = pickle.load(f)
+
+        loaded_horizon._deserialize()
+        self.widget1.loadProblem(loaded_horizon)
+
         self.text_widget.setText("<b>File > Open... </b> clicked")
 
     def openRecentFile(self, filename):
@@ -524,6 +544,7 @@ class HorizonGUI(QMainWindow):
 
     def saveFile(self):
         # Logic for saving a file goes here...
+        self.widget1.horizon_receiver.save()
         self.text_widget.setText("<b>File > Save</b> clicked")
 
     def copyContent(self):
@@ -562,6 +583,7 @@ class HorizonGUI(QMainWindow):
         # Connect Open Recent to dynamically populate it
         self.openRecentMenu.aboutToShow.connect(self.populateOpenRecent)
 
+    def _connectGuiActions(self):
         # This is amazing, I can connect a custom signal from a widget to the main window here
         # basically horizonLine in widget1 sends a signal with a msg, which I connect to the status bar
         self.widget1.constraintLine.repeated_fun.connect(self.writeInStatusBar)
@@ -695,109 +717,18 @@ class HorizonGUI(QMainWindow):
         helpToolBar = QToolBar("Help", self)
         self.addToolBar(Qt.LeftToolBarArea, helpToolBar)
 
-class TimeLine(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        self.groupBox = QGroupBox(self.centralwidget)
-        self.groupBox.setGeometry(QRect(40, 20, 341, 391))
-        self.groupBox.setStyleSheet("background-color: rgb(255, 255, 255);")
-        self.groupBox.setObjectName("groupBox")
-
-        return self.groupBox
 
 
+if __name__ == '__main__':
+
+    app = QApplication(sys.argv)
+    gui = HorizonGUI()
+
+    gui.show()
+    sys.exit(app.exec_())
 
 
-class Window_1(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        grid = QGridLayout()
-        grid.addWidget(self.createExampleGroup(), 0, 0)
-        grid.addWidget(self.createExampleGroup(), 1, 0)
-        grid.addWidget(self.createExampleGroup(), 0, 1)
-        grid.addWidget(self.createExampleGroup(), 1, 1)
-        self.setLayout(grid)
-
-        self.setWindowTitle("PyQt5 Sliders")
-        self.resize(400, 300)
-
-    def createExampleGroup(self):
-        groupBox = QGroupBox("Slider Example")
-
-        radio1 = QRadioButton("&Radio horizontal slider")
-
-        slider = QSlider(Qt.Horizontal)
-        slider.setFocusPolicy(Qt.StrongFocus)
-        slider.setTickPosition(QSlider.TicksBothSides)
-        slider.setTickInterval(10)
-        slider.setSingleStep(1)
-
-        radio1.setChecked(True)
-
-        vbox = QVBoxLayout()
-        vbox.addWidget(radio1)
-        vbox.addWidget(slider)
-        vbox.addStretch(1)
-        groupBox.setLayout(vbox)
-
-        return groupBox
-
-class Window(QMainWindow):
-    def __init__(self):
-        super().__init__()
-
-        # setting title
-        self.setWindowTitle("Python")
-
-        # setting geometry
-        self.setGeometry(1000, 200, 300, 200)
-
-        # calling method
-        self.UiComponents()
-
-        # showing all the widgets
-        self.show()
-
-    # method for widgets
-    def UiComponents(self):
-        # creating a push button
-        button = QPushButton("CLICK", self)
-
-        # setting geometry of button
-        button.setGeometry(100, 100, 100, 30)
-
-        # adding action to a button
-        button.clicked.connect(self.clickme)
-
-    # action method
-    def clickme(self):
-        # printing pressed
-        print("pressed")
-
-
-# create pyqt5 app
-# app = QApplication(sys.argv)
-# window = Window()
-# sys.exit(app.exec_())
-
-app = QApplication(sys.argv)
-gui = HorizonGUI()
-# gui = Widget1()
-
-gui.show()
-sys.exit(app.exec_())
-
-# window = QWidget()
-# window.setWindowTitle('PyQt5 App')
-# window.setGeometry(100, 100, 280, 80)
-# window.move(60, 15)
-# helloMsg = QLabel('<h1>Hello World!</h1>', parent=window)
-# helloMsg.move(60, 15)
-#
-#
-# # 4. Show your application's GUI
-# window.show()
-#
-# # 5. Run your application's event loop (or main
+    # with open(ROOT_DIR + '/try.pkl', 'rb') as f:
+    #     nodes = pickle.load(f)
+    #
+    # print(nodes)

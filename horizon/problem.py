@@ -24,7 +24,9 @@ class Problem:
         self.state_var_container = sv.StateVariables(self.nodes)
 
         # just variables
+        # todo one could set also non state variable right?
         self.var_container = list()
+
         # constraint variables
         self.cnstr_container = list()
         self.cnstr_impl = list()
@@ -266,15 +268,26 @@ class Problem:
         # print('T to finish:', t_to_finish)
         return solution_dict
 
-    # def getNode(self, n):
+    def serialize(self):
 
-# Problem.function = {
-#     'constraint': Problem.createConstraint,
-#     'cost_function': Problem.createCostFunction,
-# }
-    # def setConstraint(self, cnstr):
-    #     assert(isinstance(cnstr, fc.Constraint))
-    #     self.cnstr_container.append(cnstr.getName())
+        self.state_var_container.serialize()
+
+        self.cnstr_container[:] = [var.serialize() for var in self.cnstr_container]
+        self.cnstr_impl[:] = [var.serialize() for var in self.cnstr_impl]
+
+        self.costfun_container[:] = [var.serialize() for var in self.costfun_container]
+        self.costfun_impl[:] = [var.serialize() for var in self.costfun_impl]
+
+    def deserialize(self):
+
+        self.state_var_container.deserialize()
+
+        self.cnstr_container[:] = [var.deserialize() for var in self.cnstr_container]
+        self.cnstr_impl[:] = [var.deserialize() for var in self.cnstr_impl]
+
+        self.costfun_container[:] = [var.deserialize() for var in self.costfun_container]
+        self.costfun_impl[:] = [var.deserialize() for var in self.costfun_impl]
+
 
 if __name__ == '__main__':
     prb = Problem(10)

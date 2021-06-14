@@ -2,6 +2,9 @@ from horizon import problem as horizon
 import parser
 import re
 import sys, os
+import pickle
+from horizon_gui.definitions import ROOT_DIR
+import casadi as cs
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -15,7 +18,7 @@ class horizonImpl():
         self.sv_dict = dict()  # state variables
         self.fun_dict = dict() # functions
 
-        self.active_fun_list = list()
+        # self.active_fun_list = list()
 
     def addStateVariable(self, data):
 
@@ -59,7 +62,7 @@ class horizonImpl():
                 try:
                     # self.logger.info('Adding function: {}'.format(self.fun_dict[name]))
                     active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'])
-                    self.active_fun_list.append(active_fun)
+                    # self.active_fun_list.append(active_fun)
                     self.fun_dict[name].update({'active': active_fun})
                 except Exception as e:
                     return False, e
@@ -67,7 +70,7 @@ class horizonImpl():
             elif fun_type == 'costfunction':
                 try:
                     active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
-                    self.active_fun_list.append(active_fun)
+                    # self.active_fun_list.append(active_fun)
                     self.fun_dict[name].update({'active': active_fun})
                 except Exception as e:
                     return False, e
@@ -192,10 +195,16 @@ class horizonImpl():
 
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
+    def getFunctionDict(self):
+        return self.fun_dict
 
     def getFunction(self, name):
         if name in self.fun_dict.keys():
             return self.fun_dict[name]
+
+    def getVar(self, elem):
+
+        return self.sv_dict[elem]
 
     def _createAndAppendFun(self, name, str_fun):
 
@@ -206,7 +215,61 @@ class horizonImpl():
         # TODO add fun type??
         self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None)
 
+    def _serialize(self):
+
+        self.casadi_prb.serialize()
+
+        # serialize state variables
+        for name, data in self.sv_dict.items():
+            self.sv_dict[name]['var'] = data['var'].serialize()
+
+        # serialize functions
+        for name, data in self.fun_dict.items():
+            self.fun_dict[name]['fun'] = data['fun'].serialize()
+
+    def _deserialize(self):
+
+        self.casadi_prb.deserialize()
+
+        # deserialize state variables
+        for name, data in self.sv_dict.items():
+            self.sv_dict[name]['var'] = cs.SX.deserialize(data['var'])
+
+        # deserialize functions
+        for name, data in self.fun_dict.items():
+            self.fun_dict[name]['fun'] = cs.SX.deserialize(data['fun'])
+
+    def save(self, path=None):
+        if path is None:
+            path = ROOT_DIR
+
+        # print('way_before:', self.casadi_prb.state_var_container.state_var)
+        # print('way_before:', self.casadi_prb.state_var_container.state_var_impl)
+        # print('way_before:', [constr.getFunction() for constr in self.casadi_prb.cnstr_container])
+
+        # todo is this intelligent?
+        # serializing and deserializing everytime is stupid right?
+        # make a copy of itself and serialize that one!
+        self._serialize()
+
+        # print('before:', self.casadi_prb.state_var_container.state_var)
+        # print('before:', self.casadi_prb.state_var_container.state_var_impl)
+        # print('before:', [constr.getFunction() for constr in self.casadi_prb.cnstr_container])
+
+        with open(path + '/try.pkl', 'wb') as f:
+            pickle.dump(self, f)
+
+        self._deserialize()
+
+        # print('after:', self.casadi_prb.state_var_container.state_var)
+        # print('after:', self.casadi_prb.state_var_container.state_var_impl)
+        # print('after:', [constr.getFunction() for constr in self.casadi_prb.cnstr_container])
 
 
+
+if __name__ == '__main__':
+
+    impl = horizonImpl(20)
+    impl.addStateVariable(dict(name='x', dim=3, prev=0))
 
 
