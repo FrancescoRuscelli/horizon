@@ -50,13 +50,17 @@ class FunctionTab(QWidget):
         # adding + - push button to tab
         # self.ct_tab.tabBar().setTabButton(0, self.ct_tab.tabBar().RightSide, TabButtonWidget())
 
+    def updateRange(self, n_nodes):
+        self.n_nodes = n_nodes
+        self.slider.updateRange([0, self.n_nodes-1])
+
 class HorizonLine(QWidget):
     add_fun_horizon = pyqtSignal(dict)
     remove_fun_horizon = pyqtSignal(dict)
     repeated_fun = pyqtSignal(str)
     funNodesChanged = pyqtSignal(str, list)
 
-    def __init__(self, horizon, fun_type, logger=None, parent=None):
+    def __init__(self, horizon, fun_type, nodes=0, logger=None, parent=None):
         QWidget.__init__(self, parent)
         self.setAcceptDrops(True)
 
@@ -80,13 +84,14 @@ class HorizonLine(QWidget):
             self.options['minmax_color'] = Qt.darkRed
             self.options['ticks_color'] = Qt.darkCyan
 
-        self.n_nodes = 25
+
 
         self.setWindowState(Qt.WindowMaximized)
         self.showMaximized()
-
+        # define main layout
         self.main_layout = QHBoxLayout(self)
 
+        # define TabWidget
         self.fun_tab = QTabWidget(self)
 
         with open(CSS_DIR + '/tab.css', 'r') as f:
@@ -95,21 +100,44 @@ class HorizonLine(QWidget):
         self.fun_tab.setTabPosition(1)
         self.fun_tab.setTabsClosable(True)
 
+        # add TabWidget to main layout
         self.main_layout.addWidget(self.fun_tab)
 
-        # self.ct_tab.setStyleSheet("QTabBar::tab { height: 100px; width: 100px; background: 'red'}")
-
+        # add a layout to TabWidget
         self.fun_tab_layout = QGridLayout(self.fun_tab)
+
+        self.n_nodes = nodes
+        self._updateBoxNodes()
 
         # self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
         # self.setMouseTracking(True)
 
-        # Add widgets to the layout
+        self.fun_tab.tabCloseRequested.connect(self.removeActiveFunctionRequest)
+
+    def setBoxNodes(self, nodes):
+        self.n_nodes = nodes
+        self._updateBoxNodes()
+
+    def _updateBoxNodes(self):
+        # Add nodes to the layout
+
+        for i in reversed(range(self.fun_tab_layout.count())):
+            self.fun_tab_layout.itemAt(i).widget().deleteLater()
+
+        if self.n_nodes == 0:
+            self.setDisabled(True)
+        else:
+            self.setDisabled(False)
+
         for i in range(self.n_nodes):
             n_i = QPushButton("{}".format(i), self)
             self.fun_tab_layout.addWidget(n_i, 0, i, 1, 1, alignment=Qt.AlignTop)
 
-        self.fun_tab.tabCloseRequested.connect(self.removeActiveFunctionRequest)
+
+        for i in range(self.fun_tab.count()):
+            self.fun_tab.widget(i).findChild(FunctionTab).updateRange(self.n_nodes)
+            node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
+            self.intab_layout.setContentsMargins(node_box_width / 2 - 2, 20, node_box_width / 2 - 5, 0)
 
     def removeActiveFunctionRequest(self, index):
 
@@ -144,7 +172,7 @@ class HorizonLine(QWidget):
 
     @pyqtSlot()
     def on_repeated_fun(self, str):
-        self.repeated_ct.emit(str)
+        self.repeated_fun.emit(str)
 
     @pyqtSlot()
     def on_fun_nodes_changed(self, name, ranges):
