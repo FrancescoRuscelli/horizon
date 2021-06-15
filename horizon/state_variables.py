@@ -56,6 +56,11 @@ class StateVariable(cs.SX):
         else:
             self.var_impl['n' + str(nodes)]['w0'] = val
 
+    def _setNNodes(self, n_nodes):
+
+        self.nodes = n_nodes
+        self._project()
+
     def _project(self):
         # state_var_impl --> dict
         #  - key: nodes (n0, n1, ...)
@@ -264,6 +269,9 @@ class StateVariables:
                 k = node[node.index('n') + 1:]
                 state_var['w0'] = self.state_var[name].getInitialGuess(k)
 
+    def setNNodes(self, n_nodes):
+        self.nodes = n_nodes
+
     def serialize(self):
 
         for name, value in self.state_var.items():
@@ -289,21 +297,25 @@ class StateVariables:
 
 if __name__ == '__main__':
 
+    x = StateVariable('x', 2, 15)
+    print([id(val['var']) for val in x.var_impl.values()])
+    x._setNNodes(20)
 
-    sv = StateVariables(3)
-    x = sv.setVar('x', 2)
+    print([id(val['var']) for val in x.var_impl.values()])
+    # sv = StateVariables(3)
+    # x = sv.setVar('x', 2)
     # sv.setVar('y', 2)
-    x_prev = sv.setVar('x', 2, -2)
-
-    for i in range(4):
-        sv.update(i)
-
-    print('state_var_prev', sv.state_var_prev)
-    print('state_var_impl', sv.state_var_impl)
-
-    print('sv.getVarAbstrDict()', sv.getVarAbstrDict())
-    print('sv.getVarAbstrList()', sv.getVarAbstrList())
-    print('sv.getVarImplList()', sv.getVarImplList())
+    # x_prev = sv.setVar('x', 2, -2)
+    #
+    # for i in range(4):
+    #     sv.update(i)
+    #
+    # print('state_var_prev', sv.state_var_prev)
+    # print('state_var_impl', sv.state_var_impl)
+    #
+    # print('sv.getVarAbstrDict()', sv.getVarAbstrDict())
+    # print('sv.getVarAbstrList()', sv.getVarAbstrList())
+    # print('sv.getVarImplList()', sv.getVarImplList())
     # print('sv.getVarImpl()', sv.getVarImpl('x-2', 0))
 
 

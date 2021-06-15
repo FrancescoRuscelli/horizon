@@ -111,6 +111,16 @@ class Problem:
             if fun.getName() == name:
                 self.cnstr_container.remove(fun)
 
+    def setNNodes(self, n_nodes):
+        self.nodes = n_nodes + 1
+        self.state_var_container.setNNodes(self.nodes)
+
+        for cnstr in self.cnstr_container:
+            cnstr.setNodes([i for i in cnstr.getNodes() if i in self.nodes])
+
+        for costfun in self.costfun_container:
+            costfun.setNodes([i for i in costfun.getNodes() if i in self.nodes])
+
     def _implementFunctions(self, container, node):
         f_impl = list()
 
