@@ -431,6 +431,12 @@ class QMultiSlider(QtWidgets.QWidget):
         self.start = slider_range[0]
         self.scale = slider_range[1] - slider_range[0]
 
+        for slice in self.slices:
+            if slice.getValues()[1] > slider_range[1]:
+                slice.setMax(slider_range[1])
+            if slice.getValues()[0] < slider_range[0]:
+                slice.setMin(slider_range[0])
+
 
     @QtCore.pyqtSlot()
     def on_slices_changed(self, ranges):

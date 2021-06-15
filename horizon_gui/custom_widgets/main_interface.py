@@ -1,6 +1,5 @@
 import sys
 from functools import partial
-import logging
 
 from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget,
                              QLineEdit, QTableWidgetItem, QTableWidget, QCompleter, QHeaderView)
@@ -8,7 +7,6 @@ from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QRadioButton, QVB
 from PyQt5.QtGui import QPalette, QFont
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
-from horizon_gui.gui import gui_receiver
 from horizon_gui.gui.widget1_ui import Ui_HorizonGUI
 from horizon_gui.custom_functions import highlighter
 from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate
@@ -17,32 +15,29 @@ from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signa
 class MainInterface(QWidget, Ui_HorizonGUI):
     generic_sig = pyqtSignal(str)
 
-    def __init__(self, setup_info=None):
+    def __init__(self, horizon_receiver, logger=None):
         super(MainInterface, self).__init__()
 
         self.setupUi(self)
         # #todo logger! use it everywhere!
-        self.logger = logging.getLogger('logger')
-        self.logger.addHandler(self.consoleLogger)
-        self.logger.setLevel(logging.DEBUG)
 
+        self.logger = logger
+        self.logger.addHandler(self.consoleLogger)
         # emitting stream from python terminal
         # sys.stdout = EmittingStream()
         # sys.stdout.textWritten.connect(self.normalOutputWritten)
-        if setup_info is not None:
-            if 'nodes' in setup_info:
-                N = setup_info['nodes']
-        else:
-            N = 0
 
         # todo put it somewhere else?
         # self._init()
         # self.horizon_receiver = None
-        self.horizon_receiver = gui_receiver.horizonImpl(N, self.logger)
+        self.horizon_receiver = horizon_receiver
+        N = horizon_receiver.getNodes()
 
         self.fun_keywords = list()
 
         self._connectActions()
+
+        # spinbox to set old variables
         self.SVNodeInput.setRange(-N, 0)
 
         self.layout_ct = QVBoxLayout(self.CTPage)
@@ -74,20 +69,29 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.constraintLine.add_fun_horizon.connect(self.horizon_receiver.addFunction)
         self.constraintLine.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
         self.costfunctionLine.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
+        self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
+
+        # when opening horizon, fill the GUI
+        for name, data in horizon_receiver.getVarDict().items():
+            self.addStateVariableToGUI(name)
+
+        for name, data in horizon_receiver.getFunctionDict().items():
+            self.addFunctionToGUI(name, data['str'])
+            if data['active'] is not None:
+                if data['active'].getType() == 'constraint':
+                    line = self.constraintLine
+                elif data['active'].getType() == 'costfunction':
+                    line = self.costfunctionLine
+
+                line.addFunctionToGUI(name)
+
 
     @pyqtSlot()
     def on_generic_sig(self, str):
         self.generic_sig.emit(str)
 
-    # def _init(self, horizon_prb):
-
-
-    # def loadProblem(self, horizon_prb):
-
-        # self._init(horizon_prb)
-
     def setBoxNodes(self, n_nodes):
-
+        self.horizon_receiver.setNodes(n_nodes)
         self.constraintLine.setBoxNodes(n_nodes)
         self.costfunctionLine.setBoxNodes(n_nodes)
 
@@ -320,32 +324,37 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         # remember that I have to manually destroy it
         # self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
 
+    def addFunctionToGUI(self, name, str_fun):
+
+        # adding function to highlighter
+        self.highlighter.addKeyword(name)
+        self.fun_keywords.append('{}'.format(name))
+        model = self.completer.model()
+        model.setStringList(self.fun_keywords)
+
+        row_pos = self.funTable.rowCount()
+        self.funTable.insertRow(row_pos)
+
+        name_table = QTableWidgetItem(name)
+        name_table.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
+        name_table.setData(Qt.UserRole, str_fun)
+
+        str_table = QTableWidgetItem(str_fun)
+        str_table.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
+
+        self.funTable.setItem(row_pos, 0, name_table)
+        self.funTable.setItem(row_pos, 1, str_table)
+
 
     def generateFunction(self):
+
         name = self.funNameInput.text()
         str_fun = self.funInput.toPlainText()
         flag, signal = self.horizon_receiver.addFunction(dict(name=name, str=str_fun, active=None))
 
         if flag:
 
-            # todo add FUNCTION to highlighter and to completer
-            self.highlighter.addKeyword(name)
-            self.fun_keywords.append('{}'.format(name))
-            model = self.completer.model()
-            model.setStringList(self.fun_keywords)
-
-            row_pos = self.funTable.rowCount()
-            self.funTable.insertRow(row_pos)
-
-            name_table = QTableWidgetItem(name)
-            name_table.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
-            name_table.setData(Qt.UserRole, str_fun)
-
-            str_table = QTableWidgetItem(str_fun)
-            str_table.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled)
-
-            self.funTable.setItem(row_pos, 0, name_table)
-            self.funTable.setItem(row_pos, 1, str_table)
+            self.addFunctionToGUI(name, str_fun)
 
             # clear mask
             self.funNameInput.clear()
@@ -379,6 +388,15 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.funInput.setCompleter(self.completer)
 
     # GUI
+    def addStateVariableToGUI(self, sv_name):
+
+        self._addRowToSVTable(sv_name)
+        # add variable to highlighter and to completer
+        self.highlighter.addKeyword(sv_name)
+        self.fun_keywords.append('{}'.format(sv_name))
+        model = self.completer.model()
+        model.setStringList(self.fun_keywords)
+
     def generateStateVariable(self):
 
         default_dim = 1
@@ -393,13 +411,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         flag, signal = self.horizon_receiver.addStateVariable(dict(name=sv_name, dim=sv_dim, prev=sv_nodes))
 
         if flag:
-            self._addRowToSVTable(sv_name)
-            # add variable to highlighter and to completer
-            self.highlighter.addKeyword(sv_name)
-            self.fun_keywords.append('{}'.format(sv_name))
-            model = self.completer.model()
-            model.setStringList(self.fun_keywords)
 
+            self.addStateVariableToGUI(sv_name)
             self.SVNameInput.clear()
             self.SVDimInput.setValue(default_dim)
             self.SVNodeInput.setValue(default_past_node)

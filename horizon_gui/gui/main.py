@@ -3,18 +3,21 @@ from functools import partial
 import pickle
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QLabel, QToolBar, QAction, qApp, QLineEdit,
                              QMenu, QPushButton, QVBoxLayout, QGridLayout, QWidget, QMenuBar, QStyle,
-                             QSpinBox, QProgressBar)
+                             QSpinBox, QProgressBar, QFileDialog)
 
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSettings
 
-from horizon_gui.custom_widgets import starting_screen, main_interface, box_state_var, on_destroy_signal_window
+from horizon_gui.custom_widgets import starting_screen, main_interface, on_destroy_signal_window
+from horizon_gui.gui import gui_receiver
+import logging
+from horizon_gui.definitions import ROOT_DIR
 
 # todo:
 # SCREEN WITH ERRORS from casadi and python                           DONE
 # EDIT CONSTRAINT NOW IS WRONG (visualize function and not string)    DONE
-# EMBELLISH USAGE TABLE                                               DONE
-# make so that, when nodes number changes, the slices adapt (basically they don't have to exceed the maximum and the minimum)
+# make so that, when nodes number changes, the slices adapt (basically they don't have to exceed the maximum and the minimum) DONE
+# in state variable box: UNWRAP function! and check highlighter
 # make option for showing all constraints_line together or one for each tab
 # REMOVE CONSTRAINT (FROM LIST)
 # ADD CONSISTENCY CHECK FOR CASADI VARIABLES
@@ -43,11 +46,19 @@ class HorizonGUI(QMainWindow):
         super().__init__()
 
         # initial screen for Horizon GUI
+        self.logger = logging.getLogger('logger')
+        self.logger.setLevel(logging.DEBUG)
+
+        # settings
+        self.current_save_file = None
+        self.recent_files = list()
+        self.max_recent_files = 5
 
         self.starting_screen = starting_screen.StartingScreen()
+        self.createSetup()
+
         self.setCentralWidget(self.starting_screen)
 
-        self.nodes_input = QSpinBox()
         self._createActions()
         self._createMenuBar()
         # self._createContextMenu()
@@ -57,16 +68,24 @@ class HorizonGUI(QMainWindow):
 
         self.showMaximized()
 
+        self.loadSettings()
 
-    def initializeGui(self):
+    def createSetup(self):
 
-        setup_info = dict()
+        self.setup_opt = dict()
+        self.setup_opt['nodes'] = 0
 
-        setup_info['nodes'] = self.nodes_input.value()
+    def setNodes(self, nodes):
+        self.setup_opt['nodes'] = nodes
+
+    def initializeGui(self, horizon_receiver):
+
+        self.current_horizon = horizon_receiver
         # generate a layout for a widget, I can populate the layout with more widget
         self.main_layout = QVBoxLayout()
         # self.main_layout.addWidget(self.red_widget,1)
-        self.widget_gui = main_interface.MainInterface(setup_info)
+
+        self.widget_gui = main_interface.MainInterface(horizon_receiver, logger=self.logger)
         self.main_layout.addWidget(self.widget_gui)
 
         # generate a main widget to assign to centralwidget
@@ -81,26 +100,88 @@ class HorizonGUI(QMainWindow):
 
     def newFile(self):
         # Logic for creating a new file goes here...
-        self.text_widget.setText("<b>File > New</b> clicked")
+        horizon_receiver = gui_receiver.horizonImpl(self.setup_opt['nodes'], logger=self.logger)
+        self.initializeGui(horizon_receiver)
 
-    def openFile(self, file):
+    def updateSettings(self, recent_file):
 
-        with open(file, 'rb') as f:
-            loaded_horizon = pickle.load(f)
+        print('recent_file to append', recent_file)
+        self.settings = QSettings(ROOT_DIR + "/settings/gui_settings.ini", QSettings.IniFormat)
+        # for saving a value to the ini
+        self.settings.beginGroup('recent_files')
+        # todo mechanics for ignoring file if already in recent_files
+        if len(self.settings.allKeys()):
+            for i in range(len(self.settings.allKeys())):
+                if i <= self.max_recent_files:
+                    self.settings.setValue('file' + str(i + 2), recent_file)
+                else:
+                    self.settings.remove('file1')
+                    self.settings.setValue('file' + str(i + 1), recent_file)
+        else:
+            self.settings.setValue('file1', recent_file)
+        # for elem in self.recent_files:
+        #     self.settings.setValue('file', elem)
+        self.settings.endGroup()
 
-        loaded_horizon._deserialize()
-        self.widget_gui.loadProblem(loaded_horizon)
 
-        self.text_widget.setText("<b>File > Open... </b> clicked")
+
+    def loadSettings(self):
+
+        self.settings = QSettings(ROOT_DIR + "/settings/gui_settings.ini", QSettings.IniFormat)
+        # for saving a value to the ini
+        self.settings.beginGroup('recent_files')
+
+        self.settings.allKeys()
+        for elem in self.settings.allKeys():
+            self.recent_files.append(self.settings.value(elem))
+            print(self.recent_files)
+        self.settings.endGroup()
+
+    def openFile(self):
+
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        file_horizon, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+                                                "Pickle Files (*.pickle)", options=options)
+        if file_horizon:
+
+            self.updateSettings(file_horizon)
+            self.logger.warning('Opening file: {}'.format(file_horizon))
+            self.loadHorizon(file_horizon)
+            self.writeInStatusBar('Opening Horizon problem!')
+        else:
+            self.logger.warning('File not found. Failed loading horizon problem.')
 
     def openRecentFile(self, filename):
         # Logic for opening a recent file goes here...
-        self.text_widget.setText(f"<b>{filename}</b> opened")
+        self.openFile(filename)
 
     def saveFile(self):
         # Logic for saving a file goes here...
-        self.widget_gui.horizon_receiver.save()
-        self.text_widget.setText("<b>File > Save</b> clicked")
+        if self.current_save_file is None:
+            self.saveAsFile()
+        else:
+            self.saveHorizon(self.current_save_file, self.current_horizon)
+
+        self.writeInStatusBar('SAVING!')
+
+    def saveAsFile(self):
+
+        dlg = QFileDialog()
+        dlg.setDefaultSuffix('pickle')
+
+        file_path, _ = dlg.getSaveFileName(self, "QFileDialog.getSaveFileName()",
+                                           "", "Pickle Files (*.pickle)",
+                                           options=QFileDialog.DontUseNativeDialog)
+
+
+        if file_path:
+
+            self.logger.warning('Saving to File: {}'.format(file_path))
+            self.current_save_file = file_path
+            self.saveHorizon(self.current_save_file, self.current_horizon)
+
+            self.writeInStatusBar('SAVING!')
 
     def helpContent(self):
         # Logic for launching help goes here...
@@ -110,21 +191,38 @@ class HorizonGUI(QMainWindow):
         # Logic for showing an about dialog content goes here...
         self.text_widget.setText("<b>Help > About...</b> clicked")
 
-    def changeSpinBoxNodesSettings(self):
-        # getting current value of spin box
-        current = self.nodes_input.value()
+    def loadHorizon(self, file_path):
 
-        # setting this value to second spin box
-        self.nodes_input_setting.setValue(current)
+        with open(file_path, 'rb') as f:
+            loaded_horizon = pickle.load(f)
 
-        # method called after editing finished
+        loaded_horizon.deserialize()
 
-    def changeSpinBoxNodes(self):
-        # getting current value of spin box
-        current = self.nodes_input_setting.value()
+        self.logger.warning('Loaded Horizon: {}'.format(loaded_horizon))
+        self.initializeGui(loaded_horizon)
 
-        # setting this value to the first spin box
-        self.nodes_input.setValue(current)
+    def saveHorizon(self, file_path, horizon_to_save):
+
+        # print('way_before:', horizon_to_save.state_var_container.state_var)
+        # print('way_before:', horizon_to_save.state_var_container.state_var_impl)
+        # print('way_before:', [constr.getFunction() for constr in horizon_to_save.cnstr_container])
+        # todo is this intelligent?
+        # serializing and deserializing everytime is stupid right?
+        # make a copy of itself and serialize that one!
+        horizon_to_save.serialize()
+
+        # print('before:', horizon_to_save.state_var_container.state_var)
+        # print('before:', horizon_to_save.state_var_container.state_var_impl)
+        # print('before:', [constr.getFunction() for constr in horizon_to_save.cnstr_container])
+
+        with open(file_path, 'wb') as f:
+            pickle.dump(horizon_to_save, f)
+
+        horizon_to_save.deserialize()
+
+        # print('after:', horizon_to_save.state_var_container.state_var)
+        # print('after:', horizon_to_save.state_var_container.state_var_impl)
+        # print('after:', [constr.getFunction() for constr in horizon_to_save.cnstr_container])
 
     def openSettings(self):
 
@@ -133,31 +231,28 @@ class HorizonGUI(QMainWindow):
 
         nodes_input_label = QLabel("Number of nodes:")
         # state_variables_label = QLabel("Add state variable:")
-        self.nodes_input_setting = QSpinBox()
-        self.nodes_input_setting.setRange(0,999)
-        self.nodes_input_setting.setValue(self.nodes_input.value())
+        nodes_input = QSpinBox()
+        nodes_input.setRange(0,999)
+        nodes_input.setValue(self.setup_opt['nodes'])
         # state_variables = QLineEdit()
         # state_variables_button = QPushButton("Add")
         # initial_state_var = box_state_var.BoxStateVar()
         self.settings_layout.addWidget(nodes_input_label, 0, 0)
         # self.settings_layout.addWidget(state_variables_label, 1, 0)
-        self.settings_layout.addWidget(self.nodes_input_setting, 0, 1)
+        self.settings_layout.addWidget(nodes_input, 0, 1)
         # self.settings_layout.addWidget(state_variables, 1, 1)
         # self.settings_layout.addWidget(state_variables_button, 1, 2)
         # self.settings_layout.addWidget(initial_state_var, 2, 0, 3, 1)
-
-        self.nodes_input_setting.valueChanged.connect(self.changeSpinBoxNodes)
-        self.nodes_input.setDisabled(True)
-
+        nodes_input.valueChanged.connect(self.setNodes)
         self.settings_widget.setLayout(self.settings_layout)
         self.settings_widget.show()
-        self.settings_widget.returnDestroyed.connect(partial(self.nodes_input.setDisabled, False))
 
     def _connectActions(self):
         # Connect File actions
         self.newAction.triggered.connect(self.newFile)
         self.openAction.triggered.connect(self.openFile)
         self.saveAction.triggered.connect(self.saveFile)
+        self.saveAsAction.triggered.connect(self.saveAsFile)
         self.exitAction.triggered.connect(self.close)
         # Connect Edit actions
         self.settingAction.triggered.connect(self.openSettings)
@@ -167,7 +262,7 @@ class HorizonGUI(QMainWindow):
         # Connect Open Recent to dynamically populate it
         self.openRecentMenu.aboutToShow.connect(self.populateOpenRecent)
 
-        self.starting_screen.start_sig.connect(self.initializeGui)
+        self.starting_screen.start_sig.connect(self.newFile)
 
     def _connectGuiActions(self):
         # This is amazing, I can connect a custom signal from a widget to the main window here
@@ -183,6 +278,7 @@ class HorizonGUI(QMainWindow):
         self.text_widget.addAction(self.newAction)
         self.text_widget.addAction(self.openAction)
         self.text_widget.addAction(self.saveAction)
+        self.text_widget.addAction(self.saveAsAction)
 
     def _createActions(self):
         # Creating action using the first constructor
@@ -198,6 +294,9 @@ class HorizonGUI(QMainWindow):
 
         self.saveAction = QAction("&Save", self)
         self.saveAction.setShortcut("Ctrl+S")
+
+        self.saveAsAction = QAction("&Save As", self)
+        self.saveAsAction.setShortcut("Ctrl+A")
 
         # exit action
         self.exitAction = QAction(self.style().standardIcon(QStyle.SP_DialogCancelButton), '&Exit', self)
@@ -256,7 +355,7 @@ class HorizonGUI(QMainWindow):
         # Adding an Open Recent submenu
         self.openRecentMenu = fileMenu.addMenu("Open Recent")
         fileMenu.addAction(self.saveAction)
-
+        fileMenu.addAction(self.saveAsAction)
         fileMenu.addAction(self.exitAction)
         fileMenu.addSeparator()
         fileMenu.addAction(self.aboutAction)
@@ -266,7 +365,6 @@ class HorizonGUI(QMainWindow):
         # porcoMenu.addAction("il cristo")
         # porcoMenu.addAction("dio")
         # porcoMenu.addAction("gesu")
-
 
     def _createButton(self):
 
@@ -292,20 +390,16 @@ class HorizonGUI(QMainWindow):
         # Using a QToolBar object
         editToolBar = QToolBar("Edit", self)
         self.addToolBar(editToolBar)
-        self.nodes_label = QLabel("Nodes in Horizon: ")
-        self.nodes_input = QSpinBox()
-        self.nodes_input.setRange(0, 999)
-        editToolBar.addWidget(self.nodes_label)
-        editToolBar.addWidget(self.nodes_input)
 
 
-        self._connectToolBars()
+
+        # self._connectToolBars()
         # Using a QToolBar object and a toolbar area
         # helpToolBar = QToolBar("Help", self)
         # self.addToolBar(Qt.LeftToolBarArea, helpToolBar)
 
     def _connectToolBars(self):
-        self.nodes_input.valueChanged.connect(self.widget_gui.setBoxNodes)
+        print('_connectToolBars yet to implement')
 
 if __name__ == '__main__':
 

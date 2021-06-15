@@ -32,11 +32,10 @@ from horizon_gui.custom_widgets.multi_slider import QMultiSlider
 class FunctionTab(QWidget):
     nodesChanged = pyqtSignal(str, list)
 
-    def __init__(self, name, fun, n_nodes, options=None, parent=None):
+    def __init__(self, name, n_nodes, options=None, parent=None):
         super().__init__(parent)
 
         self.name = name
-        self.fun = fun
         self.n_nodes = n_nodes
 
         self.hlayout = QHBoxLayout(self)
@@ -168,7 +167,7 @@ class HorizonLine(QWidget):
         fun_name = source_item.item(0, 0).text()
         # fun = source_item.item(0, 0).data(Qt.UserRole)
 
-        self.addFunctionToHorizon(fun_name, self.fun_type)
+        self.addFunctionToHorizon(fun_name)
 
     @pyqtSlot()
     def on_repeated_fun(self, str):
@@ -181,46 +180,42 @@ class HorizonLine(QWidget):
     def emitFunctionNodes(self, name, ranges):
         self.on_fun_nodes_changed(name, ranges)
 
-    def addFunctionToHorizon(self, name, fun):
+    def addFunctionToGUI(self, fun_name):
+
+        node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
+        self.ft = FunctionTab(fun_name, self.n_nodes, options=self.options)
+        self.ft.nodesChanged.connect(self.emitFunctionNodes)
+        verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
+
+        # todo hardcoded bottom margin
+        self.intab_layout = QVBoxLayout()
+
+        # don't fucking ask me why, these are magic numbers (-2, -5) in margins for alignment
+        self.intab_layout.setContentsMargins(node_box_width / 2 - 2, 20, node_box_width / 2 - 5, 0)
+        self.intab_layout.addWidget(self.ft, stretch=3)
+        # self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
+        # self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
+        self.intab_layout.addSpacerItem(verticalSpacer)
+
+        self.tab = QWidget()
+        self.tab.setLayout(self.intab_layout)
+
+        self.fun_tab.addTab(self.tab, str(fun_name))
+
+    def addFunctionToHorizon(self, name):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
 
         if flag:
-
-            node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
-            self.ft = FunctionTab(name, fun, self.n_nodes, options=self.options)
-            self.ft.nodesChanged.connect(self.emitFunctionNodes)
-            # self.ct_max_lim = spinbox_line.SpinBoxLine(self.n_nodes)
-            # self.ct_min_lim = spinbox_line.SpinBoxLine(self.n_nodes)
-            verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
-
-            # todo hardcoded bottom margin
-            # self.ct.setContentsMargins(0, 0, 0, 400)
-
-            # self.ct.setMaximumHeight(100)
-            self.intab_layout = QVBoxLayout()
-
-            # don't fucking ask me why, these are magic numbers (-2, -5) in margins for alignment
-            self.intab_layout.setContentsMargins(node_box_width / 2 - 2, 20, node_box_width / 2 - 5, 0)
-            self.intab_layout.addWidget(self.ft, stretch=3)
-            # self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
-            # self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
-            self.intab_layout.addSpacerItem(verticalSpacer)
-
-            self.tab = QWidget()
-            self.tab.setLayout(self.intab_layout)
-
-            self.fun_tab.addTab(self.tab, str(name))
-
+            self.addFunctionToGUI(name)
             self.logger.info(signal)
         else:
-
             self.logger.warning(signal)
 
     def getFunctionNodes(self, name):
 
         for i in range(self.fun_tab.count()):
             if self.fun_tab.tabText(i) == name:
-                print('diocane {}'.format(self.fun_tab.widget(i).getNodes()))
+                print('Nodes of function {}: {}'.format(name, self.fun_tab.widget(i).getNodes()))
                 return self.fun_tab.widget(i).getNodes()
             else:
                 pass

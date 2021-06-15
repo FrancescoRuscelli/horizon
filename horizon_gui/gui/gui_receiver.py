@@ -3,7 +3,6 @@ import parser
 import re
 import sys, os
 import pickle
-from horizon_gui.definitions import ROOT_DIR
 import casadi as cs
 
 class horizonImpl():
@@ -75,7 +74,7 @@ class horizonImpl():
                 except Exception as e:
                     return False, e
 
-            return True, signal + 'Function "{}: {}" activated as "{}".'.format(name,  active_fun.getFunction(), active_fun.getType())
+            return True, signal + 'Function "{}" activated as "{}".'.format(name, active_fun.getType())
         else:
             return False, signal
 
@@ -202,9 +201,20 @@ class horizonImpl():
         if name in self.fun_dict.keys():
             return self.fun_dict[name]
 
+    def getVarDict(self):
+        return self.sv_dict
+
     def getVar(self, elem):
 
         return self.sv_dict[elem]
+
+    def getNodes(self):
+
+        return self.nodes
+
+    def setNodes(self, n_nodes):
+
+        self.nodes = n_nodes
 
     def _createAndAppendFun(self, name, str_fun):
 
@@ -215,19 +225,21 @@ class horizonImpl():
         # TODO add fun type??
         self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None)
 
-    def _serialize(self):
+    def serialize(self):
 
         self.casadi_prb.serialize()
 
         # serialize state variables
         for name, data in self.sv_dict.items():
+            self.logger.debug('Serializing variable "{}": {}'.format(name, data['var']))
             self.sv_dict[name]['var'] = data['var'].serialize()
 
         # serialize functions
         for name, data in self.fun_dict.items():
+            self.logger.debug('Serializing function "{}": {}'.format(name, data['fun']))
             self.fun_dict[name]['fun'] = data['fun'].serialize()
 
-    def _deserialize(self):
+    def deserialize(self):
 
         self.casadi_prb.deserialize()
 
@@ -238,34 +250,6 @@ class horizonImpl():
         # deserialize functions
         for name, data in self.fun_dict.items():
             self.fun_dict[name]['fun'] = cs.SX.deserialize(data['fun'])
-
-    def save(self, path=None):
-        if path is None:
-            path = ROOT_DIR
-
-        # print('way_before:', self.casadi_prb.state_var_container.state_var)
-        # print('way_before:', self.casadi_prb.state_var_container.state_var_impl)
-        # print('way_before:', [constr.getFunction() for constr in self.casadi_prb.cnstr_container])
-
-        # todo is this intelligent?
-        # serializing and deserializing everytime is stupid right?
-        # make a copy of itself and serialize that one!
-        self._serialize()
-
-        # print('before:', self.casadi_prb.state_var_container.state_var)
-        # print('before:', self.casadi_prb.state_var_container.state_var_impl)
-        # print('before:', [constr.getFunction() for constr in self.casadi_prb.cnstr_container])
-
-        with open(path + '/try.pkl', 'wb') as f:
-            pickle.dump(self, f)
-
-        self._deserialize()
-
-        # print('after:', self.casadi_prb.state_var_container.state_var)
-        # print('after:', self.casadi_prb.state_var_container.state_var_impl)
-        # print('after:', [constr.getFunction() for constr in self.casadi_prb.cnstr_container])
-
-
 
 if __name__ == '__main__':
 

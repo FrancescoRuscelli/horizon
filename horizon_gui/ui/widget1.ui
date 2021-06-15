@@ -478,6 +478,29 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
     <bool>true</bool>
    </property>
   </widget>
+  <widget class="QSpinBox" name="NodesSpinBox">
+   <property name="geometry">
+    <rect>
+     <x>450</x>
+     <y>100</y>
+     <width>51</width>
+     <height>31</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="NodesLabel">
+   <property name="geometry">
+    <rect>
+     <x>410</x>
+     <y>80</y>
+     <width>141</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>N. of Horizon nodes:</string>
+   </property>
+  </widget>
   <action name="actionExit">
    <property name="icon">
     <iconset>
