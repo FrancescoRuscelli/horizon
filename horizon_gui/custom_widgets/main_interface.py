@@ -19,6 +19,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         super(MainInterface, self).__init__()
 
         self.setupUi(self)
+        print(self.consoleLogger)
+        print(id(self.consoleLogger))
         # #todo logger! use it everywhere!
 
         self.logger = logger
@@ -458,4 +460,5 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
     def __del__(self):
         # Restore sys.stdout
+        self.logger.removeHandler(self.consoleLogger)
         sys.stdout = sys.__stdout__
