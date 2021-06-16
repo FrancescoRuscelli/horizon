@@ -52,7 +52,7 @@ class HorizonGUI(QMainWindow):
         # settings
         self.current_save_file = None
         self.recent_files = list()
-        self.max_recent_files = 5
+        self.max_recent_files = 3
 
         self.starting_screen = starting_screen.StartingScreen()
         self.createSetup()
@@ -105,23 +105,23 @@ class HorizonGUI(QMainWindow):
 
     def updateSettings(self, recent_file):
 
-        print('recent_file to append', recent_file)
-        self.settings = QSettings(ROOT_DIR + "/settings/gui_settings.ini", QSettings.IniFormat)
-        # for saving a value to the ini
-        self.settings.beginGroup('recent_files')
-        # todo mechanics for ignoring file if already in recent_files
-        if len(self.settings.allKeys()):
-            for i in range(len(self.settings.allKeys())):
-                if i <= self.max_recent_files:
-                    self.settings.setValue('file' + str(i + 2), recent_file)
-                else:
-                    self.settings.remove('file1')
+        if recent_file not in self.recent_files:
+            self.settings = QSettings(ROOT_DIR + "/settings/gui_settings.ini", QSettings.IniFormat)
+            # for saving a value to the ini
+            self.settings.beginGroup('recent_files')
+            # todo mechanics for ignoring file if already in recent_files
+            if len(self.settings.allKeys()):
+                i = len(self.settings.allKeys())
+                if i < self.max_recent_files:
                     self.settings.setValue('file' + str(i + 1), recent_file)
-        else:
-            self.settings.setValue('file1', recent_file)
-        # for elem in self.recent_files:
-        #     self.settings.setValue('file', elem)
-        self.settings.endGroup()
+                else:
+
+                    for k in range(1, i):
+                        self.settings.setValue('file' + str(k), self.settings.value('file' + str(k + 1)))
+                    self.settings.setValue('file' + str(i), recent_file)
+            else:
+                self.settings.setValue('file1', recent_file)
+            self.settings.endGroup()
 
 
 
@@ -134,30 +134,35 @@ class HorizonGUI(QMainWindow):
         self.settings.allKeys()
         for elem in self.settings.allKeys():
             self.recent_files.append(self.settings.value(elem))
-            print(self.recent_files)
+
         self.settings.endGroup()
 
-    def openFile(self):
+    def openFileFromDialog(self):
 
         options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
+        # options |= QFileDialog.DontUseNativeDialog
         file_horizon, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
                                                 "Pickle Files (*.pickle)", options=options)
         if file_horizon:
 
-            self.updateSettings(file_horizon)
-            self.logger.warning('Opening file: {}'.format(file_horizon))
-            self.loadHorizon(file_horizon)
-            self.writeInStatusBar('Opening Horizon problem!')
+            self.openFile(file_horizon)
+
         else:
             self.logger.warning('File not found. Failed loading horizon problem.')
+
+    def openFile(self, file_path):
+
+        self.updateSettings(file_path)
+        self.logger.warning('Opening file: {}'.format(file_path))
+        self.loadHorizon(file_path)
+        self.writeInStatusBar('Opening Horizon problem!')
 
     def openRecentFile(self, filename):
         # Logic for opening a recent file goes here...
         self.openFile(filename)
 
     def saveFile(self):
-        # Logic for saving a file goes here...
+
         if self.current_save_file is None:
             self.saveAsFile()
         else:
@@ -171,8 +176,8 @@ class HorizonGUI(QMainWindow):
         dlg.setDefaultSuffix('pickle')
 
         file_path, _ = dlg.getSaveFileName(self, "QFileDialog.getSaveFileName()",
-                                           "", "Pickle Files (*.pickle)",
-                                           options=QFileDialog.DontUseNativeDialog)
+                                           "", "Pickle Files (*.pickle)")
+        # options = QFileDialog.DontUseNativeDialog # if I use this on Windows, i cannot get defaultSuffix
 
 
         if file_path:
@@ -250,7 +255,7 @@ class HorizonGUI(QMainWindow):
     def _connectActions(self):
         # Connect File actions
         self.newAction.triggered.connect(self.newFile)
-        self.openAction.triggered.connect(self.openFile)
+        self.openAction.triggered.connect(self.openFileFromDialog)
         self.saveAction.triggered.connect(self.saveFile)
         self.saveAsAction.triggered.connect(self.saveAsFile)
         self.exitAction.triggered.connect(self.close)
@@ -318,8 +323,7 @@ class HorizonGUI(QMainWindow):
         self.openRecentMenu.clear()
         # Step 2. Dynamically create the actions
         actions = []
-        filenames = [f"File-{n}" for n in range(5)]
-        for filename in filenames:
+        for filename in self.recent_files:
             action = QAction(filename, self)
             action.triggered.connect(partial(self.openRecentFile, filename))
             actions.append(action)
