@@ -43,17 +43,29 @@ class MultiFunctionBox(QWidget):
         # self.fun_list[fun_name].nodesChanged.connect(self.emitFunctionNodes)
 
     def removeFunctionFromGUI(self, fun_name):
-                self.main_layout.removeWidget(self.titles[fun_name])
-                self.main_layout.removeWidget(self.close_buttons[fun_name])
-                self.main_layout.removeWidget(self.fun_list[fun_name])
 
-                self.titles[fun_name].deleteLater()
-                self.close_buttons[fun_name].deleteLater()
-                self.fun_list[fun_name].deleteLater()
+        for name, label in self.titles.items():
+            if fun_name == name:
+                index = self.main_layout.indexOf(label)
 
-                del self.titles[fun_name]
-                del self.close_buttons[fun_name]
-                del self.fun_list[fun_name]
+                row = self.main_layout.getItemPosition(index)[0]
+                for column in range(self.main_layout.columnCount()):
+                    layout = self.main_layout.itemAtPosition(row, column)
+                    if layout is not None:
+                        layout.widget().deleteLater()
+                        self.main_layout.removeItem(layout)
+
+        # self.main_layout.removeWidget(self.titles[fun_name])
+        # self.main_layout.removeWidget(self.close_buttons[fun_name])
+        # self.main_layout.removeWidget(self.fun_list[fun_name])
+        #
+        # self.titles[fun_name].deleteLater()
+        # self.close_buttons[fun_name].deleteLater()
+        # self.fun_list[fun_name].deleteLater()
+        #
+        # del self.titles[fun_name]
+        # del self.close_buttons[fun_name]
+        # del self.fun_list[fun_name]
 
 
 
