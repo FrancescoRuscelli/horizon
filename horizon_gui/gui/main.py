@@ -28,6 +28,11 @@ from horizon_gui.definitions import ROOT_DIR
 # ADD DIALOG BUTTON TO CONSTRAINT (YES AND NO)
 # ADD BUTTON FOR ADDING HANDLES TO MULTI-SLIDERS
 # ADD INPUT/STATE VARIABLE SELECTOR
+# STRANGE BEHAVIOUR WHEN LOADING A HORIZON_PROBLEM WITH MANY NODES: LINE LOSING ITS WIDTH
+# WHAT IF NODES ARE 0 ---> WHAT TO DO???
+# STRANGE BEHAVIOUR WHEN ADDING REMOVING AND ADDING AGAIN SAME FUNCTION TO HORIZONLINE
+# STRANGE BEHAVIOUR WHEN ADDING FUNCTION (DEPENDS_ON ERROR)
+
 
 # class EmittingStream(QObject):
 #
@@ -313,7 +318,7 @@ class HorizonGUI(QMainWindow):
 
         self.aboutAction = QAction("&About", self)
 
-        self.settingAction = QAction("@Settings", self)
+        self.settingAction = QAction("&Settings", self)
 
     def writeInStatusBar(self, msg):
         self.statusbar.showMessage(msg, 10000)
@@ -344,7 +349,7 @@ class HorizonGUI(QMainWindow):
 
         self.setMenuBar(menuBar)
 
-        fileMenu = QMenu("&Maledetto", self)
+        fileMenu = QMenu("&File", self)
         menuBar.addMenu(fileMenu)
         # Creating menus using a title
         editMenu = menuBar.addMenu("&Settings")

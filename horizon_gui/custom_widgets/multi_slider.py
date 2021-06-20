@@ -73,11 +73,9 @@ class QMultiSlider(QtWidgets.QWidget):
         self.slices = []
         self.setMouseTracking(True)
         self.moving = "none"
-
+        self.bar_tickz_heigth = 10
         self.current_display_min = 0
         self.current_display_max = 0
-
-        self.resize(500, 400)
 
         if slider_range:
             self.setRange(slider_range)
@@ -210,15 +208,16 @@ class QMultiSlider(QtWidgets.QWidget):
         painter.setBrush(self.options['background_color'])
         # int x, int y, int width, int height
         # (background)
-        painter.drawRect(0, 10, w, h - 4)
+        painter.drawRect(0, self.bar_tickz_heigth, w, h)
 
         # tickz
         painter.setPen(self.options['ticks_color'])
         size = float(self.width() - 2 * self.bar_width)
         display_unit = size / self.scale * self.single_step
-        display_ticks = [x * display_unit for x in list(range(int(self.scale / self.single_step)+1))]
+        display_ticks = [x * display_unit for x in list(range(int(self.scale / self.single_step) + 1))]
+
         for tick_pos in display_ticks:
-            painter.drawRect(tick_pos, 1, self.bar_width, 10)
+            painter.drawRect(tick_pos, 0, self.bar_width, self.bar_tickz_heigth)
 
 
         # todo I don't need a resizeEvent because every time I change size paintEvent gets called which call addSlice which call updateDisplayValues
@@ -236,10 +235,9 @@ class QMultiSlider(QtWidgets.QWidget):
         # painter.setPen(QtCore.Qt.darkYellow)
         painter.setBrush(self.options['slice_color'])
         # int x, int y, int width, int height
-        painter.drawRect(display_min - 1, 10, display_max - display_min + 2, h - 10)
+        painter.drawRect(display_min - 1, self.bar_tickz_heigth, display_max - display_min + 2, h)
 
         # min & max tabs
-
         painter.setPen(self.options['minmax_color'])
         # painter.setBrush(QtCore.Qt.black)
         painter.drawRect(display_min - self.bar_width, 1, self.bar_width, h - 2)
@@ -347,16 +345,17 @@ class QMultiSlider(QtWidgets.QWidget):
     def mouseMoveEvent(self, event):
         # this is to switch cursor when on slider
         # todo something is wrong when adding a slice, it does NOT change the cursor over the old slices
-        if not event.buttons():
+        if not event.buttons(): #because only hovering on
             for segment in self.slices:
                 if (self.fromValueToDisplay(segment)[0] - 0.5 * self.bar_area_selection) <= self.getPos(event) <= (self.fromValueToDisplay(segment)[0] + 0.5 * self.bar_area_selection):
-                    QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.SplitHCursor)
+                    self.setCursor(QtCore.Qt.SplitHCursor)
                     break
                 elif (self.fromValueToDisplay(segment)[1] - 0.5 * self.bar_area_selection) <= self.getPos(event) <= (self.fromValueToDisplay(segment)[1] + 0.5 * self.bar_area_selection):
-                    QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.SplitHCursor)
+                    self.setCursor(QtCore.Qt.SplitHCursor)
                     break
                 else:
-                    QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.ArrowCursor)
+                    self.setCursor(QtCore.Qt.ArrowCursor)
+
 
         else:
 

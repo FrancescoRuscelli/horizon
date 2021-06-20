@@ -1,75 +1,59 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QTabWidget, QHBoxLayout, QVBoxLayout, QSpacerItem, QSizePolicy
-from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex
+from PyQt5.QtWidgets import QWidget, QGridLayout, QStackedWidget, QVBoxLayout
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex, QMargins
 from PyQt5.QtGui import QStandardItemModel
 
-from horizon_gui.definitions import CSS_DIR
-from horizon_gui.custom_widgets.multi_slider import QMultiSlider
+from horizon_gui.custom_widgets.node_box_line import NodeBoxLine
+from horizon_gui.custom_widgets.function_tab import FunctionTabWidget
+from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 
-#
-# class TabButtonWidget(QWidget):
-#     def __init__(self, parent):
-#         super().__init__(parent)
-#         # Create button's
-#         self.button_add = QPushButton("+")
-#         self.button_remove = QPushButton("-")
-#
-#         # Set button size
-#         self.button_add.setFixedSize(16, 16)
-#         self.button_remove.setFixedSize(16, 16)
-#
-#         # Create layout
-#         self.layout = QVBoxLayout()
-#         self.layout.setSpacing(0)
-#         self.layout.setContentsMargins(0, 0, 0, 0)
-#
-#         # Add button's to layout
-#         self.layout.addWidget(self.button_add)
-#         self.layout.addWidget(self.button_remove)
-#
-#         # Use layout in widget
-#         self.setLayout(self.layout)
-
-class FunctionTab(QWidget):
-    nodesChanged = pyqtSignal(str, list)
-
-    def __init__(self, name, n_nodes, options=None, parent=None):
-        super().__init__(parent)
-
-        self.name = name
-        self.n_nodes = n_nodes
-
-        self.hlayout = QHBoxLayout(self)
-        self.slider = QMultiSlider(slider_range=[0, self.n_nodes - 1, 1], values=[0, self.n_nodes-1], options=options)
-        self.hlayout.addWidget(self.slider)
-
-        self.slider.slicesChanged.connect(self.on_nodes_changed)
-
-    def on_nodes_changed(self, range_list):
-        self.nodesChanged.emit(self.name, range_list)
-        # adding + - push button to tab
-        # self.ct_tab.tabBar().setTabButton(0, self.ct_tab.tabBar().RightSide, TabButtonWidget())
-
-    def updateRange(self, n_nodes):
-        self.n_nodes = n_nodes
-        self.slider.updateRange([0, self.n_nodes-1])
+# TODO now it's a fucking mess, do something
 
 class HorizonLine(QWidget):
     add_fun_horizon = pyqtSignal(dict)
     remove_fun_horizon = pyqtSignal(dict)
     repeated_fun = pyqtSignal(str)
-    funNodesChanged = pyqtSignal(str, list)
 
     def __init__(self, horizon, fun_type, nodes=0, logger=None, parent=None):
-        QWidget.__init__(self, parent)
+        super().__init__(parent)
         self.setAcceptDrops(True)
 
         self.horizon_receiver = horizon
+        self.fun_type = fun_type         # can be Constraint or Cost Function
+        self.n_nodes = nodes
 
         if logger:
             self.logger = logger
-        # can be Constraint or Cost Function
 
-        self.fun_type = fun_type
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setSpacing(0)
+
+        self.nodes_line = NodeBoxLine(self.n_nodes)
+        self.nodes_line.setAttribute(Qt.WA_StyledBackground, True)
+        self.nodes_line.setStyleSheet('background-color: green;')
+        self.main_layout.addWidget(self.nodes_line)
+
+        self.stacked_lines = QStackedWidget()
+        self.main_layout.addWidget(self.stacked_lines)
+
+        self._initOptions()
+        self._initSingleLine()
+        self._initMultiLine()
+
+    def _initSingleLine(self):
+        # define TabWidget
+
+        self.function_tab = FunctionTabWidget(self.n_nodes, options=self.options)
+        self.stacked_lines.addWidget(self.function_tab)
+
+        self.function_tab.tabCloseRequested.connect(self.removeActiveFunctionFromTabRequest)
+
+
+    def _initMultiLine(self):
+
+        self.multi_function_box = MultiFunctionBox(self.n_nodes, options=self.options)
+        self.stacked_lines.addWidget(self.multi_function_box)
+
+    def _initOptions(self):
 
         self.options = dict()
         if self.fun_type == 'constraint':
@@ -83,69 +67,22 @@ class HorizonLine(QWidget):
             self.options['minmax_color'] = Qt.darkRed
             self.options['ticks_color'] = Qt.darkCyan
 
+    def switchPage(self, index):
+        self.stacked_lines.setCurrentIndex(index)
 
 
-        self.setWindowState(Qt.WindowMaximized)
-        self.showMaximized()
-        # define main layout
-        self.main_layout = QHBoxLayout(self)
-
-        # define TabWidget
-        self.fun_tab = QTabWidget(self)
-
-        with open(CSS_DIR + '/tab.css', 'r') as f:
-            self.fun_tab.setStyleSheet(f.read())
-
-        self.fun_tab.setTabPosition(1)
-        self.fun_tab.setTabsClosable(True)
-
-        # add TabWidget to main layout
-        self.main_layout.addWidget(self.fun_tab)
-
-        # add a layout to TabWidget
-        self.fun_tab_layout = QGridLayout(self.fun_tab)
-
+    def setNodes(self, nodes):
+        #update nodes
         self.n_nodes = nodes
-        self._updateBoxNodes()
 
-        # self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
-        # self.setMouseTracking(True)
+        #update nodes in first widget (nodes line)
+        self.nodes_line.setBoxNodes(nodes)
 
-        self.fun_tab.tabCloseRequested.connect(self.removeActiveFunctionRequest)
-
-    def setBoxNodes(self, nodes):
-        self.n_nodes = nodes
-        self._updateBoxNodes()
-
-    def _updateBoxNodes(self):
-        # Add nodes to the layout
-
-        for i in reversed(range(self.fun_tab_layout.count())):
-            self.fun_tab_layout.itemAt(i).widget().deleteLater()
-
-        if self.n_nodes == 0:
-            self.setDisabled(True)
-        else:
-            self.setDisabled(False)
-
-        for i in range(self.n_nodes):
-            n_i = QPushButton("{}".format(i), self)
-            self.fun_tab_layout.addWidget(n_i, 0, i, 1, 1, alignment=Qt.AlignTop)
-
-
-        for i in range(self.fun_tab.count()):
-            self.fun_tab.widget(i).findChild(FunctionTab).updateRange(self.n_nodes)
-            node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
-            self.intab_layout.setContentsMargins(node_box_width / 2 - 2, 20, node_box_width / 2 - 5, 0)
-
-    def removeActiveFunctionRequest(self, index):
-
-        flag, signal = self.horizon_receiver.removeActiveFunction(self.fun_tab.tabText(index))
-
-        if flag:
-            self.fun_tab.removeTab(index)
-
-        self.logger.info(signal)
+        #update nodes in second widget (function line) + set margins
+        self.function_tab.setNodes(nodes)
+        node_box_width = self.nodes_line.getBoxWidth()
+        margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
+        self.function_tab.updateMargins(margins)
 
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
@@ -156,7 +93,7 @@ class HorizonLine(QWidget):
         #     print(i.text())
         #     print('drop event')
         # standard format of mimeData from QListWidget
-        if event.mimeData().hasFormat('application/x-qabstractitemmodeldatalist'):
+        if event.mimeData().hasFormat('application/x-qabstractitemmodeldatalist') and self.n_nodes != 0:
             event.accept()
         else:
             event.ignore()
@@ -173,89 +110,48 @@ class HorizonLine(QWidget):
     def on_repeated_fun(self, str):
         self.repeated_fun.emit(str)
 
-    @pyqtSlot()
-    def on_fun_nodes_changed(self, name, ranges):
-        self.funNodesChanged.emit(name, ranges)
 
-    def emitFunctionNodes(self, name, ranges):
-        self.on_fun_nodes_changed(name, ranges)
+    def addFunctionToSingleLine(self, name):
+        node_box_width = self.nodes_line.getBoxWidth()
+        self.function_tab.addFunctionToGUI(name)
 
-    def addFunctionToGUI(self, fun_name):
+        margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
+        self.function_tab.updateMargins(margins)
 
-        node_box_width = self.fun_tab_layout.itemAt(0).widget().width()
-        self.ft = FunctionTab(fun_name, self.n_nodes, options=self.options)
-        self.ft.nodesChanged.connect(self.emitFunctionNodes)
-        verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
-
-        # todo hardcoded bottom margin
-        self.intab_layout = QVBoxLayout()
-
-        # don't fucking ask me why, these are magic numbers (-2, -5) in margins for alignment
-        self.intab_layout.setContentsMargins(node_box_width / 2 - 2, 20, node_box_width / 2 - 5, 0)
-        self.intab_layout.addWidget(self.ft, stretch=3)
-        # self.intab_layout.addWidget(self.ct_max_lim, stretch=1)
-        # self.intab_layout.addWidget(self.ct_min_lim, stretch=1)
-        self.intab_layout.addSpacerItem(verticalSpacer)
-
-        self.tab = QWidget()
-        self.tab.setLayout(self.intab_layout)
-
-        self.fun_tab.addTab(self.tab, str(fun_name))
+    def addFunctionToMultiLine(self, name):
+        node_box_width = self.nodes_line.getBoxWidth()
+        self.multi_function_box.addFunctionToGUI(name)
 
     def addFunctionToHorizon(self, name):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
 
         if flag:
-            self.addFunctionToGUI(name)
+
+            # self.fun_list.append(name)
+            self.addFunctionToSingleLine(name)
+            self.addFunctionToMultiLine(name)
             self.logger.info(signal)
         else:
             self.logger.warning(signal)
+    #
+    # def removeFunctionFromHorizon(self, name):
+    #     flag, signal = self.horizon_receiver.removeActiveFunction(name)
+
+    def removeActiveFunctionFromTabRequest(self, index):
+
+        flag, signal = self.horizon_receiver.removeActiveFunction(self.function_tab.tabText(index))
+
+        if flag:
+            # self.multi_function_box.removeWidget(index)
+            self.function_tab.removeTab(index)
+
+        self.logger.info(signal)
+
+    # def updateGUI(self):
+    #
+    #     for fun in self.fun_list:
+    #         self.addFunctionToSingleLine()
+    #         self.addFunctionToMultiLine()
 
     def getFunctionNodes(self, name):
-
-        for i in range(self.fun_tab.count()):
-            if self.fun_tab.tabText(i) == name:
-                print('Nodes of function {}: {}'.format(name, self.fun_tab.widget(i).getNodes()))
-                return self.fun_tab.widget(i).getNodes()
-            else:
-                pass
-
-
-
-    # def mousePressEvent(self, event):
-    #     self.origin = event.pos()
-    #     self.rubberband.setGeometry(QRect(self.origin, QSize()))
-    #     self.rubberband.show()
-    #     QWidget.mousePressEvent(self, event)
-    #
-    # def mouseMoveEvent(self, event):
-    #     if self.rubberband.isVisible():
-    #         self.rubberband.setGeometry(QRect(self.origin, event.pos()).normalized())
-    #     QWidget.mouseMoveEvent(self, event)
-    #
-    # def mouseReleaseEvent(self, event):
-    #         if self.rubberband.isVisible():
-    #             self.rubberband.hide()
-    #             selected = []
-    #             rect = self.rubberband.geometry()
-    #             if self.ct_tab.widget(self.ct_tab.currentIndex()) is not None:
-    #                 for child in self.ct_tab.widget(self.ct_tab.currentIndex()).findChildren(QCheckBox):
-    #                     # get absolute geometry and then map it to self (HorizonLine)
-    #                     # the problem was that .geometry() returns the position w.r.t. the parent:
-    #                     # I was comparing the geometry of the rubberband taken in the HorizonLine's coordinates with
-    #                     # the geometry of the QCheckBox taken in the QGridLayout's coordinates.
-    #
-    #                     gp = child.mapToGlobal(QPoint(0, 0))
-    #                     b_a = self.mapFromGlobal(gp)
-    #
-    #                     # todo check if possible, right now im subtracting a small value to make the geometry of the checkbox smaller
-    #                     if rect.intersects(QRect(b_a.x(), b_a.y(), child.geometry().width()-20, child.geometry().height())):
-    #                         selected.append(child)
-    #
-    #             for elem in selected:
-    #                 if event.button() == Qt.RightButton:
-    #                     elem.setChecked(False)
-    #                 elif event.button() == Qt.LeftButton:
-    #                     elem.setChecked(True)
-    #
-    #         QWidget.mouseReleaseEvent(self, event)
+        self.function_tab.getFunctionNodes(name)

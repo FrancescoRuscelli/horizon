@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from horizon_gui.gui.widget1_ui import Ui_HorizonGUI
 from horizon_gui.custom_functions import highlighter
-from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate
+from horizon_gui.custom_widgets import horizon_line, node_box_line, line_edit, on_destroy_signal_window, highlight_delegate
 
 
 class MainInterface(QWidget, Ui_HorizonGUI):
@@ -19,8 +19,6 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         super(MainInterface, self).__init__()
 
         self.setupUi(self)
-        print(self.consoleLogger)
-        print(id(self.consoleLogger))
         # #todo logger! use it everywhere!
 
         self.logger = logger
@@ -43,6 +41,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.SVNodeInput.setRange(-N, 0)
 
         self.layout_ct = QVBoxLayout(self.CTPage)
+        # self.constraintLine = horizon_multi_line.HorizonMultiLine(self.horizon_receiver, 'constraint', nodes=N, logger=self.logger)
         self.constraintLine = horizon_line.HorizonLine(self.horizon_receiver, 'constraint', nodes=N, logger=self.logger)
         self.constraintLine.setContentsMargins(0, 40, 0, 0)
         self.layout_ct.addWidget(self.constraintLine)
@@ -55,23 +54,19 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.ct_layout = QHBoxLayout(self.funBox)
         self.ct_entry = self.setFunEditor(self.funBox)
 
-        # self.fun_type_input = 'generic'
-        # self.constraintTypeButton.data = 'constraint'
-        # self.costfunctionTypeButton.data = 'costfunction'
-        # self.genericTypeButton.data = 'generic'
-        #
-        # self.constraintTypeButton.toggled.connect(self.updateInputFunctionType)
-        # self.costfunctionTypeButton.toggled.connect(self.updateInputFunctionType)
-        # self.genericTypeButton.toggled.connect(self.updateInputFunctionType)
 
         self.funButton.clicked.connect(self.generateFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
         self.SVTable.itemDoubleClicked.connect(self.openSV)
         self.switchPageButton.clicked.connect(self.switchPage)
         self.constraintLine.add_fun_horizon.connect(self.horizon_receiver.addFunction)
-        self.constraintLine.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
-        self.costfunctionLine.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
+        self.constraintLine.function_tab.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
+        self.costfunctionLine.function_tab.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
+        self.SingleLineButton.toggled.connect(partial(self.constraintLine.switchPage, 0))
+        self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, 0))
+        self.MultipleLineButton.toggled.connect(partial(self.constraintLine.switchPage, 1))
+        self.MultipleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, 1))
 
         # when opening horizon, fill the GUI
         for name, data in horizon_receiver.getVarDict().items():
@@ -94,8 +89,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
     def setBoxNodes(self, n_nodes):
         self.horizon_receiver.setNodes(n_nodes)
-        self.constraintLine.setBoxNodes(n_nodes)
-        self.costfunctionLine.setBoxNodes(n_nodes)
+        self.constraintLine.setNodes(n_nodes)
+        self.costfunctionLine.setNodes(n_nodes)
 
     def switchPage(self):
         index = self.ProblemMain.currentIndex()
