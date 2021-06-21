@@ -51,7 +51,6 @@ class Function:
         for name, data in self.vars.items():
             self.vars[name] = data.serialize()
 
-
         self.fun = self.fun.serialize()
 
         return self

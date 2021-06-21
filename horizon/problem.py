@@ -99,12 +99,12 @@ class Problem:
     def removeCostFunction(self, name):
 
         if self.debug_mode:
-            self.logger.debug('Functions before removal:', self.costfun_container)
+            self.logger.debug('Functions before removal: {}'.format(self.costfun_container))
         for fun in self.costfun_container:
             if fun.getName() == name:
                 self.costfun_container.remove(fun)
         if self.debug_mode:
-            self.logger.debug('Function after removal:', self.costfun_container)
+            self.logger.debug('Function after removal: {}'.format(self.costfun_container))
 
     def removeConstraint(self, name):
         for fun in self.cnstr_container:

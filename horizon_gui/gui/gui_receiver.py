@@ -200,6 +200,7 @@ class horizonImpl():
     def getFunction(self, name):
         if name in self.fun_dict.keys():
             return self.fun_dict[name]
+        #todo change? return only active?
 
     def getVarDict(self):
         return self.sv_dict
@@ -212,8 +213,7 @@ class horizonImpl():
 
         return self.nodes
 
-    def setNodes(self, n_nodes):
-
+    def setHorizonNodes(self, n_nodes):
         self.nodes = n_nodes
 
     def _createAndAppendFun(self, name, str_fun):

@@ -63,10 +63,10 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.constraintLine.function_tab.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
         self.costfunctionLine.function_tab.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
-        self.SingleLineButton.toggled.connect(partial(self.constraintLine.switchPage, 0))
-        self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, 0))
-        self.MultipleLineButton.toggled.connect(partial(self.constraintLine.switchPage, 1))
-        self.MultipleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, 1))
+        self.SingleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.constraintLine.Single))
+        self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.constraintLine.Single))
+        self.MultipleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.costfunctionLine.Multi))
+        self.MultipleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.costfunctionLine.Multi))
 
         # when opening horizon, fill the GUI
         for name, data in horizon_receiver.getVarDict().items():
@@ -88,9 +88,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.generic_sig.emit(str)
 
     def setBoxNodes(self, n_nodes):
-        self.horizon_receiver.setNodes(n_nodes)
-        self.constraintLine.setNodes(n_nodes)
-        self.costfunctionLine.setNodes(n_nodes)
+        self.horizon_receiver.setHorizonNodes(n_nodes)
+        self.constraintLine.setHorizonNodes(n_nodes)
+        self.costfunctionLine.setHorizonNodes(n_nodes)
 
     def switchPage(self):
         index = self.ProblemMain.currentIndex()

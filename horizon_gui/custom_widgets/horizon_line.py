@@ -6,6 +6,7 @@ from horizon_gui.custom_widgets.node_box_line import NodeBoxLine
 from horizon_gui.custom_widgets.function_tab import FunctionTabWidget
 from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 
+from functools import partial
 # TODO now it's a fucking mess, do something
 
 class HorizonLine(QWidget):
@@ -35,9 +36,12 @@ class HorizonLine(QWidget):
         self.stacked_lines = QStackedWidget()
         self.main_layout.addWidget(self.stacked_lines)
 
+        self.Multi = 0
+        self.Single = 1
+
         self._initOptions()
-        self._initSingleLine()
         self._initMultiLine()
+        self._initSingleLine()
 
     def _initSingleLine(self):
         # define TabWidget
@@ -45,13 +49,17 @@ class HorizonLine(QWidget):
         self.function_tab = FunctionTabWidget(self.n_nodes, options=self.options)
         self.stacked_lines.addWidget(self.function_tab)
 
-        self.function_tab.tabCloseRequested.connect(self.removeActiveFunctionFromTabRequest)
+        self.function_tab.tabCloseRequested.connect(self.removeActiveFunctionRequestFromIndex)
+        self.function_tab.funNodesChanged.connect(partial(self.updateFunctionNodes, 'single'))
 
 
     def _initMultiLine(self):
 
         self.multi_function_box = MultiFunctionBox(self.n_nodes, options=self.options)
         self.stacked_lines.addWidget(self.multi_function_box)
+
+        self.multi_function_box.funCloseRequested.connect(self.removeActiveFunctionRequestFromName)
+        self.multi_function_box.funNodesChanged.connect(partial(self.updateFunctionNodes, 'multi'))
 
     def _initOptions(self):
 
@@ -70,8 +78,18 @@ class HorizonLine(QWidget):
     def switchPage(self, index):
         self.stacked_lines.setCurrentIndex(index)
 
+    def updateFunctionNodes(self, parent, fun_name, ranges):
 
-    def setNodes(self, nodes):
+        # change nodes of function in horizon
+        self.horizon_receiver.updateFunctionNodes(fun_name, ranges)
+
+        # update ranges in sliders
+        if parent == 'multi':
+            self.function_tab.setFunctionNodes(fun_name, ranges)
+        elif parent == 'single':
+            self.multi_function_box.setFunctionNodes(fun_name, ranges)
+
+    def setHorizonNodes(self, nodes):
         #update nodes
         self.n_nodes = nodes
 
@@ -79,10 +97,14 @@ class HorizonLine(QWidget):
         self.nodes_line.setBoxNodes(nodes)
 
         #update nodes in second widget (function line) + set margins
-        self.function_tab.setNodes(nodes)
+        self.function_tab.setHorizonNodes(nodes)
         node_box_width = self.nodes_line.getBoxWidth()
         margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
         self.function_tab.updateMargins(margins)
+
+        # update nodes in multi_function window widget
+        #todo add update margins otherwise it does not update (also, you need it anyway)
+        self.multi_function_box.setHorizonNodes(nodes)
 
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
@@ -127,7 +149,7 @@ class HorizonLine(QWidget):
 
         if flag:
 
-            # self.fun_list.append(name)
+            # self.fun_dict[] = list()
             self.addFunctionToSingleLine(name)
             self.addFunctionToMultiLine(name)
             self.logger.info(signal)
@@ -137,13 +159,20 @@ class HorizonLine(QWidget):
     # def removeFunctionFromHorizon(self, name):
     #     flag, signal = self.horizon_receiver.removeActiveFunction(name)
 
-    def removeActiveFunctionFromTabRequest(self, index):
+    def removeActiveFunctionRequestFromIndex(self, index):
 
-        flag, signal = self.horizon_receiver.removeActiveFunction(self.function_tab.tabText(index))
+        fun_name = self.function_tab.tabText(index)
+        self.removeActiveFunctionRequestFromName(fun_name)
+
+    def removeActiveFunctionRequestFromName(self, fun_name):
+
+        flag, signal = self.horizon_receiver.removeActiveFunction(fun_name)
 
         if flag:
-            # self.multi_function_box.removeWidget(index)
-            self.function_tab.removeTab(index)
+            self.multi_function_box.removeFunctionFromGUI(fun_name)
+            for i in range(self.function_tab.count()):
+                if fun_name == self.function_tab.tabText(i):
+                    self.function_tab.removeTab(i)
 
         self.logger.info(signal)
 
