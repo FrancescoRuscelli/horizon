@@ -10,6 +10,7 @@ class Highlighter(QSyntaxHighlighter):
         self.keywordFormat.setFontWeight(QFont.Bold)
 
         self.keywordPatterns = list()
+        print(list((QRegExp(pattern), self.keywordFormat) for pattern in self.keywordPatterns))
         self.highlightingRules = [(QRegExp(pattern), self.keywordFormat) for pattern in self.keywordPatterns]
 
         # classFormat = QTextCharFormat()
@@ -34,6 +35,11 @@ class Highlighter(QSyntaxHighlighter):
         self.baseOperatorFormat.setFontWeight(QFont.Bold)
         self.baseOperatorFormat.setForeground(Qt.darkCyan)
         base_op = ['sin', 'cos', 'sqrt']
+        # dir(__builtin__)
+        # dir (casadi)
+        # dir (numpy)
+
+        # todo find a way to give priority to functions, otherwise variable names are highlighted inside name of variables, if any
         self.highlightingRules.append(('|'.join(base_op), self.baseOperatorFormat))
 
 
