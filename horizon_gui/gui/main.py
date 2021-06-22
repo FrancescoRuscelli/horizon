@@ -88,14 +88,17 @@ class HorizonGUI(QMainWindow):
         self.current_horizon = horizon_receiver
         # generate a layout for a widget, I can populate the layout with more widget
         self.main_layout = QVBoxLayout()
+
         # self.main_layout.addWidget(self.red_widget,1)
 
         self.widget_gui = main_interface.MainInterface(horizon_receiver, logger=self.logger)
         self.main_layout.addWidget(self.widget_gui)
+        self.widget_gui.splitter.setStretchFactor(1, 2)
 
         # generate a main widget to assign to centralwidget
         self.main_widget = QWidget()
         self.main_widget.setLayout(self.main_layout)
+        self.main_widget.adjustSize()
         self.setCentralWidget(self.main_widget)
         self.setWindowTitle("Horizon GUI")
 

@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QStackedWidget, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QGridLayout, QStackedWidget, QVBoxLayout, QScrollArea
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex, QMargins
 from PyQt5.QtGui import QStandardItemModel
 
@@ -9,7 +9,7 @@ from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 from functools import partial
 # TODO now it's a fucking mess, do something
 
-class HorizonLine(QWidget):
+class HorizonLine(QScrollArea):
     add_fun_horizon = pyqtSignal(dict)
     remove_fun_horizon = pyqtSignal(dict)
     repeated_fun = pyqtSignal(str)
@@ -18,6 +18,10 @@ class HorizonLine(QWidget):
         super().__init__(parent)
         self.setAcceptDrops(True)
 
+        self.main_widget = QWidget()
+        self.setWidgetResizable(True)
+        self.setWidget(self.main_widget)
+
         self.horizon_receiver = horizon
         self.fun_type = fun_type         # can be Constraint or Cost Function
         self.n_nodes = nodes
@@ -25,7 +29,7 @@ class HorizonLine(QWidget):
         if logger:
             self.logger = logger
 
-        self.main_layout = QVBoxLayout(self)
+        self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)
 
         self.nodes_line = NodeBoxLine(self.n_nodes)

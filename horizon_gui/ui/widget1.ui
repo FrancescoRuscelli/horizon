@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1225</width>
-    <height>912</height>
+    <width>1307</width>
+    <height>556</height>
    </rect>
   </property>
   <property name="mouseTracking">
@@ -16,498 +16,546 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QGroupBox" name="funBox">
-   <property name="geometry">
-    <rect>
-     <x>570</x>
-     <y>10</y>
-     <width>641</width>
-     <height>201</height>
-    </rect>
-   </property>
-   <property name="layoutDirection">
-    <enum>Qt::LeftToRight</enum>
-   </property>
-   <property name="title">
-    <string>Functions</string>
-   </property>
-   <property name="alignment">
-    <set>Qt::AlignCenter</set>
-   </property>
-   <widget class="QWidget" name="gridLayoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>30</y>
-      <width>291</width>
-      <height>161</height>
-     </rect>
-    </property>
-    <layout class="QGridLayout" name="CTGrid">
-     <property name="spacing">
-      <number>0</number>
+  <layout class="QVBoxLayout" name="verticalLayout_3">
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
      </property>
-     <item row="0" column="0">
-      <widget class="QLabel" name="funNameLabel">
-       <property name="text">
-        <string>name:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="QLineEdit" name="funNameInput"/>
-     </item>
-     <item row="2" column="0" colspan="3">
-      <widget class="QPushButton" name="funButton">
-       <property name="text">
-        <string>Add Constraint</string>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="funLabel">
-       <property name="text">
-        <string>function:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="2">
-      <spacer name="horizontalSpacer">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::Expanding</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item row="1" column="1" colspan="2">
-      <widget class="LineEdit" name="funInput"/>
-     </item>
-    </layout>
-   </widget>
-   <widget class="BoxFunction" name="funTable">
-    <property name="geometry">
-     <rect>
-      <x>320</x>
-      <y>30</y>
-      <width>311</width>
-      <height>161</height>
-     </rect>
-    </property>
-    <column>
-     <property name="text">
-      <string>Name</string>
-     </property>
-    </column>
-    <column>
-     <property name="text">
-      <string>Function</string>
-     </property>
-    </column>
-   </widget>
-  </widget>
-  <widget class="QGroupBox" name="SV">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>10</y>
-     <width>381</width>
-     <height>201</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>State Variables</string>
-   </property>
-   <property name="alignment">
-    <set>Qt::AlignCenter</set>
-   </property>
-   <property name="flat">
-    <bool>false</bool>
-   </property>
-   <property name="checkable">
-    <bool>false</bool>
-   </property>
-   <widget class="QPushButton" name="SVAddButton">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>130</y>
-      <width>131</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Add State Variable</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="SVNameInput">
-    <property name="geometry">
-     <rect>
-      <x>51</x>
-      <y>50</y>
-      <width>41</width>
-      <height>20</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="SVName">
-    <property name="geometry">
-     <rect>
-      <x>8</x>
-      <y>52</y>
-      <width>41</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Name:</string>
-    </property>
-   </widget>
-   <widget class="NodesSpinBox" name="SVNodeInput">
-    <property name="geometry">
-     <rect>
-      <x>70</x>
-      <y>80</y>
-      <width>81</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="palette">
-     <palette>
-      <active>
-       <colorrole role="Highlight">
-        <brush brushstyle="SolidPattern">
-         <color alpha="0">
-          <red>87</red>
-          <green>49</green>
-          <blue>198</blue>
-         </color>
-        </brush>
-       </colorrole>
-       <colorrole role="HighlightedText">
-        <brush brushstyle="SolidPattern">
-         <color alpha="255">
-          <red>0</red>
-          <green>0</green>
-          <blue>0</blue>
-         </color>
-        </brush>
-       </colorrole>
-      </active>
-      <inactive>
-       <colorrole role="Highlight">
-        <brush brushstyle="SolidPattern">
-         <color alpha="0">
-          <red>87</red>
-          <green>49</green>
-          <blue>198</blue>
-         </color>
-        </brush>
-       </colorrole>
-       <colorrole role="HighlightedText">
-        <brush brushstyle="SolidPattern">
-         <color alpha="255">
-          <red>0</red>
-          <green>0</green>
-          <blue>0</blue>
-         </color>
-        </brush>
-       </colorrole>
-      </inactive>
-      <disabled>
-       <colorrole role="Highlight">
-        <brush brushstyle="SolidPattern">
-         <color alpha="255">
-          <red>145</red>
-          <green>141</green>
-          <blue>126</blue>
-         </color>
-        </brush>
-       </colorrole>
-       <colorrole role="HighlightedText">
-        <brush brushstyle="SolidPattern">
-         <color alpha="255">
-          <red>0</red>
-          <green>0</green>
-          <blue>0</blue>
-         </color>
-        </brush>
-       </colorrole>
-      </disabled>
-     </palette>
-    </property>
-    <property name="maximum">
-     <number>102</number>
-    </property>
-    <property name="value">
-     <number>0</number>
-    </property>
-   </widget>
-   <widget class="QLabel" name="SVNode">
-    <property name="geometry">
-     <rect>
-      <x>32</x>
-      <y>82</y>
-      <width>40</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Node:</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="SVDim">
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>50</y>
-      <width>30</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Dim:</string>
-    </property>
-   </widget>
-   <widget class="QSpinBox" name="SVDimInput">
-    <property name="geometry">
-     <rect>
-      <x>130</x>
-      <y>50</y>
-      <width>41</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="minimum">
-     <number>1</number>
-    </property>
-   </widget>
-   <widget class="Line" name="line">
-    <property name="geometry">
-     <rect>
-      <x>17</x>
-      <y>110</y>
-      <width>151</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="orientation">
-     <enum>Qt::Horizontal</enum>
-    </property>
-   </widget>
-   <widget class="BoxStateVar" name="SVTable">
-    <property name="geometry">
-     <rect>
-      <x>190</x>
-      <y>30</y>
-      <width>181</width>
-      <height>161</height>
-     </rect>
-    </property>
-    <attribute name="horizontalHeaderDefaultSectionSize">
-     <number>57</number>
-    </attribute>
-    <attribute name="horizontalHeaderMinimumSectionSize">
-     <number>20</number>
-    </attribute>
-    <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
-     <bool>false</bool>
-    </attribute>
-    <attribute name="verticalHeaderDefaultSectionSize">
-     <number>21</number>
-    </attribute>
-    <column>
-     <property name="text">
-      <string>Var</string>
-     </property>
-    </column>
-    <column>
-     <property name="text">
-      <string>Dim</string>
-     </property>
-    </column>
-   </widget>
-  </widget>
-  <widget class="QGroupBox" name="PRB">
-   <property name="geometry">
-    <rect>
-     <x>9</x>
-     <y>210</y>
-     <width>1201</width>
-     <height>461</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Problem</string>
-   </property>
-   <widget class="QWidget" name="formLayoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>850</x>
-      <y>410</y>
-      <width>201</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="LineView">
-     <item>
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>View:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QRadioButton" name="MultipleLineButton">
-       <property name="text">
-        <string>Multiple</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QRadioButton" name="SingleLineButton">
-       <property name="text">
-        <string>Single</string>
-       </property>
-       <property name="checked">
-        <bool>false</bool>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </widget>
-   <widget class="QStackedWidget" name="ProblemMain">
-    <property name="geometry">
-     <rect>
-      <x>2</x>
-      <y>20</y>
-      <width>1191</width>
-      <height>371</height>
-     </rect>
-    </property>
-    <property name="currentIndex">
-     <number>1</number>
-    </property>
-    <widget class="QWidget" name="CTPage">
-     <widget class="QLabel" name="CTLabel">
-      <property name="geometry">
-       <rect>
-        <x>480</x>
-        <y>10</y>
-        <width>111</width>
-        <height>31</height>
-       </rect>
+     <widget class="QWidget" name="">
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <widget class="QGroupBox" name="SV">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>131</height>
+          </size>
+         </property>
+         <property name="title">
+          <string>State Variables</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+         <property name="flat">
+          <bool>false</bool>
+         </property>
+         <property name="checkable">
+          <bool>false</bool>
+         </property>
+         <layout class="QGridLayout" name="gridLayout">
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="SVDimInput">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimum">
+             <number>1</number>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="SVNameInput">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="NodesSpinBox" name="SVNodeInput">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="palette">
+             <palette>
+              <active>
+               <colorrole role="Highlight">
+                <brush brushstyle="SolidPattern">
+                 <color alpha="0">
+                  <red>87</red>
+                  <green>49</green>
+                  <blue>198</blue>
+                 </color>
+                </brush>
+               </colorrole>
+               <colorrole role="HighlightedText">
+                <brush brushstyle="SolidPattern">
+                 <color alpha="255">
+                  <red>0</red>
+                  <green>0</green>
+                  <blue>0</blue>
+                 </color>
+                </brush>
+               </colorrole>
+              </active>
+              <inactive>
+               <colorrole role="Highlight">
+                <brush brushstyle="SolidPattern">
+                 <color alpha="0">
+                  <red>87</red>
+                  <green>49</green>
+                  <blue>198</blue>
+                 </color>
+                </brush>
+               </colorrole>
+               <colorrole role="HighlightedText">
+                <brush brushstyle="SolidPattern">
+                 <color alpha="255">
+                  <red>0</red>
+                  <green>0</green>
+                  <blue>0</blue>
+                 </color>
+                </brush>
+               </colorrole>
+              </inactive>
+              <disabled>
+               <colorrole role="Highlight">
+                <brush brushstyle="SolidPattern">
+                 <color alpha="255">
+                  <red>145</red>
+                  <green>141</green>
+                  <blue>126</blue>
+                 </color>
+                </brush>
+               </colorrole>
+               <colorrole role="HighlightedText">
+                <brush brushstyle="SolidPattern">
+                 <color alpha="255">
+                  <red>0</red>
+                  <green>0</green>
+                  <blue>0</blue>
+                 </color>
+                </brush>
+               </colorrole>
+              </disabled>
+             </palette>
+            </property>
+            <property name="maximum">
+             <number>102</number>
+            </property>
+            <property name="value">
+             <number>0</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="SVDim">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>Dim:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="SVNode">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>Node:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QPushButton" name="SVAddButton">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>Add State Variable</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="SVName">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>Name:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item row="0" column="4" rowspan="4">
+           <widget class="BoxStateVar" name="SVTable">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <attribute name="horizontalHeaderMinimumSectionSize">
+             <number>20</number>
+            </attribute>
+            <attribute name="horizontalHeaderDefaultSectionSize">
+             <number>57</number>
+            </attribute>
+            <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+             <bool>false</bool>
+            </attribute>
+            <attribute name="verticalHeaderDefaultSectionSize">
+             <number>21</number>
+            </attribute>
+            <column>
+             <property name="text">
+              <string>Var</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Dim</string>
+             </property>
+            </column>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="funBox">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>131</height>
+          </size>
+         </property>
+         <property name="layoutDirection">
+          <enum>Qt::LeftToRight</enum>
+         </property>
+         <property name="title">
+          <string>Functions</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_3">
+          <property name="sizeConstraint">
+           <enum>QLayout::SetMinAndMaxSize</enum>
+          </property>
+          <item row="1" column="0">
+           <widget class="QLabel" name="funLabel">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>function:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="funNameInput">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QPushButton" name="funButton">
+            <property name="text">
+             <string>Add Constraint</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="LineEdit" name="funInput">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="funNameLabel">
+            <property name="text">
+             <string>name:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <spacer name="verticalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item row="0" column="2" rowspan="4">
+           <widget class="BoxFunction" name="funTable">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <column>
+             <property name="text">
+              <string>Name</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Function</string>
+             </property>
+            </column>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="title">
+          <string>Horizon Nodes</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_2">
+          <item>
+           <widget class="QLabel" name="NodesLabel">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>138</width>
+              <height>17</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>N. nodes:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="NodesSpinBox">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>26</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="verticalSpacer_3">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QGroupBox" name="PRB">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="title">
+       <string>Problem</string>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="2" column="2">
+        <layout class="QHBoxLayout" name="LineView">
+         <item>
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>View:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="MultipleLineButton">
+           <property name="text">
+            <string>Multiple</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="SingleLineButton">
+           <property name="text">
+            <string>Single</string>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="2" column="0">
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="2" column="1">
+        <widget class="QPushButton" name="switchPageButton">
+         <property name="text">
+          <string>Switch to Cost Functions </string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0" colspan="3">
+        <widget class="QStackedWidget" name="ProblemMain">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="currentIndex">
+          <number>0</number>
+         </property>
+         <widget class="QWidget" name="CTPage"/>
+         <widget class="QWidget" name="CFPage"/>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="ConsoleLogger" name="consoleLogger">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>200</height>
+       </size>
       </property>
       <property name="font">
        <font>
-        <pointsize>15</pointsize>
+        <family>Monospace</family>
        </font>
       </property>
-      <property name="text">
-       <string>Constraints</string>
-      </property>
-     </widget>
-    </widget>
-    <widget class="QWidget" name="CFPage">
-     <widget class="QLabel" name="CFLabel">
-      <property name="geometry">
-       <rect>
-        <x>470</x>
-        <y>10</y>
-        <width>141</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>15</pointsize>
-       </font>
-      </property>
-      <property name="text">
-       <string>Cost Functions</string>
-      </property>
-     </widget>
-    </widget>
-   </widget>
-   <widget class="QPushButton" name="switchPageButton">
-    <property name="geometry">
-     <rect>
-      <x>440</x>
-      <y>410</y>
-      <width>191</width>
-      <height>25</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Switch to Cost Functions </string>
-    </property>
-   </widget>
-  </widget>
-  <widget class="ConsoleLogger" name="consoleLogger">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>680</y>
-     <width>1201</width>
-     <height>192</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <family>Monospace</family>
-    </font>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">QFrame {background-color: rgb(46, 52, 54)}
+      <property name="styleSheet">
+       <string notr="true">QFrame {background-color: rgb(46, 52, 54)}
 QTextEdit {color: rgb(238, 238, 236)}</string>
-   </property>
-   <property name="frameShape">
-    <enum>QFrame::WinPanel</enum>
-   </property>
-   <property name="frameShadow">
-    <enum>QFrame::Sunken</enum>
-   </property>
-   <property name="readOnly">
-    <bool>true</bool>
-   </property>
-  </widget>
-  <widget class="QSpinBox" name="NodesSpinBox">
-   <property name="geometry">
-    <rect>
-     <x>450</x>
-     <y>100</y>
-     <width>51</width>
-     <height>31</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QLabel" name="NodesLabel">
-   <property name="geometry">
-    <rect>
-     <x>410</x>
-     <y>80</y>
-     <width>141</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>N. of Horizon nodes:</string>
-   </property>
-  </widget>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::WinPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Sunken</enum>
+      </property>
+      <property name="sizeAdjustPolicy">
+       <enum>QAbstractScrollArea::AdjustToContents</enum>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </widget>
+   </item>
+  </layout>
   <action name="actionExit">
    <property name="icon">
     <iconset>
-     <normaloff>../../../../../.designer/resources/rocket.svg</normaloff>../../../../../.designer/resources/rocket.svg</iconset>
+     <normaloff>../../../../../../../../.designer/resources/rocket.svg</normaloff>../../../../../../../../.designer/resources/rocket.svg</iconset>
    </property>
    <property name="text">
     <string>Exit</string>
@@ -522,7 +570,7 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
   <action name="actionAbout">
    <property name="icon">
     <iconset>
-     <normaloff>../../../../../.designer/resources/info.svg</normaloff>../../../../../.designer/resources/info.svg</iconset>
+     <normaloff>../../../../../../../../.designer/resources/info.svg</normaloff>../../../../../../../../.designer/resources/info.svg</iconset>
    </property>
    <property name="text">
     <string>About</string>
@@ -562,15 +610,6 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
    <header>horizon_gui/custom_widgets/box_function.h</header>
   </customwidget>
  </customwidgets>
- <tabstops>
-  <tabstop>SVNameInput</tabstop>
-  <tabstop>SVDimInput</tabstop>
-  <tabstop>SVNodeInput</tabstop>
-  <tabstop>SVAddButton</tabstop>
-  <tabstop>funNameInput</tabstop>
-  <tabstop>funInput</tabstop>
-  <tabstop>funButton</tabstop>
- </tabstops>
  <resources/>
  <connections/>
  <slots>

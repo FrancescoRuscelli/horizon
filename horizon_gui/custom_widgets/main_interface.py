@@ -77,10 +77,14 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             if data['active'] is not None:
                 if data['active'].getType() == 'constraint':
                     line = self.constraintLine
+                    line.addFunctionToSingleLine(name)
+                    line.addFunctionToMultiLine(name)
                 elif data['active'].getType() == 'costfunction':
                     line = self.costfunctionLine
+                    line.addFunctionToSingleLine(name)
+                    line.addFunctionToMultiLine(name)
 
-                line.addFunctionToGUI(name)
+
 
 
     @pyqtSlot()
