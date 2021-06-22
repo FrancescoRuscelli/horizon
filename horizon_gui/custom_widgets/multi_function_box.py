@@ -1,23 +1,30 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QLabel, QApplication, QStyle
-from PyQt5.QtGui import QDrag
+from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QLabel, QApplication, QStyle, QScrollArea
+from PyQt5.QtGui import QDrag, QPalette
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QMimeData
 
 from horizon_gui.custom_widgets.function_line import FunctionLine
 import sys
 from functools import partial
 
-class MultiFunctionBox(QWidget):
+class MultiFunctionBox(QScrollArea):
     funNodesChanged = pyqtSignal(str, list)
     funCloseRequested = pyqtSignal(str)
 
     def __init__(self, n_nodes, options=None, parent=None):
         super().__init__(parent)
 
+        self.height_bar = 40
+        self.main_widget = QWidget()
+        # self.setBackgroundRole(QPalette.Dark)
+        # self.setFixedHeight(100)
+        self.setWidgetResizable(True)
+        self.setWidget(self.main_widget)
+
         self.n_nodes = n_nodes
         self.options = options
         self.target = None
 
-        self.main_layout = QGridLayout(self)
+        self.main_layout = QGridLayout(self.main_widget)
         self.fun_list = dict()
         self.close_buttons = dict()
         self.titles = dict()
@@ -34,12 +41,13 @@ class MultiFunctionBox(QWidget):
         self.close_buttons[fun_name].setStyleSheet('background-color: blue;')
 
         self.fun_list[fun_name] = FunctionLine(fun_name, self.n_nodes, options=self.options)
-        self.fun_list[fun_name].setObjectName(fun_name)
         self.fun_list[fun_name].nodesChanged.connect(self.emitFunctionNodes)
         self.fun_list[fun_name].setStyleSheet('background-color: red;')
 
+
         self.main_layout.addWidget(self.titles[fun_name], len(self.fun_list), 0)
         self.main_layout.addWidget(self.fun_list[fun_name], len(self.fun_list), 1)
+        self.main_layout.setRowMinimumHeight(len(self.fun_list), self.height_bar)
         self.main_layout.addWidget(self.close_buttons[fun_name], len(self.fun_list), 2)
         self.main_layout.setColumnStretch(1, 4)
 
@@ -61,18 +69,6 @@ class MultiFunctionBox(QWidget):
                     if layout is not None:
                         layout.widget().deleteLater()
                         self.main_layout.removeItem(layout)
-
-        # self.main_layout.removeWidget(self.titles[fun_name])
-        # self.main_layout.removeWidget(self.close_buttons[fun_name])
-        # self.main_layout.removeWidget(self.fun_list[fun_name])
-        #
-        # self.titles[fun_name].deleteLater()
-        # self.close_buttons[fun_name].deleteLater()
-        # self.fun_list[fun_name].deleteLater()
-        #
-        # del self.titles[fun_name]
-        # del self.close_buttons[fun_name]
-        # del self.fun_list[fun_name]
 
     def emitFunctionNodes(self, name, ranges):
         self.on_fun_nodes_changed(name, ranges)
