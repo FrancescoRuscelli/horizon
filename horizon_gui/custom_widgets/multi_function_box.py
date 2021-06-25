@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QLabel, QApplication, QStyle, QScrollArea
+from PyQt5.QtWidgets import QWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QApplication, QStyle, QScrollArea
 from PyQt5.QtGui import QDrag, QPalette
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QMimeData
 
@@ -13,7 +13,8 @@ class MultiFunctionBox(QScrollArea):
     def __init__(self, n_nodes, options=None, parent=None):
         super().__init__(parent)
 
-        self.height_bar = 40
+        self.height_bar = 100
+        self.distance_between_bars = 200
         self.main_widget = QWidget()
         # self.setBackgroundRole(QPalette.Dark)
         # self.setFixedHeight(100)
@@ -25,12 +26,17 @@ class MultiFunctionBox(QScrollArea):
         self.target = None
 
         self.main_layout = QGridLayout(self.main_widget)
+        self.main_layout.setVerticalSpacing(200)
         self.fun_list = dict()
         self.close_buttons = dict()
         self.titles = dict()
 
 
     def addFunctionToGUI(self, fun_name):
+
+        self.function_line = QWidget()
+        self.function_line.setMaximumHeight(self.height_bar)
+        self.function_line.setObjectName(fun_name)
 
         self.titles[fun_name] = QLabel(fun_name)
         self.titles[fun_name].setStyleSheet("font:Bold")
@@ -44,13 +50,15 @@ class MultiFunctionBox(QScrollArea):
         self.fun_list[fun_name].nodesChanged.connect(self.emitFunctionNodes)
         self.fun_list[fun_name].setStyleSheet('background-color: red;')
 
+        self.row_layout = QGridLayout()
+        self.row_layout.addWidget(self.titles[fun_name], 0, 0)
+        self.row_layout.addWidget(self.fun_list[fun_name], 1, 0)
+        self.row_layout.addWidget(self.close_buttons[fun_name], 0, 1)
+        # self.row_layout.setStretch(1, 4)
 
-        self.main_layout.addWidget(self.titles[fun_name], len(self.fun_list), 0)
-        self.main_layout.addWidget(self.fun_list[fun_name], len(self.fun_list), 1)
-        self.main_layout.setRowMinimumHeight(len(self.fun_list), self.height_bar)
-        self.main_layout.addWidget(self.close_buttons[fun_name], len(self.fun_list), 2)
-        self.main_layout.setColumnStretch(1, 4)
+        self.function_line.setLayout(self.row_layout)
 
+        self.main_layout.addWidget(self.function_line, len(self.fun_list), 0, Qt.AlignTop)
         self.close_buttons[fun_name].clicked.connect(partial(self.on_fun_close_requested, fun_name))
 
     @pyqtSlot()
@@ -59,16 +67,10 @@ class MultiFunctionBox(QScrollArea):
 
     def removeFunctionFromGUI(self, fun_name):
 
-        for name, label in self.titles.items():
-            if fun_name == name:
-                index = self.main_layout.indexOf(label)
-
-                row = self.main_layout.getItemPosition(index)[0]
-                for column in range(self.main_layout.columnCount()):
-                    layout = self.main_layout.itemAtPosition(row, column)
-                    if layout is not None:
-                        layout.widget().deleteLater()
-                        self.main_layout.removeItem(layout)
+        for i in range(self.main_layout.count()):
+            current_widget = self.main_layout.itemAt(i)
+            if fun_name == current_widget.widget().objectName():
+                current_widget.widget().deleteLater()
 
     def emitFunctionNodes(self, name, ranges):
         self.on_fun_nodes_changed(name, ranges)
