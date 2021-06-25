@@ -1,6 +1,9 @@
 from PyQt5.QtCore import Qt, QRegExp
 from PyQt5.QtGui import QFont, QSyntaxHighlighter, QTextCharFormat
 
+import math
+import casadi
+
 class Highlighter(QSyntaxHighlighter):
     def __init__(self, parent=None):
         super(Highlighter, self).__init__(parent)
@@ -34,13 +37,6 @@ class Highlighter(QSyntaxHighlighter):
         self.baseOperatorFormat.setFontItalic(True)
         self.baseOperatorFormat.setFontWeight(QFont.Bold)
         self.baseOperatorFormat.setForeground(Qt.darkCyan)
-        base_op = ['sin', 'cos', 'sqrt']
-        # dir(__builtin__)
-        # dir (casadi)
-        # dir (numpy)
-
-        # todo find a way to give priority to functions, otherwise variable names are highlighted inside name of variables, if any
-        self.highlightingRules.append(('|'.join(base_op), self.baseOperatorFormat))
 
 
         # functionFormat = QTextCharFormat()
@@ -51,9 +47,13 @@ class Highlighter(QSyntaxHighlighter):
     def addKeyword(self, keyword):
         # todo if a variable 'x' is in the ct function and a new state variable matching it ('x') is inserted, it does NOT hightlight right now. FIX!
         self.highlightingRules.append((keyword + '(\[\d+(:\d+)?\])', self.sliceFormat))
-        # self.highlightingRules.append(("\\b" + keyword + "\\b", self.keywordFormat))
-        self.highlightingRules.append((keyword, self.keywordFormat))
+        self.highlightingRules.append(("\\b" + keyword + "\\b", self.keywordFormat))
 
+    def addOperators(self, dictionary):
+
+        for op_list in dictionary.values():
+            modified_list = ["\\b" + elem + "\\b" for elem in op_list] # make every element independent for regex (ex: sqrtsqrt is not highlighted)
+            self.highlightingRules.append(('|'.join(modified_list), self.baseOperatorFormat))
 
     def highlightBlock(self, text):
         for pattern, format in self.highlightingRules:

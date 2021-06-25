@@ -381,6 +381,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         # with QLineEdit doesn't work, so I had to override QTextEdit
         self.highlighter = highlighter.Highlighter(self.funInput.document())
+        self.highlighter.addOperators(self.horizon_receiver.getValidOperators())
 
 
         self.completer = QCompleter(self.fun_keywords)

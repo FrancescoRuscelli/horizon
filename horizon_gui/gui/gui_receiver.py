@@ -1,9 +1,8 @@
 from horizon import problem as horizon
 import parser
 import re
-import sys, os
-import pickle
 import casadi as cs
+import math
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -46,9 +45,11 @@ class horizonImpl():
 
         flag, signal = self.checkFunction(name, str_fun)
         if flag:
-
-            self._createAndAppendFun(name, str_fun)
-            return True, signal
+            flag_syntax = self._createAndAppendFun(name, str_fun)
+            if flag_syntax:
+                return True, signal
+            else:
+                return False, "Syntax is wrong."
         else:
             return False, signal
 
@@ -81,7 +82,7 @@ class horizonImpl():
     def removeActiveFunction(self, name):
 
         active_fun_type = self.fun_dict[name]['active'].getType()
-        self.fun_dict[name].pop('active', None)
+        self.fun_dict[name]['active'] = None
 
         if active_fun_type == 'constraint':
             self.casadi_prb.removeConstraint(name)
@@ -98,13 +99,13 @@ class horizonImpl():
     def solveProblem(self):
         print('"solveProblem" yet to implement')
 
-    def checkActiveFunction(self, name): # fun, name
+    def checkActiveFunction(self, name):
 
         if self.fun_dict[name]['active'] is not None:
             signal = "active function already inserted"
             return False, signal
 
-        return True, 'Function "{}" can be activated. Adding. '.format(name)
+        return True, 'Function "{}" can be activated. Adding.'.format(name)
 
     def checkFunction(self, name, fun): # fun, name
 
@@ -120,7 +121,7 @@ class horizonImpl():
             signal = "Empty Function Not Allowed"
             return False, signal
 
-        return True, 'Function "{}" is acceptable. Adding'.format(name)
+        return True, 'Function "{}" is acceptable. Adding..'.format(name)
 
     def checkStateVariable(self, name):
 
@@ -160,13 +161,21 @@ class horizonImpl():
         all_variables = list(self.sv_dict.keys()) + list(self.fun_dict.keys())
 
         regex_vars = '\\b|'.join(sorted(re.escape(k) for k in all_variables))
+        regex_math = '\\b|'.join(sorted(re.escape(k) for k in self.getValidOperators()['math']))
 
         # If repl is a function, it is called for every non-overlapping occurrence of pattern.
         modified_fun = re.sub(regex_vars, lambda m: dict_vars.get(m.group(0)), str_fun, flags=re.IGNORECASE)
+        modified_fun = re.sub(regex_math, lambda m: 'math.{}'.format(m.group(0)), modified_fun, flags=re.IGNORECASE)
 
         # parse str to code
-        res = parser.expr(modified_fun)
+        try:
+            res = parser.expr(modified_fun)
+        except Exception as e:
+            self.logger.warning(e)
+            return fun
+
         code = res.compile()
+
 
         # todo add try exception + logger
 
@@ -180,9 +189,12 @@ class horizonImpl():
     def editFunction(self, name, str_fun):
 
         if name in self.fun_dict.keys():
-            self._createAndAppendFun(name, str_fun)
-            signal = 'Function "{}" edited with {}. Updated function: {}'.format(name, str_fun, self.fun_dict[name])
-            return True, signal
+            flag_syntax, signal_syntax = self._createAndAppendFun(name, str_fun)
+            if flag_syntax:
+                signal = 'Function "{}" edited with {}. Updated function: {}'.format(name, str_fun, self.fun_dict[name])
+                return True, signal
+            else:
+                return False, signal_syntax
         else:
             signal = 'Failed editing of function "{}".'.format(name)
             return False, signal
@@ -223,7 +235,11 @@ class horizonImpl():
         # TODO HOW ABOUT GENERIC FUNCTION? Should i do a casadi function for them?
         # fill horizon_receiver.fun_dict and funList
         # TODO add fun type??
-        self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None)
+        if fun is not None:
+            self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None)
+            return True
+        else:
+            return False
 
     def serialize(self):
 
@@ -250,6 +266,18 @@ class horizonImpl():
         # deserialize functions
         for name, data in self.fun_dict.items():
             self.fun_dict[name]['fun'] = cs.SX.deserialize(data['fun'])
+
+    def getValidOperators(self):
+        '''
+        return dictionary:
+        keys: packages imported
+        values: all the elements from the imported package that are considered "valid"
+        '''
+
+        full_list = dict()
+        full_list['math'] = [elem for elem in dir(math) if not elem.startswith('_')]
+        full_list['cs'] = ['cs.' + elem for elem in dir(cs) if not elem.startswith('_')]
+        return full_list
 
 if __name__ == '__main__':
 
