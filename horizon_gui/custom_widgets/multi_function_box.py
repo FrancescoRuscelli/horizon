@@ -36,6 +36,7 @@ class MultiFunctionBox(QScrollArea):
 
         self.function_line = QWidget()
         self.function_line.setMaximumHeight(self.height_bar)
+        self.function_line.setMinimumHeight(self.height_bar)
         self.function_line.setObjectName(fun_name)
 
         self.titles[fun_name] = QLabel(fun_name)
@@ -52,13 +53,13 @@ class MultiFunctionBox(QScrollArea):
 
         self.row_layout = QGridLayout()
         self.row_layout.addWidget(self.titles[fun_name], 0, 0)
-        self.row_layout.addWidget(self.fun_list[fun_name], 1, 0)
+        self.row_layout.addWidget(self.fun_list[fun_name], 1, 0, 1, 2)
         self.row_layout.addWidget(self.close_buttons[fun_name], 0, 1)
         # self.row_layout.setStretch(1, 4)
 
         self.function_line.setLayout(self.row_layout)
 
-        self.main_layout.addWidget(self.function_line, len(self.fun_list), 0, Qt.AlignTop)
+        self.main_layout.addWidget(self.function_line, len(self.fun_list), 0)
         self.close_buttons[fun_name].clicked.connect(partial(self.on_fun_close_requested, fun_name))
 
     @pyqtSlot()
