@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QStackedWidget, QVBoxLayout, QScrollArea
+from PyQt5.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QScrollArea
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex, QMargins
 from PyQt5.QtGui import QStandardItemModel
 
@@ -102,14 +102,24 @@ class HorizonLine(QScrollArea):
 
         #update nodes in second widget (function line) + set margins
         self.function_tab.setHorizonNodes(nodes)
+        self.updateMarginsSingleLine()
+
+
+        # update nodes in multi_function window widget
+        self.multi_function_box.setHorizonNodes(nodes)
+        self.updateMarginsMultiLine()
+
+    def updateMarginsSingleLine(self):
         node_box_width = self.nodes_line.getBoxWidth()
         margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
         self.function_tab.updateMargins(margins)
 
-        # update nodes in multi_function window widget
-        #todo add update margins otherwise it does not update (also, you need it anyway)
-        self.multi_function_box.setHorizonNodes(nodes)
 
+    def updateMarginsMultiLine(self):
+        node_box_width = self.nodes_line.getBoxWidth()
+        margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
+        self.multi_function_box.updateMargins(margins)
+    #
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
         # items = source_Widget.selectedItems()
@@ -138,15 +148,12 @@ class HorizonLine(QScrollArea):
 
 
     def addFunctionToSingleLine(self, name):
-        node_box_width = self.nodes_line.getBoxWidth()
         self.function_tab.addFunctionToGUI(name)
-
-        margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
-        self.function_tab.updateMargins(margins)
+        self.updateMarginsSingleLine()
 
     def addFunctionToMultiLine(self, name):
-        node_box_width = self.nodes_line.getBoxWidth()
         self.multi_function_box.addFunctionToGUI(name)
+        self.updateMarginsMultiLine()
 
     def addFunctionToHorizon(self, name):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
@@ -179,12 +186,6 @@ class HorizonLine(QScrollArea):
                     self.function_tab.removeTab(i)
 
         self.logger.info(signal)
-
-    # def updateGUI(self):
-    #
-    #     for fun in self.fun_list:
-    #         self.addFunctionToSingleLine()
-    #         self.addFunctionToMultiLine()
 
     def getFunctionNodes(self, name):
         self.function_tab.getFunctionNodes(name)

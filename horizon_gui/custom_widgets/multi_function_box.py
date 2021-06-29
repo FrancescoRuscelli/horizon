@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QApplication, QStyle, QScrollArea
+from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QLabel, QApplication, QStyle, QScrollArea, QSpacerItem, QSizePolicy
 from PyQt5.QtGui import QDrag, QPalette
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QMimeData
 
@@ -13,12 +13,13 @@ class MultiFunctionBox(QScrollArea):
     def __init__(self, n_nodes, options=None, parent=None):
         super().__init__(parent)
 
-        self.height_bar = 100
-        self.distance_between_bars = 200
+        self.height_bar = 80
+        self.distance_between_bars = 10
         self.main_widget = QWidget()
-        # self.setBackgroundRole(QPalette.Dark)
-        # self.setFixedHeight(100)
+        self.setBackgroundRole(QPalette.Dark)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setWidgetResizable(True)
+
         self.setWidget(self.main_widget)
 
         self.n_nodes = n_nodes
@@ -26,7 +27,7 @@ class MultiFunctionBox(QScrollArea):
         self.target = None
 
         self.main_layout = QGridLayout(self.main_widget)
-        self.main_layout.setVerticalSpacing(200)
+        self.main_layout.setVerticalSpacing(self.distance_between_bars)
         self.fun_list = dict()
         self.close_buttons = dict()
         self.titles = dict()
@@ -34,7 +35,14 @@ class MultiFunctionBox(QScrollArea):
 
     def addFunctionToGUI(self, fun_name):
 
+        # removing the QSpacerItem, if present, before adding a new multiline widget
+        for i in range(self.main_layout.count()):
+            item = self.main_layout.itemAt(i)
+            if item and isinstance(item, QSpacerItem):
+                self.main_layout.takeAt(i)
+
         self.function_line = QWidget()
+        self.function_line.setStyleSheet('background-color: orange;')
         self.function_line.setMaximumHeight(self.height_bar)
         self.function_line.setMinimumHeight(self.height_bar)
         self.function_line.setObjectName(fun_name)
@@ -52,14 +60,18 @@ class MultiFunctionBox(QScrollArea):
         self.fun_list[fun_name].setStyleSheet('background-color: red;')
 
         self.row_layout = QGridLayout()
-        self.row_layout.addWidget(self.titles[fun_name], 0, 0)
+        self.row_layout.addWidget(self.titles[fun_name], 0, 0, Qt.AlignRight)
         self.row_layout.addWidget(self.fun_list[fun_name], 1, 0, 1, 2)
-        self.row_layout.addWidget(self.close_buttons[fun_name], 0, 1)
-        # self.row_layout.setStretch(1, 4)
-
+        self.row_layout.addWidget(self.close_buttons[fun_name], 0, 1, Qt.AlignLeft)
+        self.row_layout.setSpacing(0)
+        self.row_layout.setContentsMargins(0, 0, 0, 0)
         self.function_line.setLayout(self.row_layout)
 
-        self.main_layout.addWidget(self.function_line, len(self.fun_list), 0)
+        self.main_layout.addWidget(self.function_line, len(self.fun_list), 0, Qt.AlignTop)
+        # adding a stretch to make all the widget piling from above
+        qspacer = QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.main_layout.addItem(qspacer)
+
         self.close_buttons[fun_name].clicked.connect(partial(self.on_fun_close_requested, fun_name))
 
     @pyqtSlot()
@@ -67,11 +79,13 @@ class MultiFunctionBox(QScrollArea):
         self.funCloseRequested.emit(fun_name)
 
     def removeFunctionFromGUI(self, fun_name):
-
+        del self.fun_list[fun_name]
         for i in range(self.main_layout.count()):
-            current_widget = self.main_layout.itemAt(i)
-            if fun_name == current_widget.widget().objectName():
-                current_widget.widget().deleteLater()
+            current_widget = self.main_layout.itemAt(i).widget()
+            if current_widget:
+                if fun_name == current_widget.objectName():
+                    current_widget.deleteLater()
+
 
     def emitFunctionNodes(self, name, ranges):
         self.on_fun_nodes_changed(name, ranges)
@@ -82,14 +96,18 @@ class MultiFunctionBox(QScrollArea):
 
     def setHorizonNodes(self, nodes):
         self.n_nodes = nodes
-        for i in range(self.main_layout.count()):
-            if isinstance(self.main_layout.itemAt(i).widget(), FunctionLine):
-                self.main_layout.itemAt(i).widget().updateHorizonNodes(nodes)
+
+        for item_fl in self.findChildren(FunctionLine):
+            item_fl.updateHorizonNodes(nodes)
 
     def setFunctionNodes(self, fun_name, ranges):
         for i in range(self.main_layout.count()):
             if isinstance(self.main_layout.itemAt(i).widget(), FunctionLine) and self.main_layout.itemAt(i).widget().getName() == fun_name:
                 self.main_layout.itemAt(i).widget().updateSlices(ranges)
+
+    def updateMargins(self, margins):
+        for i in range(self.main_layout.count()):
+            self.main_layout.setContentsMargins(margins)
 
     # def get_index(self, pos):
     #     for i in range(self.main_layout.count()):

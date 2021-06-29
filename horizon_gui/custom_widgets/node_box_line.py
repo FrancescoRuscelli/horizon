@@ -20,18 +20,20 @@ class NodeBoxLine(QWidget):
         self._updateBoxNodes()
 
     def getBoxWidth(self):
-        return self.node_box_layout.itemAt(0).widget().width()
+        # simply the width of the window divided by nodes
+        return self.width()/self.n_nodes
 
     def _updateBoxNodes(self):
 
         # Add nodes to the layout
         for i in reversed(range(self.node_box_layout.count())):
             self.node_box_layout.itemAt(i).widget().deleteLater()
+            self.node_box_layout.removeItem(self.node_box_layout.itemAt(i))
 
         for i in range(self.n_nodes):
-            n_i = QPushButton("{}".format(i), self)
-            self.node_box_layout.addWidget(n_i)
+            n_i = QPushButton("{}".format(i))
             n_i.setStyleSheet('background-color: orange;')
+            self.node_box_layout.addWidget(n_i)
 
 
 if __name__ == '__main__':
@@ -39,7 +41,7 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     gui = NodeBoxLine()
-    gui.setBoxNodes(3)
-
+    gui.setBoxNodes(4)
+    print(gui.getBoxWidth())
     gui.show()
     sys.exit(app.exec_())

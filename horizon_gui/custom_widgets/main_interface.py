@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from horizon_gui.gui.widget1_ui import Ui_HorizonGUI
 from horizon_gui.custom_functions import highlighter
-from horizon_gui.custom_widgets import horizon_line, node_box_line, line_edit, on_destroy_signal_window, highlight_delegate
+from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate
 
 
 class MainInterface(QWidget, Ui_HorizonGUI):
@@ -50,8 +50,6 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.costfunctionLine = horizon_line.HorizonLine(self.horizon_receiver, 'costfunction', nodes=N, logger=self.logger)
         self.costfunctionLine.setContentsMargins(0, 40, 0, 0)
         self.layout_cf.addWidget(self.costfunctionLine)
-
-        self.ct_layout = QHBoxLayout(self.funBox)
         self.ct_entry = self.setFunEditor(self.funBox)
 
 
@@ -84,15 +82,12 @@ class MainInterface(QWidget, Ui_HorizonGUI):
                     line.addFunctionToSingleLine(name)
                     line.addFunctionToMultiLine(name)
 
-
-
-
     @pyqtSlot()
     def on_generic_sig(self, str):
         self.generic_sig.emit(str)
 
     def setBoxNodes(self, n_nodes):
-        self.horizon_receiver.setHorizonNodes(n_nodes)
+        self.horizon_receiver.setHorizonNodes(n_nodes) # setting to casadi the new number of nodes
         self.constraintLine.setHorizonNodes(n_nodes)
         self.costfunctionLine.setHorizonNodes(n_nodes)
 

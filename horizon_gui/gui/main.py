@@ -78,7 +78,7 @@ class HorizonGUI(QMainWindow):
     def createSetup(self):
 
         self.setup_opt = dict()
-        self.setup_opt['nodes'] = 0
+        self.setup_opt['nodes'] = 0 # todo make it 0
 
     def setNodes(self, nodes):
         self.setup_opt['nodes'] = nodes
