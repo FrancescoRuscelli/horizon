@@ -82,8 +82,20 @@ class HorizonLine(QScrollArea):
     def switchPage(self, index):
         self.stacked_lines.setCurrentIndex(index)
 
+    def listOfListFLOATtoINT(self, listOfList):
+        # transform every element to INT
+        for i in range(len(listOfList)):
+            if isinstance(listOfList[i], list):
+                for j in range(len(listOfList[i])):
+                    listOfList[i][j] = int(listOfList[i][j])
+            else:
+                listOfList[i] = int(listOfList[i])
+
+        return listOfList
+
     def updateFunctionNodes(self, parent, fun_name, ranges):
 
+        ranges = self.listOfListFLOATtoINT(ranges)
         # change nodes of function in horizon
         self.horizon_receiver.updateFunctionNodes(fun_name, ranges)
 

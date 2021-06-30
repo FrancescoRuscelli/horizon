@@ -4,7 +4,6 @@ Qt Widget Multiple Slider widget.
 """
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 from functools import partial
 
 class Slice(QtWidgets.QWidget):
@@ -38,8 +37,8 @@ class Slice(QtWidgets.QWidget):
         self.max = max
 
     def getValues(self):
-        int_min = int(self.min)
-        int_max = int(self.max)
+        int_min = self.min
+        int_max = self.max
         return [int_min, int_max]
 
     def checkMinMax(self):
@@ -85,6 +84,16 @@ class QMultiSlider(QtWidgets.QWidget):
         if values:
             # add a slice of the given range for each list
             # todo add more slices in constructor
+            if values[0] <= slider_range[0]:
+                values[0] = slider_range[0]
+                if values[1] <= slider_range[0]:
+                    values[1] = slider_range[0]
+
+            if values[1] >= slider_range[1]:
+                values[1] = slider_range[1]
+                if values[0] >= slider_range[1]:
+                    values[0] = slider_range[1]
+
             initial_slice = Slice(values[0], values[1])
             self.addSlice(initial_slice)
         else:
@@ -108,8 +117,8 @@ class QMultiSlider(QtWidgets.QWidget):
         self.newSliceAction.setText("&New Slice")
         self.newSliceAction.setIcon(QtGui.QIcon("../resources/slice.png"))
 
-        val = self.fromDisplayToRange(event.pos().x())
-        new_slice = Slice(val, val+1)
+        val = self.fromDisplayToRange(event.pos().x(), floor=True)
+        new_slice = Slice(val, val+self.single_step)
         self.newSliceAction.triggered.connect(partial(self.addSlice, new_slice))
 
         menu.addAction(self.newSliceAction)
@@ -158,9 +167,12 @@ class QMultiSlider(QtWidgets.QWidget):
             self.emit_while_moving = 0
 
     def setRange(self, slider_range):
+
         self.start = slider_range[0]
         self.scale = slider_range[1] - slider_range[0]
         self.single_step = slider_range[2]
+
+        self.checkScale(slider_range)
 
     def fromValueToDisplay(self, slider):
         size = float(self.width() - 2 * self.bar_width - 1) # 'bar_width' is the width of the two sliders (the edges)
@@ -172,11 +184,14 @@ class QMultiSlider(QtWidgets.QWidget):
 
         return [display_min, display_max]
 
-    def fromDisplayToRange(self, display_val):
+    def fromDisplayToRange(self, display_val, floor=False):
+
         size = float(self.width() - 2 * self.bar_width - 1)
         range_val = self.start + (display_val - self.bar_width) / float(size) * self.scale
-        range_val = float(round(range_val / self.single_step)) * self.single_step
-
+        if floor:
+            range_val = float(range_val // self.single_step) * self.single_step
+        else:
+            range_val = float(round(range_val / self.single_step)) * self.single_step
         return range_val
 
 
@@ -226,7 +241,6 @@ class QMultiSlider(QtWidgets.QWidget):
         painter = QtGui.QPainter(self)
 
         h = self.height()
-
         display_min, display_max = self.fromValueToDisplay(slice)
 
         # range bar
@@ -424,9 +438,20 @@ class QMultiSlider(QtWidgets.QWidget):
             self.emitRanges()
         self.moving = "none"
 
+    def checkScale(self, slider_range):
+        # this is to handle the slider if the range is smaller than the single step
+        if slider_range[1] - slider_range[0] < slider_range[2]:
+            self.scale = slider_range[2]
+            self.setEnabled(False)
+            self.slices.clear()
+        else:
+            self.setEnabled(True)
+
     def updateRange(self, slider_range):
         self.start = slider_range[0]
         self.scale = slider_range[1] - slider_range[0]
+
+        self.checkScale(slider_range + [self.single_step])
 
         for slice in self.slices:
             if slice.getValues()[1] > slider_range[1]:
@@ -458,7 +483,7 @@ if (__name__ == "__main__"):
 
     app = QtWidgets.QApplication(sys.argv)
 
-    hslider = QMultiSlider(slider_range=[-5.0, 5.0, 0.5], values=[-4, -3])
+    hslider = QMultiSlider(slider_range=[5.0, 5.0, 0.5], values=[4, 20])
     # hslider.setEmitWhileMoving(True)
     hslider.show()
     sys.exit(app.exec_())
