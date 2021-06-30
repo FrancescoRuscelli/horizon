@@ -13,7 +13,6 @@ class NodeBoxLine(QWidget):
         self.node_box_layout.setSpacing(0)
 
         self.setBoxNodes(nodes)
-        self._updateBoxNodes()
 
     def setBoxNodes(self, nodes):
         self.n_nodes = nodes

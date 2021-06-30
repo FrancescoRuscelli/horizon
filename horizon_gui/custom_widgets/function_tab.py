@@ -3,7 +3,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from horizon_gui.definitions import CSS_DIR
 from horizon_gui.custom_widgets.function_line import FunctionLine
-
+from horizon_gui.custom_widgets.limits_line import LimitsLine
 class FunctionTabWidget(QTabWidget):
     funNodesChanged = pyqtSignal(str, list)
 
@@ -33,6 +33,8 @@ class FunctionTabWidget(QTabWidget):
         self.intab_layout.addWidget(self.ft)
         self.intab_layout.addSpacing(120)
 
+        self.ll = LimitsLine(self.n_nodes)
+        self.intab_layout.addWidget(self.ll)
 
         self.tab = QWidget()
         self.tab.setStyleSheet('background-color: blue;')
@@ -50,7 +52,6 @@ class FunctionTabWidget(QTabWidget):
     def getFunctionNodes(self, fun_name):
         for i in range(self.count()):
             if self.tabText(i) == fun_name:
-                print('Nodes of function {}: {}'.format(fun_name, self.widget(i).getNodes()))
                 return self.widget(i).getNodes()
             else:
                 pass
