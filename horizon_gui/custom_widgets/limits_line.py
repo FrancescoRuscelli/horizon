@@ -1,15 +1,17 @@
 import numpy as np
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QDoubleSpinBox, QSpinBox, QApplication, QRubberBand, QLineEdit
 from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSlot
-from PyQt5.QtGui import QStandardItemModel
+from horizon_gui.custom_widgets.infinity_spinbox import InfinitySpinBox
 
 import sys
 
 # todo
-# 1. ALL THE NODES, BUT ACTIVE ONLY THE SELECTED
-# 2. WHEN SELECTED, CHANGE COLOR
-# 3. FIX HIGHLIGHTER
+# 1. ALL THE NODES, BUT ACTIVE ONLY THE SELECTED ~OK
+# 2. WHEN SELECTED, CHANGE COLOR ~OK
+# 3. FIX HIGHLIGHTER ~OK
+
 # 4. SLIDER ON SPINBOX!!!!!!!! figata
+# 5. ONE FOR EACH DIMENSION OF VARIABLE
 
 class LimitsLine(QWidget):
     def __init__(self, nodes=0, parent=None):
@@ -27,7 +29,7 @@ class LimitsLine(QWidget):
 
     @pyqtSlot("QWidget*", "QWidget*")
     def on_focusChanged(self, old, now):
-        for child in self.findChildren(QDoubleSpinBox):
+        for child in self.findChildren(InfinitySpinBox):
             if child == now:
                 child.setStyleSheet("background-color: Crimson;")
                 self.selected.append(child)
@@ -55,7 +57,7 @@ class LimitsLine(QWidget):
             self.node_box_layout.removeItem(self.node_box_layout.itemAt(i))
 
         for i in range(self.n_nodes):
-            n_i = QDoubleSpinBox()
+            n_i = InfinitySpinBox()
             n_i.valueChanged.connect(self.multipleSet)
             n_i.setStyleSheet("background-color: MediumSeaGreen;")
 
@@ -100,7 +102,7 @@ class LimitsLine(QWidget):
                 self.rubberband.hide()
 
                 rect = self.rubberband.geometry()
-                for child in self.findChildren(QDoubleSpinBox):
+                for child in self.findChildren(InfinitySpinBox):
                     b_a = child.geometry()
                     # gp = child.mapToGlobal(QPoint(0, 0))
                     # b_a = self.mapFromGlobal(gp)
