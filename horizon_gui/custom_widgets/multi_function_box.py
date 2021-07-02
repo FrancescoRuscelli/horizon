@@ -32,6 +32,8 @@ class MultiFunctionBox(QScrollArea):
         self.close_buttons = dict()
         self.titles = dict()
 
+    def getNFunctions(self):
+        return len(self.fun_list)
 
     def addFunctionToGUI(self, fun_name):
 

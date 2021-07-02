@@ -6,7 +6,10 @@ from horizon_gui.custom_widgets.node_box_line import NodeBoxLine
 from horizon_gui.custom_widgets.function_tab import FunctionTabWidget
 from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 
+from horizon.misc_function import listOfListFLOATtoINT, unravelElements
 from functools import partial
+
+
 # TODO now it's a fucking mess, do something
 
 class HorizonLine(QScrollArea):
@@ -23,7 +26,7 @@ class HorizonLine(QScrollArea):
         self.setWidget(self.main_widget)
 
         self.horizon_receiver = horizon
-        self.fun_type = fun_type         # can be Constraint or Cost Function
+        self.fun_type = fun_type  # can be Constraint or Cost Function
         self.n_nodes = nodes
 
         if logger:
@@ -56,7 +59,6 @@ class HorizonLine(QScrollArea):
         self.function_tab.tabCloseRequested.connect(self.removeActiveFunctionRequestFromIndex)
         self.function_tab.funNodesChanged.connect(partial(self.updateFunctionNodes, 'single'))
 
-
     def _initMultiLine(self):
 
         self.multi_function_box = MultiFunctionBox(self.n_nodes, options=self.options)
@@ -82,21 +84,19 @@ class HorizonLine(QScrollArea):
     def switchPage(self, index):
         self.stacked_lines.setCurrentIndex(index)
 
-    def listOfListFLOATtoINT(self, listOfList):
-        # transform every element to INT
-        for i in range(len(listOfList)):
-            if isinstance(listOfList[i], list):
-                for j in range(len(listOfList[i])):
-                    listOfList[i][j] = int(listOfList[i][j])
-            else:
-                listOfList[i] = int(listOfList[i])
-
-        return listOfList
-
     def updateFunctionNodes(self, parent, fun_name, ranges):
+        # transform from float to INT (nodes are integer)
+        ranges = listOfListFLOATtoINT(ranges)
 
-        ranges = self.listOfListFLOATtoINT(ranges)
+        # update the visual limits (spin_boxes) for each functions
+        active_nodes = unravelElements(ranges)
+        inactive_nodes = [inactive_n for inactive_n in range(self.n_nodes-1) if inactive_n not in active_nodes]
+        print('active nodes:', active_nodes)
+        print('inactive nodes:', inactive_nodes)
+        self.function_tab.ll.showNodes(active_nodes)
+        self.function_tab.ll.hideNodes(inactive_nodes)
         # change nodes of function in horizon
+        # print('New nodes for Function {}: {}'.format(fun_name, ranges))
         self.horizon_receiver.updateFunctionNodes(fun_name, ranges)
 
         # update ranges in sliders
@@ -106,31 +106,32 @@ class HorizonLine(QScrollArea):
             self.multi_function_box.setFunctionNodes(fun_name, ranges)
 
     def setHorizonNodes(self, nodes):
-        #update nodes
+        # update nodes
         self.n_nodes = nodes
 
-        #update nodes in first widget (nodes line)
+        # update nodes in first widget (nodes line)
         self.nodes_line.setBoxNodes(nodes)
 
-        #update nodes in second widget (function line) + set margins
+        # update nodes in second widget (function line) + set margins
         self.function_tab.setHorizonNodes(nodes)
-        self.updateMarginsSingleLine()
-
+        if self.function_tab.count():
+            self.updateMarginsSingleLine()
 
         # update nodes in multi_function window widget
         self.multi_function_box.setHorizonNodes(nodes)
-        self.updateMarginsMultiLine()
+        if self.multi_function_box.getNFunctions():
+            self.updateMarginsMultiLine()
 
     def updateMarginsSingleLine(self):
         node_box_width = self.nodes_line.getBoxWidth()
-        margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
+        margins = QMargins(node_box_width / 2, 0, node_box_width / 2, 0)
         self.function_tab.updateMargins(margins)
-
 
     def updateMarginsMultiLine(self):
         node_box_width = self.nodes_line.getBoxWidth()
         margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
         self.multi_function_box.updateMargins(margins)
+
     #
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
@@ -158,7 +159,6 @@ class HorizonLine(QScrollArea):
     def on_repeated_fun(self, str):
         self.repeated_fun.emit(str)
 
-
     def addFunctionToSingleLine(self, name):
         self.function_tab.addFunctionToGUI(name)
         self.updateMarginsSingleLine()
@@ -172,12 +172,12 @@ class HorizonLine(QScrollArea):
 
         if flag:
 
-            # self.fun_dict[] = list()
             self.addFunctionToSingleLine(name)
             self.addFunctionToMultiLine(name)
             self.logger.info(signal)
         else:
             self.logger.warning(signal)
+
     #
     # def removeFunctionFromHorizon(self, name):
     #     flag, signal = self.horizon_receiver.removeActiveFunction(name)

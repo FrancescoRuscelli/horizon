@@ -58,8 +58,6 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.SVTable.itemDoubleClicked.connect(self.openSV)
         self.switchPageButton.clicked.connect(self.switchPage)
         self.constraintLine.add_fun_horizon.connect(self.horizon_receiver.addFunction)
-        self.constraintLine.function_tab.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
-        self.costfunctionLine.function_tab.funNodesChanged.connect(self.horizon_receiver.updateFunctionNodes)
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
         self.SingleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.constraintLine.Single))
         self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.constraintLine.Single))

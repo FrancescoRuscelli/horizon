@@ -20,8 +20,10 @@ class FunctionLine(QWidget):
         self.hlayout.setContentsMargins(0, 0, 0, 0)
         self.slider.slicesChanged.connect(self.on_nodes_changed)
 
+    @pyqtSlot(list)
     def on_nodes_changed(self, range_list):
         self.nodesChanged.emit(self.name, range_list)
+
         # adding + - push button to tab
         # self.ct_tab.tabBar().setTabButton(0, self.ct_tab.tabBar().RightSide, TabButtonWidget())
 

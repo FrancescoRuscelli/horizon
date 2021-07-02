@@ -4,6 +4,9 @@ from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 from horizon_gui.definitions import CSS_DIR
 from horizon_gui.custom_widgets.function_line import FunctionLine
 from horizon_gui.custom_widgets.limits_line import LimitsLine
+
+from horizon.misc_function import unravelElements
+
 class FunctionTabWidget(QTabWidget):
     funNodesChanged = pyqtSignal(str, list)
 
@@ -22,18 +25,17 @@ class FunctionTabWidget(QTabWidget):
 
 
     def addFunctionToGUI(self, fun_name):
-
         self.ft = FunctionLine(fun_name, self.n_nodes, options=self.options)
-        self.ft.nodesChanged.connect(self.emitFunctionNodes)
-
+        self.ft.nodesChanged.connect(self.on_fun_nodes_changed)
 
         # todo hardcoded bottom margin
         self.intab_layout = QVBoxLayout()
+        self.intab_layout.setSpacing(0)
 
         self.intab_layout.addWidget(self.ft)
-        self.intab_layout.addSpacing(120)
+        # self.intab_layout.addSpacing(120)
 
-        self.ll = LimitsLine(self.n_nodes)
+        self.ll = LimitsLine(self.n_nodes-1)
         self.intab_layout.addWidget(self.ll)
 
         self.tab = QWidget()
@@ -41,13 +43,9 @@ class FunctionTabWidget(QTabWidget):
         self.tab.setLayout(self.intab_layout)
         self.addTab(self.tab, str(fun_name))
 
-
-    @pyqtSlot()
+    @pyqtSlot(str, list)
     def on_fun_nodes_changed(self, fun_name, ranges):
         self.funNodesChanged.emit(fun_name, ranges)
-
-    def emitFunctionNodes(self, name, ranges):
-        self.on_fun_nodes_changed(name, ranges)
 
     def getFunctionNodes(self, fun_name):
         for i in range(self.count()):
@@ -62,11 +60,14 @@ class FunctionTabWidget(QTabWidget):
                 self.widget(i).findChild(FunctionLine).updateSlices(ranges)
 
     def updateMargins(self, margins):
-        for i in range(self.count()):
-            self.intab_layout.setContentsMargins(margins)
+        self.intab_layout.setContentsMargins(margins)
+        # for i in range(self.intab_layout.count()):
+        #     if isinstance(self.intab_layout.itemAt(i).widget(), FunctionLine):
+        #         self.intab_layout.itemAt(i).widget().hlayout.setContentsMargins(margins)
 
     def setHorizonNodes(self, nodes):
         self.n_nodes = nodes
         for i in range(self.count()):
             self.widget(i).findChild(FunctionLine).updateHorizonNodes(self.n_nodes)
+            self.widget(i).findChild(LimitsLine).setNodes(self.n_nodes-1)
 

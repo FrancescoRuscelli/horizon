@@ -15,3 +15,15 @@ def unravelElements(elements):
             unraveled_elem.append(item)
 
     return unraveled_elem
+
+
+def listOfListFLOATtoINT(listOfList):
+    # transform every element to INT
+    for i in range(len(listOfList)):
+        if isinstance(listOfList[i], list):
+            for j in range(len(listOfList[i])):
+                listOfList[i][j] = int(listOfList[i][j])
+        else:
+            listOfList[i] = int(listOfList[i])
+
+    return listOfList
