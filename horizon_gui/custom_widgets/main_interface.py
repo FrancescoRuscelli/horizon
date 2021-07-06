@@ -41,12 +41,24 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.SVNodeInput.setRange(-N, 0)
 
         self.layout_ct = QVBoxLayout(self.CTPage)
+
+        ct_title = QLabel('Constraints')
+        ct_title.setFont(QFont("Times", 12, QFont.Bold))
+        ct_title.setAlignment(Qt.AlignCenter)
+        self.layout_ct.addWidget(ct_title)
+
         # self.constraintLine = horizon_multi_line.HorizonMultiLine(self.horizon_receiver, 'constraint', nodes=N, logger=self.logger)
         self.constraintLine = horizon_line.HorizonLine(self.horizon_receiver, 'constraint', nodes=N, logger=self.logger)
         self.constraintLine.setContentsMargins(0, 40, 0, 0)
         self.layout_ct.addWidget(self.constraintLine)
 
         self.layout_cf = QVBoxLayout(self.CFPage)
+
+        cf_title = QLabel('Cost Functions')
+        cf_title.setFont(QFont("Times", 12, QFont.Bold))
+        cf_title.setAlignment(Qt.AlignCenter)
+        self.layout_cf.addWidget(cf_title)
+
         self.costfunctionLine = horizon_line.HorizonLine(self.horizon_receiver, 'costfunction', nodes=N, logger=self.logger)
         self.costfunctionLine.setContentsMargins(0, 40, 0, 0)
         self.layout_cf.addWidget(self.costfunctionLine)

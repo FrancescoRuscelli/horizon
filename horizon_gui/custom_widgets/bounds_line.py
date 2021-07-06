@@ -1,8 +1,9 @@
 import numpy as np
 from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QSpinBox, QApplication, QRubberBand, QLabel
 from PyQt5.QtGui import QPalette, QFont
-from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSlot
+from PyQt5.QtCore import Qt, QRect, QSize, QPoint, pyqtSlot, pyqtSignal
 from horizon_gui.custom_widgets.infinity_spinbox import InfinitySpinBox
+from functools import partial
 
 import sys
 
@@ -15,6 +16,11 @@ import sys
 # 5. ONE FOR EACH DIMENSION OF VARIABLE
 
 class LimitsLine(QWidget):
+    # lbChangedAll = pyqtSignal(np.matrix)
+    # ubChangedAll = pyqtSignal(np.matrix)
+    lbChanged = pyqtSignal(int, list)
+    ubChanged = pyqtSignal(int, list)
+
     def __init__(self, nodes=0, dim=1, parent=None):
         super().__init__(parent)
 
@@ -31,14 +37,14 @@ class LimitsLine(QWidget):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setSpacing(0)
 
-        self.max_lims = QWidget()
-        self.max_lims_layout = QGridLayout(self.max_lims)
-        self.max_lims_layout.setContentsMargins(0, 20, 0, 20)
-        self.max_lims_layout.setSpacing(0)
+        self.ub_widget = QWidget()
+        self.ub_layout = QGridLayout(self.ub_widget)
+        self.ub_layout.setContentsMargins(0, 20, 0, 20)
+        self.ub_layout.setSpacing(0)
 
-        self.min_lims = QWidget()
-        self.min_lims_layout = QGridLayout(self.min_lims)
-        self.min_lims_layout.setContentsMargins(0, 20, 0, 20)
+        self.lb_widget = QWidget()
+        self.lb_layout = QGridLayout(self.lb_widget)
+        self.lb_layout.setContentsMargins(0, 20, 0, 20)
 
         palette = QPalette()
         palette.setColor(QPalette.Text, Qt.red)
@@ -56,17 +62,20 @@ class LimitsLine(QWidget):
         title_max.setFont(font)
 
         self.main_layout.addWidget(title_min)
-        self.main_layout.addWidget(self.min_lims)
+        self.main_layout.addWidget(self.lb_widget)
         self.main_layout.addWidget(title_max)
-        self.main_layout.addWidget(self.max_lims)
+        self.main_layout.addWidget(self.ub_widget)
 
-        self.lims = [self.min_lims, self.max_lims]
+        self.bounds_widgets = [self.lb_widget, self.ub_widget]
 
         self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
         self.selected = []
         self.setNodes(nodes)
 
         QApplication.instance().focusChanged.connect(self.on_focusChanged)
+
+        self.lb = np.matrix(np.ones((self.dim, self.n_nodes)) * -np.inf)
+        self.ub = np.matrix(np.ones((self.dim, self.n_nodes)) * np.inf)
 
     def setNodes(self, nodes):
         self.n_nodes = nodes
@@ -78,27 +87,28 @@ class LimitsLine(QWidget):
 
     def _updateNodes(self):
 
-        for item in self.lims:
+        for item in self.bounds_widgets:
             layout = item.layout()
             # Remove all the nodes
             for i in reversed(range(layout.count())):
                 layout.itemAt(i).widget().deleteLater()
                 layout.removeItem(layout.itemAt(i))
 
-        self.createCustomSpinboxLine(self.lims[0].layout(), value=-np.inf, color_base="MediumSeaGreen", color_selected="Crimson")
-        self.createCustomSpinboxLine(self.lims[1].layout(), value=np.inf, color_base="turquoise", color_selected="Crimson")
+        self.createCustomSpinboxLine(self.bounds_widgets[0].layout(), updatefun=self.updateLowerBounds, value=-np.inf, color_base="MediumSeaGreen", color_selected="Crimson")
+        self.createCustomSpinboxLine(self.bounds_widgets[1].layout(), updatefun=self.updateUpperBounds, value=np.inf, color_base="turquoise", color_selected="Crimson")
 
 
-    def createCustomSpinboxLine(self, parent, value=0, color_base=None, color_selected=None):
+    def createCustomSpinboxLine(self, parent, updatefun, value=0.0, color_base=None, color_selected=None):
         for i in range(self.dim):
             for j in range(self.n_nodes):
                 n_i = InfinitySpinBox(color_base=color_base, color_selected=color_selected)
                 n_i.setValue(value)
                 n_i.valueChanged.connect(self.multipleSet)
+                n_i.valueChanged.connect(partial(updatefun, i, j))
                 parent.addWidget(n_i, i, j)
 
     def hideNodes(self, node_list):
-        for item in self.lims:
+        for item in self.bounds_widgets:
             layout = item.layout()
             for i in range(self.dim):
                 for j in range(self.n_nodes):
@@ -110,7 +120,7 @@ class LimitsLine(QWidget):
                         spinbox.hide()
 
     def showNodes(self, node_list):
-        for item in self.lims:
+        for item in self.bounds_widgets:
             layout = item.layout()
             for i in range(self.dim):
                 for j in range(self.n_nodes):
@@ -162,6 +172,26 @@ class LimitsLine(QWidget):
             if child.isSelected():
                 child.setValue(i)
 
+    # def updateLowerBoundsAll(self, dim, node, val):
+    #     print('lb at node {}, dimension {}, changed: {}'.format(node, dim, val))
+    #     self.lb[dim, node] = val
+    #     self.lbChanged.emit(self.lb) # pass all the bounds
+    #
+    # def updateUpperBoundsAll(self, dim, node, val):
+    #     print('ub at node {}, dimension {}, changed: {}'.format(node, dim, val))
+    #     self.ub[dim, node] = val
+    #     self.ubChanged.emit(self.ub)
+
+    def updateLowerBounds(self, dim, node, val):
+        self.lb[dim, node] = val
+        bounds_list = [item for sublist in self.lb[:, node].tolist() for item in sublist]
+        self.lbChanged.emit(node, bounds_list) # pass only the bounds at the changed node
+
+    def updateUpperBounds(self, dim, node, val):
+        self.ub[dim, node] = val
+        bounds_list = [item for sublist in self.ub[:, node].tolist() for item in sublist]
+        self.ubChanged.emit(node, bounds_list)
+
     @pyqtSlot("QWidget*", "QWidget*")
     def on_focusChanged(self, old, now):
         for child in self.findChildren(InfinitySpinBox):
@@ -171,6 +201,10 @@ class LimitsLine(QWidget):
                 modifiers = QApplication.keyboardModifiers()
                 if modifiers != Qt.ShiftModifier:
                     child.select(False)
+
+    @pyqtSlot(dict)
+    def on_nodes_changed(self, lims):
+        self.limitsChanged.emit(lims)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
