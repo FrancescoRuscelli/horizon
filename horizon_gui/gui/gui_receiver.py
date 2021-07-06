@@ -206,6 +206,15 @@ class horizonImpl():
 
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
+    def updateFunctionUpperBounds(self, name, ub, nodes):
+        self.fun_dict[name]['active'].setUpperBounds(ub, nodes)
+
+    def updateFunctionLowerBounds(self, name, ub, nodes):
+        self.fun_dict[name]['active'].setLowerBounds(ub, nodes)
+
+    def updateFunctionBounds(self, name, lb, ub, nodes):
+        self.fun_dict[name]['active'].setBounds(lb, ub, nodes)
+
     def getFunctionDict(self):
         return self.fun_dict
 
@@ -222,11 +231,11 @@ class horizonImpl():
         return self.sv_dict[elem]
 
     def getNodes(self):
-
         return self.nodes
 
     def setHorizonNodes(self, n_nodes):
         self.nodes = n_nodes
+        self.casadi_prb.setNNodes(self.nodes)
 
     def _createAndAppendFun(self, name, str_fun):
 
