@@ -103,9 +103,9 @@ class MultiFunctionBox(QScrollArea):
             item_fl.updateHorizonNodes(nodes)
 
     def setFunctionNodes(self, fun_name, ranges):
-        for i in range(self.main_layout.count()):
-            if isinstance(self.main_layout.itemAt(i).widget(), FunctionLine) and self.main_layout.itemAt(i).widget().getName() == fun_name:
-                self.main_layout.itemAt(i).widget().updateSlices(ranges)
+        for item_fl in self.findChildren(FunctionLine):
+            if item_fl.getName() == fun_name:
+                item_fl.updateSlices(ranges)
 
     def updateMargins(self, margins):
         for i in range(self.main_layout.count()):
