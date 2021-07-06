@@ -24,7 +24,7 @@ class FunctionTabWidget(QTabWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)
 
 
-    def addFunctionToGUI(self, fun_name):
+    def addFunctionToGUI(self, fun_name, dim):
         self.ft = FunctionLine(fun_name, self.n_nodes, options=self.options)
         self.ft.nodesChanged.connect(self.on_fun_nodes_changed)
 
@@ -35,7 +35,7 @@ class FunctionTabWidget(QTabWidget):
         self.intab_layout.addWidget(self.ft)
         # self.intab_layout.addSpacing(120)
 
-        self.ll = LimitsLine(self.n_nodes-1)
+        self.ll = LimitsLine(self.n_nodes-1, dim)
         self.intab_layout.addWidget(self.ll)
 
         self.tab = QWidget()

@@ -18,6 +18,9 @@ class Function:
     def getName(self):
         return self.name
 
+    def getDim(self):
+        return self.f.shape
+
     def getFunction(self):
         return self.fun
 

@@ -11,11 +11,17 @@ class FunctionLine(QWidget):
     def __init__(self, name, n_nodes, options=None, parent=None):
         super().__init__(parent)
 
+        minimum_bar_height = 80
+        maximum_bar_height = 80
+
         self.name = name
         self.n_nodes = n_nodes
 
         self.hlayout = QHBoxLayout(self)
+        self.hlayout.setAlignment(Qt.AlignTop)
         self.slider = QMultiSlider(slider_range=[0, self.n_nodes - 1, 1], values=[0, self.n_nodes-1], options=options)
+        self.slider.setMinimumHeight(minimum_bar_height)
+        self.slider.setMaximumHeight(maximum_bar_height)
         self.hlayout.addWidget(self.slider)
         self.hlayout.setContentsMargins(0, 0, 0, 0)
         self.slider.slicesChanged.connect(self.on_nodes_changed)

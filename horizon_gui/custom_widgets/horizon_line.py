@@ -91,8 +91,7 @@ class HorizonLine(QScrollArea):
         # update the visual limits (spin_boxes) for each functions
         active_nodes = unravelElements(ranges)
         inactive_nodes = [inactive_n for inactive_n in range(self.n_nodes-1) if inactive_n not in active_nodes]
-        print('active nodes:', active_nodes)
-        print('inactive nodes:', inactive_nodes)
+
         self.function_tab.ll.showNodes(active_nodes)
         self.function_tab.ll.hideNodes(inactive_nodes)
         # change nodes of function in horizon
@@ -159,8 +158,8 @@ class HorizonLine(QScrollArea):
     def on_repeated_fun(self, str):
         self.repeated_fun.emit(str)
 
-    def addFunctionToSingleLine(self, name):
-        self.function_tab.addFunctionToGUI(name)
+    def addFunctionToSingleLine(self, name, dim):
+        self.function_tab.addFunctionToGUI(name, dim)
         self.updateMarginsSingleLine()
 
     def addFunctionToMultiLine(self, name):
@@ -169,10 +168,10 @@ class HorizonLine(QScrollArea):
 
     def addFunctionToHorizon(self, name):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
-
+        dim = self.horizon_receiver.getFunction(name)['active'].getDim()[0]
         if flag:
 
-            self.addFunctionToSingleLine(name)
+            self.addFunctionToSingleLine(name, dim)
             self.addFunctionToMultiLine(name)
             self.logger.info(signal)
         else:

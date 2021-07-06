@@ -301,3 +301,11 @@ class Problem:
 
 if __name__ == '__main__':
     prb = Problem(10)
+    x = prb.createStateVariable('x', 4)
+    y = prb.createStateVariable('y', 4)
+
+    danieli = prb.createConstraint('danieli', x+y)
+
+    print(danieli.getDim())
+
+

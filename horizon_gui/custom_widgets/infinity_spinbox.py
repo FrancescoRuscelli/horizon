@@ -1,17 +1,38 @@
-from PyQt5.QtWidgets import QApplication, QSpinBox, QDoubleSpinBox, QWidget, QHBoxLayout
-from PyQt5.QtGui import QKeyEvent, QRegExpValidator
-from PyQt5.QtCore import Qt, QRegExp
+from PyQt5.QtWidgets import QApplication, QSpinBox, QDoubleSpinBox
+from PyQt5.QtGui import QKeyEvent, QRegExpValidator, QFont, QPalette
+from PyQt5.QtCore import Qt, QRegExp, QLocale
 
 import numpy as np
 
 class InfinitySpinBox(QDoubleSpinBox):
-    def __init__(self, *args):
-        QSpinBox.__init__(self, *args)
-        validator = QRegExpValidator(QRegExp(r"[-+]?inf|\d*\,\d+|\d+"), self)
+    def __init__(self, parent=None, color_base="MediumSeaGreen", color_selected="Crimson"):
+        QSpinBox.__init__(self, parent)
+
+        self.setDecimals(1)
+        
+        self.color_base = color_base
+        self.color_selected = color_selected
+
+        palette = QPalette()
+        palette.setColor(QPalette.Text, Qt.red)
+        self.lineEdit().setPalette(palette)
+
+        font = QFont("Times", 12, QFont.Bold)
+        self.lineEdit().setFont(font)
+
+
+        validator = QRegExpValidator(QRegExp(r"[-+]?\d*[\.,\,]\d+|\d+|[-+]?inf"), self)
         self.lineEdit().setValidator(validator)
 
+        self.selected = False
+
+        self.setStyleSheet("background-color: {}".format(color_base))
         self.setMinimum(-np.inf)
         self.setMaximum(np.inf)
+
+    def valueFromText(self, text):
+        text = text.replace(',', '.')
+        return self.locale().toDouble(text)[0]
 
     def keyPressEvent(self, e: QKeyEvent):
 
@@ -26,6 +47,18 @@ class InfinitySpinBox(QDoubleSpinBox):
     #     QSpinBox.stepBy(self, value)
     #     self.lineEdit().deselect()
 
+    def select(self, flag):
+        self.selected = flag
+        if flag is False:
+            self.lineEdit().deselect()
+            self.setStyleSheet("background-color: {}".format(self.color_base))
+        else:
+            self.lineEdit().selectAll()
+            self.setStyleSheet("background-color: {}".format(self.color_selected))
+
+
+    def isSelected(self):
+        return self.selected
 
 if (__name__ == "__main__"):
     import sys
