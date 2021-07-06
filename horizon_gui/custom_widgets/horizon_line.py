@@ -9,8 +9,17 @@ from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 from horizon.misc_function import listOfListFLOATtoINT, unravelElements
 from functools import partial
 
+# horizon line
+#     | | | |____ horizon
+#     | | |
+#     | | |______ nodes box line
+#     | |
+#     | |________ function tab
+#     |                 |  | ______ function_line
+#     |                 |__________ limits_line
+#     |
+#     |__________ multi_function_box
 
-# TODO now it's a fucking mess, do something
 
 class HorizonLine(QScrollArea):
     add_fun_horizon = pyqtSignal(dict)
@@ -19,14 +28,17 @@ class HorizonLine(QScrollArea):
 
     def __init__(self, horizon, fun_type, nodes=0, logger=None, parent=None):
         super().__init__(parent)
-        self.setAcceptDrops(True)
 
+        self.setAcceptDrops(True)
         self.main_widget = QWidget()
         self.setWidgetResizable(True)
         self.setWidget(self.main_widget)
 
+        self.bounds_flag = True
         self.horizon_receiver = horizon
         self.fun_type = fun_type  # can be Constraint or Cost Function
+        if fun_type == 'costfunction':
+            self.bounds_flag = False
         self.n_nodes = nodes
 
         if logger:
@@ -51,13 +63,15 @@ class HorizonLine(QScrollArea):
         self._initSingleLine()
 
     def _initSingleLine(self):
-        # define TabWidget
 
-        self.function_tab = FunctionTabWidget(self.n_nodes, options=self.options)
+        self.function_tab = FunctionTabWidget(self.n_nodes, options=self.options, bounds_flag=self.bounds_flag)
         self.stacked_lines.addWidget(self.function_tab)
 
         self.function_tab.tabCloseRequested.connect(self.removeActiveFunctionRequestFromIndex)
         self.function_tab.funNodesChanged.connect(partial(self.updateFunctionNodes, 'single'))
+        self.function_tab.funLbChanged.connect(self.updateFunctionLb)
+        self.function_tab.funUbChanged.connect(self.updateFunctionUb)
+
 
     def _initMultiLine(self):
 
@@ -88,12 +102,9 @@ class HorizonLine(QScrollArea):
         # transform from float to INT (nodes are integer)
         ranges = listOfListFLOATtoINT(ranges)
 
-        # update the visual limits (spin_boxes) for each functions
-        active_nodes = unravelElements(ranges)
-        inactive_nodes = [inactive_n for inactive_n in range(self.n_nodes-1) if inactive_n not in active_nodes]
-
-        self.function_tab.ll.showNodes(active_nodes)
-        self.function_tab.ll.hideNodes(inactive_nodes)
+        # update bounds widgets
+        if self.fun_type == 'constraint':
+            self.function_tab.setFunctionBounds(fun_name, ranges)
         # change nodes of function in horizon
         # print('New nodes for Function {}: {}'.format(fun_name, ranges))
         self.horizon_receiver.updateFunctionNodes(fun_name, ranges)
@@ -104,9 +115,28 @@ class HorizonLine(QScrollArea):
         elif parent == 'single':
             self.multi_function_box.setFunctionNodes(fun_name, ranges)
 
+    # # todo isn't it better to pass a matrix with rows as dim and columns as nodes?
+    # def updateFunctionLbAll(self, fun_name, bounds):
+    #     print('function {} changed LOWER bounds: {}'.format(fun_name, bounds))
+    #     self.horizon_receiver.updateFunctionLowerBounds(fun_name, bounds)
+    #
+    # def updateFunctionUbAll(self, fun_name, bounds):
+    #     print('function {} changed UPPER bounds: {}'.format(fun_name, bounds))
+    #     self.horizon_receiver.updateFunctionLowerBounds(fun_name, )
+
+    def updateFunctionLb(self, fun_name, node, bounds):
+        # print('function {} changed at node {}, new LOWER bounds: {}'.format(fun_name, node, bounds.transpose()))
+        self.horizon_receiver.updateFunctionLowerBounds(fun_name, bounds, node)
+
+    def updateFunctionUb(self, fun_name, node, bounds):
+        # print('function {} changed at node {}, new UPPER bounds: {}'.format(fun_name, node, bounds.transpose()))
+        self.horizon_receiver.updateFunctionUpperBounds(fun_name, bounds, node)
+
     def setHorizonNodes(self, nodes):
         # update nodes
         self.n_nodes = nodes
+        # update nodes in horizon
+        self.horizon_receiver.setHorizonNodes(nodes)
 
         # update nodes in first widget (nodes line)
         self.nodes_line.setBoxNodes(nodes)
@@ -123,7 +153,7 @@ class HorizonLine(QScrollArea):
 
     def updateMarginsSingleLine(self):
         node_box_width = self.nodes_line.getBoxWidth()
-        margins = QMargins(node_box_width / 2, 0, node_box_width / 2, 0)
+        margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)  # todo why?
         self.function_tab.updateMargins(margins)
 
     def updateMarginsMultiLine(self):
@@ -197,6 +227,3 @@ class HorizonLine(QScrollArea):
                     self.function_tab.removeTab(i)
 
         self.logger.info(signal)
-
-    def getFunctionNodes(self, name):
-        self.function_tab.getFunctionNodes(name)

@@ -15,26 +15,29 @@ import sys
 # 4. SLIDER ON SPINBOX!!!!!!!! figata
 # 5. ONE FOR EACH DIMENSION OF VARIABLE
 
-class LimitsLine(QWidget):
+class BoundsLine(QWidget):
     # lbChangedAll = pyqtSignal(np.matrix)
     # ubChangedAll = pyqtSignal(np.matrix)
     lbChanged = pyqtSignal(int, list)
     ubChanged = pyqtSignal(int, list)
 
-    def __init__(self, nodes=0, dim=1, parent=None):
+    def __init__(self, name, nodes=0, dim=1, parent=None):
         super().__init__(parent)
+
+        self.name = name
 
         self.min_color_base = "MediumSeaGreen"
         self.min_color_selected = "Crimson"
         self.max_color_base = "turquoise"
         self.max_color_selected = "Crimson"
 
-        self.setStyleSheet("background-color: rgb(255,0,0); margin:5px; border:1px solid rgb(0, 255, 0); ")
+        self.setStyleSheet("background-color: rgb(255,0,0); border:1px solid rgb(0, 255, 0); ")
         self.n_nodes = nodes
         self.dim = dim
 
         self.layouts = []
         self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
         self.ub_widget = QWidget()
@@ -206,9 +209,12 @@ class LimitsLine(QWidget):
     def on_nodes_changed(self, lims):
         self.limitsChanged.emit(lims)
 
+    def getName(self):
+        return self.name
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    gui = LimitsLine(dim=3)
+    gui = BoundsLine('daniele', dim=3)
     gui.setNodes(12)
     gui.hideNodes([1,4,5,6,7])
     # gui.showNodes([1,4,5])

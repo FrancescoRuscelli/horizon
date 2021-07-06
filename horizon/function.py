@@ -28,7 +28,6 @@ class Function:
         return self.nodes
 
     def setNodes(self, nodes, erasing=False):
-
         unraveled_nodes = misc.unravelElements(nodes)
 
         if erasing:
@@ -86,12 +85,11 @@ class Constraint(Function):
             self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
 
 
-
     # todo transform string in typeFun "ConstraintType"
     def getType(self):
         return 'constraint'
 
-    def setBoundsMin(self, bounds, nodes=None):
+    def setLowerBounds(self, bounds, nodes=None):
 
         if nodes is None:
             unraveled_nodes = self.nodes
@@ -102,7 +100,7 @@ class Constraint(Function):
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
 
-    def setBoundsMax(self, bounds, nodes=None):
+    def setUpperBounds(self, bounds, nodes=None):
 
         if nodes is None:
             unraveled_nodes = self.nodes
@@ -115,19 +113,20 @@ class Constraint(Function):
 
     def setBounds(self, lb, ub, nodes=None):
 
-        self.setBoundsMin(lb, nodes)
-        self.setBoundsMax(ub, nodes)
+        self.setLowerBounds(lb, nodes)
+        self.setUpperBounds(ub, nodes)
 
-    def getBoundsMin(self, node):
+    def getLowerBounds(self, node):
+        print(self.bounds)
         lb = self.bounds['n' + str(node)]['lb']
         return lb
 
-    def getBoundsMax(self, node):
+    def getUpperBounds(self, node):
         ub = self.bounds['n' + str(node)]['ub']
         return ub
 
     def getBounds(self, nodes):
-        return [self.getBoundsMin(nodes), self.getBoundsMax(nodes)]
+        return [self.getLowerBounds(nodes), self.getUpperBounds(nodes)]
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):

@@ -9,7 +9,7 @@ class InfinitySpinBox(QDoubleSpinBox):
         QSpinBox.__init__(self, parent)
 
         self.setDecimals(1)
-        
+
         self.color_base = color_base
         self.color_selected = color_selected
 

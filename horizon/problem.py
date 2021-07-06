@@ -116,10 +116,10 @@ class Problem:
         self.state_var_container.setNNodes(self.nodes)
 
         for cnstr in self.cnstr_container:
-            cnstr.setNodes([i for i in cnstr.getNodes() if i in self.nodes])
+            cnstr.setNodes([i for i in cnstr.getNodes() if i in range(self.nodes)])
 
         for costfun in self.costfun_container:
-            costfun.setNodes([i for i in costfun.getNodes() if i in self.nodes])
+            costfun.setNodes([i for i in costfun.getNodes() if i in range(self.nodes)])
 
     def _implementFunctions(self, container, node):
         f_impl = list()
@@ -210,8 +210,8 @@ class Problem:
         for node in range(self.nodes):
             for cnstr in self.cnstr_container:
                 if node in cnstr.getNodes():
-                    self.lbg += cnstr.getBoundsMin(node)
-                    self.ubg += cnstr.getBoundsMax(node)
+                    self.lbg += cnstr.getLowerBounds(node)
+                    self.ubg += cnstr.getUpperBounds(node)
 
         self.lbw = self.state_var_container.getBoundsMinList()
         self.ubw = self.state_var_container.getBoundsMaxList()
