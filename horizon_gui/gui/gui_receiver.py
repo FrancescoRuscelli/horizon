@@ -250,6 +250,18 @@ class horizonImpl():
         else:
             return False
 
+    def generateProblem(self):
+        # try:
+        self.casadi_prb.createProblem()
+        # except Exception as e:
+        #     return self.logger.warning(e)
+
+    def solve(self):
+        try:
+            self.casadi_prb.solveProblem()
+        except Exception as e:
+            return self.logger.warning(e)
+
     def serialize(self):
 
         self.casadi_prb.serialize()

@@ -13,7 +13,6 @@ class Highlighter(QSyntaxHighlighter):
         self.keywordFormat.setFontWeight(QFont.Bold)
 
         self.keywordPatterns = list()
-        print(list((QRegExp(pattern), self.keywordFormat) for pattern in self.keywordPatterns))
         self.highlightingRules = [(QRegExp(pattern), self.keywordFormat) for pattern in self.keywordPatterns]
 
         # classFormat = QTextCharFormat()

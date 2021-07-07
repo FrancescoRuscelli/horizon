@@ -266,9 +266,8 @@ class QRangeSlider(QWidget):
         size = float(self.rangeSliderSize() - 2 * self.bar_width - 1)
         if (self.moving == "min") or (self.moving == "bar"):
             self.min_val = self.start + (self.display_min - self.bar_width)/float(size) * self.scale
-            print(self.min_val)
             self.min_val = float(round(self.min_val/self.single_step))*self.single_step
-            print(self.min_val)
+
         if (self.moving == "max") or (self.moving == "bar"):
             self.max_val = self.start + (self.display_max - self.bar_width)/float(size) * self.scale
             self.max_val = float(round(self.max_val/self.single_step))*self.single_step

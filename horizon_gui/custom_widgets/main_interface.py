@@ -75,6 +75,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.constraintLine.Single))
         self.MultipleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.costfunctionLine.Multi))
         self.MultipleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.costfunctionLine.Multi))
+        self.CreateButton.clicked.connect(self.horizon_receiver.generateProblem)
+        self.SolveButton.clicked.connect(self.horizon_receiver.solve)
 
         # when opening horizon, fill the GUI
         for name, data in horizon_receiver.getVarDict().items():
@@ -85,7 +87,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             if data['active'] is not None:
                 if data['active'].getType() == 'constraint':
                     line = self.constraintLine
-                    line.addFunctionToSingleLine(name)
+                    # todo getDim() only taking the row, what if it's a matrix?
+                    line.addFunctionToSingleLine(name, data['active'].getDim()[0])
                     line.addFunctionToMultiLine(name)
                 elif data['active'].getType() == 'costfunction':
                     line = self.costfunctionLine
