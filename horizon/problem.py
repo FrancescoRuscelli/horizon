@@ -5,14 +5,13 @@ from horizon import state_variables as sv
 import numpy as np
 import logging
 import sys
-import time
 
 class Problem:
 
     def __init__(self, N, crash_if_suboptimal=False):
 
         self.logger = logging.getLogger('logger')
-        # self.logger.setLevel(level=logging.DEBUG)
+        self.logger.setLevel(level=logging.DEBUG)
         self.debug_mode = self.logger.isEnabledFor(logging.DEBUG)
         stdout_handler = logging.StreamHandler(sys.stdout)
         self.logger.addHandler(stdout_handler)
@@ -162,6 +161,7 @@ class Problem:
 
     def createProblem(self):
 
+
         for k in range(self.nodes):  # todo decide if N or N+1
             self.logger.debug('Node {}:'.format(k))
             # implement the abstract state variable with the current node
@@ -173,13 +173,12 @@ class Problem:
 
             self.costfun_sum = cs.sum1(cs.vertcat(*self.costfun_impl))
 
-
         # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
         # self.logger.debug('constraints unraveled:', cs.vertcat(*self.cnstr_impl))
         # self.logger.debug('cost functions unraveled:', cs.vertcat(*self.costfun_impl))
         # self.logger.debug('cost function summed:', self.costfun_sum)
         # self.logger.debug('----------------------------------------------------')
-
+        # todo add checking for everything
         j = self.costfun_sum
         w = self.state_var_container.getVarImplList()
         g = cs.vertcat(*self.cnstr_impl)
@@ -300,12 +299,48 @@ class Problem:
 
 
 if __name__ == '__main__':
-    prb = Problem(10)
-    x = prb.createStateVariable('x', 4)
-    y = prb.createStateVariable('y', 4)
+    prb = Problem(6)
+    x = prb.createStateVariable('x', 2)
+    y = prb.createStateVariable('y', 2)
+
+    x.setBounds([-2, -2], [2, 2])
+
+    # todo this is allright but I have to remember that if I update the nodes (from 3 to 6 for example) i'm not updating the constraint nodes
+    # todo so if it was active on all the node before, then it will be active only on the node 1, 2, 3 (not on 4, 5, 6)
+
+    scoping_node = 1
+    print('number of nodes of {}: {}'.format(x, x.getNNodes()))
+    print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
+
 
     danieli = prb.createConstraint('danieli', x+y)
 
-    print(danieli.getDim())
+    prb.createProblem()
+    print('before:', prb.state_var_container.getVarImplList())
+
+    print('===== Changing n. of nodes to 3 =====')
+    prb.setNNodes(3)
+    scoping_node = 5
+    print('number of nodes of {}: {}'.format(x, x.getNNodes()))
+    print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
+
+
+    prb.createProblem()
+    # todo check why this is so
+    print('after:', prb.state_var_container.getVarImplList())
+
+    scoping_node = 5
+    print('number of nodes of {}: {}'.format(x, x.getNNodes()))
+    print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
+    # x.setBounds(10)
+    # danieli.setNodes([1,6])
+
+
+    # todo what do I do?
+    # is it better to project the abstract variable as soon as it is created, to set the bounds and everything?
+    # or is it better to wait for the buildProblem to generate the projection of the abstract value along the horizon line?
+
+
+
 
 

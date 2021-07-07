@@ -6,6 +6,10 @@ import logging
 import numpy as np
 import types
 
+'''
+now the StateVariable is only abstract at the very beginning.
+Formerly
+'''
 class StateVariable(cs.SX):
     def __init__(self, tag, dim, nodes):
         super(StateVariable, self).__init__(cs.SX.sym(tag, dim))
@@ -17,6 +21,7 @@ class StateVariable(cs.SX):
         # self.var = cs.SX.sym(tag, dim)
         self.var_impl = dict()
 
+        # todo project it as soon as I create the variable. Ok?
         self._project()
 
     def setLowerBounds(self, bounds, nodes=None):
@@ -29,7 +34,7 @@ class StateVariable(cs.SX):
                 self.var_impl['n' + str(n)]['lb'] = bounds
         else:
             self.var_impl['n' + str(nodes)]['lb'] = bounds
-        
+
     def setUpperBounds(self, bounds, nodes=None):
 
         if nodes is None:
@@ -65,15 +70,37 @@ class StateVariable(cs.SX):
         # state_var_impl --> dict
         #  - key: nodes (n0, n1, ...)
         #  - val: dict with name and value of implemented variable
+
         for n in range(self.nodes):
-            var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
-            self.var_impl['n' + str(n)] = dict()
-            self.var_impl['n' + str(n)]['var'] = var_impl
-            self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
-            self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
-            self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
+            if 'n' + str(n) in self.var_impl:
+                pass
+            else:
+                var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
+                self.var_impl['n' + str(n)] = dict()
+                self.var_impl['n' + str(n)]['var'] = var_impl
+                self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
+                self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
+                self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
+
+    # todo project only at node n (it is used if I want to reproject at each node)
+    # def _projectN(self, n):
+    #
+    #     # state_var_impl --> dict
+    #     #  - key: nodes (n0, n1, ...)
+    #     #  - val: dict with name and value of implemented variable
+    #     var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
+    #     self.var_impl['n' + str(n)] = dict()
+    #     self.var_impl['n' + str(n)]['var'] = var_impl
+    #     self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
+    #     self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
+    #     self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
+    #
+    #     return var_impl
+
 
     def getImpl(self, node):
+        # todo this is another option: reproject everytime one asks for .getImpl
+        # var_impl = self._projectN(node)
         var_impl = self.var_impl['n' + str(node)]['var']
         return var_impl
 
@@ -174,7 +201,6 @@ class StateVariables:
     def getVarImplList(self):
 
         state_var_impl_list = list()
-
         for node, val in self.state_var_impl.items():
             for var_abstract in val.keys():
                 # get from state_var_impl the relative var
@@ -246,12 +272,12 @@ class StateVariables:
                 if self.logger.isEnabledFor(logging.DEBUG):
                     self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
-            # todo this is not necessary right?
+            # todo bounds are not necessary here
             var_bound_min = self.state_var[name].getBoundMin(k)
             var_bound_max = self.state_var[name].getBoundMax(k)
             initial_guess = self.state_var[name].getInitialGuess(k)
             var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
-            self.state_var_impl['n' + str(k)].update({name : var_dict})
+            self.state_var_impl['n' + str(k)].update({name: var_dict})
 
     def updateBounds(self):
 
@@ -271,6 +297,12 @@ class StateVariables:
 
     def setNNodes(self, n_nodes):
         self.nodes = n_nodes
+        for var in self.state_var.values():
+            var._setNNodes(self.nodes)
+        for var in self.state_var_prev.values():
+            var._setNNodes(self.nodes)
+
+        # todo should I truncate also the self.var_impl_list?
 
     def serialize(self):
 

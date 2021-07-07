@@ -117,7 +117,6 @@ class Constraint(Function):
         self.setUpperBounds(ub, nodes)
 
     def getLowerBounds(self, node):
-        print(self.bounds)
         lb = self.bounds['n' + str(node)]['lb']
         return lb
 
