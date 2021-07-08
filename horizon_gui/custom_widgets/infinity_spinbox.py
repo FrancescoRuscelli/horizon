@@ -8,6 +8,9 @@ class InfinitySpinBox(QDoubleSpinBox):
     def __init__(self, parent=None, color_base="MediumSeaGreen", color_selected="Crimson"):
         QSpinBox.__init__(self, parent)
 
+        locale = QLocale(QLocale.English)
+        self.setLocale(locale)
+
         self.setDecimals(1)
 
         self.color_base = color_base
@@ -27,12 +30,9 @@ class InfinitySpinBox(QDoubleSpinBox):
         self.selected = False
 
         self.setStyleSheet("background-color: {}".format(color_base))
+
         self.setMinimum(-np.inf)
         self.setMaximum(np.inf)
-
-    def valueFromText(self, text):
-        text = text.replace(',', '.')
-        return self.locale().toDouble(text)[0]
 
     def keyPressEvent(self, e: QKeyEvent):
 
@@ -42,10 +42,6 @@ class InfinitySpinBox(QDoubleSpinBox):
             self.setValue(self.minimum())
         else:
             super(QDoubleSpinBox, self).keyPressEvent(e)
-
-    # def stepBy(self, value):
-    #     QSpinBox.stepBy(self, value)
-    #     self.lineEdit().deselect()
 
     def select(self, flag):
         self.selected = flag
