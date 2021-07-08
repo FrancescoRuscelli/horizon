@@ -11,7 +11,7 @@ class Problem:
     def __init__(self, N, crash_if_suboptimal=False):
 
         self.logger = logging.getLogger('logger')
-        self.logger.setLevel(level=logging.DEBUG)
+        # self.logger.setLevel(level=logging.DEBUG)
         self.debug_mode = self.logger.isEnabledFor(logging.DEBUG)
         stdout_handler = logging.StreamHandler(sys.stdout)
         self.logger.addHandler(stdout_handler)
@@ -140,11 +140,11 @@ class Problem:
         return f_impl
 
     def _updateConstraints(self, node):
+
         temp_cnsrt_impl = self._implementFunctions(self.cnstr_container, node)
         if temp_cnsrt_impl:
             # add implemented constraints in list
             self.cnstr_impl += temp_cnsrt_impl
-
 
     # def getVariablesName(self):
     #     return [name for name, var in self.var]
@@ -160,7 +160,10 @@ class Problem:
     # def setStateBoundsFromName(self, name, ubw, lbw, nodes=None):
 
     def createProblem(self):
-
+        # this is to reset both the constraints and the cost functions everytime I create a problem
+        self.cnstr_impl.clear()
+        self.costfun_impl.clear()
+        self.state_var_container.clear()
 
         for k in range(self.nodes):  # todo decide if N or N+1
             self.logger.debug('Node {}:'.format(k))
@@ -182,6 +185,7 @@ class Problem:
         j = self.costfun_sum
         w = self.state_var_container.getVarImplList()
         g = cs.vertcat(*self.cnstr_impl)
+
         self.prob = {'f': j, 'x': w, 'g': g}
 
         self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
@@ -312,24 +316,24 @@ if __name__ == '__main__':
     print('number of nodes of {}: {}'.format(x, x.getNNodes()))
     print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
 
-
+    print('way before:', prb.state_var_container.getVarImplList())
     danieli = prb.createConstraint('danieli', x+y)
 
     prb.createProblem()
     print('before:', prb.state_var_container.getVarImplList())
 
-    print('===== Changing n. of nodes to 3 =====')
-    prb.setNNodes(3)
-    scoping_node = 5
+    print('================== Changing n. of nodes to 3 ==================')
+    prb.setNNodes(2)
+    scoping_node = 1
     print('number of nodes of {}: {}'.format(x, x.getNNodes()))
     print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
-
+    print('after but before create:', prb.state_var_container.getVarImplList())
 
     prb.createProblem()
     # todo check why this is so
     print('after:', prb.state_var_container.getVarImplList())
 
-    scoping_node = 5
+    scoping_node = 1
     print('number of nodes of {}: {}'.format(x, x.getNNodes()))
     print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
     # x.setBounds(10)

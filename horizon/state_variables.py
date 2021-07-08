@@ -4,7 +4,6 @@ import casadi as cs
 from collections import OrderedDict
 import logging
 import numpy as np
-import types
 
 '''
 now the StateVariable is only abstract at the very beginning.
@@ -70,17 +69,24 @@ class StateVariable(cs.SX):
         # state_var_impl --> dict
         #  - key: nodes (n0, n1, ...)
         #  - val: dict with name and value of implemented variable
+        # old_var_impl = copy.deepcopy(self.var_impl)
+        # self.var_impl.clear()
+        new_var_impl = dict()
 
         for n in range(self.nodes):
             if 'n' + str(n) in self.var_impl:
-                pass
+                new_var_impl['n' + str(n)] = self.var_impl['n' + str(n)]
             else:
                 var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
-                self.var_impl['n' + str(n)] = dict()
-                self.var_impl['n' + str(n)]['var'] = var_impl
-                self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
-                self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
-                self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
+                new_var_impl['n' + str(n)] = dict()
+                new_var_impl['n' + str(n)]['var'] = var_impl
+                new_var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
+                new_var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
+                new_var_impl['n' + str(n)]['w0'] = [0] * self.dim
+
+        self.var_impl = new_var_impl
+
+
 
     # todo project only at node n (it is used if I want to reproject at each node)
     # def _projectN(self, n):
@@ -296,13 +302,23 @@ class StateVariables:
                 state_var['w0'] = self.state_var[name].getInitialGuess(k)
 
     def setNNodes(self, n_nodes):
+
+        # this is required to update the self.state_var_impl EACH time a new number of node is set
+        # removed_nodes = [node for node in range(self.nodes) if node not in range(n_nodes)]
+        # for node in removed_nodes:
+        #     if 'n' + str(node) in self.state_var_impl:
+        #         del self.state_var_impl['n' + str(node)]
+
         self.nodes = n_nodes
         for var in self.state_var.values():
             var._setNNodes(self.nodes)
         for var in self.state_var_prev.values():
             var._setNNodes(self.nodes)
 
-        # todo should I truncate also the self.var_impl_list?
+
+    def clear(self):
+        self.state_var_impl.clear()
+
 
     def serialize(self):
 
@@ -329,18 +345,18 @@ class StateVariables:
 
 if __name__ == '__main__':
 
-    x = StateVariable('x', 2, 15)
-    print([id(val['var']) for val in x.var_impl.values()])
-    x._setNNodes(20)
+    # x = StateVariable('x', 2, 15)
+    # print([id(val['var']) for val in x.var_impl.values()])
+    # x._setNNodes(20)
+    # print([id(val['var']) for val in x.var_impl.values()])
 
-    print([id(val['var']) for val in x.var_impl.values()])
-    # sv = StateVariables(3)
-    # x = sv.setVar('x', 2)
-    # sv.setVar('y', 2)
+    sv = StateVariables(3)
+    x = sv.setVar('x', 2)
+    sv.setVar('y', 2)
     # x_prev = sv.setVar('x', 2, -2)
     #
-    # for i in range(4):
-    #     sv.update(i)
+    for i in range(4):
+        sv.update(i)
     #
     # print('state_var_prev', sv.state_var_prev)
     # print('state_var_impl', sv.state_var_impl)
