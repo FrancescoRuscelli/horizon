@@ -228,7 +228,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     gui = BoundsLine('daniele', nodes=1, dim=3)
     gui.setNodes(10)
-    # gui.hideNodes([1,4,5,6,7])
+    gui.hideNodes([0,1,2,4,5,6,7,8])
     # gui.showNodes([1,4,5])
 
     pushbutton = QPushButton('daniele')

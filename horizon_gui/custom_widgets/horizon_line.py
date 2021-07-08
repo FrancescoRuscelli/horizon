@@ -153,7 +153,7 @@ class HorizonLine(QScrollArea):
 
     def updateMarginsSingleLine(self):
         node_box_width = self.nodes_line.getBoxWidth()
-        margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)  # todo why?
+        margins = QMargins(node_box_width / 2, 0, node_box_width / 2, 0)  # todo why?
         self.function_tab.updateMargins(margins)
 
     def updateMarginsMultiLine(self):

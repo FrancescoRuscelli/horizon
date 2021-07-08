@@ -43,7 +43,7 @@ class FunctionTabWidget(QTabWidget):
         self.intab_layout.addWidget(self.ft)
         # self.intab_layout.addSpacing(120)
         if self.bounds_flag:
-            self.bl = BoundsLine(fun_name, self.n_nodes - 1, dim)
+            self.bl = BoundsLine(fun_name, self.n_nodes, dim)
             self.bl.lbChanged.connect(partial(self.on_fun_lb_changed, fun_name))
             self.bl.ubChanged.connect(partial(self.on_fun_ub_changed, fun_name))
 
@@ -84,7 +84,7 @@ class FunctionTabWidget(QTabWidget):
     def setFunctionBounds(self, fun_name, ranges):
         # # update the widget bounds (spin_boxes) for each functions
         active_nodes = unravelElements(ranges)
-        inactive_nodes = [inactive_n for inactive_n in range(self.n_nodes-1) if inactive_n not in active_nodes]
+        inactive_nodes = [inactive_n for inactive_n in range(self.n_nodes) if inactive_n not in active_nodes]
 
         for widget_bl in self.findChildren(BoundsLine):
             if widget_bl.getName() == fun_name:
@@ -93,14 +93,14 @@ class FunctionTabWidget(QTabWidget):
 
 
     def updateMargins(self, margins):
-        self.intab_layout.setContentsMargins(margins)
-        # for i in range(self.intab_layout.count()):
-        #     if isinstance(self.intab_layout.itemAt(i).widget(), FunctionLine):
-        #         self.intab_layout.itemAt(i).widget().hlayout.setContentsMargins(margins)
+        # self.intab_layout.setContentsMargins(margins)
+        for i in range(self.intab_layout.count()):
+            if isinstance(self.intab_layout.itemAt(i).widget(), FunctionLine):
+                self.intab_layout.itemAt(i).widget().hlayout.setContentsMargins(margins)
 
     def setHorizonNodes(self, nodes):
         self.n_nodes = nodes
         for i in range(self.count()):
             self.widget(i).findChild(FunctionLine).updateHorizonNodes(self.n_nodes)
-            self.widget(i).findChild(BoundsLine).setNodes(self.n_nodes - 1)
+            self.widget(i).findChild(BoundsLine).setNodes(self.n_nodes)
 
