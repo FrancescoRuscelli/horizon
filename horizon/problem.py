@@ -186,6 +186,11 @@ class Problem:
         w = self.state_var_container.getVarImplList()
         g = cs.vertcat(*self.cnstr_impl)
 
+        if self.debug_mode:
+            self.logger.debug('cost fun: {}'.format(j))
+            self.logger.debug('state variables: {}'.format(w))
+            self.logger.debug('constraints: {}'.format(g))
+
         self.prob = {'f': j, 'x': w, 'g': g}
 
         self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
