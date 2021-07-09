@@ -286,6 +286,22 @@ class Problem:
         # print('T to finish:', t_to_finish)
         return solution_dict
 
+    def scopeNodeVars(self, node):
+
+        if 'n' + str(node) in self.state_var_container.state_var_impl:
+            return self.state_var_container.state_var_impl['n' + str(node)]
+        else:
+            return None
+        # dict_vars = dict()
+        # for name in self.state_var_container.getVarAbstrDict().keys():
+        #
+        #     dict_vars[name] = (self.state_var_container.getVarImpl(name, node))
+        #
+        # return dict_vars
+
+    def scopeNodeConstraints(self, node):
+        pass
+
     def serialize(self):
 
         self.state_var_container.serialize()
@@ -308,7 +324,7 @@ class Problem:
 
 
 if __name__ == '__main__':
-    prb = Problem(6)
+    prb = Problem(8)
     x = prb.createStateVariable('x', 2)
     y = prb.createStateVariable('y', 2)
 
@@ -317,33 +333,38 @@ if __name__ == '__main__':
     # todo this is allright but I have to remember that if I update the nodes (from 3 to 6 for example) i'm not updating the constraint nodes
     # todo so if it was active on all the node before, then it will be active only on the node 1, 2, 3 (not on 4, 5, 6)
 
-    scoping_node = 1
-    print('number of nodes of {}: {}'.format(x, x.getNNodes()))
-    print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
 
-    print('way before:', prb.state_var_container.getVarImplList())
+    scoping_node = 8
+    print('var at nodes {}  BEFORE creating the problem: '.format(scoping_node), prb.scopeNodeVars(scoping_node))
+    print('number of nodes of {}: {}'.format(x, x.getNNodes()))
+    # print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
+
+    # print('getVarImplList way before:', prb.state_var_container.getVarImplList())
     danieli = prb.createConstraint('danieli', x+y)
 
     prb.createProblem()
-    print('before:', prb.state_var_container.getVarImplList())
-
-    print('================== Changing n. of nodes to 3 ==================')
-    prb.setNNodes(2)
-    scoping_node = 1
+    print('var at nodes {}  AFTER creating the problem: '.format(scoping_node), prb.scopeNodeVars(scoping_node))
+    # print('getVarImplList before:', prb.state_var_container.getVarImplList())
+    new_n_nodes = 5
+    print('================== Changing n. of nodes to {} =================='.format(new_n_nodes))
+    prb.setNNodes(new_n_nodes)
+    scoping_node = 8
+    print('var at nodes AFTER changing the n. of nodes but BEFORE rebuilding: {}'.format(scoping_node), prb.scopeNodeVars(scoping_node))
     print('number of nodes of {}: {}'.format(x, x.getNNodes()))
-    print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
-    print('after but before create:', prb.state_var_container.getVarImplList())
-
+    # print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
+    # print('getVarImplList after but before create:', prb.state_var_container.getVarImplList())
     prb.createProblem()
-    # todo check why this is so
-    print('after:', prb.state_var_container.getVarImplList())
 
-    scoping_node = 1
+    # todo check why this is so
+    # print('after:', prb.state_var_container.getVarImplList())
+
+    scoping_node = 8
+    print('var at nodes AFTER changing the n. of nodes but AFTER rebuilding: {}'.format(scoping_node), prb.scopeNodeVars(scoping_node))
     print('number of nodes of {}: {}'.format(x, x.getNNodes()))
-    print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
+    # print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
     # x.setBounds(10)
     # danieli.setNodes([1,6])
-
+    prb.scopeNodeVars(2)
 
     # todo what do I do?
     # is it better to project the abstract variable as soon as it is created, to set the bounds and everything?

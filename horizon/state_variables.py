@@ -192,12 +192,18 @@ class StateVariables:
         node_name = 'n' + str(k)
 
         if name.find('-') == -1:
-            var = self.state_var_impl[node_name][name]['var']
+            if node_name in self.state_var_impl:
+                var = self.state_var_impl[node_name][name]['var']
+            else:
+                var = None
         else:
             var_name = name[:name.index('-')]
             k_prev = int(name[name.index('-'):])
             node_prev = 'n' + str(k+k_prev)
-            var = self.state_var_impl[node_prev][var_name]['var']
+            if node_name in self.state_var_impl:
+                var = self.state_var_impl[node_prev][var_name]['var']
+            else:
+                var = None
 
         return var
 

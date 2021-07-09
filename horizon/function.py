@@ -94,7 +94,7 @@ class Constraint(Function):
         if nodes is None:
             unraveled_nodes = self.nodes
         else:
-            unraveled_nodes = misc.unravelElements(nodes)
+            unraveled_nodes = misc.unravelElements(nodes) # todo are we sure this is ok?
 
         for node in unraveled_nodes:
             if node in self.nodes:
