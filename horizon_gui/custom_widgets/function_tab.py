@@ -91,7 +91,6 @@ class FunctionTabWidget(QTabWidget):
                 widget_bl.showNodes(active_nodes)
                 widget_bl.hideNodes(inactive_nodes)
 
-
     def updateMargins(self, margins):
         # self.intab_layout.setContentsMargins(margins)
         for i in range(self.intab_layout.count()):

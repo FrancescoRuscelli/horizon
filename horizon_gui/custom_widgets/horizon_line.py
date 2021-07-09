@@ -47,7 +47,7 @@ class HorizonLine(QScrollArea):
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)
 
-        self.nodes_line = NodeBoxLine(self.n_nodes)
+        self.nodes_line = NodeBoxLine(self.horizon_receiver, self.n_nodes)
         self.nodes_line.setAttribute(Qt.WA_StyledBackground, True)
         self.nodes_line.setStyleSheet('background-color: green;')
         self.main_layout.addWidget(self.nodes_line)

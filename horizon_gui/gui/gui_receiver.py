@@ -201,8 +201,8 @@ class horizonImpl():
 
     def updateFunctionNodes(self, name, nodes):
         # small hack to include also the max for each couple of min/max --> [0, 3] --> 0, 1, 2, 3. Not 0, 1, 2
-        for couples in nodes:
-            couples[1] = couples[1]+1
+        # for couples in nodes:
+        #     couples[1] = couples[1]+1
 
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
@@ -261,6 +261,15 @@ class horizonImpl():
             self.casadi_prb.solveProblem()
         except Exception as e:
             return self.logger.warning(e)
+
+    def getInfoAtNodes(self, node):
+        vars = list()
+        vars_dict = self.casadi_prb.scopeNodeVars(node) #lb, ub, w0
+        if vars_dict is not None:
+            for var in vars_dict.values():
+                vars.append(var)
+
+        return vars
 
     def serialize(self):
 
