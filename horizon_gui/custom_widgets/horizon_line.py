@@ -101,6 +101,9 @@ class HorizonLine(QScrollArea):
     def updateFunctionNodes(self, parent, fun_name, ranges):
         # transform from float to INT (nodes are integer)
         ranges = listOfListFLOATtoINT(ranges)
+        # small hack to include also the max for each couple of min/max --> [0, 3] --> 0, 1, 2, 3. Not 0, 1, 2
+        for couples in ranges:
+            couples[1] = couples[1]+1
 
         # update bounds widgets
         if self.fun_type == 'constraint':
