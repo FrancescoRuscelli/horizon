@@ -1,4 +1,6 @@
-from PyQt5.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QScrollArea
+from PyQt5.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QScrollArea, QTableWidget, \
+    QLabel, QTableWidgetItem, QGridLayout, QAbstractScrollArea, QSizePolicy, QHeaderView, QLayout
+
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex, QMargins
 from PyQt5.QtGui import QStandardItemModel
 
@@ -6,6 +8,7 @@ from horizon_gui.custom_widgets.node_box_line import NodeBoxLine
 from horizon_gui.custom_widgets.function_tab import FunctionTabWidget
 from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 
+from horizon_gui.custom_widgets.on_destroy_signal_window import DestroySignalWindow
 from horizon.misc_function import listOfListFLOATtoINT, unravelElements
 from functools import partial
 
@@ -47,7 +50,8 @@ class HorizonLine(QScrollArea):
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)
 
-        self.nodes_line = NodeBoxLine(self.horizon_receiver, self.n_nodes)
+        self.nodes_line = NodeBoxLine(self.n_nodes)
+        self.nodes_line.buttonPressed.connect(self.openProblemDetails)
         self.nodes_line.setAttribute(Qt.WA_StyledBackground, True)
         self.nodes_line.setStyleSheet('background-color: green;')
         self.main_layout.addWidget(self.nodes_line)
@@ -108,6 +112,8 @@ class HorizonLine(QScrollArea):
         # update bounds widgets
         if self.fun_type == 'constraint':
             self.function_tab.setFunctionBounds(fun_name, ranges)
+
+
         # change nodes of function in horizon
         # print('New nodes for Function {}: {}'.format(fun_name, ranges))
         self.horizon_receiver.updateFunctionNodes(fun_name, ranges)
@@ -230,3 +236,59 @@ class HorizonLine(QScrollArea):
                     self.function_tab.removeTab(i)
 
         self.logger.info(signal)
+
+    def openProblemDetails(self, node):
+
+        self.info_box = DestroySignalWindow()
+        self.info_box.setWindowTitle('Node {}'.format(node))
+        self.info_box.show()
+        info_box_layout = QGridLayout(self.info_box)
+        # self.info_box.setFixedSize(info_box_layout.sizeHint())
+        # info_box_layout.setSizeConstraint(QLayout.SetFixedSize)
+        # self.info_box.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        # self.info_box.adjustSize()
+
+        label_title_state_var = QLabel('State Variables:')
+        info_box_layout.addWidget(label_title_state_var, 0, 0)
+        table_vars = QTableWidget()
+        table_vars.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        table_vars.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        table_vars.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+
+        table_vars.setColumnCount(4)
+        table_vars.setHorizontalHeaderLabels(['Var Impl', 'Lower Bounds', 'Upper Bounds', 'Initial Guess'])
+
+        info_box_layout.addWidget(table_vars, 0, 1)
+
+        for elem in self.horizon_receiver.getInfoAtNodes(node):
+            rowPosition = table_vars.rowCount()
+            table_vars.insertRow(rowPosition)
+            table_vars.setItem(rowPosition, 0, QTableWidgetItem((str(elem['var']))))
+            table_vars.setItem(rowPosition, 1, QTableWidgetItem((str(elem['lb']))))
+            table_vars.setItem(rowPosition, 2, QTableWidgetItem((str(elem['ub']))))
+            table_vars.setItem(rowPosition, 3, QTableWidgetItem((str(elem['w0']))))
+
+        table_vars.resizeColumnsToContents()
+
+
+
+        label_title_constraint = QLabel('Constraint:')
+        info_box_layout.addWidget(label_title_constraint, 1, 0)
+        table_constr = QTableWidget()
+        table_constr.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        table_constr.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        table_constr.setColumnCount(3)
+        table_constr.setHorizontalHeaderLabels(['Constraint', 'Lower Bounds', 'Upper Bounds'])
+        info_box_layout.addWidget(table_constr, 1, 1)
+
+        for elem in self.horizon_receiver.getInfoAtNodes(node):
+            rowPosition = table_vars.rowCount()
+            table_vars.insertRow(rowPosition)
+            table_vars.setItem(rowPosition, 0, QTableWidgetItem((str(elem['var']))))
+            table_vars.setItem(rowPosition, 1, QTableWidgetItem((str(elem['lb']))))
+            table_vars.setItem(rowPosition, 2, QTableWidgetItem((str(elem['ub']))))
+            table_vars.setItem(rowPosition, 3, QTableWidgetItem((str(elem['w0']))))
+
+        table_vars.resizeColumnsToContents()

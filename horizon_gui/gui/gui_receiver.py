@@ -200,10 +200,6 @@ class horizonImpl():
             return False, signal
 
     def updateFunctionNodes(self, name, nodes):
-        # small hack to include also the max for each couple of min/max --> [0, 3] --> 0, 1, 2, 3. Not 0, 1, 2
-        # for couples in nodes:
-        #     couples[1] = couples[1]+1
-
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
     def updateFunctionUpperBounds(self, name, ub, nodes):
@@ -269,6 +265,8 @@ class horizonImpl():
             for var in vars_dict.values():
                 vars.append(var)
 
+        cnstrs = self.casadi_prb.scopeNodeConstraints(node)
+        print(cnstrs)
         return vars
 
     def serialize(self):
