@@ -11,6 +11,7 @@ from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 from horizon_gui.custom_widgets.on_destroy_signal_window import DestroySignalWindow
 from horizon.misc_function import listOfListFLOATtoINT, unravelElements
 from functools import partial
+import os
 
 # horizon line
 #     | | | |____ horizon
@@ -49,7 +50,6 @@ class HorizonLine(QScrollArea):
 
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)
-
         self.nodes_line = NodeBoxLine(self.n_nodes)
         self.nodes_line.buttonPressed.connect(self.openProblemDetails)
         self.nodes_line.setAttribute(Qt.WA_StyledBackground, True)
@@ -243,25 +243,25 @@ class HorizonLine(QScrollArea):
         self.info_box.setWindowTitle('Node {}'.format(node))
         self.info_box.show()
         info_box_layout = QGridLayout(self.info_box)
-        # self.info_box.setFixedSize(info_box_layout.sizeHint())
-        # info_box_layout.setSizeConstraint(QLayout.SetFixedSize)
-        # self.info_box.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        # self.info_box.adjustSize()
+
+        if os.name == 'posix':
+            info_box_layout.setSizeConstraint(QLayout.SetFixedSize)
 
         label_title_state_var = QLabel('State Variables:')
         info_box_layout.addWidget(label_title_state_var, 0, 0)
         table_vars = QTableWidget()
         table_vars.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         table_vars.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        table_vars.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
+        # table_vars.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         table_vars.setColumnCount(4)
         table_vars.setHorizontalHeaderLabels(['Var Impl', 'Lower Bounds', 'Upper Bounds', 'Initial Guess'])
 
         info_box_layout.addWidget(table_vars, 0, 1)
 
-        for elem in self.horizon_receiver.getInfoAtNodes(node):
+        vars, cnstrs, costfuns = self.horizon_receiver.getInfoAtNodes(node)
+
+        for elem in vars:
             rowPosition = table_vars.rowCount()
             table_vars.insertRow(rowPosition)
             table_vars.setItem(rowPosition, 0, QTableWidgetItem((str(elem['var']))))
@@ -270,8 +270,6 @@ class HorizonLine(QScrollArea):
             table_vars.setItem(rowPosition, 3, QTableWidgetItem((str(elem['w0']))))
 
         table_vars.resizeColumnsToContents()
-
-
 
         label_title_constraint = QLabel('Constraint:')
         info_box_layout.addWidget(label_title_constraint, 1, 0)
@@ -279,16 +277,34 @@ class HorizonLine(QScrollArea):
         table_constr.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         table_constr.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
 
-        table_constr.setColumnCount(3)
-        table_constr.setHorizontalHeaderLabels(['Constraint', 'Lower Bounds', 'Upper Bounds'])
+        table_constr.setColumnCount(4)
+        table_constr.setHorizontalHeaderLabels(['Name', 'Function', 'Lower Bounds', 'Upper Bounds'])
         info_box_layout.addWidget(table_constr, 1, 1)
 
-        for elem in self.horizon_receiver.getInfoAtNodes(node):
-            rowPosition = table_vars.rowCount()
-            table_vars.insertRow(rowPosition)
-            table_vars.setItem(rowPosition, 0, QTableWidgetItem((str(elem['var']))))
-            table_vars.setItem(rowPosition, 1, QTableWidgetItem((str(elem['lb']))))
-            table_vars.setItem(rowPosition, 2, QTableWidgetItem((str(elem['ub']))))
-            table_vars.setItem(rowPosition, 3, QTableWidgetItem((str(elem['w0']))))
+        for name, item in cnstrs.items():
+            rowPosition = table_constr.rowCount()
+            table_constr.insertRow(rowPosition)
+            table_constr.setItem(rowPosition, 0, QTableWidgetItem(name))
+            table_constr.setItem(rowPosition, 1, QTableWidgetItem((str(item['val']))))
+            table_constr.setItem(rowPosition, 2, QTableWidgetItem((str(item['lb']))))
+            table_constr.setItem(rowPosition, 3, QTableWidgetItem((str(item['ub']))))
 
-        table_vars.resizeColumnsToContents()
+        table_constr.resizeColumnsToContents()
+
+        label_title_costfun = QLabel('Cost Functions:')
+        info_box_layout.addWidget(label_title_costfun, 2, 0)
+        table_costfun = QTableWidget()
+        table_costfun.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        table_costfun.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        table_costfun.setColumnCount(2)
+        table_costfun.setHorizontalHeaderLabels(['Name', 'Function'])
+        info_box_layout.addWidget(table_costfun, 2, 1)
+
+        for name, item in costfuns.items():
+            rowPosition = table_costfun.rowCount()
+            table_costfun.insertRow(rowPosition)
+            table_costfun.setItem(rowPosition, 0, QTableWidgetItem(name))
+            table_costfun.setItem(rowPosition, 1, QTableWidgetItem((str(item))))
+
+        table_costfun.resizeColumnsToContents()

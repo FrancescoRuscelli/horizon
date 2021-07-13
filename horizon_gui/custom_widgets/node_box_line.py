@@ -7,10 +7,9 @@ import sys
 class NodeBoxLine(QWidget):
     buttonPressed = pyqtSignal(int)
 
-    def __init__(self, horizon_receiver, nodes=0, parent=None):
+    def __init__(self, nodes=0, parent=None):
         super().__init__(parent)
 
-        self.horizon_receiver = horizon_receiver
         self.node_box_layout = QHBoxLayout(self)
         margins = self.node_box_layout.contentsMargins()
         margins.setBottom(0)

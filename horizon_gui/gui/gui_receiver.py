@@ -266,8 +266,9 @@ class horizonImpl():
                 vars.append(var)
 
         cnstrs = self.casadi_prb.scopeNodeConstraints(node)
-        print(cnstrs)
-        return vars
+        costfuns = self.casadi_prb.scopeNodeCostFunctions(node)
+
+        return vars, cnstrs, costfuns
 
     def serialize(self):
 

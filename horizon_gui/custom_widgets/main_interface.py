@@ -92,7 +92,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
                     line.addFunctionToMultiLine(name)
                 elif data['active'].getType() == 'costfunction':
                     line = self.costfunctionLine
-                    line.addFunctionToSingleLine(name)
+                    line.addFunctionToSingleLine(name, data['active'].getDim()[0])
                     line.addFunctionToMultiLine(name)
 
     @pyqtSlot()

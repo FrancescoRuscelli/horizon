@@ -101,6 +101,11 @@ class FunctionTabWidget(QTabWidget):
     def setHorizonNodes(self, nodes):
         self.n_nodes = nodes
         for i in range(self.count()):
-            self.widget(i).findChild(FunctionLine).updateHorizonNodes(self.n_nodes)
-            self.widget(i).findChild(BoundsLine).setNodes(self.n_nodes)
+            functionline = self.widget(i).findChild(FunctionLine)
+            if functionline:
+                functionline.updateHorizonNodes(self.n_nodes)
+
+            boundsline = self.widget(i).findChild(BoundsLine)
+            if boundsline:
+                boundsline.setNodes(self.n_nodes)
 

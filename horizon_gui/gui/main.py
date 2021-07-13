@@ -161,7 +161,7 @@ class HorizonGUI(QMainWindow):
     def openFile(self, file_path):
 
         self.updateSettings(file_path)
-        self.logger.warning('Opening file: {}'.format(file_path))
+        self.logger.info('Opening file: {}'.format(file_path))
         self.loadHorizon(file_path)
         self.writeInStatusBar('Opening Horizon problem!')
 
@@ -190,7 +190,7 @@ class HorizonGUI(QMainWindow):
 
         if file_path:
 
-            self.logger.warning('Saving to File: {}'.format(file_path))
+            self.logger.info('Saving to File: {}'.format(file_path))
             self.current_save_file = file_path
             self.saveHorizon(self.current_save_file, self.current_horizon)
 
@@ -211,7 +211,7 @@ class HorizonGUI(QMainWindow):
 
         loaded_horizon.deserialize()
 
-        self.logger.warning('Loaded Horizon: {}'.format(loaded_horizon))
+        self.logger.info('Loaded Horizon: {}'.format(loaded_horizon))
         self.initializeGui(loaded_horizon)
 
     def saveHorizon(self, file_path, horizon_to_save):
@@ -232,6 +232,7 @@ class HorizonGUI(QMainWindow):
             pickle.dump(horizon_to_save, f)
 
         horizon_to_save.deserialize()
+
 
         # print('after:', horizon_to_save.state_var_container.state_var)
         # print('after:', horizon_to_save.state_var_container.state_var_impl)
