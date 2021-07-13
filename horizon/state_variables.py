@@ -207,6 +207,9 @@ class StateVariables:
 
         return var
 
+    def getVarImplAtNode(self, k):
+        return self.state_var_impl['n' + str(k)]
+
     def getVarImplDict(self):
         return self.state_var_impl
 

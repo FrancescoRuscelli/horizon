@@ -21,18 +21,11 @@ class Problem:
         self.nodes = N + 1
         # state variable to optimize
         self.state_var_container = sv.StateVariables(self.nodes)
+        self.function_container = fc.FunctionsContainer(self.state_var_container, self.nodes, self.logger)
 
         # just variables
         # todo one could set also non state variable right?
         self.var_container = list()
-
-        # constraint variables
-        self.cnstr_container = list()
-        self.cnstr_impl = list()
-        self.cnstr_impl_dict = dict()
-
-        self.costfun_container = list()
-        self.costfun_impl = list()
 
     def createStateVariable(self, name, dim, prev_nodes=None):
         var = self.state_var_container.setStateVar(name, dim, prev_nodes)
@@ -70,8 +63,6 @@ class Problem:
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
 
-        container = self.cnstr_container
-
         if not nodes:
             nodes = [0, self.nodes]
 
@@ -79,125 +70,74 @@ class Problem:
         if self.debug_mode:
             self.logger.debug('Creating function "{}": {} with abstract variables {}'.format(name, g, used_var))
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
-        container.append(fun)
+
+        self.function_container.addFunction(fun)
 
         return fun
 
     def createCostFunction(self, name, j, nodes=None):
 
-        container = self.costfun_container
         if not nodes:
             nodes = [0, self.nodes]
 
         used_var = self._getUsedVar(j)
 
         fun = fc.CostFunction(name, j, used_var, nodes)
-        container.append(fun)
+
+        self.function_container.addFunction(fun)
 
         return fun
 
     def removeCostFunction(self, name):
 
-        if self.debug_mode:
-            self.logger.debug('Functions before removal: {}'.format(self.costfun_container))
-        for fun in self.costfun_container:
-            if fun.getName() == name:
-                self.costfun_container.remove(fun)
-        if self.debug_mode:
-            self.logger.debug('Function after removal: {}'.format(self.costfun_container))
+        # if self.debug_mode:
+        #     self.logger.debug('Functions before removal: {}'.format(self.costfun_container))
+        self.function_container.removeFunction(name)
+        # if self.debug_mode:
+        #     self.logger.debug('Function after removal: {}'.format(self.costfun_container))
 
     def removeConstraint(self, name):
-        for fun in self.cnstr_container:
-            if fun.getName() == name:
-                self.cnstr_container.remove(fun)
+        self.function_container.removeFunction(name)
 
     def setNNodes(self, n_nodes):
         self.nodes = n_nodes + 1
         self.state_var_container.setNNodes(self.nodes)
-
-        for cnstr in self.cnstr_container:
-            cnstr.setNodes([i for i in cnstr.getNodes() if i in range(self.nodes)])
-
-        for costfun in self.costfun_container:
-            costfun.setNodes([i for i in costfun.getNodes() if i in range(self.nodes)])
-
-    def _implementFunctions(self, container, node):
-        f_impl = list()
-
-        # TODO be careful about ordering
-        for fun in container:
-            f = fun.getFunction()
-
-            # implement constraint only if constraint is present in node k
-            if node in fun.getNodes():
-                used_vars = list()
-                for name, val in fun.getVariables().items():
-                    var = self.state_var_container.getVarImpl(name, node)
-                    used_vars.append(var)
-
-                f_impl.append(f(*used_vars))
-                if self.debug_mode:
-                    self.logger.debug('Implemented function "{}": {} with vars {}'.format(fun.getName(), f_impl, used_vars))
-        return f_impl
-
-    def _updateConstraints(self, node):
-
-        temp_cnsrt_impl = self._implementFunctions(self.cnstr_container, node)
-        if temp_cnsrt_impl:
-            # add implemented constraints in list
-            self.cnstr_impl_dict['n' + str(node)] = temp_cnsrt_impl
-            self.cnstr_impl += temp_cnsrt_impl
-
-    # def getVariablesName(self):
-    #     return [name for name, var in self.var]
-
-    def _updateCostFunctions(self, node):
-
-        temp_costfun_impl = self._implementFunctions(self.costfun_container, node)
-        if temp_costfun_impl:
-            # add implemented cost function in list
-            self.costfun_impl += temp_costfun_impl
-
-    # todo add setStateBoundsFromName
-    # def setStateBoundsFromName(self, name, ubw, lbw, nodes=None):
+        self.function_container.setNNodes(self.nodes)
 
     def createProblem(self):
         # this is to reset both the constraints and the cost functions everytime I create a problem
-        self.cnstr_impl.clear()
-        self.costfun_impl.clear()
         self.state_var_container.clear()
+        self.function_container.clear()
 
         for k in range(self.nodes):  # todo decide if N or N+1
             self.logger.debug('Node {}:'.format(k))
             # implement the abstract state variable with the current node
             self.state_var_container.update(k)
-            # implement the constraint
-            self._updateConstraints(k) #todo not sure but ok, maybe better a constraint class container that updates takin state_var_container?
-            self._updateCostFunctions(k)
+            # implement the constraints and the cost functions with the current node
+            self.function_container.update(k)
+
             self.logger.debug('===========================================')
 
-            self.costfun_sum = cs.sum1(cs.vertcat(*self.costfun_impl))
+        self.j = self.function_container.getCostFImplSum()
+        self.w = self.state_var_container.getVarImplList()
+        self.g = self.function_container.getCnstrFList()
 
         # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
-        # self.logger.debug('constraints unraveled:', cs.vertcat(*self.cnstr_impl))
-        # self.logger.debug('cost functions unraveled:', cs.vertcat(*self.costfun_impl))
-        # self.logger.debug('cost function summed:', self.costfun_sum)
+        # self.logger.debug('constraints unraveled:', cs.vertcat(*self. ...))
+        # self.logger.debug('cost functions unraveled:', cs.vertcat(*self. ...))
+        # self.logger.debug('cost function summed:', self.j)
         # self.logger.debug('----------------------------------------------------')
-        # todo add checking for everything
-        j = self.costfun_sum
-        w = self.state_var_container.getVarImplList()
-        g = cs.vertcat(*self.cnstr_impl)
 
         if self.debug_mode:
-            self.logger.debug('cost fun: {}'.format(j))
-            self.logger.debug('state variables: {}'.format(w))
-            self.logger.debug('constraints: {}'.format(g))
+            self.logger.debug('cost fun: {}'.format(self.j))
+            self.logger.debug('state variables: {}'.format(self.w))
+            self.logger.debug('constraints: {}'.format(self.g))
 
-        self.prob = {'f': j, 'x': w, 'g': g}
+        self.prob = {'f': self.j, 'x': self.w, 'g': self.g}
 
         self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
-                           {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                            'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+                                {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                                 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
     def solveProblem(self):
 
@@ -205,50 +145,42 @@ class Problem:
         self.state_var_container.updateBounds()
         self.state_var_container.updateInitialGuess()
 
-        w = self.state_var_container.getVarImplList()
         self.w0 = self.state_var_container.getInitialGuessList()
 
         if self.debug_mode:
             self.logger.debug('Initial guess vector for variables:'.format(self.state_var_container.getInitialGuessList()))
 
-        g = cs.vertcat(*self.cnstr_impl)
-        j = self.costfun_sum
-
-        self.lbg = []
-        self.ubg = []
-
-        for node in range(self.nodes):
-            for cnstr in self.cnstr_container:
-                if node in cnstr.getNodes():
-                    self.lbg += cnstr.getLowerBounds(node)
-                    self.ubg += cnstr.getUpperBounds(node)
-
         self.lbw = self.state_var_container.getBoundsMinList()
         self.ubw = self.state_var_container.getBoundsMaxList()
 
+        self.lbg = self.function_container.getLowerBoundsList()
+        self.ubg = self.function_container.getUpperBoundsList()
+
+
         if self.debug_mode:
             self.logger.debug('================')
-            self.logger.debug('len w: {}'.format(w.shape))
+            self.logger.debug('len w: {}'.format(self.w.shape))
             self.logger.debug('len lbw: {}'.format(len(self.lbw)))
             self.logger.debug('len ubw: {}'.format(len(self.ubw)))
             self.logger.debug('len w0: {}'.format(len(self.w0)))
-            self.logger.debug('len g: {}'.format(g.shape))
+            self.logger.debug('len g: {}'.format(self.g.shape))
             self.logger.debug('len lbg: {}'.format(len(self.lbg)))
             self.logger.debug('len ubg: {}'.format(len(self.ubg)))
 
 
             self.logger.debug('================')
-            self.logger.debug('w: {}'.format(w))
+            self.logger.debug('w: {}'.format(self.w))
             self.logger.debug('lbw: {}'.format(self.lbw))
             self.logger.debug('ubw: {}'.format(self.ubw))
-            self.logger.debug('g: {}'.format(g))
+            self.logger.debug('g: {}'.format(self.g))
             self.logger.debug('lbg: {}'.format(self.lbg))
             self.logger.debug('ubg: {}'.format(self.ubg))
-            self.logger.debug('j: {}'.format(j))
+            self.logger.debug('j: {}'.format(self.j))
 
         # t_to_set_up = time.time() - t_start
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
+
         sol = self.solver(x0=self.w0, lbx=self.lbw, ubx=self.ubw, lbg=self.lbg, ubg=self.ubg)
 
         # t_to_solve = time.time() - t_start
@@ -290,38 +222,23 @@ class Problem:
 
     def scopeNodeVars(self, node):
 
-        if 'n' + str(node) in self.state_var_container.state_var_impl:
-            return self.state_var_container.state_var_impl['n' + str(node)]
-        else:
-            return None
-
+        return self.state_var_container.getVarImplAtNode(node)
 
     def scopeNodeConstraints(self, node):
+        return self.function_container.getCnstrFImplAtNode(node)
 
-        if 'n' + str(node) in self.cnstr_impl_dict:
-            return self.cnstr_impl_dict['n' + str(node)]
-        else:
-            return None
+    def scopeNodeCostFunctions(self, node):
+        return self.function_container.getCostFImplAtNode(node)
 
     def serialize(self):
 
         self.state_var_container.serialize()
-
-        self.cnstr_container[:] = [var.serialize() for var in self.cnstr_container]
-        self.cnstr_impl[:] = [var.serialize() for var in self.cnstr_impl]
-
-        self.costfun_container[:] = [var.serialize() for var in self.costfun_container]
-        self.costfun_impl[:] = [var.serialize() for var in self.costfun_impl]
+        self.function_container.serialize()
 
     def deserialize(self):
 
         self.state_var_container.deserialize()
-
-        self.cnstr_container[:] = [var.deserialize() for var in self.cnstr_container]
-        self.cnstr_impl[:] = [var.deserialize() for var in self.cnstr_impl]
-
-        self.costfun_container[:] = [var.deserialize() for var in self.costfun_container]
-        self.costfun_impl[:] = [var.deserialize() for var in self.costfun_impl]
+        self.function_container.deserialize()
 
 
 if __name__ == '__main__':
@@ -342,7 +259,7 @@ if __name__ == '__main__':
 
     # print('getVarImplList way before:', prb.state_var_container.getVarImplList())
     danieli = prb.createConstraint('danieli', x+y)
-
+    sucua = prb.createCostFunction('sucua', x*y)
     prb.createProblem()
 
     for i in range(8):
