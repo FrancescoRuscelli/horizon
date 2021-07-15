@@ -4,11 +4,14 @@ import casadi as cs
 from collections import OrderedDict
 import logging
 import numpy as np
+import copy
+import pickle
 
 '''
 now the StateVariable is only abstract at the very beginning.
 Formerly
 '''
+
 class StateVariable(cs.SX):
     def __init__(self, tag, dim, nodes):
         super(StateVariable, self).__init__(cs.SX.sym(tag, dim))
@@ -86,8 +89,6 @@ class StateVariable(cs.SX):
 
         self.var_impl = new_var_impl
 
-
-
     # todo project only at node n (it is used if I want to reproject at each node)
     # def _projectN(self, n):
     #
@@ -128,6 +129,10 @@ class StateVariable(cs.SX):
     def getNNodes(self):
         return self.nodes
 
+    def __reduce__(self):
+        return (self.__class__, (self.tag, self.dim, self.nodes, ))
+
+
 class InputVariable(StateVariable):
     def __init__(self, tag, dim, nodes):
         super(InputVariable, self).__init__(tag, dim, nodes)
@@ -148,7 +153,6 @@ class InputVariable(StateVariable):
             self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
 
 class StateVariables:
-
     def __init__(self, nodes, logger=None):
 
         self.logger = logger
@@ -156,7 +160,6 @@ class StateVariables:
 
         self.state_var = OrderedDict()
         self.state_var_prev = OrderedDict()
-
         self.state_var_impl = OrderedDict()
 
     def setVar(self, var_type, name, dim, prev_nodes):
@@ -331,41 +334,77 @@ class StateVariables:
 
     def serialize(self):
 
-        for name, value in self.state_var.items():
-            self.state_var[name] = value.serialize()
+        # todo how to do? I may use __reduce__ but I don't know how
+        # for name, value in self.state_var.items():
+        #     print('state_var', type(value))
+        #     self.state_var[name] = value.serialize()
 
-        for name, value in self.state_var_prev.items():
-            self.state_var_prev[name] = value.serialize()
+        # for name, value in self.state_var_prev.items():
+        #     print('state_var_prev', type(value))
+        #     self.state_var_prev[name] = value.serialize()
 
-        for name, value in self.state_var_impl.items():
-            self.state_var_impl[name] = value.serialize()
+        for node, item in self.state_var_impl.items():
+            for name, elem in item.items():
+                self.state_var_impl[node][name]['var'] = elem['var'].serialize()
 
     def deserialize(self):
 
-        for name, value in self.state_var.items():
-            self.state_var[name] = cs.SX.deserialize(value)
+        # for name, value in self.state_var.items():
+        #     self.state_var[name] = cs.SX.deserialize(value)
+        #
+        # for name, value in self.state_var_prev.items():
+        #     self.state_var_prev[name] = cs.SX.deserialize(value)
 
-        for name, value in self.state_var_prev.items():
-            self.state_var_prev[name] = cs.SX.deserialize(value)
+        for node, item in self.state_var_impl.items():
+            for name, elem in item.items():
+                self.state_var_impl[node][name]['var'] = cs.SX.deserialize(elem['var'])
 
-        for name, value in self.state_var_impl.items():
-            self.state_var_impl[name] = cs.SX.deserialize(value)
-
+    # def __reduce__(self):
+    #     return (self.__class__, (self.nodes, self.logger, ))
 
 if __name__ == '__main__':
+
+    # x = StateVariable('x', 2, 4)
+    # x._project()
+    # print('before serialization:', x)
+    # print('bounds:', x.getBounds(2))
+    # x.setBounds(2,2)
+    # print('bounds:', x.getBounds(2))
+    # print('===PICKLING===')
+    # a = pickle.dumps(x)
+    # print(a)
+    # print('===DEPICKLING===')
+    # x_new = pickle.loads(a)
+    #
+    # print(type(x_new))
+    # print(x_new)
+    # print(x_new.tag)
+    #
+    # print('bounds:', x.getBounds(2))
+    # print(x.var_impl)
+    # exit()
 
     # x = StateVariable('x', 2, 15)
     # print([id(val['var']) for val in x.var_impl.values()])
     # x._setNNodes(20)
     # print([id(val['var']) for val in x.var_impl.values()])
 
-    sv = StateVariables(3)
-    x = sv.setVar('x', 2)
-    sv.setVar('y', 2)
+    n_nodes = 10
+    sv = StateVariables(n_nodes)
+    sv.setStateVar('x', 2)
+    sv.setStateVar('y', 2)
+    for k in range(n_nodes):
+        sv.update(k)
+
+    print(sv.state_var)
+    print(sv.state_var_prev)
+    print(sv.state_var_impl)
+    print(sv.getVarAbstrDict())
+    print(sv.getVarImplDict())
     # x_prev = sv.setVar('x', 2, -2)
     #
-    for i in range(4):
-        sv.update(i)
+    # for i in range(4):
+    #     sv.update(i)
     #
     # print('state_var_prev', sv.state_var_prev)
     # print('state_var_impl', sv.state_var_impl)
@@ -375,4 +414,14 @@ if __name__ == '__main__':
     # print('sv.getVarImplList()', sv.getVarImplList())
     # print('sv.getVarImpl()', sv.getVarImpl('x-2', 0))
 
+    print('===PICKLING===')
+    sv_serialized = pickle.dumps(sv)
+    print(sv_serialized)
+    print('===DEPICKLING===')
+    sv_new = pickle.loads(sv_serialized)
 
+    print(sv_new.state_var)
+    print(sv_new.state_var_prev)
+    print(sv_new.state_var_impl)
+    print(sv_new.getVarAbstrDict())
+    print(sv_new.getVarImplDict())

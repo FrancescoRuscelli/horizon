@@ -3,6 +3,7 @@ import parser
 import re
 import casadi as cs
 import math
+import pickle
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -274,24 +275,39 @@ class horizonImpl():
 
         self.casadi_prb.serialize()
 
-        # serialize state variables
-        for name, data in self.sv_dict.items():
-            self.logger.debug('Serializing variable "{}": {}'.format(name, data['var']))
-            self.sv_dict[name]['var'] = data['var'].serialize()
 
-        # serialize functions
+        # # serialize state variables
+        # for name, data in self.sv_dict.items():
+        #     self.logger.debug('Serializing variable "{}": {}'.format(name, data['var']))
+        #     self.sv_dict[name]['var'] = data['var'].serialize()
+        #
+        # # serialize functions
+        # print(self.casadi_prb.getConstraints())
+        # print(self.fun_dict)
+        #
+        # for elem in self.fun_dict.values():
+        #     if 'active' in elem:
+        #         print(elem['active'])
+        #         del elem['active']
+
         for name, data in self.fun_dict.items():
-            self.logger.debug('Serializing function "{}": {}'.format(name, data['fun']))
+            if self.logger:
+                self.logger.debug('Serializing function "{}": {}'.format(name, data['fun']))
             self.fun_dict[name]['fun'] = data['fun'].serialize()
 
     def deserialize(self):
 
         self.casadi_prb.deserialize()
 
-        # deserialize state variables
-        for name, data in self.sv_dict.items():
-            self.sv_dict[name]['var'] = cs.SX.deserialize(data['var'])
+        # # deserialize state variables
+        # for name, data in self.sv_dict.items():
+        #     self.sv_dict[name]['var'] = cs.SX.deserialize(data['var'])
 
+        # for name, data in self.casadi_prb.getConstraints().items():
+        #     print(name)
+        #     print(data)
+        #     # self.fun_dict[name]['fun'] =
+        #     self.fun_dict[name]['active'] = data
         # deserialize functions
         for name, data in self.fun_dict.items():
             self.fun_dict[name]['fun'] = cs.SX.deserialize(data['fun'])
@@ -310,7 +326,16 @@ class horizonImpl():
 
 if __name__ == '__main__':
 
-    impl = horizonImpl(20)
-    impl.addStateVariable(dict(name='x', dim=3, prev=0))
+    impl = horizonImpl(5)
+    impl.addStateVariable(dict(name='x', dim=1, prev=0))
+    impl.addStateVariable(dict(name='y', dim=1, prev=0))
+
+    fun = dict(name='asd', str='x+y')
+    impl.addFunction(fun)
+
+    impl.serialize()
+    pickle.dumps(impl)
+
+
 
 

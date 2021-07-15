@@ -3,10 +3,10 @@ from functools import partial
 import pickle
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QLabel, QToolBar, QAction, qApp, QLineEdit,
                              QMenu, QPushButton, QVBoxLayout, QGridLayout, QWidget, QMenuBar, QStyle,
-                             QSpinBox, QProgressBar, QFileDialog)
+                             QSpinBox, QProgressBar, QFileDialog, QDialog)
 
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QSettings
+from PyQt5.QtCore import Qt, QSettings, QDir
 
 from horizon_gui.custom_widgets import starting_screen, main_interface, on_destroy_signal_window
 from horizon_gui.gui import gui_receiver
@@ -32,6 +32,7 @@ from horizon_gui.definitions import ROOT_DIR
 # WHAT IF NODES ARE 0 ---> WHAT TO DO???
 # STRANGE BEHAVIOUR WHEN ADDING REMOVING AND ADDING AGAIN SAME FUNCTION TO HORIZONLINE
 # STRANGE BEHAVIOUR WHEN ADDING FUNCTION (DEPENDS_ON ERROR)
+# WHEN RELOADING, MARGINS OF MULTI_SLIDER IS WRONG
 
 
 # class EmittingStream(QObject):
@@ -152,9 +153,7 @@ class HorizonGUI(QMainWindow):
         file_horizon, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
                                                 "Pickle Files (*.pickle)", options=options)
         if file_horizon:
-
             self.openFile(file_horizon)
-
         else:
             self.logger.warning('File not found. Failed loading horizon problem.')
 
@@ -176,16 +175,23 @@ class HorizonGUI(QMainWindow):
         else:
             self.saveHorizon(self.current_save_file, self.current_horizon)
 
+        self.updateSettings(self.current_save_file)
         self.writeInStatusBar('SAVING!')
 
     def saveAsFile(self):
 
+
         dlg = QFileDialog()
         dlg.setDefaultSuffix('pickle')
+        dlg.setFilter(dlg.filter() | QDir.Hidden)
+        dlg.setNameFilters(['Pickle Files (*.pickle)'])
 
-        file_path, _ = dlg.getSaveFileName(self, "QFileDialog.getSaveFileName()",
-                                           "", "Pickle Files (*.pickle)")
-        # options = QFileDialog.DontUseNativeDialog # if I use this on Windows, i cannot get defaultSuffix
+        dlg.setAcceptMode(QFileDialog.AcceptSave)
+
+        if dlg.exec_() == QDialog.Accepted:
+            file_path = dlg.selectedFiles()[0]
+        else:
+            file_path = None
 
 
         if file_path:
@@ -216,37 +222,78 @@ class HorizonGUI(QMainWindow):
 
     def saveHorizon(self, file_path, horizon_to_save):
 
-        # print('way_before:', horizon_to_save.state_var_container.state_var)
-        # print('way_before:', horizon_to_save.state_var_container.state_var_impl)
-        # print('way_before:', [constr.getFunction() for constr in horizon_to_save.cnstr_container])
+        # print('way_before:', horizon_to_save.casadi_prb.state_var_container.state_var)
+        # print('way_before:', horizon_to_save.casadi_prb.state_var_container.state_var_prev)
+        # print('way_before:', horizon_to_save.casadi_prb.state_var_container.state_var_impl)
+        # print('way_before:', [elem.getFunction() for elem in horizon_to_save.casadi_prb.function_container.cnstr_container.values()])
+        # print('way_before:', horizon_to_save.casadi_prb.function_container.cnstr_impl)
+        # print('way_before:', [elem.getFunction() for elem in horizon_to_save.casadi_prb.function_container.costfun_container.values()])
+        # print('way_before:', horizon_to_save.casadi_prb.function_container.costfun_impl)
+        # print('way_before:', horizon_to_save.casadi_prb.function_container.state_vars.state_var)
+        # print('way_before:', horizon_to_save.casadi_prb.prob['f'])
+        # print('way_before:', horizon_to_save.casadi_prb.prob['x'])
+        # print('way_before:', horizon_to_save.casadi_prb.prob['g'])
+        # print('way_before', horizon_to_save.sv_dict)
+        # print('way_before', horizon_to_save.fun_dict)
+
         # todo is this intelligent?
         # serializing and deserializing everytime is stupid right?
         # make a copy of itself and serialize that one!
         horizon_to_save.serialize()
 
-        # print('before:', horizon_to_save.state_var_container.state_var)
-        # print('before:', horizon_to_save.state_var_container.state_var_impl)
-        # print('before:', [constr.getFunction() for constr in horizon_to_save.cnstr_container])
+        # print('before:', horizon_to_save.casadi_prb.state_var_container.state_var)
+        # print('before:', horizon_to_save.casadi_prb.state_var_container.state_var_prev)
+        # print('before:', horizon_to_save.casadi_prb.state_var_container.state_var_impl)
+        # print('before:', [elem.getFunction() for elem in horizon_to_save.casadi_prb.function_container.cnstr_container.values()])
+        # print('before:', horizon_to_save.casadi_prb.function_container.cnstr_impl)
+        # print('before:', [elem.getFunction() for elem in horizon_to_save.casadi_prb.function_container.costfun_container.values()])
+        # print('before:', horizon_to_save.casadi_prb.function_container.costfun_impl)
+        # print('before:', horizon_to_save.casadi_prb.function_container.state_vars.state_var)
+        # print('before:', horizon_to_save.casadi_prb.prob['f'])
+        # print('before:', horizon_to_save.casadi_prb.prob['x'])
+        # print('before:', horizon_to_save.casadi_prb.prob['g'])
+        # print('before', horizon_to_save.sv_dict)
+        # print('before', horizon_to_save.fun_dict)
+
+        # print('var_container is pickleable?', self.pickleable(horizon_to_save.casadi_prb.var_container))
+        # print('state_var_container is pickleable?', self.pickleable(horizon_to_save.casadi_prb.state_var_container))
+        # print('function_container is pickleable?', self.pickleable(horizon_to_save.casadi_prb.function_container))
+        # print('nodes is pickleable?', self.pickleable(horizon_to_save.casadi_prb.nodes))
+        # print('solver is pickleable?', self.pickleable(horizon_to_save.casadi_prb.solver))
+        # print('prob is pickleable?', self.pickleable(horizon_to_save.casadi_prb.prob))
+        # print('sv_dict is pickleable?', self.pickleable(horizon_to_save.sv_dict))
+        # print('fun_dict is pickleable?', self.pickleable(horizon_to_save.fun_dict))
+
 
         with open(file_path, 'wb') as f:
             pickle.dump(horizon_to_save, f)
 
         horizon_to_save.deserialize()
 
-
-        # print('after:', horizon_to_save.state_var_container.state_var)
-        # print('after:', horizon_to_save.state_var_container.state_var_impl)
-        # print('after:', [constr.getFunction() for constr in horizon_to_save.cnstr_container])
+        # print('after', horizon_to_save.casadi_prb.state_var_container.state_var)
+        # print('after', horizon_to_save.casadi_prb.state_var_container.state_var_prev)
+        # print('after', horizon_to_save.casadi_prb.state_var_container.state_var_impl)
+        # print('after:', [elem.getFunction() for elem in horizon_to_save.casadi_prb.function_container.cnstr_container.values()])
+        # print('after:', horizon_to_save.casadi_prb.function_container.cnstr_impl)
+        # print('after:', [elem.getFunction() for elem in horizon_to_save.casadi_prb.function_container.costfun_container.values()])
+        # print('after:', horizon_to_save.casadi_prb.function_container.costfun_impl)
+        # print('after:', horizon_to_save.casadi_prb.function_container.state_vars.state_var)
+        # print('after:', horizon_to_save.casadi_prb.prob['f'])
+        # print('after:', horizon_to_save.casadi_prb.prob['x'])
+        # print('after:', horizon_to_save.casadi_prb.prob['g'])
+        # print('after', horizon_to_save.sv_dict)
+        # print('after', horizon_to_save.fun_dict)
 
     def openSettings(self):
 
+        # todo save also the settings of the GUI
         self.settings_widget = on_destroy_signal_window.DestroySignalWindow()
         self.settings_layout = QGridLayout()
 
         nodes_input_label = QLabel("Number of nodes:")
         # state_variables_label = QLabel("Add state variable:")
         nodes_input = QSpinBox()
-        nodes_input.setRange(0,999)
+        nodes_input.setRange(0, 999)
         nodes_input.setValue(self.setup_opt['nodes'])
         # state_variables = QLineEdit()
         # state_variables_button = QPushButton("Add")
@@ -413,6 +460,13 @@ class HorizonGUI(QMainWindow):
 
     def _connectToolBars(self):
         print('_connectToolBars yet to implement')
+
+    def pickleable(self, obj):
+        try:
+            pickle.dumps(obj)
+        except pickle.PicklingError:
+            return False
+        return True
 
 if __name__ == '__main__':
 

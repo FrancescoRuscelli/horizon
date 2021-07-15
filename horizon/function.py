@@ -2,6 +2,7 @@ import casadi as cs
 import numpy as np
 from horizon import misc_function as misc
 from collections import OrderedDict
+import pickle
 
 class Function:
     def __init__(self, name, f, used_vars, nodes):
@@ -33,6 +34,7 @@ class Function:
             return None
 
     def _project(self, node, used_vars):
+        # print('projected fun "{}" with vars {}:'.format(self.fun, used_vars))
         self.fun_impl['n' + str(node)] = self.fun(*used_vars)
         return self.fun_impl['n' + str(node)]
 
@@ -51,6 +53,8 @@ class Function:
                 self.nodes.append(i)
                 self.nodes.sort()
 
+        print('nodes of function {} are: {}'.format(self.name, self.nodes))
+
     def getVariables(self):
         return self.vars
         # return [var for name, var in self.var]
@@ -65,6 +69,9 @@ class Function:
         for name, data in self.vars.items():
             self.vars[name] = data.serialize()
 
+        for node, item in self.fun_impl.items():
+            self.fun_impl[node] = item.serialize()
+
         self.fun = self.fun.serialize()
 
         return self
@@ -76,9 +83,13 @@ class Function:
         for name, data in self.vars.items():
             self.vars[name] = cs.SX.deserialize(data)
 
+        for node, item in self.fun_impl.items():
+            self.fun_impl[node] = cs.Function.deserialize(item)
+
         self.fun = cs.Function.deserialize(self.fun)
 
         return self
+
 
 class Constraint(Function):
     def __init__(self, name, f, used_vars, nodes, bounds=None):
@@ -125,6 +136,7 @@ class Constraint(Function):
 
     def setBounds(self, lb, ub, nodes=None):
 
+        # todo wrong! check if lb and ub are the length of the variable!
         self.setLowerBounds(lb, nodes)
         self.setUpperBounds(ub, nodes)
 
@@ -138,6 +150,22 @@ class Constraint(Function):
 
     def getBounds(self, nodes):
         return [self.getLowerBounds(nodes), self.getUpperBounds(nodes)]
+
+    def setNodes(self, nodes, erasing=False):
+        unraveled_nodes = misc.unravelElements(nodes)
+
+        if erasing:
+            self.nodes.clear()
+
+        # adding to function nodes
+        for i in unraveled_nodes:
+            if i not in self.nodes:
+                self.nodes.append(i)
+                self.nodes.sort()
+                # print('ciao')
+                # if 'n' + str(i) not in self.bounds:
+                #     pass #print(self.bounds)
+                    # self.bounds['n' + str(i)] = dict(lb=[-np.inf] * self.f.shape[0], ub=[np.inf] * self.f.shape[0])
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):
@@ -199,12 +227,15 @@ class FunctionsContainer:
 
         # TODO be careful about ordering
         for fun_name, fun in container.items():
-
+            # print('implementing function "{}" at node {}.'.format(fun_name, node))
+            # print('Function is active on nodes: {}'.format(fun.getNodes()))
+            # print('Function depends on variables: {}'.format(fun.getVariables()))
             # implement constraint only if constraint is present in node k
             if node in fun.getNodes():
                 used_vars = list()
                 for name, val in fun.getVariables().items():
                     var = self.state_vars.getVarImpl(name, node)
+                    # print('used abstract var "{}" implemented as {}'.format(name, var))
                     used_vars.append(var)
 
 
@@ -217,7 +248,7 @@ class FunctionsContainer:
                     fun_dict = f_impl
 
                 container_impl['n' + str(node)].update({fun_name: fun_dict})
-
+                # print('==================================================')
                 self.logger.debug('Implemented function "{}" of type {}: {} with vars {}'.format(fun_name, fun.getType(), f_impl, used_vars))
 
     def getCnstrFImpl(self, name, node):
@@ -287,6 +318,12 @@ class FunctionsContainer:
         for costfun in self.costfun_container.values():
             costfun.setNodes([i for i in costfun.getNodes() if i in range(self.nodes)])
 
+    def getNCnstrFun(self):
+        return len(self.cnstr_container)
+
+    def getNCostFun(self):
+        return len(self.costfun_container)
+
     def clear(self):
         self.cnstr_impl.clear()
         self.costfun_impl.clear()
@@ -295,32 +332,54 @@ class FunctionsContainer:
 
         for name, item in self.cnstr_container.items():
             self.cnstr_container[name] = item.serialize()
-        for node in self.cnstr_impl.values():
-            for name, item in node.items():
-                self.cnstr_impl[node][name] = item['val'].serialize()
+
+        for node, item in self.cnstr_impl.items():
+            for name, elem in item.items():
+                self.cnstr_impl[node][name]['val'] = elem['val'].serialize()
 
         for name, item in self.costfun_container.items():
             self.costfun_container[name] = item.serialize()
-        for node in self.costfun_impl.values():
-            for name, item in node.items():
-                self.costfun_impl[node][name] = item.serialize()
+
+        for node, item in self.costfun_impl.items():
+            for name, elem in item.items():
+                self.costfun_impl[node][name] = elem.serialize()
 
 
     def deserialize(self):
 
         for name, item in self.cnstr_container.items():
             self.cnstr_container[name] = item.deserialize()
-        for node in self.cnstr_impl.values():
-            for name, item in node.items():
-                self.cnstr_impl[node][name] = item['val'].deserialize()
 
+        for node in self.cnstr_impl.keys():
+            for name, item in self.cnstr_impl[node].items():
+                self.cnstr_impl[node][name]['val'] = cs.SX.deserialize(item['val'])
+
+        # these are CASADI functions
         for name, item in self.costfun_container.items():
             self.costfun_container[name] = item.deserialize()
-        for node in self.costfun_impl.values():
-            for name, item in node.items():
-                self.costfun_impl[node][name] = item.deserialize()
+
+        # these are SX variables
+        for node, item in self.costfun_impl.items():
+            for name, elem in item.items():
+                self.costfun_impl[node][name] = cs.SX.deserialize(elem)
 
 
 
+
+
+if __name__ == '__main__':
+
+    x = cs.SX.sym('x', 2)
+    y = cs.SX.sym('y', 2)
+    fun = x+y
+    used_var = dict(x=x, y=y)
+    funimpl = Function('dan', fun, used_var, 1)
+
+    funimpl = funimpl.serialize()
+    print('===PICKLING===')
+    funimpl_serialized = pickle.dumps(funimpl)
+    print(funimpl_serialized)
+    print('===DEPICKLING===')
+    funimpl_new = pickle.loads(funimpl_serialized)
 
 
