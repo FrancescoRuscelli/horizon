@@ -5,9 +5,7 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators
-
-
+from horizon.utils import utils, integrators, casadi_kin_dyn
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
@@ -18,9 +16,6 @@ FK_waist = cs.Function.deserialize(kindyn.fk('Waist'))
 FKR = cs.Function.deserialize(kindyn.fk('Contact1'))
 FKL = cs.Function.deserialize(kindyn.fk('Contact2'))
 FKRope = cs.Function.deserialize(kindyn.fk('rope_anchor2'))
-
-# Inverse Dynamics
-ID = cs.Function.deserialize(kindyn.rnea())
 
 # OPTIMIZATION PARAMETERS
 ns = 30  # number of shooting nodes
@@ -72,13 +67,59 @@ qdot.setBounds(qdot_min, qdot_max)
 
 qddot_min = (-100.*np.ones(nv)).tolist()
 qddot_max = (100.*np.ones(nv)).tolist()
-qddot.setBounds(qddot_min, qddot_max, [0,ns-1])
+qddot.setBounds(qddot_min, qddot_max)
 
 f_min = (-10000.*np.ones(nf)).tolist()
 f_max = (10000.*np.ones(nf)).tolist()
-f1.setBounds(f_min, f_max, [0,ns-1])
-f2.setBounds(f_min, f_max, [0,ns-1])
-frope.setBounds(f_min, f_max, [0,ns-1])
+f1.setBounds(f_min, f_max)
+f2.setBounds(f_min, f_max)
+frope.setBounds(f_min, f_max)
 
+# Add initial guess to STATE and CONTROL variables
+q_init = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                   0., 0., 0.,
+                   0., 0., 0.,
+                   0., 0., 0.,
+                   0.1]
+q.setInitialGuess(q_init)
 
+qdot_init = np.zeros(nv).tolist()
+qdot.setInitialGuess(qdot_init)
 
+qddot_init = np.zeros(nv).tolist()
+qddot.setInitialGuess(qdot_init)
+
+f_init = np.zeros(nf).tolist()
+f1.setInitialGuess(f_init)
+f2.setInitialGuess(f_init)
+frope.setInitialGuess(f_init)
+
+# Cost function
+prb.createCostFunction("min_joint_vel", 100.*cs.dot(qdot[6:-1], qdot[6:-1]))
+prb.createCostFunction("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]))
+prb.createCostFunction("min_f1", 1000.*cs.dot(f1, f1))
+prb.createCostFunction("min_f2", 1000.*cs.dot(f2, f2))
+
+frope_prev = prb.createInputVariable("frope", nf, -1)
+prb.createCostFunction("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), [1, ns])
+
+# Constraints
+prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))
+prb.createConstraint("qdotinit", qdot, nodes=0, bounds=dict(lb=qdot_init, ub=qdot_init))
+
+x_int = F_integrator(x0=x, p=qddot)
+prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=[0,ns], bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+
+tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
+                    -1000., -1000., -1000.,  # Contact 1
+                    -1000., -1000., -1000.,  # Contact 2
+                    0., 0., 0.,  # rope_anchor
+                    0.]  # rope
+tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
+                        1000., 1000., 1000.,  # Contact 1
+                        1000., 1000., 1000.,  # Contact 2
+                        0., 0., 0.,  # rope_anchor
+                        0.0]  # rope
+
+frame_force_mapping = {'rope_anchor2': frope}
+tau = casadi_kin_dyn.inverse_dynamics(q, qdot, qddot, frame_force_mapping, kindyn)

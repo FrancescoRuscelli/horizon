@@ -87,3 +87,5 @@ def dynamic_model_with_floating_base(q, ndot, nddot):
     xdot = cs.vertcat(cs.mtimes(R, ndot[0:3]), cs.vertcat(*quaterniondot), ndot[6:ndot.shape[0]], nddot)
 
     return x, xdot
+
+
