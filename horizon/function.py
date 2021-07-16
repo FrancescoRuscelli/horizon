@@ -93,11 +93,12 @@ class Function:
 
 class Constraint(Function):
     def __init__(self, name, f, used_vars, nodes, bounds=None):
-        super().__init__(name, f, used_vars, nodes)
 
         self.bounds = dict()
-        for node in self.nodes:
+        for node in nodes:
             self.bounds['n' + str(node)] = dict(lb=[-np.inf] * f.shape[0], ub=[np.inf] * f.shape[0])
+
+        super().__init__(name, f, used_vars, nodes)
 
         # todo setBounds
         if bounds is not None:
@@ -106,7 +107,6 @@ class Constraint(Function):
                 bounds['nodes'] = None
 
             self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
-
 
     # todo transform string in typeFun "ConstraintType"
     def getType(self):
@@ -162,10 +162,8 @@ class Constraint(Function):
             if i not in self.nodes:
                 self.nodes.append(i)
                 self.nodes.sort()
-                # print('ciao')
-                # if 'n' + str(i) not in self.bounds:
-                #     pass #print(self.bounds)
-                    # self.bounds['n' + str(i)] = dict(lb=[-np.inf] * self.f.shape[0], ub=[np.inf] * self.f.shape[0])
+                if 'n' + str(i) not in self.bounds:
+                    self.bounds['n' + str(i)] = dict(lb=[-np.inf] * self.f.shape[0], ub=[np.inf] * self.f.shape[0])
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):
