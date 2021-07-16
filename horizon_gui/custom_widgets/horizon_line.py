@@ -207,6 +207,7 @@ class HorizonLine(QScrollArea):
 
     def addFunctionToHorizon(self, name):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
+
         dim = self.horizon_receiver.getFunction(name)['active'].getDim()[0]
         if flag:
 
