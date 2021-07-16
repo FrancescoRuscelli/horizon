@@ -136,21 +136,22 @@ class StateVariable(cs.SX):
 class InputVariable(StateVariable):
     def __init__(self, tag, dim, nodes):
         super(InputVariable, self).__init__(tag, dim, nodes)
+        self.nodes = nodes-1
 
-    def getNNodes(self):
-        return self.nodes-1
-
-    def _project(self):
-        # state_var_impl --> dict
-        #  - key: nodes (n0, n1, ...)
-        #  - val: dict with name and value of implemented variable
-        for n in range(self.nodes-1):
-            var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
-            self.var_impl['n' + str(n)] = dict()
-            self.var_impl['n' + str(n)]['var'] = var_impl
-            self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
-            self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
-            self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
+    # def getNNodes(self):
+    #     return self.nodes-1
+    #
+    # def _project(self):
+    #     # state_var_impl --> dict
+    #     #  - key: nodes (n0, n1, ...)
+    #     #  - val: dict with name and value of implemented variable
+    #     for n in range(self.nodes-1):
+    #         var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
+    #         self.var_impl['n' + str(n)] = dict()
+    #         self.var_impl['n' + str(n)]['var'] = var_impl
+    #         self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
+    #         self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
+    #         self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
 
 class StateVariables:
     def __init__(self, nodes, logger=None):
