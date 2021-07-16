@@ -51,7 +51,6 @@ class Problem:
 
     def _getUsedVar(self, f):
         used_var = dict()
-        print('checking var dependencies of {} (id: {}) (type: {}) among abstract variables {} (id: {})'.format(f, id(f), type(f), self.state_var_container.getVarAbstrDict(), id(self.state_var_container.getVarAbstrDict())))
         for name_var, value_var in self.state_var_container.getVarAbstrDict().items():
             if cs.depends_on(f, value_var):
                 used_var[name_var] = value_var
@@ -63,13 +62,15 @@ class Problem:
     #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
-        print('creating constraint {}'.format(name))
+
         if not nodes:
             nodes = [0, self.nodes]
 
         used_var = self._getUsedVar(g)
+
         if self.debug_mode:
             self.logger.debug('Creating function "{}": {} with abstract variables {}'.format(name, g, used_var))
+
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
 
         self.function_container.addFunction(fun)
@@ -204,7 +205,7 @@ class Problem:
         solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.state_var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
-
+        self.logger.debug("SOLVER SOLUTION:")
         for node, val in self.state_var_container.getVarImplDict().items():
             if self.debug_mode:
                 self.logger.debug('Node: {}'.format(node))
@@ -213,15 +214,10 @@ class Problem:
                 dim = var['var'].shape[0]
                 node_number = int(node[node.index('n') + 1:])
                 solution_dict[name][:, node_number] = w_opt[pos:pos + dim]
-
-                if self.debug_mode:
-                    self.logger.debug('var {} of dim {}'.format(name, var['var'].shape[0]))
-                    self.logger.debug('Previous state: {}'.format(solution_dict))
-                    self.logger.debug('Var state: {}'.format(solution_dict[name]))
-                    self.logger.debug('Appending to {} opt sol [{}-{}]: {}'.format(name, pos, pos + dim, sol['x']))
-                    self.logger.debug('Current state: {}'.format(solution_dict))
-                    # self.logger.debug('~~~~~~~~~~~~~')
                 pos = pos + dim
+
+        if self.debug_mode:
+            self.logger.debug('Current state: {}'.format(solution_dict))
 
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
@@ -251,18 +247,18 @@ class Problem:
 
         if self.prob:
 
-            self.prob.clear()
-            ## print('serializing f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
-            ## print('serializing x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
-            ## print('serializing g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
+            # self.prob.clear()
+            # print('serializing f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
+            # print('serializing x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
+            # print('serializing g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
 
-            # self.prob['f'] = self.prob['f'].serialize()
-            # self.prob['x'] = self.prob['x'].serialize()
-            # self.prob['g'] = self.prob['g'].serialize()
+            self.prob['f'] = self.prob['f'].serialize()
+            self.prob['x'] = self.prob['x'].serialize()
+            self.prob['g'] = self.prob['g'].serialize()
 
-            ## print('serialized f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
-            ## print('serialized x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
-            ## print('serialized g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
+            # print('serialized f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
+            # print('serialized x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
+            # print('serialized g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
 
 
         return self
@@ -273,14 +269,13 @@ class Problem:
         self.function_container.deserialize()
 
         if self.prob:
-            pass
-            # self.prob['f'] = cs.Sparsity.deserialize(self.prob['f']) if self.function_container.getNCostFun() == 0 else cs.SX.deserialize(self.prob['f'])
-            # self.prob['x'] = cs.SX.deserialize(self.prob['x'])
-            # self.prob['g'] = cs.Sparsity.deserialize(self.prob['g']) if self.function_container.getNCnstrFun() == 0 else cs.SX.deserialize(self.prob['g'])
+            self.prob['f'] = cs.Sparsity.deserialize(self.prob['f']) if self.function_container.getNCostFun() == 0 else cs.SX.deserialize(self.prob['f'])
+            self.prob['x'] = cs.SX.deserialize(self.prob['x'])
+            self.prob['g'] = cs.Sparsity.deserialize(self.prob['g']) if self.function_container.getNCnstrFun() == 0 else cs.SX.deserialize(self.prob['g'])
 
-            ## print('deserializing f', self.prob['f'])
-            ## print('deserializing x', self.prob['x'])
-            ## print('deserializing g', self.prob['g'])
+            # print('deserializing f', self.prob['f'])
+            # print('deserializing x', self.prob['x'])
+            # print('deserializing g', self.prob['g'])
 
         return self
 
@@ -292,7 +287,13 @@ if __name__ == '__main__':
     x = prb.createStateVariable('x', 2)
     y = prb.createStateVariable('y', 2)
     danieli = prb.createConstraint('danieli', x+y)
+
+    danieli.setBounds([12, 12],[12, 12], 4)
     prb.createProblem()
+    prb.solveProblem()
+
+    exit()
+
 
     print('===PICKLING===')
     prb = prb.serialize()
@@ -312,7 +313,7 @@ if __name__ == '__main__':
     # todo how to check if the new state variable x is used by all the constraints?
 
     # oebus = prb_new.createConstraint('oebus', x)  # should not work
-    # oebus = prb_new.createConstraint('oebus', sv_new['x'])  # should work
+    oebus = prb_new.createConstraint('oebus', sv_new['x'])  # should work
     prb_new.createProblem()
 
     exit()
