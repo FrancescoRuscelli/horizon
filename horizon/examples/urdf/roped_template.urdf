@@ -1,0 +1,275 @@
+<?xml version="1.0" ?>
+<robot name="roped_template">
+    
+<material name="blue">
+  <color rgba="0 0 0.8 1"/>
+</material>
+<material name="black">
+  <color rgba="0 0 0 1"/>
+</material>
+<material name="white">
+  <color rgba="1 1 1 1"/>
+</material>
+<material name="grey">
+  <color rgba="0.5 0.5 0.5 1"/>
+</material>
+<material name="red">
+  <color rgba="1.0 0.0 0.0 1"/>
+</material>
+
+<link name="base_link"/>
+
+<link name="Waist">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <!--mass value="69.0"/-->
+      <mass value="40.0"/>
+      <!--inertia ixx="2.1667" ixy="0.0" ixz="0.0" iyy="1.8750" iyz="0.0" izz="1.0417"/-->
+      <inertia ixx="1.5" ixy="0.0" ixz="0.0" iyy="1.733" iyz="0.0" izz="0.8333"/>
+  </inertial>
+  <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Waist_visual">
+        <box size="0.3 0.4 0.6"/>
+      </geometry>
+      <material name="blue"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Waist_collision">
+        <box size="0.3 0.4 0.6"/>
+      </geometry>
+  </collision>
+</link>
+
+<joint name="base_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="Waist"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+</joint>
+
+<link name="world"/>
+
+<joint name="reference" type="floating">
+    <parent link="world"/>
+<child link="base_link"/>
+</joint>
+
+<!-- CONTACT LINKS -->
+<link name="Contact1_0"/>
+<link name="Contact1_1"/>
+<link name="Contact1">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="0.04" ixy="0.0" ixz="0.0" iyy="0.04" iyz="0.0" izz="0.04"/>
+  </inertial>
+  <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Contact1_visual">
+        <sphere radius="0.1"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Contact1_collision">
+        <sphere radius="0.1"/>
+      </geometry>
+  </collision>
+</link>
+
+<link name="Contact2_0"/>
+<link name="Contact2_1"/>
+<link name="Contact2">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="0.04" ixy="0.0" ixz="0.0" iyy="0.04" iyz="0.0" izz="0.04"/>
+  </inertial>
+  <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="contact_link2_visual">
+         <sphere radius="0.1"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="contact_link2_collision">
+        <sphere radius="0.1"/>
+      </geometry>
+  </collision>
+</link>
+
+
+<!-- JOINTS -->
+<!-- right leg-->
+<joint name="Contact1_x" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <parent link="Waist"/>
+    <child link="Contact1_0"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-.3" upper=".3" velocity="1"/>
+</joint>
+<joint name="Contact1_y" type="prismatic">
+    <axis xyz="0 1 0"/>
+    <parent link="Contact1_0"/>
+    <child link="Contact1_1"/>
+    <origin rpy="0 0 0" xyz="0 -0.15 0"/>
+    <limit effort="0" lower="-0.1" upper="0.05" velocity="1"/>
+</joint>
+<joint name="Contact1_z" type="prismatic">
+    <axis xyz="0 0 1"/>
+    <parent link="Contact1_1"/>
+    <child link="Contact1"/>
+    <origin rpy="0 0 0" xyz="0 0 -0.5"/>
+    <limit effort="0" lower="-0.1" upper="0.1" velocity="1"/>
+</joint>
+
+<!-- left leg-->
+<joint name="Contact2_x" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <parent link="Waist"/>
+    <child link="Contact2_0"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-.3" upper=".3" velocity="1"/>
+</joint>
+<joint name="Contact2_y" type="prismatic">
+    <axis xyz="0 1 0"/>
+    <parent link="Contact2_0"/>
+    <child link="Contact2_1"/>
+    <origin rpy="0 0 0" xyz="0 0.15 0"/>
+    <limit effort="0" lower="-0.05" upper="0.1" velocity="1"/>
+</joint>
+<joint name="Contact2_z" type="prismatic">
+    <axis xyz="0 0 1"/>
+    <parent link="Contact2_1"/>
+    <child link="Contact2"/>
+    <origin rpy="0 0 0" xyz="0 0 -0.5"/>
+    <limit effort="0" lower="-0.1" upper="0.1" velocity="1"/>
+</joint>
+
+<!-- anchor body-->
+<link name="rope_anchor1_1"/>
+<link name="rope_anchor1_2"/>
+<link name="rope_anchor1_3">
+<visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="rope_anchor1_3_visual">
+         <sphere radius="0.03"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="rope_anchor1_3_collision">
+        <sphere radius="0.03"/>
+      </geometry>
+  </collision>
+</link>
+
+<joint name="rope_anchor1_1_x" type="revolute">
+    <axis xyz="1 0 0"/>
+    <parent link="Waist"/>
+    <child link="rope_anchor1_1"/>
+    <origin rpy="0 0 0" xyz="0 0 0.3"/>
+    <limit effort="0" lower="-1.57" upper="1.57" velocity="10"/>
+</joint>
+<joint name="rope_anchor1_2_y" type="revolute">
+    <axis xyz="0 1 0"/>
+    <parent link="rope_anchor1_1"/>
+    <child link="rope_anchor1_2"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1.57" upper="1.57" velocity="10"/>
+</joint>
+<joint name="rope_anchor1_3_z" type="revolute">
+    <axis xyz="0 0 1"/>
+    <parent link="rope_anchor1_2"/>
+    <child link="rope_anchor1_3"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-3.1415" upper="3.1415" velocity="10"/>
+</joint>
+
+<!-- rope -->
+<link name="rope_link1">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.187" ixy="0.0" ixz="0.0" iyy="0.187" iyz="0.0" izz="0.00005"/>
+  </inertial>
+<visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="rope_link1_visual">
+         <cylinder length="0.2" radius="0.01"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="rope_link1_collision">
+        <cylinder length="0.2" radius="0.01"/>
+      </geometry>
+  </collision>
+</link>
+
+<joint name="rope_link1_joint" type="fixed">
+    <parent link="rope_anchor1_3"/>
+    <child link="rope_link1"/>
+    <origin rpy="0 0 0" xyz="0 0 0.13"/>
+</joint>
+
+<link name="rope_link2">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.187" ixy="0.0" ixz="0.0" iyy="0.187" iyz="0.0" izz="0.00005"/>
+  </inertial>
+<visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="rope_link2_visual">
+         <cylinder length="0.2" radius="0.01"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="rope_link2_collision">
+        <cylinder length="0.2" radius="0.01"/>
+      </geometry>
+  </collision>
+</link>
+
+<joint name="rope_joint" type="prismatic">
+    <axis xyz="0 0 1"/>
+    <parent link="rope_link1"/>
+    <child link="rope_link2"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="0" upper="3" velocity="10"/>
+</joint>
+
+<!-- anchor body 2-->
+<link name="rope_anchor2">
+<visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="rope_anchor2_visual">
+         <sphere radius="0.03"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="rope_anchor2_collision">
+        <sphere radius="0.03"/>
+      </geometry>
+  </collision>
+</link>
+
+<joint name="rope_anchor2_j" type="fixed">
+    <axis xyz="1 0 0"/>
+    <parent link="rope_link2"/>
+    <child link="rope_anchor2"/>
+    <origin rpy="0 0 0" xyz="0 0 0.13"/>
+</joint>
+
+</robot>
