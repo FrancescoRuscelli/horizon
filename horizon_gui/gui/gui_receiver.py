@@ -248,10 +248,10 @@ class horizonImpl():
             return False
 
     def generateProblem(self):
-        # try:
-        self.casadi_prb.createProblem()
-        # except Exception as e:
-        #     return self.logger.warning(e)
+        try:
+            self.casadi_prb.createProblem()
+        except Exception as e:
+            return self.logger.warning(e)
 
     def solve(self):
         try:
