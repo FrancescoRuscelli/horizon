@@ -123,3 +123,4 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
 
 frame_force_mapping = {'rope_anchor2': frope}
 tau = casadi_kin_dyn.inverse_dynamics(q, qdot, qddot, frame_force_mapping, kindyn)
+prb.createConstraint("inverse_dynamics", tau, nodes=[0,ns], bounds=dict(lb=tau_min, ub=tau_max))
