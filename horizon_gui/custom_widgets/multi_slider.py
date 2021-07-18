@@ -19,11 +19,11 @@ class Slice(QtWidgets.QWidget):
         self.old_max = 0.0
         self.scale = 0
 
-    def emitRange(self):
-        if (self.old_min != self.min) or (self.old_max != self.max):
-            self.rangeChanged.emit(self.min, self.max)
-            self.old_min = self.min
-            self.old_max = self.max
+    # def emitRange(self):
+    #     if (self.old_min != self.min) or (self.old_max != self.max):
+    #         self.rangeChanged.emit(self.min, self.max)
+    #         self.old_min = self.min
+    #         self.old_max = self.max
 
     def setValues(self, values):
         self.min = values[0]
@@ -429,6 +429,7 @@ class QMultiSlider(QtWidgets.QWidget):
                         self.emitRanges()
 
     def emitRanges(self):
+        # todo should emit ALL THE VALUES and not only .min .max?
         all_ranges = [slice.getValues() for slice in self.slices]
         self.on_slices_changed(all_ranges)
         # self.active_slice.emitRange()
@@ -483,7 +484,7 @@ if (__name__ == "__main__"):
 
     app = QtWidgets.QApplication(sys.argv)
 
-    hslider = QMultiSlider(slider_range=[5.0, 5.0, 0.5], values=[4, 20])
+    hslider = QMultiSlider(slider_range=[-5.0, 5.0, 1], values=[1, 2])
     # hslider.setEmitWhileMoving(True)
     hslider.show()
     sys.exit(app.exec_())
