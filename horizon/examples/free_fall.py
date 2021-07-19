@@ -158,7 +158,7 @@ frope_hist = solution["frope"]
 
 # resampling
 dt = 0.001
-p_res, v_res = resampler_trajectory.second_order_resample_integrator(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_mapping, kindyn)
+q_res, qdot_res, qddot_res = resampler_trajectory.second_order_resample_integrator(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_mapping, kindyn)
 
 
 PRINT = False
@@ -199,5 +199,5 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
               'rope_joint']
 
-resampler_trajectory.replay_trajectory(dt, joint_list, p_res).replay()
+resampler_trajectory.replay_trajectory(dt, joint_list, q_res).replay()
 
