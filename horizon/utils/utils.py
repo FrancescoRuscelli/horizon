@@ -58,7 +58,7 @@ def toRot(q):
     return R
 
 
-def dynamic_model_with_floating_base(q, ndot, nddot):
+def double_integrator_with_floating_base(q, ndot, nddot):
     """
     Construct the floating-base dynamic model:
                 x = [q, ndot]

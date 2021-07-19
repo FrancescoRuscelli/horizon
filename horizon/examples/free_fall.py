@@ -39,7 +39,7 @@ f2 = prb.createInputVariable("f2", nf)
 frope = prb.createInputVariable("frope", nf)
 
 # Creates double integrator
-x, xdot = utils.dynamic_model_with_floating_base(q, qdot, qddot)
+x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
 # Formulate discrete time dynamics
 tf = 1.0  # [s]
