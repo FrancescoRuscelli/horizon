@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 
 import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
 import rospy
@@ -26,7 +27,7 @@ nv = kindyn.nv()  # Velocity DoFs
 nf = 3  # 2 feet contacts + rope contact with wall, Force DOfs
 
 # Create horizon problem
-prb = problem.Problem(ns)
+prb = problem.Problem(ns, logging_level=logging.DEBUG)
 
 # Creates problem STATE variables
 q = prb.createStateVariable("q", nq)
@@ -96,19 +97,19 @@ frope.setInitialGuess(f_init)
 
 # Cost function
 prb.createCostFunction("min_joint_vel", 100.*cs.dot(qdot[6:-1], qdot[6:-1]))
-prb.createCostFunction("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]))
-prb.createCostFunction("min_f1", 1000.*cs.dot(f1, f1))
-prb.createCostFunction("min_f2", 1000.*cs.dot(f2, f2))
+prb.createCostFunction("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]), list(range(1, ns)))
+prb.createCostFunction("min_f1", 1000.*cs.dot(f1, f1), list(range(1, ns)))
+prb.createCostFunction("min_f2", 1000.*cs.dot(f2, f2), list(range(1, ns)))
 
 frope_prev = prb.createInputVariable("frope", nf, -1)
 prb.createCostFunction("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), list(range(1, ns)))
 
 # Constraints
-prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))
-prb.createConstraint("qdotinit", qdot, nodes=0, bounds=dict(lb=qdot_init, ub=qdot_init))
+prb.createConstraint("qinit", q, nodes=[0], bounds=dict(lb=q_init, ub=q_init))
+prb.createConstraint("qdotinit", qdot, nodes=[0], bounds=dict(lb=qdot_init, ub=qdot_init))
 
 x_int = F_integrator(x0=x, p=qddot)
-prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(0, ns)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+#prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(0, ns)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
                     -1000., -1000., -1000.,  # Contact 1
@@ -123,9 +124,26 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
 
 frame_force_mapping = {'rope_anchor2': frope}
 tau = casadi_kin_dyn.inverse_dynamics(q, qdot, qddot, frame_force_mapping, kindyn)
-prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
+#prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
 
 p_rope_init = FKRope(q=q_init)['ee_pos']
 p_rope = FKRope(q=q)['ee_pos']
-prb.createConstraint("rope_anchor_point", p_rope, bounds=dict(lb=p_rope_init, ub=p_rope_init))
+#prb.createConstraint("rope_anchor_point", p_rope, bounds=dict(lb=p_rope_init, ub=p_rope_init))
+
+# Creates problem
+prb.createProblem()
+
+# SETUP SOLVER
+opts = {'ipopt.tol': 1e-4,
+        'ipopt.max_iter': 2000,
+        'ipopt.linear_solver': 'ma57'}
+
+solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
+prb.setSolver(solver)
+
+prb.solveProblem()
+
+
+
+
 
