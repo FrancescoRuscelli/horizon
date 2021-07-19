@@ -53,8 +53,6 @@ class Function:
                 self.nodes.append(i)
                 self.nodes.sort()
 
-        print('nodes of function {} are: {}'.format(self.name, self.nodes))
-
     def getVariables(self):
         return self.vars
         # return [var for name, var in self.var]

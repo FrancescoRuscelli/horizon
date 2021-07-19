@@ -63,6 +63,7 @@ class Problem:
     #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
+
         if nodes is None:
             nodes = list(range(0, self.nodes))
         else:
@@ -75,7 +76,8 @@ class Problem:
         used_var = self._getUsedVar(g)
 
         if self.debug_mode:
-            self.logger.debug('Creating Constraint Function "{}": {} with abstract variables {}, active in nodes: {}'.format(name, g, used_var, nodes))
+            # self.logger.debug('Creating Constraint Function "{}": {} with abstract variables {}, active in nodes: {}'.format(name, g, used_var, nodes))
+            self.logger.debug('Creating Constraint Function "{}": active in nodes: {}'.format(name, nodes))
 
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
 
@@ -96,7 +98,8 @@ class Problem:
         used_var = self._getUsedVar(j)
 
         if self.debug_mode:
-            self.logger.debug('Creating Cost Function "{}": {} with abstract variables {},  active in nodes: {}'.format(name, j, used_var, nodes))
+            # self.logger.debug('Creating Cost Function "{}": {} with abstract variables {},  active in nodes: {}'.format(name, j, used_var, nodes))
+            self.logger.debug('Creating Cost Function "{}": active in nodes: {}'.format(name, nodes))
 
         fun = fc.CostFunction(name, j, used_var, nodes)
 
@@ -151,9 +154,9 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        self.solver = cs.nlpsol('solver', 'ipopt', self.prob)#,
-                                #{'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                                # 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+        self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
+                                {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                                 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
     def solveProblem(self):
 
