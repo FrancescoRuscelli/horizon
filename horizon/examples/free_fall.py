@@ -105,11 +105,11 @@ frope_prev = prb.createInputVariable("frope", nf, -1)
 prb.createCostFunction("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), list(range(1, ns)))
 
 # Constraints
-prb.createConstraint("qinit", q, nodes=[0], bounds=dict(lb=q_init, ub=q_init))
-prb.createConstraint("qdotinit", qdot, nodes=[0], bounds=dict(lb=qdot_init, ub=qdot_init))
+prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))
+prb.createConstraint("qdotinit", qdot, nodes=0, bounds=dict(lb=qdot_init, ub=qdot_init))
 
 x_int = F_integrator(x0=x, p=qddot)
-#prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(0, ns)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(0, ns)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
                     -1000., -1000., -1000.,  # Contact 1
@@ -124,11 +124,11 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
 
 frame_force_mapping = {'rope_anchor2': frope}
 tau = casadi_kin_dyn.inverse_dynamics(q, qdot, qddot, frame_force_mapping, kindyn)
-#prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
+prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
 
 p_rope_init = FKRope(q=q_init)['ee_pos']
 p_rope = FKRope(q=q)['ee_pos']
-#prb.createConstraint("rope_anchor_point", p_rope, bounds=dict(lb=p_rope_init, ub=p_rope_init))
+prb.createConstraint("rope_anchor_point", p_rope-p_rope_init, bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
 # Creates problem
 prb.createProblem()
