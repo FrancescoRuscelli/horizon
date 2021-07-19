@@ -42,13 +42,13 @@ class Function:
         return self.nodes
 
     def setNodes(self, nodes, erasing=False):
-        unraveled_nodes = misc.unravelElements(nodes)
+        # unraveled_nodes = misc.unravelElements(nodes)
 
         if erasing:
             self.nodes.clear()
 
         # adding to function nodes
-        for i in unraveled_nodes:
+        for i in nodes: #unraveled_nodes:
             if i not in self.nodes:
                 self.nodes.append(i)
                 self.nodes.sort()
@@ -93,11 +93,12 @@ class Function:
 
 class Constraint(Function):
     def __init__(self, name, f, used_vars, nodes, bounds=None):
-        super().__init__(name, f, used_vars, nodes)
 
         self.bounds = dict()
-        for node in self.nodes:
+        for node in nodes:
             self.bounds['n' + str(node)] = dict(lb=[-np.inf] * f.shape[0], ub=[np.inf] * f.shape[0])
+
+        super().__init__(name, f, used_vars, nodes)
 
         # todo setBounds
         if bounds is not None:
@@ -107,7 +108,6 @@ class Constraint(Function):
 
             self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
 
-
     # todo transform string in typeFun "ConstraintType"
     def getType(self):
         return 'constraint'
@@ -115,22 +115,24 @@ class Constraint(Function):
     def setLowerBounds(self, bounds, nodes=None):
 
         if nodes is None:
-            unraveled_nodes = self.nodes
-        else:
-            unraveled_nodes = misc.unravelElements(nodes) # todo are we sure this is ok?
+            # unraveled_nodes
+            nodes = self.nodes
+        # else:
+        #     unraveled_nodes = misc.unravelElements(nodes) # todo are we sure this is ok?
 
-        for node in unraveled_nodes:
+        for node in nodes: #unraveled_nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
 
     def setUpperBounds(self, bounds, nodes=None):
 
         if nodes is None:
-            unraveled_nodes = self.nodes
-        else:
-            unraveled_nodes = misc.unravelElements(nodes)
+            # unraveled_nodes
+            nodes = self.nodes
+        # else:
+        #     unraveled_nodes = misc.unravelElements(nodes)
 
-        for node in unraveled_nodes:
+        for node in nodes: #unraveled_nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'ub': bounds})
 
@@ -152,20 +154,18 @@ class Constraint(Function):
         return [self.getLowerBounds(nodes), self.getUpperBounds(nodes)]
 
     def setNodes(self, nodes, erasing=False):
-        unraveled_nodes = misc.unravelElements(nodes)
+        # unraveled_nodes = misc.unravelElements(nodes)
 
         if erasing:
             self.nodes.clear()
 
         # adding to function nodes
-        for i in unraveled_nodes:
+        for i in nodes: #unraveled_nodes:
             if i not in self.nodes:
                 self.nodes.append(i)
                 self.nodes.sort()
-                # print('ciao')
-                # if 'n' + str(i) not in self.bounds:
-                #     pass #print(self.bounds)
-                    # self.bounds['n' + str(i)] = dict(lb=[-np.inf] * self.f.shape[0], ub=[np.inf] * self.f.shape[0])
+                if 'n' + str(i) not in self.bounds:
+                    self.bounds['n' + str(i)] = dict(lb=[-np.inf] * self.f.shape[0], ub=[np.inf] * self.f.shape[0])
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):
@@ -227,7 +227,7 @@ class FunctionsContainer:
 
         # TODO be careful about ordering
         for fun_name, fun in container.items():
-            # print('implementing function "{}" at node {}.'.format(fun_name, node))
+            # self.logger.debug('implementing function "{}" at node {}.'.format(fun_name, node))
             # print('Function is active on nodes: {}'.format(fun.getNodes()))
             # print('Function depends on variables: {}'.format(fun.getVariables()))
             # implement constraint only if constraint is present in node k
@@ -313,10 +313,10 @@ class FunctionsContainer:
         self.nodes = n_nodes
 
         for cnstr in self.cnstr_container.values():
-            cnstr.setNodes([i for i in cnstr.getNodes() if i in range(self.nodes)])
+            cnstr.setNodes([i for i in cnstr.getNodes() if i in range(self.nodes)], erasing=True)
 
         for costfun in self.costfun_container.values():
-            costfun.setNodes([i for i in costfun.getNodes() if i in range(self.nodes)])
+            costfun.setNodes([i for i in costfun.getNodes() if i in range(self.nodes)], erasing=True)
 
     def getNCnstrFun(self):
         return len(self.cnstr_container)

@@ -105,18 +105,15 @@ class HorizonLine(QScrollArea):
     def updateFunctionNodes(self, parent, fun_name, ranges):
         # transform from float to INT (nodes are integer)
         ranges = listOfListFLOATtoINT(ranges)
-        # small hack to include also the max for each couple of min/max --> [0, 3] --> 0, 1, 2, 3. Not 0, 1, 2
-        for couples in ranges:
-            couples[1] = couples[1]+1
-
+        # TODO HERE I SHOULD DO UNRAVEL
         # update bounds widgets
+        nodes = unravelElements(ranges)
         if self.fun_type == 'constraint':
-            self.function_tab.setFunctionBounds(fun_name, ranges)
-
+            self.function_tab.setFunctionBounds(fun_name, nodes)
 
         # change nodes of function in horizon
         # print('New nodes for Function {}: {}'.format(fun_name, ranges))
-        self.horizon_receiver.updateFunctionNodes(fun_name, ranges)
+        self.horizon_receiver.updateFunctionNodes(fun_name, nodes)
 
         # update ranges in sliders
         if parent == 'multi':
@@ -207,6 +204,7 @@ class HorizonLine(QScrollArea):
 
     def addFunctionToHorizon(self, name):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
+
         dim = self.horizon_receiver.getFunction(name)['active'].getDim()[0]
         if flag:
 

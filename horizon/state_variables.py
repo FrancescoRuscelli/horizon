@@ -12,6 +12,7 @@ now the StateVariable is only abstract at the very beginning.
 Formerly
 '''
 
+# todo create function checker to check if nodes are in self.nodes and if everything is ok with the input (no dict, no letters...)
 class StateVariable(cs.SX):
     def __init__(self, tag, dim, nodes):
         super(StateVariable, self).__init__(cs.SX.sym(tag, dim))
@@ -29,24 +30,28 @@ class StateVariable(cs.SX):
     def setLowerBounds(self, bounds, nodes=None):
 
         if nodes is None:
-            nodes = [0, self.nodes]
-
-        if isinstance(nodes, list):
-            for n in range(nodes[0], nodes[1]):
-                self.var_impl['n' + str(n)]['lb'] = bounds
+            nodes = list(range(0, self.nodes))
         else:
-            self.var_impl['n' + str(nodes)]['lb'] = bounds
+            if isinstance(nodes, list):
+                nodes = [node for node in nodes if node in range(self.nodes)]
+            else:
+                nodes = [nodes] if nodes in range(self.nodes) else []
+
+        for node in nodes:
+            self.var_impl['n' + str(node)]['lb'] = bounds
 
     def setUpperBounds(self, bounds, nodes=None):
 
         if nodes is None:
-            nodes = [0, self.nodes]
-
-        if isinstance(nodes, list):
-            for n in range(nodes[0], nodes[1]):
-                self.var_impl['n' + str(n)]['ub'] = bounds
+            nodes = list(range(0, self.nodes))
         else:
-            self.var_impl['n' + str(nodes)]['ub'] = bounds
+            if isinstance(nodes, list):
+                nodes = [node for node in nodes if node in range(self.nodes)]
+            else:
+                nodes = [nodes] if nodes in range(self.nodes) else []
+
+        for node in nodes:
+            self.var_impl['n' + str(node)]['ub'] = bounds
 
     def setBounds(self, lb, ub, nodes=None):
         self.setLowerBounds(lb, nodes)

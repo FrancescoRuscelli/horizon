@@ -9,10 +9,11 @@ import pickle
 
 class Problem:
 
-    def __init__(self, N, crash_if_suboptimal=False):
+    def __init__(self, N, crash_if_suboptimal=False, logging_level=logging.INFO):
 
+        self.solver = None
         self.logger = logging.getLogger('logger')
-        # self.logger.setLevel(level=logging.DEBUG)
+        self.logger.setLevel(level=logging_level)
         self.debug_mode = self.logger.isEnabledFor(logging.DEBUG)
         stdout_handler = logging.StreamHandler(sys.stdout)
         self.logger.addHandler(stdout_handler)
@@ -51,7 +52,6 @@ class Problem:
 
     def _getUsedVar(self, f):
         used_var = dict()
-        print('checking var dependencies of {} (id: {}) (type: {}) among abstract variables {} (id: {})'.format(f, id(f), type(f), self.state_var_container.getVarAbstrDict(), id(self.state_var_container.getVarAbstrDict())))
         for name_var, value_var in self.state_var_container.getVarAbstrDict().items():
             if cs.depends_on(f, value_var):
                 used_var[name_var] = value_var
@@ -63,13 +63,15 @@ class Problem:
     #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
-        print('creating constraint {}'.format(name))
+
         if not nodes:
-            nodes = [0, self.nodes]
+            nodes = list(range(0, self.nodes))
 
         used_var = self._getUsedVar(g)
+
         if self.debug_mode:
-            self.logger.debug('Creating function "{}": {} with abstract variables {}'.format(name, g, used_var))
+            self.logger.debug('Creating Constraint Function "{}": {} with abstract variables {}, active in nodes: {}'.format(name, g, used_var, nodes))
+
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
 
         self.function_container.addFunction(fun)
@@ -79,9 +81,14 @@ class Problem:
     def createCostFunction(self, name, j, nodes=None):
 
         if not nodes:
-            nodes = [0, self.nodes]
+            nodes = list(range(self.nodes))
+        else:
+            nodes = [node for node in nodes if node in range(self.nodes)]
 
         used_var = self._getUsedVar(j)
+
+        if self.debug_mode:
+            self.logger.debug('Creating Cost Function "{}": {} with abstract variables {},  active in nodes: {}'.format(name, j, used_var, nodes))
 
         fun = fc.CostFunction(name, j, used_var, nodes)
 
@@ -101,7 +108,7 @@ class Problem:
         self.function_container.removeFunction(name)
 
     def setNNodes(self, n_nodes):
-        self.nodes = n_nodes + 1
+        self.nodes = n_nodes + 1 # todo because I decided so
         self.state_var_container.setNNodes(self.nodes)
         self.function_container.setNNodes(self.nodes)
 
@@ -136,20 +143,24 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
-                                {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                                 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+        self.solver = cs.nlpsol('solver', 'ipopt', self.prob)#,
+                                #{'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                                # 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
     def solveProblem(self):
 
         # t_start = time.time()
+        if self.solver is None:
+            self.logger.warning('Problem is not created. Nothing to solve!')
+            return 0
+
         self.state_var_container.updateBounds()
         self.state_var_container.updateInitialGuess()
 
         w0 = self.state_var_container.getInitialGuessList()
 
         if self.debug_mode:
-            self.logger.debug('Initial guess vector for variables:'.format(self.state_var_container.getInitialGuessList()))
+            self.logger.debug('Initial guess vector for variables: {}'.format(self.state_var_container.getInitialGuessList()))
 
 
         lbw = self.state_var_container.getBoundsMinList()
@@ -204,7 +215,7 @@ class Problem:
         solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.state_var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
-
+        self.logger.debug("SOLVER SOLUTION:")
         for node, val in self.state_var_container.getVarImplDict().items():
             if self.debug_mode:
                 self.logger.debug('Node: {}'.format(node))
@@ -213,15 +224,10 @@ class Problem:
                 dim = var['var'].shape[0]
                 node_number = int(node[node.index('n') + 1:])
                 solution_dict[name][:, node_number] = w_opt[pos:pos + dim]
-
-                if self.debug_mode:
-                    self.logger.debug('var {} of dim {}'.format(name, var['var'].shape[0]))
-                    self.logger.debug('Previous state: {}'.format(solution_dict))
-                    self.logger.debug('Var state: {}'.format(solution_dict[name]))
-                    self.logger.debug('Appending to {} opt sol [{}-{}]: {}'.format(name, pos, pos + dim, sol['x']))
-                    self.logger.debug('Current state: {}'.format(solution_dict))
-                    # self.logger.debug('~~~~~~~~~~~~~')
                 pos = pos + dim
+
+        if self.debug_mode:
+            self.logger.debug('Current state: {}'.format(solution_dict))
 
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
@@ -251,18 +257,18 @@ class Problem:
 
         if self.prob:
 
-            self.prob.clear()
-            ## print('serializing f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
-            ## print('serializing x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
-            ## print('serializing g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
+            # self.prob.clear()
+            # print('serializing f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
+            # print('serializing x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
+            # print('serializing g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
 
-            # self.prob['f'] = self.prob['f'].serialize()
-            # self.prob['x'] = self.prob['x'].serialize()
-            # self.prob['g'] = self.prob['g'].serialize()
+            self.prob['f'] = self.prob['f'].serialize()
+            self.prob['x'] = self.prob['x'].serialize()
+            self.prob['g'] = self.prob['g'].serialize()
 
-            ## print('serialized f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
-            ## print('serialized x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
-            ## print('serialized g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
+            # print('serialized f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
+            # print('serialized x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
+            # print('serialized g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
 
 
         return self
@@ -273,87 +279,93 @@ class Problem:
         self.function_container.deserialize()
 
         if self.prob:
-            pass
-            # self.prob['f'] = cs.Sparsity.deserialize(self.prob['f']) if self.function_container.getNCostFun() == 0 else cs.SX.deserialize(self.prob['f'])
-            # self.prob['x'] = cs.SX.deserialize(self.prob['x'])
-            # self.prob['g'] = cs.Sparsity.deserialize(self.prob['g']) if self.function_container.getNCnstrFun() == 0 else cs.SX.deserialize(self.prob['g'])
+            self.prob['f'] = cs.Sparsity.deserialize(self.prob['f']) if self.function_container.getNCostFun() == 0 else cs.SX.deserialize(self.prob['f'])
+            self.prob['x'] = cs.SX.deserialize(self.prob['x'])
+            self.prob['g'] = cs.Sparsity.deserialize(self.prob['g']) if self.function_container.getNCnstrFun() == 0 else cs.SX.deserialize(self.prob['g'])
 
-            ## print('deserializing f', self.prob['f'])
-            ## print('deserializing x', self.prob['x'])
-            ## print('deserializing g', self.prob['g'])
+            # print('deserializing f', self.prob['f'])
+            # print('deserializing x', self.prob['x'])
+            # print('deserializing g', self.prob['g'])
 
         return self
 
 
 if __name__ == '__main__':
 
-    nodes = 8
-    prb = Problem(nodes)
-    x = prb.createStateVariable('x', 2)
-    y = prb.createStateVariable('y', 2)
-    danieli = prb.createConstraint('danieli', x+y)
-    prb.createProblem()
-
-    print('===PICKLING===')
-    prb = prb.serialize()
-    prb_serialized = pickle.dumps(prb)
-
-    print('===DEPICKLING===')
-    prb_new = pickle.loads(prb_serialized)
-    prb_new.deserialize()
-
-    sv_new = prb_new.getStateVariables()
-    cnstr_new = prb_new.getConstraints()
-
-    # these two are different
-    print('x', x)
-    print('new x', sv_new['x'])
-
-    # todo how to check if the new state variable x is used by all the constraints?
-
-    # oebus = prb_new.createConstraint('oebus', x)  # should not work
+    # nodes = 8
+    # prb = Problem(nodes)
+    # x = prb.createStateVariable('x', 2)
+    # y = prb.createStateVariable('y', 2)
+    # danieli = prb.createConstraint('danieli', x+y)
+    #
+    # danieli.setBounds([12, 12],[12, 12], 4)
+    # prb.createProblem()
+    # sol = prb.solveProblem()
+    #
+    # print(sol)
+    # exit()
+    #
+    #
+    # print('===PICKLING===')
+    # prb = prb.serialize()
+    # prb_serialized = pickle.dumps(prb)
+    #
+    # print('===DEPICKLING===')
+    # prb_new = pickle.loads(prb_serialized)
+    # prb_new.deserialize()
+    #
+    # sv_new = prb_new.getStateVariables()
+    # cnstr_new = prb_new.getConstraints()
+    #
+    # # these two are different
+    # print('x', x)
+    # print('new x', sv_new['x'])
+    #
+    # # todo how to check if the new state variable x is used by all the constraints?
+    #
+    # # oebus = prb_new.createConstraint('oebus', x)  # should not work
     # oebus = prb_new.createConstraint('oebus', sv_new['x'])  # should work
-    prb_new.createProblem()
+    # prb_new.createProblem()
+    #
+    # exit()
+    # ==================================================================================================================
+    # ==================================================================================================================
+    # ==================================================================================================================
+    # nodes = 8
+    # prb = Problem(nodes)
+    # x = prb.createStateVariable('x', 2)
+    # y = prb.createStateVariable('y', 2)
+    # # todo something wrong here
+    # danieli = prb.createConstraint('danieli', x+y)
+    # sucua = prb.createCostFunction('sucua', x*y)
+    #
+    #
+    # prb.createProblem()
+    #
+    # print('===PICKLING===')
+    #
+    # prb = prb.serialize()
+    # prb_serialized = pickle.dumps(prb)
+    #
+    #
+    # print('===DEPICKLING===')
+    # prb_new = pickle.loads(prb_serialized)
+    # prb_new.deserialize()
+    #
+    # prb_new.createProblem()
+    # print(prb_new.prob)
+    #
+    # exit()
+    # ==================================================================================================================
+    # ==================================================================================================================
+    # ==================================================================================================================
 
-    exit()
-    # ==================================================================================================================
-    # ==================================================================================================================
-    # ==================================================================================================================
     nodes = 8
-    prb = Problem(nodes)
+    prb = Problem(nodes, logging_level=logging.INFO)
     x = prb.createStateVariable('x', 2)
     y = prb.createStateVariable('y', 2)
-    # todo something wrong here
-    danieli = prb.createConstraint('danieli', x+y)
-    sucua = prb.createCostFunction('sucua', x*y)
 
-
-    prb.createProblem()
-
-    print('===PICKLING===')
-
-    prb = prb.serialize()
-    prb_serialized = pickle.dumps(prb)
-
-
-    print('===DEPICKLING===')
-    prb_new = pickle.loads(prb_serialized)
-    prb_new.deserialize()
-
-    prb_new.createProblem()
-    print(prb_new.prob)
-
-    exit()
-    # ==================================================================================================================
-    # ==================================================================================================================
-    # ==================================================================================================================
-
-    nodes = 8
-    prb = Problem(nodes)
-    x = prb.createStateVariable('x', 2)
-    y = prb.createStateVariable('y', 2)
-
-    x.setBounds([-2, -2], [2, 2], [1, 5])
+    x.setBounds([-2, -2], [2, 2])
 
     # todo this is allright but I have to remember that if I update the nodes (from 3 to 6 for example) i'm not updating the constraint nodes
     # todo so if it was active on all the node before, then it will be active only on the node 1, 2, 3 (not on 4, 5, 6)
@@ -366,10 +378,14 @@ if __name__ == '__main__':
 
     # print('getVarImplList way before:', prb.state_var_container.getVarImplList())
     danieli = prb.createConstraint('danieli', x+y)
-    sucua = prb.createCostFunction('sucua', x*y)
+    sucua = prb.createCostFunction('sucua', x*y, nodes=list(range(3, 15)))
+    pellico = prb.createCostFunction('pellico', x-y, nodes=[0, 4, 6])
+
+    danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=[1, 3])
+
     prb.createProblem()
 
-    for i in range(nodes):
+    for i in range(nodes+1):
         print(x.getBounds(i))
 
     # print('var at nodes {}  AFTER creating the problem: '.format(scoping_node), prb.scopeNodeVars(scoping_node))
@@ -388,7 +404,7 @@ if __name__ == '__main__':
     # print('after:', prb.state_var_container.getVarImplList())
 
     scoping_node = 8
-    # print('var at nodes {} AFTER changing the n. of nodes but AFTER rebuilding: {}'.format(scoping_node, prb.scopeNodeVars(scoping_node)))
+    # print('var at nodes {} AFTER changing the n. of nodes but AFTER rebuilding: {}'.format(scoping_node, prb.scopeNodeVars(scoping_node))) # should not work
     # print('number of nodes of {}: {}'.format(x, x.getNNodes()))
     # print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
     # x.setBounds(10)
@@ -396,9 +412,9 @@ if __name__ == '__main__':
     prb.scopeNodeVars(2)
 
 
-    x.setBounds([2, 8], [2, 8], 4)
+    x.setBounds([2, 8], [2, 8], 5)
 
-    for i in range(new_n_nodes):
+    for i in range(new_n_nodes+1):
         print(x.getBounds(i))
 
     # todo what do I do?

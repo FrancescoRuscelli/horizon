@@ -4,6 +4,7 @@ import re
 import casadi as cs
 import math
 import pickle
+from logging import INFO, DEBUG
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -12,7 +13,7 @@ class horizonImpl():
         self.logger = logger
 
         self.nodes = nodes
-        self.casadi_prb = horizon.Problem(self.nodes)
+        self.casadi_prb = horizon.Problem(self.nodes, logging_level=DEBUG)
 
         self.sv_dict = dict()  # state variables
         self.fun_dict = dict() # functions
@@ -248,10 +249,10 @@ class horizonImpl():
             return False
 
     def generateProblem(self):
-        # try:
-        self.casadi_prb.createProblem()
-        # except Exception as e:
-        #     return self.logger.warning(e)
+        try:
+            self.casadi_prb.createProblem()
+        except Exception as e:
+            return self.logger.warning(e)
 
     def solve(self):
         try:

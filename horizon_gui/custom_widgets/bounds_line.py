@@ -201,14 +201,12 @@ class BoundsLine(QWidget):
 
     def updateLowerBounds(self, dim, node, val):
         self.lb[dim, node] = val
-        # bounds_list = [item for sublist in self.lb[:, node].tolist() for item in sublist]
-        bounds_list = self.lb[:, node].tolist()
+        bounds_list = [item for sublist in self.lb[:, node].tolist() for item in sublist]
         self.lbChanged.emit(node, bounds_list) # pass only the bounds at the changed node
 
     def updateUpperBounds(self, dim, node, val):
         self.ub[dim, node] = val
-        # bounds_list = [item for sublist in self.ub[:, node].tolist() for item in sublist]
-        bounds_list = self.ub[:, node].tolist()
+        bounds_list = [item for sublist in self.ub[:, node].tolist() for item in sublist]
         self.ubChanged.emit(node, bounds_list)
 
     @pyqtSlot("QWidget*", "QWidget*")
