@@ -11,6 +11,7 @@ class Problem:
 
     def __init__(self, N, crash_if_suboptimal=False, logging_level=logging.INFO):
 
+        self.opts = None
         self.solver = None
         self.logger = logging.getLogger('logger')
         self.logger.setLevel(level=logging_level)
@@ -112,7 +113,11 @@ class Problem:
         self.state_var_container.setNNodes(self.nodes)
         self.function_container.setNNodes(self.nodes)
 
-    def createProblem(self):
+    def createProblem(self, opts=None):
+
+        if opts is not None:
+            self.opts = opts
+
         # this is to reset both the constraints and the cost functions everytime I create a problem
         self.state_var_container.clear()
         self.function_container.clear()
@@ -143,12 +148,22 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        self.solver = cs.nlpsol('solver', 'ipopt', self.prob)#,
-                                #{'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                                # 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+        if self.opts is not None:
+            if "nlpsol.ipopt" in self.opts:
+                self.solver = cs.nlpsol('solver', 'ipopt', self.prob)#,
+                                    #{'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                                    # 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+
+    def getProblem(self):
+        return self.prob
+
+    def setSolver(self, solver):
+        self.solver = solver
+
+    def getSolver(self):
+        return self.solver
 
     def solveProblem(self):
-
         # t_start = time.time()
         if self.solver is None:
             self.logger.warning('Problem is not created. Nothing to solve!')
