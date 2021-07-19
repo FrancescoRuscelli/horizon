@@ -392,7 +392,7 @@ if __name__ == '__main__':
     sucua = prb.createCostFunction('sucua', x*y, nodes=list(range(3, 15)))
     pellico = prb.createCostFunction('pellico', x-y, nodes=[0, 4, 6])
 
-    danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=[1, 3])
+    danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=3)
 
     prb.createProblem()
 
