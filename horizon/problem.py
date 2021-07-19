@@ -226,19 +226,13 @@ class Problem:
         solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.state_var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
-        self.logger.debug("SOLVER SOLUTION:")
         for node, val in self.state_var_container.getVarImplDict().items():
-            if self.debug_mode:
-                self.logger.debug('Node: {}'.format(node))
 
             for name, var in val.items():
                 dim = var['var'].shape[0]
                 node_number = int(node[node.index('n') + 1:])
                 solution_dict[name][:, node_number] = w_opt[pos:pos + dim]
                 pos = pos + dim
-
-        if self.debug_mode:
-            self.logger.debug('Current state: {}'.format(solution_dict))
 
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
