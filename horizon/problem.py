@@ -67,6 +67,11 @@ class Problem:
 
         if not nodes:
             nodes = list(range(0, self.nodes))
+        else:
+            if isinstance(nodes, list):
+                nodes = [node for node in nodes if node in range(self.nodes)]
+            else:
+                nodes = [nodes] if nodes in range(self.nodes) else []
 
         used_var = self._getUsedVar(g)
 
@@ -84,7 +89,10 @@ class Problem:
         if not nodes:
             nodes = list(range(self.nodes))
         else:
-            nodes = [node for node in nodes if node in range(self.nodes)]
+            if isinstance(nodes, list):
+                nodes = [node for node in nodes if node in range(self.nodes)]
+            else:
+                nodes = [nodes] if nodes in range(self.nodes) else []
 
         used_var = self._getUsedVar(j)
 
