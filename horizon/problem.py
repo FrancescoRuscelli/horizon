@@ -64,14 +64,14 @@ class Problem:
     #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
-
-        if not nodes:
+        if nodes is None:
             nodes = list(range(0, self.nodes))
         else:
             if isinstance(nodes, list):
                 nodes = [node for node in nodes if node in range(self.nodes)]
             else:
                 nodes = [nodes] if nodes in range(self.nodes) else []
+
 
         used_var = self._getUsedVar(g)
 
