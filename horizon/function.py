@@ -114,7 +114,6 @@ class Constraint(Function):
 
     def setLowerBounds(self, bounds, nodes=None):
 
-        print('sakamoto penis', self.nodes)
         if nodes is None:
             # unraveled_nodes
             nodes = self.nodes
@@ -228,7 +227,7 @@ class FunctionsContainer:
 
         # TODO be careful about ordering
         for fun_name, fun in container.items():
-            # print('implementing function "{}" at node {}.'.format(fun_name, node))
+            # self.logger.debug('implementing function "{}" at node {}.'.format(fun_name, node))
             # print('Function is active on nodes: {}'.format(fun.getNodes()))
             # print('Function depends on variables: {}'.format(fun.getVariables()))
             # implement constraint only if constraint is present in node k

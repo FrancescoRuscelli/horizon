@@ -107,13 +107,13 @@ class HorizonLine(QScrollArea):
         ranges = listOfListFLOATtoINT(ranges)
         # TODO HERE I SHOULD DO UNRAVEL
         # update bounds widgets
+        nodes = unravelElements(ranges)
         if self.fun_type == 'constraint':
-            self.function_tab.setFunctionBounds(fun_name, ranges)
-
+            self.function_tab.setFunctionBounds(fun_name, nodes)
 
         # change nodes of function in horizon
         # print('New nodes for Function {}: {}'.format(fun_name, ranges))
-        self.horizon_receiver.updateFunctionNodes(fun_name, ranges)
+        self.horizon_receiver.updateFunctionNodes(fun_name, nodes)
 
         # update ranges in sliders
         if parent == 'multi':

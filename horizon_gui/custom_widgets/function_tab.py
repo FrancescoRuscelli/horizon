@@ -81,10 +81,9 @@ class FunctionTabWidget(QTabWidget):
                 widget_fl.updateSlices(ranges)
 
 
-    def setFunctionBounds(self, fun_name, ranges):
+    def setFunctionBounds(self, fun_name, active_nodes):
 
         # # update the widget bounds (spin_boxes) for each functions
-        active_nodes = unravelElements(ranges)
         inactive_nodes = [inactive_n for inactive_n in range(self.n_nodes) if inactive_n not in active_nodes]
 
         for widget_bl in self.findChildren(BoundsLine):

@@ -465,10 +465,10 @@ class QMultiSlider(QtWidgets.QWidget):
 
         if any(isinstance(el, list) for el in ranges):
             for range in ranges:
-                new_slice = Slice(range[0], range[1]-1)
+                new_slice = Slice(range[0], range[1])
                 self.slices.append(new_slice)
         else:
-            new_slice = Slice(ranges[0], ranges[1]-1)
+            new_slice = Slice(ranges[0], ranges[1])
             self.slices.append(new_slice)
 
         # self.active_slice = new_slice
