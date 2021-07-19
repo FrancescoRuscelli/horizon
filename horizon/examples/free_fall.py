@@ -6,7 +6,7 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn
+from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
 import matplotlib.pyplot as plt
 
 # Loading URDF model in pinocchio
@@ -156,28 +156,48 @@ f2_hist = solution["f2"]
 frope_hist = solution["frope"]
 
 
+# resampling
+dt = 0.001
+p_res, v_res = resampler_trajectory.second_order_resample_integrator(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_mapping, kindyn)
 
 
-# plots raw solution
-time = np.arange(0.0, tf+1e-6, tf/ns)
+PRINT = False
+if PRINT:
+    # plots raw solution
+    time = np.arange(0.0, tf+1e-6, tf/ns)
 
-plt.figure()
-for i in range(0, 3):
-    plt.plot(time, q_hist[i,:])
-plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
-plt.xlabel('$\mathrm{[sec]}$', size = 20)
-plt.ylabel('$\mathrm{[m]}$', size = 20)
+    plt.figure()
+    for i in range(0, 3):
+        plt.plot(time, q_hist[i,:])
+    plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
+    plt.xlabel('$\mathrm{[sec]}$', size = 20)
+    plt.ylabel('$\mathrm{[m]}$', size = 20)
 
-plt.figure()
-for i in range(0, 3):
-    plt.plot(time[:-1], qddot_hist[i,:])
-plt.suptitle('$\mathrm{Base \ Acceleration}$', size = 20)
-plt.xlabel('$\mathrm{[sec]}$', size = 20)
-plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size = 20)
+    plt.figure()
+    for i in range(0, 3):
+        plt.plot(time[:-1], qddot_hist[i,:])
+    plt.suptitle('$\mathrm{Base \ Acceleration}$', size = 20)
+    plt.xlabel('$\mathrm{[sec]}$', size = 20)
+    plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size = 20)
 
-plt.show()
+    plt.figure()
+    for i in range(0, 3):
+        plt.plot(time[:-1], f1_hist[i, :])
+        plt.plot(time[:-1], f2_hist[i, :])
+        plt.plot(time[:-1], frope_hist[i, :])
+    plt.suptitle('$\mathrm{force \ feet \ and \ rope}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{ [N] } /  \mathrm{ [sec^2] } $', size=20)
+
+    plt.show()
 
 
 
+# REPLAY TRAJECTORY
+joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
+              'Contact2_x', 'Contact2_y', 'Contact2_z',
+              'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
+              'rope_joint']
 
+resampler_trajectory.replay_trajectory(dt, joint_list, p_res).replay()
 
