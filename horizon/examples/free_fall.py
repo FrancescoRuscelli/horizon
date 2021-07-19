@@ -7,6 +7,7 @@ import casadi as cs
 import numpy as np
 from horizon import problem
 from horizon.utils import utils, integrators, casadi_kin_dyn
+import matplotlib.pyplot as plt
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
@@ -27,7 +28,7 @@ nv = kindyn.nv()  # Velocity DoFs
 nf = 3  # 2 feet contacts + rope contact with wall, Force DOfs
 
 # Create horizon problem
-prb = problem.Problem(ns, logging_level=logging.DEBUG)
+prb = problem.Problem(ns)
 
 # Creates problem STATE variables
 q = prb.createStateVariable("q", nq)
@@ -108,18 +109,22 @@ prb.createCostFunction("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_
 prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))
 prb.createConstraint("qdotinit", qdot, nodes=0, bounds=dict(lb=qdot_init, ub=qdot_init))
 
-x_int = F_integrator(x0=x, p=qddot)
-prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(0, ns)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+q_prev = prb.createStateVariable("q", nq, -1)
+qdot_prev = prb.createStateVariable("qdot", nv, -1)
+qddot_prev = prb.createInputVariable("qddot", nv, -1)
+x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
+x_int = F_integrator(x0=x_prev, p=qddot_prev)
+prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
                     -1000., -1000., -1000.,  # Contact 1
                     -1000., -1000., -1000.,  # Contact 2
-                    0., 0., 0.,  # rope_anchor
+                    0., 0., 0.,  # rope master point
                     0.]  # rope
 tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
                         1000., 1000., 1000.,  # Contact 1
                         1000., 1000., 1000.,  # Contact 2
-                        0., 0., 0.,  # rope_anchor
+                        0., 0., 0.,  # rope master point
                         0.0]  # rope
 
 frame_force_mapping = {'rope_anchor2': frope}
@@ -141,7 +146,36 @@ opts = {'ipopt.tol': 1e-4,
 solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
 prb.setSolver(solver)
 
-prb.solveProblem()
+solution = prb.solveProblem()
+
+q_hist = solution["q"]
+qdot_hist = solution["qdot"]
+qddot_hist = solution["qddot"]
+f1_hist = solution["f1"]
+f2_hist = solution["f2"]
+frope_hist = solution["frope"]
+
+
+
+
+# plots raw solution
+time = np.arange(0.0, tf+1e-6, tf/ns)
+
+plt.figure()
+for i in range(0, 3):
+    plt.plot(time, q_hist[i,:])
+plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
+plt.xlabel('$\mathrm{[sec]}$', size = 20)
+plt.ylabel('$\mathrm{[m]}$', size = 20)
+
+plt.figure()
+for i in range(0, 3):
+    plt.plot(time[:-1], qddot_hist[i,:])
+plt.suptitle('$\mathrm{Base \ Acceleration}$', size = 20)
+plt.xlabel('$\mathrm{[sec]}$', size = 20)
+plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size = 20)
+
+plt.show()
 
 
 
