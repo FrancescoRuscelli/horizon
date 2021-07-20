@@ -11,7 +11,7 @@ from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
 # Switch between suspended and free fall
-FREE_FALL = False
+FREE_FALL = True
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
@@ -168,7 +168,8 @@ frope_hist = solution["frope"]
 
 # resampling
 dt = 0.001
-q_res, qdot_res, qddot_res = resampler_trajectory.second_order_resample_integrator(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_mapping, kindyn)
+frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anchor2': frope_hist}
+q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_hist_mapping, kindyn)
 
 
 PRINT = False
