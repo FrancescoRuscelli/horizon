@@ -7,6 +7,7 @@ import casadi as cs
 import numpy as np
 from horizon import problem
 from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
 # Loading URDF model in pinocchio
@@ -199,5 +200,5 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
               'rope_joint']
 
-resampler_trajectory.replay_trajectory(dt, joint_list, q_res).replay()
+replay_trajectory(dt, joint_list, q_res).replay()
 
