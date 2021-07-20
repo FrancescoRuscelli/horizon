@@ -3,7 +3,7 @@ from horizon.utils import integrators
 import numpy as np
 
 
-def second_order_resample_integrator(p, v, a, tf, dt, dae, frame_force_mapping, kindyn, force_reference_frame = cas_kin_dyn.CasadiKinDyn.LOCAL):
+def second_order_resample_integrator(p, v, a, tf, dt, dae):
     """
     Resample solution to a different number of nodes, RK4 integrator is used for the resampling
     Args:
@@ -17,18 +17,10 @@ def second_order_resample_integrator(p, v, a, tf, dt, dae, frame_force_mapping, 
                 'p': control
                 'ode': a function of the state and control returning the derivative of the state
                 'quad': quadrature term
-        frame_force_mapping: dictionary containing a map between frames and force variables e.g. {'lsole': f1}
-        kindyn: object of type casadi_kin_dyn
-        force_reference_frame: this is the frame which is used to compute the Jacobian during the ID computation:
-                LOCAL (default)
-                WORLD
-                LOCAL_WORLD_ALIGNED
-
     Returns:
         p_res: resampled p
         v_res: resampled v
         a_res: resampled a
-        TODO: add resampled controls!
     """
     ns = p.shape[1]
 

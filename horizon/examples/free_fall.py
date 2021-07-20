@@ -10,6 +10,9 @@ from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajecto
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
+# Switch between suspended and free fall
+FREE_FALL = False
+
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
@@ -62,6 +65,10 @@ q_max = [10.0,  10.0,  10.0,  1.0,  1.0,  1.0,  1.0,  # Floating base
                   0.3, 0.1, 0.1,  # Contact 2
                   1.57, 1.57, 3.1415,  # rope_anchor
                   10.0]  # rope
+if not FREE_FALL:
+    q_min[-1] = 0.1
+    q_max[-1] = 0.1
+
 q.setBounds(q_min, q_max)
 
 qdot_min = (-100.*np.ones(nv)).tolist()
@@ -127,6 +134,8 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
                         1000., 1000., 1000.,  # Contact 2
                         0., 0., 0.,  # rope master point
                         0.0]  # rope
+if not FREE_FALL:
+    tau_min[-1] = -10000.0
 
 frame_force_mapping = {'rope_anchor2': frope}
 tau = casadi_kin_dyn.inverse_dynamics(q, qdot, qddot, frame_force_mapping, kindyn)
