@@ -49,7 +49,7 @@ def resample_torques(p, v, a, tf, dt, dae, frame_force_mapping, kindyn, force_re
         i += 1
         if t > (node + 1) * node_time:
             node += 1
-            
+
     tau_res = np.zeros(a_res.shape)
 
     ID = casadi_kin_dyn.InverseDynamics(kindyn, frame_force_mapping.keys())
@@ -63,6 +63,20 @@ def resample_torques(p, v, a, tf, dt, dae, frame_force_mapping, kindyn, force_re
     return p_res, v_res, a_res, frame_res_force_mapping, tau_res
 
 def second_order_resample_integrator(p, v, a, tf, dt, dae):
+    """
+    Resample a solution with the given dt
+    Args:
+        p: position
+        v: velocity
+        a: acceleration
+        tf: final time
+        dt: resampling time
+        dae: dynamic model
+    Return:
+        p_res: resampled position
+        v_res: resampled velocity
+        a_res: resampled acceleration
+    """
     number_of_nodes = p.shape[1]
     node_time = tf/(number_of_nodes-1)
     n_res = int(round(tf/dt))

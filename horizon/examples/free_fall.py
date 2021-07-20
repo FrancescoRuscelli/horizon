@@ -180,20 +180,11 @@ frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anch
 q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_hist_mapping, kindyn)
 
 
-print("q_res", q_res.shape)
-print("qdot_res", qdot_res.shape)
-print("qddot_res", qddot_res.shape)
-print("tau_res: ", tau_res.shape)
-
-
-
 PRINT = True
 if PRINT:
     # plots raw solution
     time = np.arange(0.0, tf+1e-6, tf/ns)
     time_res = np.arange(0.0, q_res.shape[1]*dt - dt, dt)
-    print(time_res.shape)
-
 
     plt.figure()
     for i in range(0, 3):
