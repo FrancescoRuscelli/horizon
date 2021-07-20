@@ -98,9 +98,6 @@ class horizonImpl():
     def removeStateVariable(self, data):
         print('"removeStateVariable" yet to implement. Data: {}'.format(data))
 
-    def solveProblem(self):
-        print('"solveProblem" yet to implement')
-
     def checkActiveFunction(self, name):
 
         if self.fun_dict[name]['active'] is not None:
@@ -248,17 +245,19 @@ class horizonImpl():
         else:
             return False
 
-    def generateProblem(self):
+    def generate(self):
         try:
             self.casadi_prb.createProblem()
         except Exception as e:
             return self.logger.warning(e)
+        return True
 
     def solve(self):
         try:
             self.casadi_prb.solveProblem()
         except Exception as e:
             return self.logger.warning(e)
+        return True
 
     def getInfoAtNodes(self, node):
         vars = list()
@@ -271,6 +270,9 @@ class horizonImpl():
         costfuns = self.casadi_prb.scopeNodeCostFunctions(node)
 
         return vars, cnstrs, costfuns
+
+    def plot(self):
+        pass
 
     def serialize(self):
 
