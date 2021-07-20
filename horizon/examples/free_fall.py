@@ -11,7 +11,7 @@ from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
 # Switch between suspended and free fall
-FREE_FALL = True
+FREE_FALL = False
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
@@ -138,7 +138,7 @@ if not FREE_FALL:
     tau_min[-1] = -10000.0
 
 frame_force_mapping = {'rope_anchor2': frope}
-tau = casadi_kin_dyn.inverse_dynamics(q, qdot, qddot, frame_force_mapping, kindyn)
+tau = casadi_kin_dyn.InverseDynamics(kindyn, ['rope_anchor2']).call(q, qdot, qddot, frame_force_mapping)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
 
 p_rope_init = FKRope(q=q_init)['ee_pos']
@@ -165,6 +165,14 @@ f1_hist = solution["f1"]
 f2_hist = solution["f2"]
 frope_hist = solution["frope"]
 
+tau_hist = np.zeros(qddot_hist.shape)
+ID = casadi_kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'])
+for i in range(ns):
+    frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'rope_anchor2': frope_hist[:, i]}
+    tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()
+
+
+
 
 # resampling
 dt = 0.001
@@ -172,10 +180,20 @@ frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anch
 q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_hist_mapping, kindyn)
 
 
-PRINT = False
+print("q_res", q_res.shape)
+print("qdot_res", qdot_res.shape)
+print("qddot_res", qddot_res.shape)
+print("tau_res: ", tau_res.shape)
+
+
+
+PRINT = True
 if PRINT:
     # plots raw solution
     time = np.arange(0.0, tf+1e-6, tf/ns)
+    time_res = np.arange(0.0, q_res.shape[1]*dt - dt, dt)
+    print(time_res.shape)
+
 
     plt.figure()
     for i in range(0, 3):
@@ -186,10 +204,24 @@ if PRINT:
 
     plt.figure()
     for i in range(0, 3):
+        plt.plot(time_res, q_res[i, :])
+    plt.suptitle('$\mathrm{Base \ Position \ Resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{[m]}$', size=20)
+
+    plt.figure()
+    for i in range(0, 3):
         plt.plot(time[:-1], qddot_hist[i,:])
     plt.suptitle('$\mathrm{Base \ Acceleration}$', size = 20)
     plt.xlabel('$\mathrm{[sec]}$', size = 20)
     plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size = 20)
+
+    plt.figure()
+    for i in range(0, 3):
+        plt.plot(time_res[:-1], qddot_res[i, :])
+    plt.suptitle('$\mathrm{Base \ Acceleration \ Resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size=20)
 
     plt.figure()
     for i in range(0, 3):
@@ -199,6 +231,32 @@ if PRINT:
     plt.suptitle('$\mathrm{force \ feet \ and \ rope}$', size=20)
     plt.xlabel('$\mathrm{[sec]}$', size=20)
     plt.ylabel('$\mathrm{ [N] } /  \mathrm{ [sec^2] } $', size=20)
+
+    plt.figure()
+    f1_res = frame_force_res_mapping["Contact1"]
+    f2_res = frame_force_res_mapping["Contact2"]
+    frope_res = frame_force_res_mapping["rope_anchor2"]
+    for i in range(0, 3):
+        plt.plot(time_res[:-1], f1_res[i, :])
+        plt.plot(time_res[:-1], f2_res[i, :])
+        plt.plot(time_res[:-1], frope_res[i, :])
+    plt.suptitle('$\mathrm{force \ feet \ and \ rope \ resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{ [N] } /  \mathrm{ [sec^2] } $', size=20)
+
+    plt.figure()
+    for i in range(0, 6):
+        plt.plot(time[:-1], tau_hist[i, :])
+    plt.suptitle('$\mathrm{base \ force}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{ [N] }} $', size=20)
+
+    plt.figure()
+    for i in range(0, 6):
+        plt.plot(time_res[:-1], tau_res[i, :], '-x')
+    plt.suptitle('$\mathrm{base \ force \ resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{ [N] }} $', size=20)
 
     plt.show()
 
