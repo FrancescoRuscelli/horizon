@@ -6,7 +6,7 @@ class InverseDynamics():
     Class which computes inverse dynamics:
     given generalized position, velocities and accelerations returns generalized torques
     """
-    def __init__(self, kindyn, contact_frames, force_reference_frame = cas_kin_dyn.CasadiKinDyn.LOCAL):
+    def __init__(self, kindyn, contact_frames = [], force_reference_frame = cas_kin_dyn.CasadiKinDyn.LOCAL):
         """
         Args:
             kindyn: casadi_kin_dyn object
@@ -21,7 +21,7 @@ class InverseDynamics():
         for frame in contact_frames:
             self.contact_jacobians[frame] = cs.Function.deserialize(kindyn.jacobian(frame, force_reference_frame))
 
-    def call(self, q, qdot, qddot, frame_force_mapping):
+    def call(self, q, qdot, qddot, frame_force_mapping = dict()):
         """
         Computes generalized torques:
         Args:
