@@ -247,7 +247,7 @@ class horizonImpl():
 
     def generate(self):
         try:
-            self.casadi_prb.createProblem()
+            self.casadi_prb.createProblem({"nlpsol.ipopt":True})
         except Exception as e:
             return self.logger.warning(e)
         return True

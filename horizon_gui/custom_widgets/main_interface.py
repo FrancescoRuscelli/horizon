@@ -64,11 +64,11 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.layout_cf.addWidget(self.costfunctionLine)
         self.ct_entry = self.setFunEditor(self.funBox)
         #
-        with open(CSS_DIR + '/button_old.css', 'r') as f:
-            self.SolveButton.setStyleSheet(f.read())
-
-        with open(CSS_DIR + '/button_old.css', 'r') as f:
-            self.PlotButton.setStyleSheet(f.read())
+        # with open(CSS_DIR + '/button_old.css', 'r') as f:
+        #     self.SolveButton.setStyleSheet(f.read())
+        #
+        # with open(CSS_DIR + '/button_old.css', 'r') as f:
+        #     self.PlotButton.setStyleSheet(f.read())
 
         self.funButton.clicked.connect(self.generateFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
@@ -83,6 +83,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.CreateButton.clicked.connect(self.createButtonPushed)
         self.SolveButton.clicked.connect(self.solveButtonPushed)
         self.PlotButton.clicked.connect(self.plotButtonPushed)
+
+        self.ledCreate.setEnabled(False)
+        self.ledSolve.setEnabled(False)
 
         # when opening horizon, fill the GUI
         for name, data in horizon_receiver.getVarDict().items():
@@ -104,14 +107,16 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     def createButtonPushed(self):
         if self.horizon_receiver.generate():
             self.SolveButton.setEnabled(True)
-            with open(CSS_DIR + '/button_new.css', 'r') as f:
-                self.SolveButton.setStyleSheet(f.read())
+            self.ledCreate.setReady(True)
+            # with open(CSS_DIR + '/button_new.css', 'r') as f:
+            #     self.SolveButton.setStyleSheet(f.read())
 
     def solveButtonPushed(self):
         if self.horizon_receiver.solve():
             self.PlotButton.setEnabled(True)
-            with open(CSS_DIR + '/button_new.css', 'r') as f:
-                self.PlotButton.setStyleSheet(f.read())
+            self.ledSolve.setReady(True)
+            # with open(CSS_DIR + '/button_new.css', 'r') as f:
+            #     self.PlotButton.setStyleSheet(f.read())
 
 
     def plotButtonPushed(self):
