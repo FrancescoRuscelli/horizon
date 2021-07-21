@@ -64,6 +64,7 @@ class Problem:
     #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
+
         if nodes is None:
             nodes = list(range(0, self.nodes))
         else:
@@ -72,11 +73,11 @@ class Problem:
             else:
                 nodes = [nodes] if nodes in range(self.nodes) else []
 
-
         used_var = self._getUsedVar(g)
 
         if self.debug_mode:
-            self.logger.debug('Creating Constraint Function "{}": {} with abstract variables {}, active in nodes: {}'.format(name, g, used_var, nodes))
+            # self.logger.debug('Creating Constraint Function "{}": {} with abstract variables {}, active in nodes: {}'.format(name, g, used_var, nodes))
+            self.logger.debug('Creating Constraint Function "{}": active in nodes: {}'.format(name, nodes))
 
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
 
@@ -86,7 +87,7 @@ class Problem:
 
     def createCostFunction(self, name, j, nodes=None):
 
-        if not nodes:
+        if nodes is None:
             nodes = list(range(self.nodes))
         else:
             if isinstance(nodes, list):
@@ -97,7 +98,8 @@ class Problem:
         used_var = self._getUsedVar(j)
 
         if self.debug_mode:
-            self.logger.debug('Creating Cost Function "{}": {} with abstract variables {},  active in nodes: {}'.format(name, j, used_var, nodes))
+            # self.logger.debug('Creating Cost Function "{}": {} with abstract variables {},  active in nodes: {}'.format(name, j, used_var, nodes))
+            self.logger.debug('Creating Cost Function "{}": active in nodes: {}'.format(name, nodes))
 
         fun = fc.CostFunction(name, j, used_var, nodes)
 
@@ -156,11 +158,9 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        if self.opts is not None:
-            if "nlpsol.ipopt" in self.opts:
-                self.solver = cs.nlpsol('solver', 'ipopt', self.prob)#,
-                                    #{'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                                    # 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+        self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
+                                {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                                 'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
     def getProblem(self):
         return self.prob
@@ -169,9 +169,10 @@ class Problem:
         self.solver = solver
 
     def getSolver(self):
-        return self.solver
+        return self.solver	
 
     def solveProblem(self):
+
         # t_start = time.time()
         if self.solver is None:
             self.logger.warning('Problem is not created. Nothing to solve!')
@@ -238,20 +239,15 @@ class Problem:
         solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.state_var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
-        self.logger.debug("SOLVER SOLUTION:")
         for node, val in self.state_var_container.getVarImplDict().items():
-            if self.debug_mode:
-                self.logger.debug('Node: {}'.format(node))
-
+        
             for name, var in val.items():
                 dim = var['var'].shape[0]
                 node_number = int(node[node.index('n') + 1:])
                 solution_dict[name][:, node_number] = w_opt[pos:pos + dim]
                 pos = pos + dim
 
-        if self.debug_mode:
-            self.logger.debug('Current state: {}'.format(solution_dict))
-
+        
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
         return solution_dict
@@ -404,7 +400,7 @@ if __name__ == '__main__':
     sucua = prb.createCostFunction('sucua', x*y, nodes=list(range(3, 15)))
     pellico = prb.createCostFunction('pellico', x-y, nodes=[0, 4, 6])
 
-    danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=[1, 3])
+    danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=3)
 
     prb.createProblem()
 

@@ -4,13 +4,13 @@ from functools import partial
 from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget,
                              QLineEdit, QTableWidgetItem, QTableWidget, QCompleter, QHeaderView)
 
-from PyQt5.QtGui import QPalette, QFont
+from PyQt5.QtGui import QPalette, QFont, QColor
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from horizon_gui.gui.widget1_ui import Ui_HorizonGUI
 from horizon_gui.custom_functions import highlighter
 from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate
-
+from horizon_gui.definitions import CSS_DIR
 
 class MainInterface(QWidget, Ui_HorizonGUI):
     generic_sig = pyqtSignal(str)
@@ -63,7 +63,12 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.costfunctionLine.setContentsMargins(0, 40, 0, 0)
         self.layout_cf.addWidget(self.costfunctionLine)
         self.ct_entry = self.setFunEditor(self.funBox)
+        #
+        with open(CSS_DIR + '/button_old.css', 'r') as f:
+            self.SolveButton.setStyleSheet(f.read())
 
+        with open(CSS_DIR + '/button_old.css', 'r') as f:
+            self.PlotButton.setStyleSheet(f.read())
 
         self.funButton.clicked.connect(self.generateFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
@@ -75,8 +80,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.constraintLine.Single))
         self.MultipleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.costfunctionLine.Multi))
         self.MultipleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.costfunctionLine.Multi))
-        self.CreateButton.clicked.connect(self.horizon_receiver.generateProblem)
-        self.SolveButton.clicked.connect(self.horizon_receiver.solve)
+        self.CreateButton.clicked.connect(self.createButtonPushed)
+        self.SolveButton.clicked.connect(self.solveButtonPushed)
+        self.PlotButton.clicked.connect(self.plotButtonPushed)
 
         # when opening horizon, fill the GUI
         for name, data in horizon_receiver.getVarDict().items():
@@ -94,6 +100,22 @@ class MainInterface(QWidget, Ui_HorizonGUI):
                     line = self.costfunctionLine
                     line.addFunctionToSingleLine(name, data['active'].getDim()[0])
                     line.addFunctionToMultiLine(name)
+
+    def createButtonPushed(self):
+        if self.horizon_receiver.generate():
+            self.SolveButton.setEnabled(True)
+            with open(CSS_DIR + '/button_new.css', 'r') as f:
+                self.SolveButton.setStyleSheet(f.read())
+
+    def solveButtonPushed(self):
+        if self.horizon_receiver.solve():
+            self.PlotButton.setEnabled(True)
+            with open(CSS_DIR + '/button_new.css', 'r') as f:
+                self.PlotButton.setStyleSheet(f.read())
+
+
+    def plotButtonPushed(self):
+        self.horizon_receiver.plot()
 
     @pyqtSlot()
     def on_generic_sig(self, str):

@@ -1,3 +1,5 @@
+import logging
+
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from horizon.problem import Problem
@@ -53,7 +55,7 @@ class PlotterHorizon:
 if __name__ == '__main__':
 
     nodes = 8
-    prb = Problem(nodes)
+    prb = Problem(nodes, logging_level=logging.DEBUG)
     x = prb.createStateVariable('x', 2)
     y = prb.createStateVariable('y', 2)
 
@@ -62,8 +64,8 @@ if __name__ == '__main__':
 
     x.setBounds([2, 2], [2, 2])
 
-    suka.setBounds([4], [4], [2, 4])
     danieli.setBounds([12, 12], [12, 12], 4)
+    suka.setBounds([4], [4], [2, 3, 5, 6])
 
 
     prb.createProblem()

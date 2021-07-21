@@ -53,8 +53,6 @@ class Function:
                 self.nodes.append(i)
                 self.nodes.sort()
 
-        print('nodes of function {} are: {}'.format(self.name, self.nodes))
-
     def getVariables(self):
         return self.vars
         # return [var for name, var in self.var]
@@ -115,24 +113,28 @@ class Constraint(Function):
     def setLowerBounds(self, bounds, nodes=None):
 
         if nodes is None:
-            # unraveled_nodes
             nodes = self.nodes
-        # else:
-        #     unraveled_nodes = misc.unravelElements(nodes) # todo are we sure this is ok?
+        else:
+            if isinstance(nodes, list):
+                nodes = [node for node in nodes if node in self.nodes]
+            else:
+                nodes = [nodes] if nodes in self.nodes else []
 
-        for node in nodes: #unraveled_nodes:
+        for node in nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
 
     def setUpperBounds(self, bounds, nodes=None):
 
         if nodes is None:
-            # unraveled_nodes
             nodes = self.nodes
-        # else:
-        #     unraveled_nodes = misc.unravelElements(nodes)
+        else:
+            if isinstance(nodes, list):
+                nodes = [node for node in nodes if node in self.nodes]
+            else:
+                nodes = [nodes] if nodes in self.nodes else []
 
-        for node in nodes: #unraveled_nodes:
+        for node in nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'ub': bounds})
 
