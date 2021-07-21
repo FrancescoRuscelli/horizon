@@ -11,10 +11,10 @@ def RK4(dae, opts, casadi_type):
     nx = x.size1()
     nv = qddot.size1()
 
-    if casadi_type is 'MX':
+    if casadi_type == 'MX':
         X0_RK = cs.MX.sym('X0_RK', nx)
         U_RK = cs.MX.sym('U_RK', nv)
-    elif casadi_type is 'SX':
+    elif casadi_type == 'SX':
         X0_RK = cs.SX.sym('X0_RK', nx)
         U_RK = cs.SX.sym('U_RK', nv)
     else:
