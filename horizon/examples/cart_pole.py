@@ -48,8 +48,8 @@ opts = {'tf': tf/ns}
 F_integrator = integrators.RK4(dae, opts, "SX")
 
 # Limits
-q_min = [-10., -2.*np.pi]
-q_max = [10., 2.*np.pi]
+q_min = [-0.5, -2.*np.pi]
+q_max = [0.5, 2.*np.pi]
 q_init = [0., 0.]
 
 qdot_lims = np.array([100., 100.])
@@ -59,9 +59,9 @@ qddot_lims = np.array([1000., 1000.])
 qddot_init = [0., 0.]
 
 q.setBounds(q_min, q_max)
-q.setBounds(q_init, q_init, nodes=[0])
+q.setBounds(q_init, q_init, nodes=0)
 qdot.setBounds((-qdot_lims).tolist(), qdot_lims.tolist())
-qdot.setBounds(qdot_init, qdot_init, nodes=[0])
+qdot.setBounds(qdot_init, qdot_init, nodes=0)
 qddot.setBounds((-qddot_lims).tolist(), qddot_lims.tolist())
 
 q.setInitialGuess(q_init)
@@ -69,11 +69,12 @@ qdot.setInitialGuess(qdot_init)
 qddot.setInitialGuess(qddot_init)
 
 # Cost function
-x_int = F_integrator(x0=x_prev, p=qddot_prev)
-prb.createCostFunction("qdot_init", cs.dot(qdot, qdot), nodes=[0])
-prb.createCostFunction("L", x_int["qf"], nodes=list(range(1, ns+1)))
+l = F_integrator(x0=x, p=qddot)
+prb.createCostFunction("qddot", cs.dot(qddot, qddot), nodes=0)
+prb.createCostFunction("L", l["qf"], nodes=list(range(0, ns)))
 
 # Constraints
+x_int = F_integrator(x0=x_prev, p=qddot_prev)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
 prb.createConstraint("up", q[1] - np.pi, nodes=ns, bounds=dict(lb = [0], ub = [0]))
 prb.createConstraint("final_qdot", qdot - np.array([0., 0.]), nodes=ns, bounds=dict(lb = np.zeros(2).tolist(), ub = np.zeros(2).tolist()))
