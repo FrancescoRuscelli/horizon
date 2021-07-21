@@ -52,7 +52,7 @@ tf = 1.0  # [s]
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
 opts = {'tf': tf/ns}
-F_integrator = integrators.RK4(dae, opts, "SX")
+F_integrator = integrators.RK4(dae, opts, cs.SX)
 
 # Add bounds to STATE and CONTROL variables
 q_min = [-10.0, -10.0, -10.0, -1.0, -1.0, -1.0, -1.0,  # Floating base

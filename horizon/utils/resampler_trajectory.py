@@ -82,7 +82,7 @@ def second_order_resample_integrator(p, v, a, tf, dt, dae):
     n_res = int(round(tf/dt))
 
     opts = {'tf': dt}
-    F_integrator = integrators.RK4(dae, opts, 'SX')
+    F_integrator = integrators.RK4(dae, opts, cs.SX)
 
     x_res0 = np.hstack((p[:, 0], v[:, 0]))
 
@@ -115,7 +115,7 @@ def second_order_resample_integrator(p, v, a, tf, dt, dae):
             node += 1
             if new_dt >= 1e-6:
                 opts = {'tf': new_dt}
-                new_F_integrator = integrators.RK4(dae, opts, 'SX')
+                new_F_integrator = integrators.RK4(dae, opts, cs.SX)
                 x_resi = new_F_integrator(x0=np.hstack((p[:,node], v[:,node])), p=a[:, node])['xf'].toarray().flatten()
                 x_res[:, i] = x_resi
                 p_res[:, i] = x_resi[0:p.shape[0]]
