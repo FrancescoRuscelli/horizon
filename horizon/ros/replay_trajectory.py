@@ -39,7 +39,7 @@ class replay_trajectory:
         '''
         self.__sleep = secs
 
-    def replay(self):
+    def replay(self, is_floating_base=True):
         pub = rospy.Publisher('joint_states', JointState, queue_size=10)
         rospy.init_node('joint_state_publisher')
         rate = rospy.Rate(1. / self.dt)
@@ -47,33 +47,36 @@ class replay_trajectory:
         joint_state_pub.header = Header()
         joint_state_pub.name = self.joint_list
 
-        br = ros_tf.TransformBroadcaster()
-        m = geometry_msgs.msg.TransformStamped()
-        m.header.frame_id = 'world'
-        m.child_frame_id = 'base_link'
+        if is_floating_base:
+            br = ros_tf.TransformBroadcaster()
+            m = geometry_msgs.msg.TransformStamped()
+            m.header.frame_id = 'world'
+            m.child_frame_id = 'base_link'
 
         nq = np.shape(self.q_replay)[1]
 
         while not rospy.is_shutdown():
             for qk in self.q_replay.T:
-                qk = normalize_quaternion(qk)
 
-                m.transform.translation.x = qk[0]
-                m.transform.translation.y = qk[1]
-                m.transform.translation.z = qk[2]
-                m.transform.rotation.x = qk[3]
-                m.transform.rotation.y = qk[4]
-                m.transform.rotation.z = qk[5]
-                m.transform.rotation.w = qk[6]
+                if is_floating_base:
+                    qk = normalize_quaternion(qk)
 
-                br.sendTransform((m.transform.translation.x, m.transform.translation.y, m.transform.translation.z),
-                                 (m.transform.rotation.x, m.transform.rotation.y, m.transform.rotation.z,
-                                  m.transform.rotation.w),
-                                 rospy.Time.now(), m.child_frame_id, m.header.frame_id)
+                    m.transform.translation.x = qk[0]
+                    m.transform.translation.y = qk[1]
+                    m.transform.translation.z = qk[2]
+                    m.transform.rotation.x = qk[3]
+                    m.transform.rotation.y = qk[4]
+                    m.transform.rotation.z = qk[5]
+                    m.transform.rotation.w = qk[6]
+
+                    br.sendTransform((m.transform.translation.x, m.transform.translation.y, m.transform.translation.z),
+                                     (m.transform.rotation.x, m.transform.rotation.y, m.transform.rotation.z,
+                                      m.transform.rotation.w),
+                                     rospy.Time.now(), m.child_frame_id, m.header.frame_id)
 
                 t = rospy.Time.now()
                 joint_state_pub.header.stamp = t
-                joint_state_pub.position = qk[7:nq]
+                joint_state_pub.position = qk[7:nq] if is_floating_base else qk
                 joint_state_pub.velocity = []
                 joint_state_pub.effort = []
                 pub.publish(joint_state_pub)
