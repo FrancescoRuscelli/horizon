@@ -87,7 +87,7 @@ class Problem:
 
     def createCostFunction(self, name, j, nodes=None):
 
-        if not nodes:
+        if nodes is None:
             nodes = list(range(self.nodes))
         else:
             if isinstance(nodes, list):
