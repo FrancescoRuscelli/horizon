@@ -74,7 +74,10 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.funTable.itemDoubleClicked.connect(self.openFunction)
         self.SVTable.itemDoubleClicked.connect(self.openSV)
         self.switchPageButton.clicked.connect(self.switchPage)
-        self.constraintLine.add_fun_horizon.connect(self.horizon_receiver.addFunction)
+        # self.constraintLine.active_fun_horizon.connect(partial(self.ledSolve, False))
+        # self.constraintLine.active_fun_horizon.connect(partial(self.ledCreate, False))
+
+
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
         self.SingleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.constraintLine.Single))
         self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.constraintLine.Single))
@@ -84,7 +87,6 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.SolveButton.clicked.connect(self.solveButtonPushed)
         self.PlotButton.clicked.connect(self.plotButtonPushed)
 
-        self.ledCreate.setEnabled(False)
         self.ledSolve.setEnabled(False)
 
         # when opening horizon, fill the GUI
@@ -107,6 +109,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     def createButtonPushed(self):
         if self.horizon_receiver.generate():
             self.SolveButton.setEnabled(True)
+            self.ledSolve.setEnabled(True)
             self.ledCreate.setReady(True)
             # with open(CSS_DIR + '/button_new.css', 'r') as f:
             #     self.SolveButton.setStyleSheet(f.read())
@@ -456,6 +459,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
             self.logger.info(signal)
             self.on_generic_sig(signal)
+            self.ledCreate.setReady(False)
+            self.ledSolve.setReady(False)
 
         else:
             self.SVNameInput.setFocus()

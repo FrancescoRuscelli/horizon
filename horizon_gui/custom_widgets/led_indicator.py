@@ -13,6 +13,11 @@ class LedIndicator(QWidget):
         # self.setCheckable(True)
         self.is_ready = False
 
+        # Grey
+        disabled_color_1 = QColor(107, 107, 107)
+        disabled_color_2 = QColor(93, 93, 93)
+        self.color_disabled = [disabled_color_1, disabled_color_2]
+
         # # Green
         # self.on_color_1 = QColor(0, 255, 0)
         # self.on_color_2 = QColor(0, 192, 0)
@@ -56,15 +61,20 @@ class LedIndicator(QWidget):
         painter.drawEllipse(QPointF(0, 0), 490, 490)
 
         painter.setPen(pen)
-
-        if self.is_ready:
+        if not self.isEnabled():
             gradient = QRadialGradient(QPointF(-500, -500), 1500, QPointF(-500, -500))
-            gradient.setColorAt(0, self.color_ready[0])
-            gradient.setColorAt(1, self.color_ready[1])
+            gradient.setColorAt(0, self.color_disabled[0])
+            gradient.setColorAt(1, self.color_disabled[1])
         else:
-            gradient = QRadialGradient(QPointF(500, 500), 1500, QPointF(500, 500))
-            gradient.setColorAt(0, self.color_not_ready[0])
-            gradient.setColorAt(1, self.color_not_ready[1])
+
+            if self.is_ready:
+                gradient = QRadialGradient(QPointF(-500, -500), 1500, QPointF(-500, -500))
+                gradient.setColorAt(0, self.color_ready[0])
+                gradient.setColorAt(1, self.color_ready[1])
+            else:
+                gradient = QRadialGradient(QPointF(500, 500), 1500, QPointF(500, 500))
+                gradient.setColorAt(0, self.color_not_ready[0])
+                gradient.setColorAt(1, self.color_not_ready[1])
 
         painter.setBrush(gradient)
         painter.drawEllipse(QPointF(0, 0), 480, 480)
@@ -116,6 +126,7 @@ class ExampleWindow(QWidget):
         main_layout = QGridLayout(self)
 
         self.led = LedIndicator()
+        self.led.setEnabled(False)
 
 
 

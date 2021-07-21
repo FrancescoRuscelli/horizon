@@ -26,8 +26,8 @@ import os
 
 
 class HorizonLine(QScrollArea):
-    add_fun_horizon = pyqtSignal(dict)
-    remove_fun_horizon = pyqtSignal(dict)
+    active_fun_horizon = pyqtSignal(str)
+    remove_fun_horizon = pyqtSignal(str)
     repeated_fun = pyqtSignal(str)
 
     def __init__(self, horizon, fun_type, nodes=0, logger=None, parent=None):
@@ -187,7 +187,7 @@ class HorizonLine(QScrollArea):
         source_item.dropMimeData(event.mimeData(), Qt.CopyAction, 0, 0, QModelIndex())
         fun_name = source_item.item(0, 0).text()
         # fun = source_item.item(0, 0).data(Qt.UserRole)
-
+        self.active_fun_horizon.emit(fun_name)
         self.addFunctionToHorizon(fun_name)
 
     @pyqtSlot()
