@@ -89,3 +89,8 @@ def double_integrator_with_floating_base(q, ndot, nddot):
     return x, xdot
 
 
+def double_integrator(q, qdot, qddot):
+    x = cs.vertcat(q, qdot)
+    xdot = cs.vertcat(qdot, qddot)
+    return x, xdot
+
