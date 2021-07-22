@@ -227,11 +227,11 @@
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
-            <attribute name="horizontalHeaderMinimumSectionSize">
-             <number>20</number>
-            </attribute>
             <attribute name="horizontalHeaderDefaultSectionSize">
              <number>57</number>
+            </attribute>
+            <attribute name="horizontalHeaderMinimumSectionSize">
+             <number>20</number>
             </attribute>
             <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
              <bool>false</bool>
@@ -386,7 +386,7 @@
           <item row="3" column="1">
            <widget class="LedIndicator" name="ledCreate" native="true">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+             <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
@@ -474,6 +474,12 @@
           </item>
           <item row="1" column="1">
            <widget class="QLabel" name="label_3">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="text">
              <string>updated:</string>
             </property>
@@ -517,6 +523,9 @@
             <property name="text">
              <string>N. nodes:</string>
             </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
            </widget>
           </item>
           <item>
@@ -532,6 +541,9 @@
               <width>0</width>
               <height>26</height>
              </size>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
             </property>
            </widget>
           </item>
@@ -676,7 +688,7 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
   <action name="actionExit">
    <property name="icon">
     <iconset>
-     <normaloff>../../../../../../../../.designer/resources/rocket.svg</normaloff>../../../../../../../../.designer/resources/rocket.svg</iconset>
+     <normaloff>../../../../../.designer/resources/rocket.svg</normaloff>../../../../../.designer/resources/rocket.svg</iconset>
    </property>
    <property name="text">
     <string>Exit</string>
@@ -691,7 +703,7 @@ QTextEdit {color: rgb(238, 238, 236)}</string>
   <action name="actionAbout">
    <property name="icon">
     <iconset>
-     <normaloff>../../../../../../../../.designer/resources/info.svg</normaloff>../../../../../../../../.designer/resources/info.svg</iconset>
+     <normaloff>../../../../../.designer/resources/info.svg</normaloff>../../../../../.designer/resources/info.svg</iconset>
    </property>
    <property name="text">
     <string>About</string>

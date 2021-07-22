@@ -5,6 +5,7 @@ import casadi as cs
 import math
 import pickle
 from logging import INFO, DEBUG
+from horizon.utils import plotter as plt
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -18,6 +19,7 @@ class horizonImpl():
         self.sv_dict = dict()  # state variables
         self.fun_dict = dict() # functions
 
+        self.plt = plt.PlotterHorizon(logger=self.logger)
         # self.active_fun_list = list()
 
     def addStateVariable(self, data):
@@ -254,7 +256,8 @@ class horizonImpl():
 
     def solve(self):
         try:
-            self.casadi_prb.solveProblem()
+            sol = self.casadi_prb.solveProblem()
+            self.plt.setSolution(sol)
         except Exception as e:
             return self.logger.warning(e)
         return True
@@ -272,7 +275,7 @@ class horizonImpl():
         return vars, cnstrs, costfuns
 
     def plot(self):
-        pass
+        self.plt.plotVariables()
 
     def serialize(self):
 

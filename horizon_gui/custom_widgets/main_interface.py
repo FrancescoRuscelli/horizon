@@ -35,7 +35,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         self.fun_keywords = list()
 
-        self._connectActions()
+        # self._connectActions()
 
         # spinbox to set old variables
         self.SVNodeInput.setRange(-N, 0)
@@ -69,15 +69,11 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         #
         # with open(CSS_DIR + '/button_old.css', 'r') as f:
         #     self.PlotButton.setStyleSheet(f.read())
-
+        self.SVAddButton.clicked.connect(self.generateStateVariable)
         self.funButton.clicked.connect(self.generateFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
         self.SVTable.itemDoubleClicked.connect(self.openSV)
         self.switchPageButton.clicked.connect(self.switchPage)
-        # self.constraintLine.active_fun_horizon.connect(partial(self.ledSolve, False))
-        # self.constraintLine.active_fun_horizon.connect(partial(self.ledCreate, False))
-
-
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
         self.SingleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.constraintLine.Single))
         self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.constraintLine.Single))
@@ -87,6 +83,19 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.SolveButton.clicked.connect(self.solveButtonPushed)
         self.PlotButton.clicked.connect(self.plotButtonPushed)
 
+        # these set to NOT READY the create/solve problem buttons if something in the horizon problem is changed
+        self.constraintLine.active_fun_horizon.connect(partial(self.ledCreate.setReady, False))
+        self.constraintLine.active_fun_horizon.connect(partial(self.ledSolve.setReady, False))
+        self.constraintLine.bounds_changed.connect(partial(self.ledCreate.setReady, False))
+        self.constraintLine.bounds_changed.connect(partial(self.ledSolve.setReady, False))
+        self.costfunctionLine.active_fun_horizon.connect(partial(self.ledCreate.setReady, False))
+        self.costfunctionLine.active_fun_horizon.connect(partial(self.ledSolve.setReady, False))
+        self.costfunctionLine.bounds_changed.connect(partial(self.ledCreate.setReady, False))
+        self.costfunctionLine.bounds_changed.connect(partial(self.ledSolve.setReady, False))
+        self.NodesSpinBox.valueChanged.connect(partial(self.ledCreate.setReady, False))
+        self.NodesSpinBox.valueChanged.connect(partial(self.ledSolve.setReady, False))
+        self.constraintLine.function_nodes_changed.connect(partial(self.ledCreate.setReady, False))
+        self.constraintLine.function_nodes_changed.connect(partial(self.ledSolve.setReady, False))
         self.ledSolve.setEnabled(False)
 
         # when opening horizon, fill the GUI
@@ -133,6 +142,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.horizon_receiver.setHorizonNodes(n_nodes) # setting to casadi the new number of nodes
         self.constraintLine.setHorizonNodes(n_nodes)
         self.costfunctionLine.setHorizonNodes(n_nodes)
+        # self.ledCreate.setReady(False)
+        # self.ledSolve.setReady(False)
 
     def switchPage(self):
         index = self.ProblemMain.currentIndex()
@@ -459,6 +470,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
             self.logger.info(signal)
             self.on_generic_sig(signal)
+            # todo here is it ok?
             self.ledCreate.setReady(False)
             self.ledSolve.setReady(False)
 
@@ -469,9 +481,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
     # GUI
     def _connectActions(self):
-
+        pass
         # todo PUTT ALL OTHER CONNECT
-        self.SVAddButton.clicked.connect(self.generateStateVariable)
+        # self.SVAddButton.clicked.connect(self.generateStateVariable)
 
     # GUI
     def _addRowToSVTable(self, name):

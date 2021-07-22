@@ -26,9 +26,11 @@ import os
 
 
 class HorizonLine(QScrollArea):
-    active_fun_horizon = pyqtSignal(str)
-    remove_fun_horizon = pyqtSignal(str)
+    active_fun_horizon = pyqtSignal()
+    remove_fun_horizon = pyqtSignal()
     repeated_fun = pyqtSignal(str)
+    bounds_changed = pyqtSignal()
+    function_nodes_changed = pyqtSignal()
 
     def __init__(self, horizon, fun_type, nodes=0, logger=None, parent=None):
         super().__init__(parent)
@@ -73,8 +75,11 @@ class HorizonLine(QScrollArea):
 
         self.function_tab.tabCloseRequested.connect(self.removeActiveFunctionRequestFromIndex)
         self.function_tab.funNodesChanged.connect(partial(self.updateFunctionNodes, 'single'))
+        self.function_tab.funNodesChanged.connect(self.function_nodes_changed.emit)
         self.function_tab.funLbChanged.connect(self.updateFunctionLb)
+        self.function_tab.funLbChanged.connect(self.bounds_changed.emit)
         self.function_tab.funUbChanged.connect(self.updateFunctionUb)
+        self.function_tab.funUbChanged.connect(self.bounds_changed.emit)
 
 
     def _initMultiLine(self):
@@ -84,6 +89,7 @@ class HorizonLine(QScrollArea):
 
         self.multi_function_box.funCloseRequested.connect(self.removeActiveFunctionRequestFromName)
         self.multi_function_box.funNodesChanged.connect(partial(self.updateFunctionNodes, 'multi'))
+        self.multi_function_box.funNodesChanged.connect(self.function_nodes_changed.emit)
 
     def _initOptions(self):
 
@@ -120,15 +126,6 @@ class HorizonLine(QScrollArea):
             self.function_tab.setFunctionNodes(fun_name, ranges)
         elif parent == 'single':
             self.multi_function_box.setFunctionNodes(fun_name, ranges)
-
-    # # todo isn't it better to pass a matrix with rows as dim and columns as nodes?
-    # def updateFunctionLbAll(self, fun_name, bounds):
-    #     print('function {} changed LOWER bounds: {}'.format(fun_name, bounds))
-    #     self.horizon_receiver.updateFunctionLowerBounds(fun_name, bounds)
-    #
-    # def updateFunctionUbAll(self, fun_name, bounds):
-    #     print('function {} changed UPPER bounds: {}'.format(fun_name, bounds))
-    #     self.horizon_receiver.updateFunctionLowerBounds(fun_name, )
 
     def updateFunctionLb(self, fun_name, node, bounds):
         # print('function {} changed at node {}, new LOWER bounds: {}'.format(fun_name, node, bounds.transpose()))
@@ -187,7 +184,7 @@ class HorizonLine(QScrollArea):
         source_item.dropMimeData(event.mimeData(), Qt.CopyAction, 0, 0, QModelIndex())
         fun_name = source_item.item(0, 0).text()
         # fun = source_item.item(0, 0).data(Qt.UserRole)
-        self.active_fun_horizon.emit(fun_name)
+        self.active_fun_horizon.emit()
         self.addFunctionToHorizon(fun_name)
 
     @pyqtSlot()

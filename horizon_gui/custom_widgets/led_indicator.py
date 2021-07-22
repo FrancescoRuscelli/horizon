@@ -10,6 +10,7 @@ class LedIndicator(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
 
+        self.setMinimumSize(5, 5)
         # self.setCheckable(True)
         self.is_ready = False
 
