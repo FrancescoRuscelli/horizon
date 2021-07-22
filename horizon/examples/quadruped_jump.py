@@ -106,21 +106,16 @@ touch_down_node = 20
 q_fb_trg = [0.0, 0.0, 0.8, 0.0, 0.0, 0.0, 1.0]
 
 prb.createCostFunction("jump", 1000.*cs.dot(q[2] - q_fb_trg[2], q[2] - q_fb_trg[2]), nodes = list(range(lift_node, touch_down_node)))
+prb.createCostFunction("floating_base_quaternion", 100.*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
+prb.createCostFunction("min_qdot", 10.*cs.dot(qdot, qdot))
 
+qddot_prev = prb.createInputVariable("qddot", nv, -1)
+prb.createCostFunction("min_jerk", 0.0003*cs.dot(qddot-qddot_prev, qddot-qddot_prev), nodes=list(range(1, ns)))
 
-
-# min_fb_or = lambda k: 100.*dot(Q[k][3:7]-q_fb_trg[3:7], Q[k][3:7]-q_fb_trg[3:7])
-# J += cost_function(min_fb_or, 0, ns)
-#
-# min_qdot = lambda k: 10.*dot(Qdot[k], Qdot[k])
-# J += cost_function(min_qdot,  0, ns)
-#
-# min_jerk = lambda k: 0.0003*dot(Qddot[k]-Qddot[k-1], Qddot[k]-Qddot[k-1])
-# J += cost_function(min_jerk, 0, ns-1) # <- this smooths qddot solution
-#
-# min_deltaFC = lambda k: 0.01*dot((F1[k]-F1[k-1])+(F2[k]-F2[k-1])+(F3[k]-F3[k-1])+(F4[k]-F4[k-1]),
-#                                  (F1[k]-F1[k-1])+(F2[k]-F2[k-1])+(F3[k]-F3[k-1])+(F4[k]-F4[k-1]))  # min Fdot
-# J += cost_function(min_deltaFC, touch_down_node+1, ns-1)
-#
-#
+f1_prev = prb.createInputVariable("f1", nf, -1)
+f2_prev = prb.createInputVariable("f2", nf, -1)
+f3_prev = prb.createInputVariable("f3", nf, -1)
+f4_prev = prb.createInputVariable("f4", nf, -1)
+prb.createCostFunction("min_deltaforce", 0.01*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
+                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)), nodes=list(range(1, ns)))
 
