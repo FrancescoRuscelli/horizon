@@ -28,7 +28,8 @@ class InverseDynamics():
             q: joint positions
             qdot: joint velocities
             qddot: joint accelerations
-            frame_force_mapping: dictionary containing a map between frames and force variables e.g. {'lsole': F1}
+            frame_force_mapping: dictionary containing a map between frames and force variables e.g. {'lsole': F1} representing the frame
+                where the force is acting (the force is expressed in force_reference_frame!)
         """
         JtF_sum = 0
 
