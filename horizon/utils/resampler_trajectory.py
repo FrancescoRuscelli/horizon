@@ -7,17 +7,17 @@ def resample_torques(p, v, a, tf, dt, dae, frame_force_mapping, kindyn, force_re
     """
         Resample solution to a different number of nodes, RK4 integrator is used for the resampling
         Args:
-            X: state variable
-            U_integrator: control variable
-            time: the final time (tf) or the vector of intermediate periods (dt_hist)
+            p: position
+            v: velocity
+            a: acceleration
+            tf: the final time (tf) or the vector of intermediate periods (dt_hist)
             dt: resampled period
             dae: a dictionary containing
                     'x': state
                     'p': control
                     'ode': a function of the state and control returning the derivative of the state
                     'quad': quadrature term
-            ID: Function.deserialize(kindyn.rnea()) TODO: remove, this can be taken from kindyn
-            dict: dictionary containing a map between frames and force variables e.g. {'lsole': F1}
+            frame_force_mapping: dictionary containing a map between frames and force variables e.g. {'lsole': F1}
             kindyn: object of type casadi_kin_dyn
             force_reference_frame: this is the frame which is used to compute the Jacobian during the ID computation:
                     LOCAL (default)
