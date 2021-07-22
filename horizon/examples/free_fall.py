@@ -180,7 +180,7 @@ frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anch
 q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_hist_mapping, kindyn)
 
 
-PRINT = True
+PRINT = False
 if PRINT:
     # plots raw solution
     time = np.arange(0.0, tf+1e-6, tf/ns)
@@ -259,5 +259,5 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
               'rope_joint']
 
-replay_trajectory(dt, joint_list, q_res).replay()
+replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping).replay()
 
