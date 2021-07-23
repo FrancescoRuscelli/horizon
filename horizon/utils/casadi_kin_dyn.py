@@ -1,5 +1,36 @@
 import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
+import numpy as np
+
+def linearized_friciton_cone(f, mu, R):
+    """
+    Args:
+        f: force (only linear components)
+        mu: friciton cone
+        R: rotation matrix between force reference frame and surface frame (ff_R_cf, ff: force frame, cf: contact frame)
+
+    Returns:
+        constraint
+        lb
+        ub
+    """
+
+    mu_lin = mu / 2.0 * np.sqrt(2.0)
+
+    A_fr = np.zeros([5, 3])
+    A_fr[0, 0] = 1.0
+    A_fr[0, 2] = -mu_lin
+    A_fr[1, 0] = -1.0
+    A_fr[1, 2] = -mu_lin
+    A_fr[2, 1] = 1.0
+    A_fr[2, 2] = -mu_lin
+    A_fr[3, 1] = -1.0
+    A_fr[3, 2] = -mu_lin
+    A_fr[4, 2] = -1.0
+
+    A_fr_R = cs.mtimes(A_fr, R.T)
+
+    return cs.mtimes(A_fr_R, f), [-np.inf, -np.inf, -np.inf, -np.inf, -np.inf], [0., 0., 0., 0., 0.]
 
 class InverseDynamics():
     """
