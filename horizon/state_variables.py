@@ -210,7 +210,8 @@ class StateVariables:
     def getVarsDim(self):
         var_dim_tot = 0
         for var in self.state_var.values():
-            var_dim_tot += var.shape[0] * self.nodes
+            if isinstance(var, StateVariable):
+                var_dim_tot += var.shape[0] * var.getNNodes()
         return var_dim_tot
 
 

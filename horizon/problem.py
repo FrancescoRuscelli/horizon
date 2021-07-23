@@ -310,9 +310,10 @@ if __name__ == '__main__':
     prb = Problem(nodes, logging_level=logging.DEBUG)
     x = prb.createStateVariable('x', 2)
     y = prb.createStateVariable('y', 2)
+    z = prb.createInputVariable('z', 2)
     danieli = prb.createConstraint('danieli', x+y, range(4, 10))
 
-
+    x.setBounds([2,2], [2,2])
     danieli.setBounds([12, 12],[12, 12], list(range(4, 10)))
     prb.createProblem({"nlpsol.ipopt":True})
     sol = prb.solveProblem()
