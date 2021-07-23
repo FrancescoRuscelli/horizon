@@ -21,7 +21,7 @@ def normalize_quaternion(q):
 
 
 class replay_trajectory:
-    def __init__(self, dt, joint_list, q_replay, frame_force_mapping = {}, force_reference_frame = cas_kin_dyn.CasadiKinDyn.LOCAL, kindyn=None):
+    def __init__(self, dt, joint_list, q_replay, frame_force_mapping=None, force_reference_frame=cas_kin_dyn.CasadiKinDyn.LOCAL, kindyn=None):
         """
         Contructor
         Args:
@@ -32,6 +32,8 @@ class replay_trajectory:
             force_reference_frame: frame w.r.t. the force is expressed. If LOCAL_WORLD_ALIGNED then forces are rotated in LOCAL frame before being published
             kindyn: needed if forces are in LOCAL_WORLD_ALIGNED
         """
+        if frame_force_mapping is None:
+            frame_force_mapping = {}
         self.dt = dt
         self.joint_list = joint_list
         self.q_replay = q_replay
