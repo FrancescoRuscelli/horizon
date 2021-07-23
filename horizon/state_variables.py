@@ -11,9 +11,9 @@ Formerly
 '''
 
 # todo create function checker to check if nodes are in self.nodes and if everything is ok with the input (no dict, no letters...)
-class StateVariable(cs.SX):
+class Variable(cs.SX):
     def __init__(self, tag, dim, nodes):
-        super(StateVariable, self).__init__(cs.SX.sym(tag, dim))
+        super(Variable, self).__init__(cs.SX.sym(tag, dim))
 
         self.tag = tag
         self.dim = dim
@@ -27,7 +27,7 @@ class StateVariable(cs.SX):
 
     def setLowerBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        nodes = misc.checkNodes(nodes, self.nodes)
 
         if isinstance(bounds, (list, int, float)):
             bounds = np.array(bounds)
@@ -43,7 +43,7 @@ class StateVariable(cs.SX):
 
     def setUpperBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        nodes = misc.checkNodes(nodes, self.nodes)
 
         if isinstance(bounds, (list, int, float)):
             bounds = np.array(bounds)
@@ -63,7 +63,7 @@ class StateVariable(cs.SX):
 
     def setInitialGuess(self, val, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        nodes = misc.checkNodes(nodes, self.nodes)
 
         if isinstance(val, (list, int, float)):
             val = np.array(val)
@@ -91,7 +91,7 @@ class StateVariable(cs.SX):
         # self.var_impl.clear()
         new_var_impl = dict()
 
-        for n in range(self.nodes):
+        for n in self.nodes:
             if 'n' + str(n) in self.var_impl:
                 new_var_impl['n' + str(n)] = self.var_impl['n' + str(n)]
             else:
@@ -148,11 +148,6 @@ class StateVariable(cs.SX):
         return (self.__class__, (self.tag, self.dim, self.nodes, ))
 
 
-class InputVariable(StateVariable):
-    def __init__(self, tag, dim, nodes):
-        super(InputVariable, self).__init__(tag, dim, nodes)
-        self.nodes = nodes-1
-
 class StateVariables:
     def __init__(self, nodes, logger=None):
 
@@ -163,19 +158,22 @@ class StateVariables:
         self.state_var_prev = OrderedDict()
         self.state_var_impl = OrderedDict()
 
-    def setVar(self, var_type, name, dim, prev_nodes):
+    def createVar(self, name, dim, active_nodes, prev_nodes):
+
+        active_nodes = misc.checkNodes(active_nodes, range(self.nodes))
 
         # todo what if 'prev_nodes' it is a list
         createTag = lambda name, node: name + str(node) if node is not None else name
         checkExistence = lambda name, node: True if prev_nodes is None else True if name in self.state_var else False
         tag = createTag(name, prev_nodes)
 
+
         if self.logger:
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('Setting variable {} with tag {} as {}'.format(name, tag, var_type))
+                self.logger.debug('Setting variable {} with tag {} on nodes:'.format(name, tag, active_nodes))
 
         if checkExistence(name, prev_nodes):
-            var = var_type(tag, dim, self.nodes)
+            var = Variable(tag, dim, active_nodes)
             if prev_nodes is None:
                 self.state_var[tag] = var
             else:
@@ -185,11 +183,15 @@ class StateVariables:
             raise Exception('Yet to declare the present variable!')
 
     def setStateVar(self, name, dim, prev_nodes=None):
-        var = self.setVar(StateVariable, name, dim, prev_nodes)
+        var = self.createVar(name, dim, range(self.nodes), prev_nodes)
         return var
 
     def setInputVar(self, name, dim, prev_nodes=None):
-        var = self.setVar(InputVariable, name, dim, prev_nodes)
+        var = self.createVar(name, dim, range(self.nodes - 1), prev_nodes)
+        return var
+
+    def setVar(self, name, dim, nodes, prev_nodes=None):
+        var = self.createVar(name, dim, nodes, prev_nodes)
         return var
 
     def getVarsDim(self):

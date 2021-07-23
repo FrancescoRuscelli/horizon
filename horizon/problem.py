@@ -39,6 +39,9 @@ class Problem:
         var = self.state_var_container.setInputVar(name, dim, prev_nodes)
         return var
 
+    def createVariable(self, name, dim, nodes, prev_nodes=None):
+        var = self.state_var_container.setVar(name, dim, nodes, prev_nodes)
+        return var
     # def setVariable(self, name, var):
 
         # assert (isinstance(var, (cs.casadi.SX, cs.casadi.MX)))
@@ -301,6 +304,15 @@ class Problem:
 
 if __name__ == '__main__':
 
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    # x = prb.createStateVariable('x', 2)
+    # x = prb.createInputVariable('x', 2)
+    x = prb.createVariable('x', 2, [2, 5])
+
+    print(x.getNNodes())
+
+    exit()
     # ==================================================================================================================
     # ======================================= bounds as list but also other stuff =====================================
     # ==================================================================================================================
