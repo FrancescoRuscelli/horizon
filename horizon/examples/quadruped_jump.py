@@ -22,7 +22,7 @@ nv = kindyn.nv()  # Velocity DoFs
 nf = 3  # Force DOfs
 
 # Create horizon problem
-prb = problem.Problem(ns)
+prb = problem.Problem(ns, logging_level=logging.DEBUG)
 
 # Creates problem STATE variables
 q = prb.createStateVariable("q", nq)
@@ -94,9 +94,9 @@ f3.setInitialGuess(f_init)
 f4.setBounds(f_min, f_max)
 f4.setInitialGuess(f_init)
 
-dt_min = 0.03 #[s]
-dt_max = 0.15 #[s]
-dt_init = dt_min
+dt_min = [0.03] #[s]
+dt_max = [0.15] #[s]
+dt_init = [dt_min]
 dt.setBounds(dt_min, dt_max)
 dt.setInitialGuess(dt_init)
 
@@ -118,4 +118,63 @@ f3_prev = prb.createInputVariable("f3", nf, -1)
 f4_prev = prb.createInputVariable("f4", nf, -1)
 prb.createCostFunction("min_deltaforce", 0.01*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
                                                       (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)), nodes=list(range(1, ns)))
+
+# Constraints
+q_prev = prb.createStateVariable("q", nq, -1)
+qdot_prev = prb.createStateVariable("qdot", nv, -1)
+qddot_prev = prb.createInputVariable("qddot", nv, -1)
+dt_prev = prb.createInputVariable("dt", 1, -1)
+x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
+x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt_prev)
+prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+
+tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
+            -10000., -10000., -10000.,  # Contact 1
+            -10000., -10000., -10000.,  # Contact 2
+            -10000., -10000., -10000.,  # Contact 3
+            -10000., -10000., -10000.]  # Contact 4
+
+tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
+            10000., 10000., 10000.,  # Contact 1
+            10000., 10000., 10000.,  # Contact 2
+            10000., 10000., 10000.,  # Contact 3
+            10000., 10000., 10000.]  # Contact 4
+dd = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
+tau = casadi_kin_dyn.InverseDynamics(kindyn, dd.keys()).call(q, qdot, qddot, dd)
+prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
+
+# GROUND
+mu = 0.8 # friction coefficient
+R = np.identity(3, dtype=float) # environment rotation wrt inertial frame
+
+# foot
+contact_names = ['Contact1', 'Contact2', 'Contact3', 'Contact4']
+forces = [f1, f2, f3, f4]
+for frame, f in zip(contact_names, forces):
+    # BEFORE AND AFTER FLIGHT PHASE
+    FK = cs.Function.deserialize(kindyn.fk(frame))
+    p = FK(q=q)['ee_pos']
+    pd = FK(q=q_init)['ee_pos']
+    prb.createConstraint(f"{frame}_before_jump", p - pd, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+    prb.createConstraint(f"{frame}_after_jump", p - pd, nodes=list(range(touch_down_node, ns+1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+
+    fc, fc_lb, fc_ub = casadi_kin_dyn.linearized_friciton_cone(f, mu, R)
+    prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=list(range(0, lift_node)), bounds=dict(lb=fc_lb, ub=fc_ub))
+    prb.createConstraint(f"{frame}_friction_cone_after_jump", fc, nodes=list(range(touch_down_node, ns)), bounds=dict(lb=fc_lb, ub=fc_ub))
+
+    # DURING FLIGHT PHASE
+    prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=list(range(lift_node, touch_down_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+
+# Create problem
+prb.createProblem()
+
+opts = {'ipopt.tol': 0.001,
+        'ipopt.constr_viol_tol': 0.001,
+        'ipopt.max_iter': 5000,
+        'ipopt.linear_solver': 'ma57'}
+
+solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
+prb.setSolver(solver)
+
+solution = prb.solveProblem()
 
