@@ -42,7 +42,7 @@ def resample_torques(p, v, a, tf, dt, dae, frame_force_mapping, kindyn, force_re
     i = 0
     number_of_nodes = p.shape[1]
     node_time = tf / (number_of_nodes - 1)
-    while t <= tf:
+    while i < a_res.shape[1]-1:
         for key in frame_force_mapping:
             frame_res_force_mapping[key][:, i] = frame_force_mapping[key][:, node]
         t += dt
@@ -99,11 +99,13 @@ def second_order_resample_integrator(p, v, a, tf, dt, dae):
     t = 0.
     i = 0
     node = 0
-    while t <= tf-dt:
+    while i < a_res.shape[1]-1:
         x_resi = F_integrator(x0=x_res[:, i], p=a[:, node])['xf'].toarray().flatten()
 
         t += dt
         i += 1
+
+        #print(f"{t} <= {tf-dt}, i: {i}")
 
         x_res[:, i] = x_resi
         p_res[:, i] = x_resi[0:p.shape[0]]
