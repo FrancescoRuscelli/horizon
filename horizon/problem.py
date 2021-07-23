@@ -6,6 +6,7 @@ import numpy as np
 import logging
 import sys
 import pickle
+import horizon.misc_function as misc
 
 class Problem:
 
@@ -65,13 +66,7 @@ class Problem:
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
 
-        if nodes is None:
-            nodes = list(range(0, self.nodes))
-        else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in range(self.nodes)]
-            else:
-                nodes = [nodes] if nodes in range(self.nodes) else []
+        nodes = misc.checkNodes(nodes, range(self.nodes))
 
         used_var = self._getUsedVar(g)
 
@@ -87,13 +82,7 @@ class Problem:
 
     def createCostFunction(self, name, j, nodes=None):
 
-        if nodes is None:
-            nodes = list(range(self.nodes))
-        else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in range(self.nodes)]
-            else:
-                nodes = [nodes] if nodes in range(self.nodes) else []
+        nodes = misc.checkNodes(nodes, range(self.nodes))
 
         used_var = self._getUsedVar(j)
 
@@ -158,12 +147,11 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        if self.opts is not None:
-            if "nlpsol.ipopt" in self.opts:
-                if self.opts["nlpsol.ipopt"]:
-                    self.solver = cs.nlpsol('solver', 'ipopt', self.prob,
-                                    {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                                     'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+        if "nlpsol.ipopt" in self.opts:
+            if self.opts["nlpsol.ipopt"]:
+                self.solver = cs.nlpsol('solver', 'ipopt', self.prob) #,
+                                # {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
+                                #  'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
 
     def getProblem(self):
         return self.prob
@@ -314,6 +302,29 @@ class Problem:
 
 if __name__ == '__main__':
 
+    # ==================================================================================================================
+    # ======================================= bounds as list but also other stuff =====================================
+    # ==================================================================================================================
+
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createStateVariable('x', 2)
+    y = prb.createStateVariable('y', 2)
+    danieli = prb.createConstraint('danieli', x+y, range(4, 10))
+
+
+    danieli.setBounds([12, 12],[12, 12], list(range(4, 10)))
+    prb.createProblem({"nlpsol.ipopt":True})
+    sol = prb.solveProblem()
+
+    print(sol)
+    exit()
+
+
+    # ==================================================================================================================
+    # ==================================================================================================================
+    # ==================================================================================================================
+
     # nodes = 8
     # prb = Problem(nodes)
     # x = prb.createStateVariable('x', 2)
@@ -405,7 +416,7 @@ if __name__ == '__main__':
 
     danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=3)
 
-    prb.createProblem()
+    prb.createProblem({"nlpsol.ipopt":True})
 
     for i in range(nodes+1):
         print(x.getBounds(i))

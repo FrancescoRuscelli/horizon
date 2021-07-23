@@ -28,6 +28,20 @@ def listOfListFLOATtoINT(listOfList):
 
     return listOfList
 
+def checkNodes(nodes, nodes_self):
+    if nodes is None:
+        nodes = nodes_self
+    else:
+        if hasattr(nodes, "__iter__") and not isinstance(nodes, str):
+            nodes = [node for node in nodes if node in nodes_self]
+        elif isinstance(nodes, int):
+            nodes = [nodes] if nodes in nodes_self else []
+        else:
+            raise Exception('Type {} is not supported to specify nodes.'.format(type(nodes)))
+
+    return nodes
+
+
 
 if __name__ == '__main__':
     penis = [[1, 5], [3, 9], [12, 18]]
