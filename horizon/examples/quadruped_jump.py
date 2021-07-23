@@ -22,7 +22,7 @@ nv = kindyn.nv()  # Velocity DoFs
 nf = 3  # Force DOfs
 
 # Create horizon problem
-prb = problem.Problem(ns, logging_level=logging.DEBUG)
+prb = problem.Problem(ns)
 
 # Creates problem STATE variables
 q = prb.createStateVariable("q", nq)
@@ -77,9 +77,8 @@ qdot.setInitialGuess(qdot_init)
 qddot_min = (-100.*np.ones(nv)).tolist()
 qddot_max = (100.*np.ones(nv)).tolist()
 qddot_init = np.zeros(nv).tolist()
-qddot_init[2] = -9.8
+qddot_init[2] = -9.81
 qddot.setBounds(qddot_min, qddot_max)
-qddot.setBounds(qddot_init, qddot_init, 0)
 qddot.setInitialGuess(qddot_init)
 
 f_min = (-10000.*np.ones(nf)).tolist()
@@ -94,7 +93,7 @@ f3.setInitialGuess(f_init)
 f4.setBounds(f_min, f_max)
 f4.setInitialGuess(f_init)
 
-dt_min = [0.03] #[s]
+dt_min = [0.15] #[s]
 dt_max = [0.15] #[s]
 dt_init = [dt_min]
 dt.setBounds(dt_min, dt_max)
@@ -105,7 +104,7 @@ lift_node = 10
 touch_down_node = 20
 q_fb_trg = [0.0, 0.0, 0.8, 0.0, 0.0, 0.0, 1.0]
 
-prb.createCostFunction("jump", 1000.*cs.dot(q[2] - q_fb_trg[2], q[2] - q_fb_trg[2]), nodes = list(range(lift_node, touch_down_node)))
+#prb.createCostFunction("jump", 1000.*cs.dot(q[2] - q_fb_trg[2], q[2] - q_fb_trg[2]), nodes = list(range(lift_node, touch_down_node)))
 prb.createCostFunction("floating_base_quaternion", 100.*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
 prb.createCostFunction("min_qdot", 10.*cs.dot(qdot, qdot))
 
@@ -126,7 +125,7 @@ qddot_prev = prb.createInputVariable("qddot", nv, -1)
 dt_prev = prb.createInputVariable("dt", 1, -1)
 x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
 x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt_prev)
-prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
             -10000., -10000., -10000.,  # Contact 1
@@ -163,7 +162,7 @@ for frame, f in zip(contact_names, forces):
     prb.createConstraint(f"{frame}_friction_cone_after_jump", fc, nodes=list(range(touch_down_node, ns)), bounds=dict(lb=fc_lb, ub=fc_ub))
 
     # DURING FLIGHT PHASE
-    prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=list(range(lift_node, touch_down_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+    #prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=list(range(lift_node, touch_down_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
 # Create problem
 prb.createProblem()
@@ -177,4 +176,25 @@ solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
 prb.setSolver(solver)
 
 solution = prb.solveProblem()
+
+q_hist = solution["q"]
+qdot_hist = solution["qdot"]
+qddot_hist = solution["qddot"]
+f1_hist = solution["f1"]
+f2_hist = solution["f2"]
+f3_hist = solution["f3"]
+f4_hist = solution["f4"]
+dt_hist = solution["dt"]
+
+# resampling
+dt = 0.001
+frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'Contact3': f3_hist, 'Contact4': f4_hist}
+q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, np.sum(dt_hist), dt, dae, frame_force_hist_mapping, kindyn)
+
+joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
+              'Contact2_x', 'Contact2_y', 'Contact2_z',
+              'Contact3_x', 'Contact3_y', 'Contact3_z',
+              'Contact4_x', 'Contact4_y', 'Contact4_z']
+
+replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping).replay()
 
