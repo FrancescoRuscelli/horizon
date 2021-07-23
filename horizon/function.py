@@ -3,6 +3,7 @@ import numpy as np
 from horizon import misc_function as misc
 from collections import OrderedDict
 import pickle
+import time
 
 class Function:
     def __init__(self, name, f, used_vars, nodes):
@@ -94,7 +95,7 @@ class Constraint(Function):
 
         self.bounds = dict()
         for node in nodes:
-            self.bounds['n' + str(node)] = dict(lb=[-np.inf] * f.shape[0], ub=[np.inf] * f.shape[0])
+            self.bounds['n' + str(node)] = dict(lb=np.full(f.shape[0], -np.inf), ub=np.full(f.shape[0], np.inf))
 
         super().__init__(name, f, used_vars, nodes)
 
@@ -112,37 +113,40 @@ class Constraint(Function):
 
     def setLowerBounds(self, bounds, nodes=None):
 
-        if nodes is None:
-            nodes = self.nodes
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        if isinstance(bounds, list):
+            bounds = np.array(bounds)
         else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in self.nodes]
-            else:
-                nodes = [nodes] if nodes in self.nodes else []
+            bounds = bounds.flatten()
 
         for node in nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
 
+        # print('function lower bounds: {}'.format(nodes))
+
     def setUpperBounds(self, bounds, nodes=None):
 
-        if nodes is None:
-            nodes = self.nodes
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        if isinstance(bounds, list):
+            bounds = np.array(bounds)
         else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in self.nodes]
-            else:
-                nodes = [nodes] if nodes in self.nodes else []
+            bounds = bounds.flatten()
 
         for node in nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'ub': bounds})
+
+        # print('function upper bounds: {}'.format(nodes))
 
     def setBounds(self, lb, ub, nodes=None):
 
         # todo wrong! check if lb and ub are the length of the variable!
         self.setLowerBounds(lb, nodes)
         self.setUpperBounds(ub, nodes)
+
 
     def getLowerBounds(self, node):
         lb = self.bounds['n' + str(node)]['lb']
@@ -167,7 +171,7 @@ class Constraint(Function):
                 self.nodes.append(i)
                 self.nodes.sort()
                 if 'n' + str(i) not in self.bounds:
-                    self.bounds['n' + str(i)] = dict(lb=[-np.inf] * self.f.shape[0], ub=[np.inf] * self.f.shape[0])
+                    self.bounds['n' + str(i)] = dict(lb=np.full(self.f.shape[0], -np.inf), ub=np.full(self.f.shape[0], np.inf))
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):
@@ -189,7 +193,6 @@ class FunctionsContainer:
 
         self.costfun_container = OrderedDict()
         self.costfun_impl = OrderedDict()
-
 
     def addFunction(self, fun):
         if fun.getType() == 'constraint':
@@ -253,6 +256,14 @@ class FunctionsContainer:
                 # print('==================================================')
                 self.logger.debug('Implemented function "{}" of type {}: {} with vars {}'.format(fun_name, fun.getType(), f_impl, used_vars))
 
+    def getCnstrDim(self):
+
+        total_dim = 0
+        for cnstr in self.cnstr_container.values():
+            total_dim += cnstr.getDim()[0] * len(cnstr.getNodes())
+
+        return total_dim
+
     def getCnstrFImpl(self, name, node):
         if 'n' + str(node) in self.cnstr_impl:
             if name in self.cnstr_impl['n' + str(node)]:
@@ -294,18 +305,26 @@ class FunctionsContainer:
         return cs.vertcat(*cnstr_impl)
 
     def getLowerBoundsList(self):
-        lbg = list()
+
+        lbg = np.zeros(self.getCnstrDim())
+
+        j = 0
         for node in self.cnstr_impl.values():
             for elem in node.values():
-                lbg += elem['lb']
+                lbg[j:j+elem['lb'].shape[0]] = elem['lb']
+                j = j+elem['lb'].shape[0]
 
         return lbg
 
     def getUpperBoundsList(self):
-        ubg = list()
+
+        ubg = np.zeros(self.getCnstrDim())
+
+        j = 0
         for node in self.cnstr_impl.values():
             for elem in node.values():
-                ubg += elem['ub']
+                ubg[j:j + elem['ub'].shape[0]] = elem['ub']
+                j = j + elem['ub'].shape[0]
 
         return ubg
 
@@ -345,7 +364,6 @@ class FunctionsContainer:
         for node, item in self.costfun_impl.items():
             for name, elem in item.items():
                 self.costfun_impl[node][name] = elem.serialize()
-
 
     def deserialize(self):
 

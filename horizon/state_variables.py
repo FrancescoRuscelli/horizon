@@ -1,11 +1,9 @@
-import pprint
-
 import casadi as cs
 from collections import OrderedDict
 import logging
 import numpy as np
-import copy
 import pickle
+import horizon.misc_function as misc
 
 '''
 now the StateVariable is only abstract at the very beginning.
@@ -29,26 +27,32 @@ class StateVariable(cs.SX):
 
     def setLowerBounds(self, bounds, nodes=None):
 
-        if nodes is None:
-            nodes = list(range(0, self.nodes))
+        nodes = misc.checkNodes(nodes, range(self.nodes))
+
+        if isinstance(bounds, (list, int, float)):
+            bounds = np.array(bounds)
         else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in range(self.nodes)]
-            else:
-                nodes = [nodes] if nodes in range(self.nodes) else []
+            bounds = bounds.flatten()
+
+        dim = bounds.shape[0] if bounds.shape else 1
+        if dim != self.dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
 
         for node in nodes:
             self.var_impl['n' + str(node)]['lb'] = bounds
 
     def setUpperBounds(self, bounds, nodes=None):
 
-        if nodes is None:
-            nodes = list(range(0, self.nodes))
+        nodes = misc.checkNodes(nodes, range(self.nodes))
+
+        if isinstance(bounds, (list, int, float)):
+            bounds = np.array(bounds)
         else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in range(self.nodes)]
-            else:
-                nodes = [nodes] if nodes in range(self.nodes) else []
+            bounds = bounds.flatten()
+
+        dim = bounds.shape[0] if bounds.shape else 1
+        if dim != self.dim:
+            raise Exception('Wrong dimension of upper bounds inserted.')
 
         for node in nodes:
             self.var_impl['n' + str(node)]['ub'] = bounds
@@ -59,14 +63,20 @@ class StateVariable(cs.SX):
 
     def setInitialGuess(self, val, nodes=None):
 
-        if nodes is None:
-            nodes = [0, self.nodes]
+        nodes = misc.checkNodes(nodes, range(self.nodes))
 
-        if isinstance(nodes, list):
-            for n in range(nodes[0], nodes[1]):
-                self.var_impl['n' + str(n)]['w0'] = val
+        if isinstance(val, (list, int, float)):
+            val = np.array(val)
         else:
-            self.var_impl['n' + str(nodes)]['w0'] = val
+            val = val.flatten()
+
+        dim = val.shape[0] if val.shape else 1
+        if dim != self.dim:
+            raise Exception('Wrong dimension of initial guess inserted.')
+
+        for node in nodes:
+            self.var_impl['n' + str(node)]['w0'] = val
+
 
     def _setNNodes(self, n_nodes):
 
@@ -88,9 +98,9 @@ class StateVariable(cs.SX):
                 var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
                 new_var_impl['n' + str(n)] = dict()
                 new_var_impl['n' + str(n)]['var'] = var_impl
-                new_var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
-                new_var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
-                new_var_impl['n' + str(n)]['w0'] = [0] * self.dim
+                new_var_impl['n' + str(n)]['lb'] = np.full(self.dim, -np.inf)
+                new_var_impl['n' + str(n)]['ub'] = np.full(self.dim, np.inf)
+                new_var_impl['n' + str(n)]['w0'] = np.zeros(self.dim)
 
         self.var_impl = new_var_impl
 
@@ -197,6 +207,14 @@ class StateVariables:
         var = self.setVar(InputVariable, name, dim, prev_nodes)
         return var
 
+    def getVarsDim(self):
+        var_dim_tot = 0
+        for var in self.state_var.values():
+            if isinstance(var, StateVariable):
+                var_dim_tot += var.shape[0] * var.getNNodes()
+        return var_dim_tot
+
+
     def getVarImpl(self, name, k):
         node_name = 'n' + str(k)
 
@@ -236,25 +254,32 @@ class StateVariables:
         return cs.vertcat(*state_var_impl_list)
 
     def getBoundsMinList(self):
+        # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
+        state_var_bound_list = np.zeros(self.getVarsDim())
 
-        state_var_bound_list = list()
-
+        j = 0
         for node, val in self.state_var_impl.items():
             for var_abstract in val.keys():
-
-                state_var_bound_list += val[var_abstract]['lb']
+                var = val[var_abstract]['lb']
+                dim = val[var_abstract]['lb'].shape[0]
+                state_var_bound_list[j:j+dim] = var
+                j = j + dim
 
         return state_var_bound_list
 
     def getBoundsMaxList(self):
+        # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
 
-        state_var_bound_list = list()
+        state_var_bound_list = np.zeros(self.getVarsDim())
 
+        j = 0
         for node, val in self.state_var_impl.items():
             for var_abstract in val.keys():
-                # get from state_var_impl the relative var
-                # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
-                state_var_bound_list += val[var_abstract]['ub']
+                var = val[var_abstract]['ub']
+                dim = val[var_abstract]['ub'].shape[0]
+                state_var_bound_list[j:j + dim] = var
+                j = j + dim
+
 
         return state_var_bound_list
 
@@ -269,13 +294,15 @@ class StateVariables:
 
     def getInitialGuessList(self):
 
-        initial_guess_list = list()
+        initial_guess_list = np.zeros(self.getVarsDim())
 
+        j = 0
         for node, val in self.state_var_impl.items():
             for var_abstract in val.keys():
-                # get from state_var_impl the relative var
-                # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
-                initial_guess_list += val[var_abstract]['w0']
+                var = val[var_abstract]['w0']
+                dim = val[var_abstract]['w0'].shape[0]
+                initial_guess_list[j:j + dim] = var
+                j = j + dim
 
         return initial_guess_list
 

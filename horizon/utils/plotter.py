@@ -6,15 +6,20 @@ from horizon.problem import Problem
 import math
 
 class PlotterHorizon:
-    def __init__(self, sol, nodes):
+    def __init__(self, sol=None, logger=None):
 
         self.sol = sol
-        self.nodes = nodes
+        self.logger = logger
 
-        # plt.scatter(opt_values['p'][0, 0], opt_values['p'][1, 0], color='r', edgecolors='r', s=60)
-        # plt.scatter(opt_values['p'][0, -1], opt_values['p'][1, -1], color='r', edgecolors='k', s=60)
+    def setSolution(self, sol):
+        self.sol = sol
+
     def plotVariables(self):
 
+        if self.sol is None:
+            if self.logger:
+                self.logger("Plotter is empty. Load a solution.")
+            return 0
         n_col = 3
         n_plots = len(self.sol)
         cols = n_col if n_col < len(self.sol) else len(self.sol)
@@ -26,11 +31,11 @@ class PlotterHorizon:
         for key, val in self.sol.items():
             ax = fig.add_subplot(gs[i])
             for dim in range(val.shape[0]):
-                ax.plot(range(self.nodes + 1), val[dim, :], marker="o")
+                ax.plot(range(val.shape[1]), val[dim, :], marker="o")
 
             ax.set_title('{}'.format(key))
             # ax.set(xlabel='nodes', ylabel='vals')
-            plt.xticks(list(range(self.nodes+1)))
+            plt.xticks(list(range(val.shape[1])))
             i = i+1
 
 
@@ -68,12 +73,12 @@ if __name__ == '__main__':
     suka.setBounds([4], [4], [2, 3, 5, 6])
 
 
-    prb.createProblem()
+    prb.createProblem({"nlpsol.ipopt":True})
     sol = prb.solveProblem()
 
     print('==============================================================')
 
-    hplt = PlotterHorizon(sol, 8)
+    hplt = PlotterHorizon(sol)
 
     hplt.plotVariables()
     # hplt.plotVariable('x')
