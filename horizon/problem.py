@@ -147,11 +147,10 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        if "nlpsol.ipopt" in self.opts:
-            if self.opts["nlpsol.ipopt"]:
-                self.solver = cs.nlpsol('solver', 'ipopt', self.prob) #,
-                                # {'ipopt': {'linear_solver': 'ma27', 'tol': 1e-4, 'print_level': 3, 'sb': 'yes'},
-                                #  'print_time': 0})  # 'acceptable_tol': 1e-4(ma57) 'constr_viol_tol':1e-3
+        if opts is not None:
+            if "nlpsol.ipopt" in self.opts:
+                if self.opts["nlpsol.ipopt"]:
+                    self.solver = cs.nlpsol('solver', 'ipopt', self.prob)
 
     def getProblem(self):
         return self.prob
