@@ -105,9 +105,9 @@ touch_down_node = 20
 q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.9, 0.0, 0.0, 0.0, 1.0]).tolist()
 
 prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes= list(range(lift_node, touch_down_node)))
-prb.createCostFunction("floating_base_quaternion", 1.*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
+#prb.createCostFunction("floating_base_quaternion", 0.1*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
 prb.createCostFunction("min_qdot", 10.*cs.dot(qdot, qdot))
-prb.createCostFunction("min_qddot", 0.1*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
+prb.createCostFunction("min_qddot", 0.001*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
 
 f1_prev = prb.createInputVariable("f1", nf, -1)
 f2_prev = prb.createInputVariable("f2", nf, -1)
@@ -126,16 +126,16 @@ x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt_prev)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
-            -10000., -10000., -10000.,  # Contact 1
-            -10000., -10000., -10000.,  # Contact 2
-            -10000., -10000., -10000.,  # Contact 3
-            -10000., -10000., -10000.]  # Contact 4
+            -1000., -1000., -1000.,  # Contact 1
+            -1000., -1000., -1000.,  # Contact 2
+            -1000., -1000., -1000.,  # Contact 3
+            -1000., -1000., -1000.]  # Contact 4
 
 tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
-            10000., 10000., 10000.,  # Contact 1
-            10000., 10000., 10000.,  # Contact 2
-            10000., 10000., 10000.,  # Contact 3
-            10000., 10000., 10000.]  # Contact 4
+            1000., 1000., 1000.,  # Contact 1
+            1000., 1000., 1000.,  # Contact 2
+            1000., 1000., 1000.,  # Contact 3
+            1000., 1000., 1000.]  # Contact 4
 dd = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
 tau = casadi_kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
@@ -157,8 +157,9 @@ for frame, f in zip(contact_names, forces):
     prb.createConstraint(f"{frame}_before_jump", p - pd, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
     prb.createConstraint(f"{frame}_after_jump", p - pd, nodes=list(range(touch_down_node, ns+1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
-    DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL))
+    DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=qdot)['ee_vel_linear']
+    prb.createConstraint(f"{frame}_vel_before_jump", v, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
     prb.createConstraint(f"{frame}_vel_after_jump", v, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
     fc, fc_lb, fc_ub = casadi_kin_dyn.linearized_friciton_cone(f, mu, R)
@@ -190,11 +191,48 @@ f3_hist = solution["f3"]
 f4_hist = solution["f4"]
 dt_hist = solution["dt"]
 
+tau_hist = np.zeros(qddot_hist.shape)
+ID = casadi_kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'])
+for i in range(ns):
+    frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'Contact3': f3_hist[:, i], 'Contact4': f4_hist[:, i]}
+    tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()
+
+
 
 # resampling
 dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'Contact3': f3_hist, 'Contact4': f4_hist}
 q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, dt_hist.flatten(), dt, dae, frame_force_hist_mapping, kindyn)
+
+PLOTS = True
+if PLOTS:
+    time = np.arange(0.0, q_res.shape[1]*dt, dt)
+
+    plt.figure()
+    for i in range(3):
+        plt.plot(time, q_res[i, :])
+    plt.suptitle('$\mathrm{Base \ Position \ Resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{[m]}$', size=20)
+
+    plt.figure()
+    for i in range(6):
+        plt.plot(tau_hist[i, :])
+    plt.suptitle('$\mathrm{Base \ Forces}$', size=20)
+    plt.xlabel('$\mathrm{sample}$', size=20)
+    plt.ylabel('$\mathrm{[N]}$', size=20)
+
+    plt.figure()
+    for i in range(6):
+        plt.plot(time[:-1], tau_res[i, :])
+    plt.suptitle('$\mathrm{Base \ Forces \ Resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{[N]}$', size=20)
+
+    plt.show()
+
+
+
 
 joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'Contact2_x', 'Contact2_y', 'Contact2_z',
