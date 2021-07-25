@@ -102,19 +102,19 @@ dt.setInitialGuess(dt_init)
 # SET UP COST FUNCTION
 lift_node = 10
 touch_down_node = 20
-q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.5, 0.0, 0.0, 0.0, 1.0]).tolist()
+q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.9, 0.0, 0.0, 0.0, 1.0]).tolist()
 
-prb.createCostFunction("jump", 1000.*cs.dot(q[2] - q_fb_trg[2], q[2] - q_fb_trg[2]), nodes = list(range(lift_node, touch_down_node)))
-prb.createCostFunction("floating_base_quaternion", 100.*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
+prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes= list(range(lift_node, touch_down_node)))
+prb.createCostFunction("floating_base_quaternion", 1.*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
 prb.createCostFunction("min_qdot", 10.*cs.dot(qdot, qdot))
-prb.createCostFunction("min_qddot", 1.*cs.dot(qddot, qddot), nodes = list(range(0, ns)))
+prb.createCostFunction("min_qddot", 0.1*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
 
 f1_prev = prb.createInputVariable("f1", nf, -1)
 f2_prev = prb.createInputVariable("f2", nf, -1)
 f3_prev = prb.createInputVariable("f3", nf, -1)
 f4_prev = prb.createInputVariable("f4", nf, -1)
-prb.createCostFunction("min_deltaforce", 0.01*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
-                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)), nodes=list(range(1, ns)))
+prb.createCostFunction("min_deltaforce", 0.001*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
+                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)), nodes= list(range(1, ns)))
 
 # Constraints
 q_prev = prb.createStateVariable("q", nq, -1)
@@ -140,6 +140,8 @@ dd = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
 tau = casadi_kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
 
+prb.createConstraint("final_velocity", qdot, nodes=ns+1, bounds=dict(lb=np.zeros((nv, 1)), ub=np.zeros((nv, 1))))
+
 # GROUND
 mu = 0.8 # friction coefficient
 R = np.identity(3, dtype=float) # environment rotation wrt inertial frame
@@ -154,6 +156,10 @@ for frame, f in zip(contact_names, forces):
     pd = FK(q=q_init)['ee_pos']
     prb.createConstraint(f"{frame}_before_jump", p - pd, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
     prb.createConstraint(f"{frame}_after_jump", p - pd, nodes=list(range(touch_down_node, ns+1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+
+    DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL))
+    v = DFK(q=q, qdot=qdot)['ee_vel_linear']
+    prb.createConstraint(f"{frame}_vel_after_jump", v, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
     fc, fc_lb, fc_ub = casadi_kin_dyn.linearized_friciton_cone(f, mu, R)
     prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=list(range(0, lift_node)), bounds=dict(lb=fc_lb, ub=fc_ub))
@@ -195,5 +201,8 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'Contact3_x', 'Contact3_y', 'Contact3_z',
               'Contact4_x', 'Contact4_y', 'Contact4_z']
 
-replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn).replay()
+
+repl = replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+repl.sleep(1.)
+repl.replay()
 
