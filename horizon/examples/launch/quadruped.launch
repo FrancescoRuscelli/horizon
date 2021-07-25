@@ -1,6 +1,6 @@
 <launch>
      <!-- send the cogimon robot XML to param server -->
-     <param name="robot_description" textfile="$(find Horizon)/configs/urdf/centauro_lower_body_template.urdf" />
+     <param name="robot_description" textfile="../urdf/quadruped.urdf" />
 
     <!-- start robot state publisher -->
     <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" >
@@ -21,7 +21,7 @@
         <rosparam param="rgba">[0.5, 0.5, 0.5, 0.5]</rosparam>
     </node>
     
-    <!-- node type="rviz" name="rviz" pkg="rviz" args="-d $(find Horizon)/launch/centauro_jump_dt.rviz" output="screen"/-->
+    <!-- node type="rviz" name="rviz" pkg="rviz" args="-d quadruped.rviz" output="screen"/ -->
 
 
 </launch>

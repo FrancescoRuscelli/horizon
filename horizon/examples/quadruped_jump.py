@@ -102,7 +102,7 @@ dt.setInitialGuess(dt_init)
 # SET UP COST FUNCTION
 lift_node = 10
 touch_down_node = 20
-q_fb_trg = [0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0]
+q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.5, 0.0, 0.0, 0.0, 1.0]).tolist()
 
 prb.createCostFunction("jump", 1000.*cs.dot(q[2] - q_fb_trg[2], q[2] - q_fb_trg[2]), nodes = list(range(lift_node, touch_down_node)))
 prb.createCostFunction("floating_base_quaternion", 100.*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
@@ -195,5 +195,5 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'Contact3_x', 'Contact3_y', 'Contact3_z',
               'Contact4_x', 'Contact4_y', 'Contact4_z']
 
-replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping).replay()
+replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn).replay()
 

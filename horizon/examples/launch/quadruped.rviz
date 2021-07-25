@@ -3,7 +3,8 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Grid1
       Splitter Ratio: 0.5
     Tree Height: 719
   - Class: rviz/Selection
@@ -45,9 +46,9 @@ Visualization Manager:
       Offset:
         X: 0
         Y: 0
-        Z: 0
+        Z: -0.7699999809265137
       Plane: XY
-      Plane Cell Count: 10
+      Plane Cell Count: 100
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz/InteractiveMarkers
@@ -200,15 +201,6 @@ Visualization Manager:
       Torque Color: 204; 204; 51
       Unreliable: false
       Value: true
-    - Class: rviz/InteractiveMarkers
-      Enable Transparency: true
-      Enabled: false
-      Name: InteractiveMarkers
-      Show Axes: false
-      Show Descriptions: true
-      Show Visual Aids: false
-      Update Topic: /simple_marker_plane/update
-      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -253,9 +245,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.16039857268333435
+      Pitch: 0.240398570895195
       Target Frame: <Fixed Frame>
-      Yaw: 1.3203976154327393
+      Yaw: 1.125397801399231
     Saved: ~
 Window Geometry:
   Displays:
@@ -273,5 +265,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1848
-  X: 1992
-  Y: 547
+  X: 72
+  Y: 27

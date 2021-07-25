@@ -50,16 +50,17 @@ class replay_trajectory:
                 raise Exception('kindyn input can not be None if force_reference_frame is LOCAL_WORLD_ALIGNED!')
             for frame in self.frame_force_mapping: # WE LOOP ON FRAMES
                 FK = cs.Function.deserialize(kindyn.fk(frame))
-                k = 0
-                for w in self.frame_force_mapping[frame]: # WE LOOP ON FORCES
-                    w_R_f = FK(q=self.q_replay[k])['ee_rot']
+                w_all = self.frame_force_mapping[frame]
+                for k in range(0, w_all.shape[1]):
+                    w_R_f = FK(q=self.q_replay[:, k])['ee_rot']
+                    w = w_all[:, k].reshape(-1, 1)
                     if w.shape[0] == 3:
-                        self.frame_force_mapping[frame] = w_R_f.T * w
+                        self.frame_force_mapping[frame][:, k] = np.dot(w_R_f.T,  w).T
                     else:
-                        A = np.zeros((6,6))
+                        A = np.zeros((6, 6))
                         A[0:3, 0:3] = A[3:6, 3:6] = w_R_f.T
-                        self.frame_force_mapping[frame] = A * w
-                    k += 1
+                        self.frame_force_mapping[frame][:, k] = np.dot(A,  w).T
+
 
     def publishContactForces(self, time, k):
         i = 0
