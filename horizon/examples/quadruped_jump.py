@@ -191,7 +191,7 @@ f4_hist = solution["f4"]
 dt_hist = solution["dt"]
 
 tau_hist = np.zeros(qddot_hist.shape)
-ID = casadi_kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'])
+ID = casadi_kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 for i in range(ns):
     frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'Contact3': f3_hist[:, i], 'Contact4': f4_hist[:, i]}
     tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()
@@ -201,7 +201,7 @@ for i in range(ns):
 # resampling
 dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'Contact3': f3_hist, 'Contact4': f4_hist}
-q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, dt_hist.flatten(), dt, dae, frame_force_hist_mapping, kindyn)
+q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, dt_hist.flatten(), dt, dae, frame_force_hist_mapping, kindyn, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
 PLOTS = True
 if PLOTS:
