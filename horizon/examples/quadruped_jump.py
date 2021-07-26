@@ -77,7 +77,6 @@ qdot.setInitialGuess(qdot_init)
 qddot_min = (-100.*np.ones(nv)).tolist()
 qddot_max = (100.*np.ones(nv)).tolist()
 qddot_init = np.zeros(nv).tolist()
-qddot_init[2] = -9.81
 qddot.setBounds(qddot_min, qddot_max)
 qddot.setInitialGuess(qddot_init)
 
