@@ -65,6 +65,7 @@ def make_direct_collocation(prob: prb.Problem,
 
     # some constants
     nx = x.shape[0]
+    N = prob.getNNodes() - 1
 
     # create additional variables (states at collocation points)
     collo = [prob.createInputVariable(f'collo_x_{i}', dim=x.shape[0]) for i in range(d)]
