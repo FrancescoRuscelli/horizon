@@ -66,7 +66,7 @@ class InverseDynamics():
 
         for frame, wrench in frame_force_mapping.items():
             J = self.contact_jacobians[frame](q=q)['J']
-            if (wrench.shape[0] == 3):  # point contact
+            if wrench.shape[0] == 3:  # point contact
                 JtF = cs.mtimes(J[0:3, :].T, wrench)
             else:  # surface contact
                 JtF = cs.mtimes(J.T, wrench)
