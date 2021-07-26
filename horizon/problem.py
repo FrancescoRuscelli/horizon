@@ -140,10 +140,10 @@ class Problem:
         # self.logger.debug('cost function summed:', self.j)
         # self.logger.debug('----------------------------------------------------')
 
-        if self.debug_mode:
-            self.logger.debug('cost fun: {}'.format(j))
-            self.logger.debug('state variables: {}'.format(w))
-            self.logger.debug('constraints: {}'.format(g))
+        # if self.debug_mode:
+        #     self.logger.debug('cost fun: {}'.format(j))
+        #     self.logger.debug('state variables: {}'.format(w))
+        #     self.logger.debug('constraints: {}'.format(g))
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
@@ -200,14 +200,14 @@ class Problem:
             self.logger.debug('len ubg: {}'.format(len(ubg)))
 
 
-            self.logger.debug('================')
-            self.logger.debug('w: {}'.format(w))
-            self.logger.debug('lbw: {}'.format(lbw))
-            self.logger.debug('ubw: {}'.format(ubw))
-            self.logger.debug('g: {}'.format(g))
-            self.logger.debug('lbg: {}'.format(lbg))
-            self.logger.debug('ubg: {}'.format(ubg))
-            self.logger.debug('j: {}'.format(j))
+            # self.logger.debug('================')
+            # self.logger.debug('w: {}'.format(w))
+            # self.logger.debug('lbw: {}'.format(lbw))
+            # self.logger.debug('ubw: {}'.format(ubw))
+            # self.logger.debug('g: {}'.format(g))
+            # self.logger.debug('lbg: {}'.format(lbg))
+            # self.logger.debug('ubg: {}'.format(ubg))
+            # self.logger.debug('j: {}'.format(j))
 
         # t_to_set_up = time.time() - t_start
         # print('T to set up:', t_to_set_up)
