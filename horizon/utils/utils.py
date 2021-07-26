@@ -3,7 +3,6 @@ import casadi as cs
 def skew(q):
     """
     Create skew matrix from vector part of quaternion
-    TODO: move out
     Args:
         q: vector part of quaternion [qx, qy, qz]
 
@@ -19,7 +18,6 @@ def skew(q):
 def quaterion_product(q, p):
     """
     Computes quaternion product between two quaternions q and p
-    TODO: move out
     Args:
         q: quaternion
         p: quaternion
@@ -35,7 +33,6 @@ def quaterion_product(q, p):
 def toRot(q):
     """
     Compute rotation matrix associated to given quaternion q
-    TODO: move out
     Args:
         q: quaternion
 
@@ -66,7 +63,6 @@ def double_integrator_with_floating_base(q, ndot, nddot):
     using quaternion dynamics: quatdot = quat x [omega, 0]
     NOTE: this implementation consider floating-base position and orientation expressed in GLOBAL (world) coordinates while
     linear and angular velocities expressed in LOCAL (base_link) coordinates.
-    TODO: creates dedicated file for quaternion handling
     Args:
         q: joint space coordinates: q = [x y z px py pz pw qj], where p is a quaternion
         ndot: joint space velocities: ndot = [vx vy vz wx wy wz qdotj]
