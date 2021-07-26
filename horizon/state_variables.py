@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import pickle
 import horizon.misc_function as misc
+import pprint
 
 '''
 now the StateVariable is only abstract at the very beginning.
@@ -20,7 +21,10 @@ class StateVariable(cs.SX):
         self.nodes = nodes
 
         # self.var = cs.SX.sym(tag, dim)
+        self.var_offset = list()
         self.var_impl = dict()
+
+        self.offset = 0
 
         # todo project it as soon as I create the variable. Ok?
         self._project()
@@ -77,6 +81,24 @@ class StateVariable(cs.SX):
         for node in nodes:
             self.var_impl['n' + str(node)]['w0'] = val
 
+    def getVarOffset(self, node):
+
+        if node > 0:
+            node = f'+{node}'
+
+        createTag = lambda name, node: name + str(node) if node is not None else name
+
+
+        new_tag = createTag(self.tag, node)
+        # todo here the problem is that I don't want a full state_variable (BOUNDS are useless here)
+        var = self.__class__(new_tag, self.dim, self.nodes)
+        var.offset = int(node)
+
+        self.var_offset.append(var)
+        return var
+
+    def getVarOffsetDict(self):
+        return self.var_offset
 
     def _setNNodes(self, n_nodes):
 
@@ -160,36 +182,26 @@ class StateVariables:
         self.nodes = nodes
 
         self.state_var = OrderedDict()
-        self.state_var_prev = OrderedDict()
+
         self.state_var_impl = OrderedDict()
 
-    def setVar(self, var_type, name, dim, prev_nodes):
+    def setVar(self, var_type, name, dim):
 
-        # todo what if 'prev_nodes' it is a list
-        createTag = lambda name, node: name + str(node) if node is not None else name
-        checkExistence = lambda name, node: True if prev_nodes is None else True if name in self.state_var else False
-        tag = createTag(name, prev_nodes)
+        var = var_type(name, dim, self.nodes)
+        self.state_var[name] = var
 
         if self.logger:
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('Setting variable {} with tag {} as {}'.format(name, tag, var_type))
+                self.logger.debug('Setting variable {} as {}'.format(name, var_type))
 
-        if checkExistence(name, prev_nodes):
-            var = var_type(tag, dim, self.nodes)
-            if prev_nodes is None:
-                self.state_var[tag] = var
-            else:
-                self.state_var_prev[tag] = var
-            return var
-        else:
-            raise Exception('Yet to declare the present variable!')
-
-    def setStateVar(self, name, dim, prev_nodes=None):
-        var = self.setVar(StateVariable, name, dim, prev_nodes)
         return var
 
-    def setInputVar(self, name, dim, prev_nodes=None):
-        var = self.setVar(InputVariable, name, dim, prev_nodes)
+    def setStateVar(self, name, dim):
+        var = self.setVar(StateVariable, name, dim)
+        return var
+
+    def setInputVar(self, name, dim):
+        var = self.setVar(InputVariable, name, dim)
         return var
 
     def getVarsDim(self):
@@ -198,23 +210,29 @@ class StateVariables:
             var_dim_tot += var.shape[0] * var.getNNodes()
         return var_dim_tot
 
+    def getVarAbstrDict(self, past=True):
+
+        if past:
+            var_abstr_dict = dict()
+            for name, var in self.state_var.items():
+                var_abstr_dict[name] = list()
+                var_abstr_dict[name].append(var)
+                for var_offset in var.getVarOffsetDict():
+                    var_abstr_dict[name].append(var_offset)
+        else:
+            # todo beware of deep copy
+            var_abstr_dict = self.state_var
+
+        return var_abstr_dict
 
     def getVarImpl(self, name, k):
+
         node_name = 'n' + str(k)
 
-        if name.find('-') == -1:
-            if node_name in self.state_var_impl:
-                var = self.state_var_impl[node_name][name]['var']
-            else:
-                var = None
+        if node_name in self.state_var_impl:
+            var = self.state_var_impl[node_name][name]['var']
         else:
-            var_name = name[:name.index('-')]
-            k_prev = int(name[name.index('-'):])
-            node_prev = 'n' + str(k+k_prev)
-            if node_name in self.state_var_impl:
-                var = self.state_var_impl[node_prev][var_name]['var']
-            else:
-                var = None
+            var = None
 
         return var
 
@@ -266,15 +284,6 @@ class StateVariables:
 
 
         return state_var_bound_list
-
-    def getVarAbstrDict(self, past=True):
-        # this is used to check the variable existing in the function. It requires all the variables and the previous variables
-        if past:
-            var_abstr_dict = {**self.state_var, **self.state_var_prev}
-        else:
-            var_abstr_dict = self.state_var
-
-        return var_abstr_dict
 
     def getInitialGuessList(self):
 
@@ -341,8 +350,8 @@ class StateVariables:
         self.nodes = n_nodes
         for var in self.state_var.values():
             var._setNNodes(self.nodes)
-        for var in self.state_var_prev.values():
-            var._setNNodes(self.nodes)
+        # for var in self.state_var_prev.values():
+        #     var._setNNodes(self.nodes)
 
 
     def clear(self):
@@ -408,16 +417,29 @@ if __name__ == '__main__':
 
     n_nodes = 10
     sv = StateVariables(n_nodes)
-    sv.setStateVar('x', 2)
+    x = sv.setStateVar('x', 2)
+    x_prev = x.createAbstrNode(-1)
+
+    print(x_prev)
+    print(type(x_prev))
+    print(type(x))
+
+    exit()
+    sv.setStateVar('x', 2, -1)
     sv.setStateVar('y', 2)
+
     for k in range(n_nodes):
         sv.update(k)
 
-    print(sv.state_var)
-    print(sv.state_var_prev)
-    print(sv.state_var_impl)
-    print(sv.getVarAbstrDict())
-    print(sv.getVarImplDict())
+    # print(sv.state_var)
+    # print(sv.state_var_prev)
+    pprint.pprint(sv.state_var_impl)
+    # pprint.pprint(sv.getVarAbstrDict())
+    # pprint.pprint(sv.getVarImplDict())
+    # pprint.pprint(sv.getVarImpl('x-1', 1))
+
+
+    exit()
     # x_prev = sv.setVar('x', 2, -2)
     #
     # for i in range(4):

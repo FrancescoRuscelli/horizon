@@ -12,9 +12,17 @@ class Function:
         self.name = name
         self.nodes = []
 
-        self.vars = used_vars #todo isn't there another way to get the variables from the function g?
+        all_vars = list()
+        for name, val in used_vars.items():
+            if hasattr(val, '__iter__'):
+                for item in val:
+                    all_vars.append(item)
+            else:
+                all_vars.append(val)
 
-        self.fun = cs.Function(name, list(self.vars.values()), [self.f])
+        self.vars = used_vars # todo isn't there another way to get the variables from the function g?
+
+        self.fun = cs.Function(name, all_vars, [self.f])
         self.fun_impl = dict()
 
         self.setNodes(nodes)
@@ -239,10 +247,13 @@ class FunctionsContainer:
             if node in fun.getNodes():
                 used_vars = list()
                 for name, val in fun.getVariables().items():
-                    var = self.state_vars.getVarImpl(name, node)
-                    # print('used abstract var "{}" implemented as {}'.format(name, var))
-                    used_vars.append(var)
-
+                    if hasattr(val, '__iter__'):
+                        for item in val:
+                            var = self.state_vars.getVarImpl(name, node + item.offset)
+                            used_vars.append(var)
+                    else:
+                        var = self.state_vars.getVarImpl(name, node + val.offset)
+                        used_vars.append(var)
 
                 f_impl = fun._project(node, used_vars)
                 if fun.getType() == 'constraint':
@@ -254,7 +265,7 @@ class FunctionsContainer:
 
                 container_impl['n' + str(node)].update({fun_name: fun_dict})
                 # print('==================================================')
-                self.logger.debug('Implemented function "{}" of type {}: {} with vars {}'.format(fun_name, fun.getType(), f_impl, used_vars))
+                self.logger.debug(f'Implemented function "{fun_name}" of type {fun.getType()}: {f_impl} with vars {used_vars} at node {node}')
 
     def getCnstrDim(self):
 
