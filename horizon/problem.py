@@ -31,6 +31,9 @@ class Problem:
         # todo one could set also non state variable right?
         self.var_container = list()
 
+    def getNNodes(self) -> int:
+        return self.nodes
+
     def createStateVariable(self, name, dim, prev_nodes=None):
         var = self.state_var_container.setStateVar(name, dim, prev_nodes)
         return var
