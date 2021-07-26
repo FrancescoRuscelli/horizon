@@ -254,7 +254,8 @@ class FunctionsContainer:
 
                 container_impl['n' + str(node)].update({fun_name: fun_dict})
                 # print('==================================================')
-                self.logger.debug('Implemented function "{}" of type {}: {} with vars {}'.format(fun_name, fun.getType(), f_impl, used_vars))
+                #self.logger.debug('Implemented function "{}" of type {}: {} with vars {}'.format(fun_name, fun.getType(), f_impl, used_vars))
+                self.logger.debug(f'Implemented function "{fun_name}" of type {fun.getType()} with size {f_impl.shape}')
 
     def getCnstrDim(self):
 
