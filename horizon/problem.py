@@ -126,7 +126,7 @@ class Problem:
         self.function_container.clear()
 
         for k in range(self.nodes):  # todo decide if N or N+1
-            self.logger.debug('Node {}:'.format(k))
+            self.logger.debug(f'Node {k}:')
             # implement the abstract state variable with the current node
             self.state_var_container.update(k)
             # implement the constraints and the cost functions with the current node
