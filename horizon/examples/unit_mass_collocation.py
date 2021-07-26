@@ -34,7 +34,6 @@ use_ms = False
 if use_ms:  # multiple shooting
     my_integrator = make_integrator(x, xdot, F, l, dt)
     ms = prob.createConstraint('ms', my_integrator(x_prev, F_prev)[0] - x, nodes=range(1, N+1))
-    ms.setBounds(lb=np.zeros(nx), ub=np.zeros(nx))
 else:  # collocation
     make_direct_collocation(prob=prob, x=x, x_prev=x_prev, xdot=xdot, degree=3, dt=dt)
 

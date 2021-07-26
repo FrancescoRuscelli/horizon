@@ -122,7 +122,6 @@ def make_direct_collocation(prob: prb.Problem,
         x_prev_int += collo_prev[i] * D[i]
 
     cc = prob.createConstraint('collo_continuity', x_prev_int - x, nodes=range(1, N+1))
-    cc.setBounds(lb=np.zeros(nx), ub=np.zeros(nx))
 
     # dynamics constraint (one per collocation point)
     for i in range(d):
@@ -132,4 +131,3 @@ def make_direct_collocation(prob: prb.Problem,
             # loop on basis polynomials
             xder += C[i+1, j]*collo[j]
         dyn = prob.createConstraint(f'collo_dyn_{i}', xder - xdot*dt, nodes=range(N))
-        dyn.setBounds(lb=np.zeros(nx), ub=np.zeros(nx))
