@@ -52,12 +52,12 @@ def make_direct_collocation(prob: prb.Problem,
     that is based on approximating polynomials.
 
     Parameters:
-    prob (prb.Problem): the horizon problem
-    x (cs.SX): the state variable
-    x_prev (cs.SX): the state variable at the previous node
-    xdot (cs.SX): the system dynamics
-    degree (int): degree of approximating polynomial
-    dt (float|StateVariable): discretization interval (cal be a control input)
+        prob (prb.Problem): the horizon problem
+        x (cs.SX): the state variable
+        x_prev (cs.SX): the state variable at the previous node
+        xdot (cs.SX): the system dynamics
+        degree (int): degree of approximating polynomial
+        dt (float|StateVariable): discretization interval (cal be a control input)
     """    
 
     # handle input
