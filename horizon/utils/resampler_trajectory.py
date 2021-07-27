@@ -1,4 +1,4 @@
-import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
+from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 from horizon.utils import integrators, casadi_kin_dyn
 import numpy as np
 import casadi as cs
