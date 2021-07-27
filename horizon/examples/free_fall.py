@@ -11,7 +11,7 @@ from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
 # Switch between suspended and free fall
-FREE_FALL = False
+FREE_FALL = True
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
@@ -180,7 +180,7 @@ frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anch
 q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf/ns, dt, dae, frame_force_hist_mapping, kindyn)
 
 
-PRINT = False
+PRINT = True
 if PRINT:
     # plots raw solution
     time = np.arange(0.0, tf+1e-6, tf/ns)

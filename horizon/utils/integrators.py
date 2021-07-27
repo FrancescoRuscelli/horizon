@@ -1,4 +1,6 @@
 import casadi as cs
+import horizon.problem as prb
+import numpy as np
 
 def EULER(dae, opts=None, casadi_type=cs.SX):
     """
