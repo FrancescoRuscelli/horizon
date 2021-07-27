@@ -31,6 +31,8 @@ class Problem:
         # todo one could set also non state variable right?
         self.var_container = list()
 
+        self.sol = None # store solution from solver
+
     def getNNodes(self) -> int:
         return self.nodes
 
@@ -217,7 +219,7 @@ class Problem:
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
 
-        sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+        self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
 
         # t_to_solve = time.time() - t_start
         # print('T to solve:', t_to_solve)
@@ -227,7 +229,7 @@ class Problem:
             if not self.solver.stats()['success']:
                 raise Exception('Optimal solution NOT found.')
 
-        w_opt = sol['x'].full().flatten()
+        w_opt = self.sol['x'].full().flatten()
 
         # split solution for each variable
         solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.state_var_container.getVarAbstrDict(past=False).items()}
