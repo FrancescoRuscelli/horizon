@@ -64,13 +64,12 @@ def make_direct_collocation(prob: prb.Problem,
     d = degree
 
     # some constants
-    nx = x.shape[0]
     N = prob.getNNodes() - 1
 
     # create additional variables (states at collocation points)
     collo = [prob.createInputVariable(f'collo_x_{i}', dim=x.shape[0]) for i in range(d)]
+    collo_prev = [var.getVarOffset(-1) for var in collo]
     collo.insert(0, x)  # append state at beginning of interval
-    collo_prev = [prob.createInputVariable(f'collo_x_{i}', dim=x.shape[0], prev_nodes=-1) for i in range(d)]
     collo_prev.insert(0, x_prev) # append state at beginning of previous interval
 
     # generate coefficients from magic polynomial

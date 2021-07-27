@@ -1,4 +1,4 @@
-import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
+from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 
 class InverseDynamics():

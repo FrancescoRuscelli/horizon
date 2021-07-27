@@ -20,17 +20,16 @@ prob = prb.Problem(N=N)
 p = prob.createStateVariable('pos', dim=1)
 v = prob.createStateVariable('vel', dim=1)
 F = prob.createInputVariable('force', dim=1)
-p_prev = prob.createStateVariable('pos', dim=1, prev_nodes=-1)
-v_prev = prob.createStateVariable('vel', dim=1, prev_nodes=-1)
-F_prev = prob.createInputVariable('force', dim=1, prev_nodes=-1)
+p_prev = p.getVarOffset(-1)
+v_prev = v.getVarOffset(-1)
+F_prev = F.getVarOffset(-1)
 
 x = cs.vertcat(p, v)
 x_prev = cs.vertcat(p_prev, v_prev)
 xdot = cs.vertcat(v, F)
 l = cs.sumsqr(F)  # useless
 
-
-use_ms = False
+use_ms = True
 if use_ms:  # multiple shooting
     my_integrator = make_integrator(x, xdot, F, l, dt)
     ms = prob.createConstraint('ms', my_integrator(x_prev, F_prev)[0] - x, nodes=range(1, N+1))
