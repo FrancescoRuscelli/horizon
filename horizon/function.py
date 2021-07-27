@@ -99,8 +99,9 @@ class Constraint(Function):
     def __init__(self, name, f, used_vars, nodes, bounds=None):
 
         self.bounds = dict()
+        # constraints are initialize to 0.: 0. <= x <= 0.
         for node in nodes:
-            self.bounds['n' + str(node)] = dict(lb=np.full(f.shape[0], -np.inf), ub=np.full(f.shape[0], np.inf))
+            self.bounds['n' + str(node)] = dict(lb=np.full(f.shape[0], 0.), ub=np.full(f.shape[0], 0.))
 
         super().__init__(name, f, used_vars, nodes)
 
@@ -109,6 +110,11 @@ class Constraint(Function):
 
             if 'nodes' not in bounds:
                 bounds['nodes'] = None
+            # if only one constraint is set, we assume:
+            if 'lb' not in bounds:  # -inf <= x <= ub
+                bounds['lb'] = np.full(f.shape[0], -np.inf)
+            if 'ub' not in bounds:  # lb <= x <= inf
+                bounds['ub'] = np.full(f.shape[0], np.inf)
 
             self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
 
@@ -176,7 +182,8 @@ class Constraint(Function):
                 self.nodes.append(i)
                 self.nodes.sort()
                 if 'n' + str(i) not in self.bounds:
-                    self.bounds['n' + str(i)] = dict(lb=np.full(self.f.shape[0], -np.inf), ub=np.full(self.f.shape[0], np.inf))
+                    self.bounds['n' + str(i)] = dict(lb=np.full(self.f.shape[0], 0.),
+                                                     ub=np.full(self.f.shape[0], 0.))
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):

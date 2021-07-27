@@ -1,0 +1,240 @@
+<?xml version="1.0" ?>
+<robot name="template">
+    
+<material name="blue">
+  <color rgba="0 0 0.8 1"/>
+</material>
+<material name="black">
+  <color rgba="0 0 0 1"/>
+</material>
+<material name="white">
+  <color rgba="1 1 1 1"/>
+</material>
+<material name="grey">
+  <color rgba="0.5 0.5 0.5 1"/>
+</material>
+<material name="red">
+  <color rgba="1.0 0.0 0.0 1"/>
+</material>
+
+<link name="base_link"/>
+
+<link name="Waist">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.16 0.0 0.0"/>
+      <mass value="69.0"/>
+<!--      <origin rpy="0 0 0" xyz="0.108 0.0 0.0"/>-->
+<!--      <mass value="55.0"/>-->
+      <inertia ixx="1.0417" ixy="0.0" ixz="0.0" iyy="1.8750" iyz="0.0" izz="2.1667"/>
+  </inertial>
+  <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Waist_visual">
+        <box size="0.6 0.4 0.3"/>
+      </geometry>
+      <material name="blue"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Waist_collision">
+        <box size="0.6 0.4 0.3"/>
+      </geometry>
+  </collision>
+</link>
+
+<joint name="base_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="Waist"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+</joint>
+
+<link name="world"/>
+
+<joint name="reference" type="floating">
+    <parent link="world"/>
+<child link="base_link"/>
+</joint>
+
+<!-- CONTACT LINKS -->
+<link name="Contact1_0"/>
+<link name="Contact1_1"/>
+<link name="Contact1">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="0.04" ixy="0.0" ixz="0.0" iyy="0.04" iyz="0.0" izz="0.04"/>
+  </inertial>
+  <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Contact1_visual">
+        <sphere radius="0.1"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Contact1_collision">
+        <sphere radius="0.1"/>
+      </geometry>
+  </collision>
+</link>
+
+<link name="Contact2_0"/>
+<link name="Contact2_1"/>
+<link name="Contact2">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="0.04" ixy="0.0" ixz="0.0" iyy="0.04" iyz="0.0" izz="0.04"/>
+  </inertial>
+  <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="contact_link2_visual">
+         <sphere radius="0.1"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="contact_link2_collision">
+        <sphere radius="0.1"/>
+      </geometry>
+  </collision>
+</link>
+
+<link name="Contact3_0"/>
+<link name="Contact3_1"/>
+<link name="Contact3">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="0.04" ixy="0.0" ixz="0.0" iyy="0.04" iyz="0.0" izz="0.04"/>
+  </inertial>
+  <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Contact3_visual">
+        <sphere radius="0.1"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Contact3_collision">
+        <sphere radius="0.1"/>
+      </geometry>
+  </collision>
+</link>
+
+<link name="Contact4_0"/>
+<link name="Contact4_1"/>
+<link name="Contact4">
+  <inertial>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="0.04" ixy="0.0" ixz="0.0" iyy="0.04" iyz="0.0" izz="0.04"/>
+  </inertial>
+  <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Contact4_visual">
+        <sphere radius="0.1"/>
+      </geometry>
+      <material name="white"/>
+  </visual>
+  <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <geometry name="Contact4_collision">
+        <sphere radius="0.1"/>
+      </geometry>
+  </collision>
+</link>
+
+<!-- JOINTS -->
+<joint name="Contact1_x" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <parent link="Waist"/>
+    <child link="Contact1_0"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+<joint name="Contact1_y" type="prismatic">
+    <axis xyz="0 1 0"/>
+    <parent link="Contact1_0"/>
+    <child link="Contact1_1"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+<joint name="Contact1_z" type="prismatic">
+    <axis xyz="0 0 1"/>
+    <parent link="Contact1_1"/>
+    <child link="Contact1"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+
+<joint name="Contact2_x" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <parent link="Waist"/>
+    <child link="Contact2_0"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+<joint name="Contact2_y" type="prismatic">
+    <axis xyz="0 1 0"/>
+    <parent link="Contact2_0"/>
+    <child link="Contact2_1"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+<joint name="Contact2_z" type="prismatic">
+    <axis xyz="0 0 1"/>
+    <parent link="Contact2_1"/>
+    <child link="Contact2"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+
+<joint name="Contact3_x" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <parent link="Waist"/>
+    <child link="Contact3_0"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+<joint name="Contact3_y" type="prismatic">
+    <axis xyz="0 1 0"/>
+    <parent link="Contact3_0"/>
+    <child link="Contact3_1"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+<joint name="Contact3_z" type="prismatic">
+    <axis xyz="0 0 1"/>
+    <parent link="Contact3_1"/>
+    <child link="Contact3"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+
+<joint name="Contact4_x" type="prismatic">
+    <axis xyz="1 0 0"/>
+    <parent link="Waist"/>
+    <child link="Contact4_0"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+<joint name="Contact4_y" type="prismatic">
+    <axis xyz="0 1 0"/>
+    <parent link="Contact4_0"/>
+    <child link="Contact4_1"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+<joint name="Contact4_z" type="prismatic">
+    <axis xyz="0 0 1"/>
+    <parent link="Contact4_1"/>
+    <child link="Contact4"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <limit effort="0" lower="-1" upper="1" velocity="1"/>
+</joint>
+
+</robot>

@@ -29,6 +29,9 @@ class Problem:
         self.prob = None
 
 
+    def getNNodes(self) -> int:
+        return self.nodes
+
     def createStateVariable(self, name, dim):
         var = self.var_container.setStateVar(name, dim)
         return var
@@ -72,15 +75,17 @@ class Problem:
     #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
-
+        
+        # get nodes as a list
         nodes = misc.checkNodes(nodes, range(self.nodes))
 
+        # get vars that constraint depends upon
         used_var = self._getUsedVar(g)
 
         if self.debug_mode:
-            # self.logger.debug('Creating Constraint Function "{}": {} with abstract variables {}, active in nodes: {}'.format(name, g, used_var, nodes))
-            self.logger.debug('Creating Constraint Function "{}": active in nodes: {}'.format(name, nodes))
+            self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes}')
 
+        # create internal representation of a constraint
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
 
         self.function_container.addFunction(fun)
@@ -94,8 +99,7 @@ class Problem:
         used_var = self._getUsedVar(j)
 
         if self.debug_mode:
-            # self.logger.debug('Creating Cost Function "{}": {} with abstract variables {},  active in nodes: {}'.format(name, j, used_var, nodes))
-            self.logger.debug('Creating Cost Function "{}": active in nodes: {}'.format(name, nodes))
+            self.logger.debug(f'Creating Cost Function "{name}": active in nodes: {nodes}')
 
         fun = fc.CostFunction(name, j, used_var, nodes)
 
@@ -149,10 +153,10 @@ class Problem:
         # self.logger.debug('cost function summed:', self.j)
         # self.logger.debug('----------------------------------------------------')
 
-        if self.debug_mode:
-            self.logger.debug('cost fun: {}'.format(j))
-            self.logger.debug('state variables: {}'.format(w))
-            self.logger.debug('constraints: {}'.format(g))
+        # if self.debug_mode:
+        #     self.logger.debug('cost fun: {}'.format(j))
+        #     self.logger.debug('state variables: {}'.format(w))
+        #     self.logger.debug('constraints: {}'.format(g))
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
@@ -209,14 +213,14 @@ class Problem:
             self.logger.debug('len ubg: {}'.format(len(ubg)))
 
 
-            self.logger.debug('================')
-            self.logger.debug('w: {}'.format(w))
-            self.logger.debug('lbw: {}'.format(lbw))
-            self.logger.debug('ubw: {}'.format(ubw))
-            self.logger.debug('g: {}'.format(g))
-            self.logger.debug('lbg: {}'.format(lbg))
-            self.logger.debug('ubg: {}'.format(ubg))
-            self.logger.debug('j: {}'.format(j))
+            # self.logger.debug('================')
+            # self.logger.debug('w: {}'.format(w))
+            # self.logger.debug('lbw: {}'.format(lbw))
+            # self.logger.debug('ubw: {}'.format(ubw))
+            # self.logger.debug('g: {}'.format(g))
+            # self.logger.debug('lbg: {}'.format(lbg))
+            # self.logger.debug('ubg: {}'.format(ubg))
+            # self.logger.debug('j: {}'.format(j))
 
         # t_to_set_up = time.time() - t_start
         # print('T to set up:', t_to_set_up)
