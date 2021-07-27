@@ -1,6 +1,4 @@
 import casadi as cs
-
-import horizon.problem
 import horizon.utils.integrators as integ
 
 class TranscriptionsHandler:
@@ -14,7 +12,7 @@ class TranscriptionsHandler:
         self.state_dot = state_dot
         self.dt = dt
 
-        state_list = self.problem.getState()
+        state_list = self.problem.getState().getList()
         state_prev_list = list()
 
         for var in state_list:
@@ -33,7 +31,7 @@ class TranscriptionsHandler:
 
 
 
-    def set_default_integrator(self):
+    def setDefaultIntegrator(self):
         # todo cost should be optional
 
         opts = dict()
@@ -45,9 +43,9 @@ class TranscriptionsHandler:
         dae['ode'] = self.state_dot
         dae['quad'] = cs.sumsqr(self.input)
 
-        self.integrator = integ.RK4(dae=dae, opts=opts, casadi_type='SX')
+        self.integrator = integ.RK4(dae=dae, opts=opts, casadi_type=cs.SX)
 
-    def set_integrator(self, integrator):
+    def setIntegrator(self, integrator):
         self.integrator = integrator
 
     def __integrate(self, state, input):
@@ -56,12 +54,12 @@ class TranscriptionsHandler:
                 raise Exception('Dynamics of the system is not specified. Missing "state_dot"')
             if self.logger:
                 self.logger.warning('Integrator not set. Using default integrator RK4')
-            self.set_default_integrator()
+            self.setDefaultIntegrator()
 
         state_int = self.integrator(state, input)[0]
         return state_int
 
-    def set_multiple_shooting(self):
+    def setMultipleShooting(self):
 
         state_int = self.__integrate(self.state_prev, self.input_prev)
         ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))

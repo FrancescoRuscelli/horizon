@@ -10,8 +10,8 @@ import pprint
 now the StateVariable is only abstract at the very beginning.
 Formerly
 '''
-
 # todo create function checker to check if nodes are in self.nodes and if everything is ok with the input (no dict, no letters...)
+
 class Variable(cs.SX):
     def __init__(self, tag, dim, nodes):
         super(Variable, self).__init__(cs.SX.sym(tag, dim))
@@ -179,6 +179,28 @@ class InputVariable(Variable):
 class StateVariable(Variable):
     def __init__(self, tag, dim, nodes):
         super(StateVariable, self).__init__(tag, dim, nodes)
+
+class State:
+    def __init__(self, *args : StateVariable):
+
+        self.state_vars = [item for item in args]
+
+    def getVarOffset(self, offset):
+        var_list = list()
+        for var in self.state_vars:
+            var_list.append(var.getVarOffset(offset))
+
+        return self.__class__(*var_list)
+
+    def getList(self):
+        return self.state_vars
+
+    def getVars(self):
+        return cs.vertcat(*self.state_vars)
+
+    def addVariable(self, var):
+        self.state_vars.append(var)
+
 
 class VariablesContainer:
     def __init__(self, nodes, logger=None):

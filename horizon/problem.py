@@ -28,12 +28,14 @@ class Problem:
         self.function_container = fc.FunctionsContainer(self.var_container, self.nodes, self.logger)
         self.prob = None
 
+        self.state = sv.State()
 
     def getNNodes(self) -> int:
         return self.nodes
 
     def createStateVariable(self, name, dim):
         var = self.var_container.setStateVar(name, dim)
+        self.state.addVariable(var)
         return var
 
     def createInputVariable(self, name, dim):
@@ -53,8 +55,7 @@ class Problem:
     #             return var
     #     return None
     def getState(self):
-        state = list(self.var_container.getStateVars().values())
-        return state
+        return self.state
 
     def getInput(self):
         input = list(self.var_container.getInputVars().values())
@@ -75,7 +76,7 @@ class Problem:
     #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
-        
+
         # get nodes as a list
         nodes = misc.checkNodes(nodes, range(self.nodes))
 
@@ -172,7 +173,7 @@ class Problem:
         self.solver = solver
 
     def getSolver(self):
-        return self.solver	
+        return self.solver
 
     def solveProblem(self):
 
@@ -243,14 +244,14 @@ class Problem:
 
         pos = 0
         for node, val in self.var_container.getVarImplDict().items():
-        
+
             for name, var in val.items():
                 dim = var['var'].shape[0]
                 node_number = int(node[node.index('n') + 1:])
                 solution_dict[name][:, node_number] = w_opt[pos:pos + dim]
                 pos = pos + dim
 
-        
+
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
         return solution_dict
@@ -323,6 +324,13 @@ if __name__ == '__main__':
     u = prb.createInputVariable('u', 2)
     xprev = x.getVarOffset(-1)
     xnext = x.getVarOffset(+1)
+
+    state = prb.getState()
+    state_prev = state.getVarOffset(-1)
+    print(state_prev.getList())
+    print(state_prev.getVars())
+
+    exit()
     print(x)
     print(xprev)
     print(xnext)
@@ -338,10 +346,10 @@ if __name__ == '__main__':
     # dae['ode'] = state_dot
     # dae['quad'] = cs.sumsqr(u)
 
-    # integrator = int.RK4(dae, opts, 'SX')
+    # integrator = int.RK4(dae, opts, cs.SX)
     hl = tm.TranscriptionsHandler(prb, 0.01, state_dot=state_dot)
     # hl.set_integrator(integrator)
-    hl.set_multiple_shooting()
+    hl.setMultipleShooting()
 
     prb.createProblem()
 
