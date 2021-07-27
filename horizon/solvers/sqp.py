@@ -5,7 +5,7 @@ import numpy
 
 def sqpsol(name, qp_solver, problem_dict, options_dict):
     """
-    sqpsol creates a sqp solver
+    sqpsol creates a sqp solver using Gauss-Newton approximation of the Hessian
     Args:
         name: name of the solver (not used at the moment)
         qp_solver: internal qp solver name
@@ -72,7 +72,7 @@ def jac(dict, var_string_list, function_string_list):
 
 class sqp(object):
     """
-    Implements a sqp solver
+    Implements a sqp solver using Gauss-Newton approximation of the Hessian
     """
     def __init__(self, name, qp_solver, problem_dict, options_dict):
         """
