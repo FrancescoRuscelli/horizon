@@ -55,15 +55,10 @@ class Problem:
     def _getUsedVar(self, f):
         used_var = dict()
         for name_var, value_var in self.state_var_container.getVarAbstrDict().items():
-            print(value_var)
-            if hasattr(value_var, '__iter__'):
-                used_var[name_var] = list()
-                for var in value_var:
-                    if cs.depends_on(f, var):
-                        used_var[name_var].append(var)
-            else:
-                if cs.depends_on(f, value_var):
-                    used_var[name_var] = value_var
+            used_var[name_var] = list()
+            for var in value_var:
+                if cs.depends_on(f, var):
+                    used_var[name_var].append(var)
 
         return used_var
 
@@ -315,7 +310,7 @@ if __name__ == '__main__':
     print(x)
     print(xprev)
     print(xnext)
-    danieli = prb.createConstraint('danieli', x + xnext, range(4, 10))
+    danieli = prb.createConstraint('danieli', x + xprev, range(0, 10))
 
     prb.createProblem()
 

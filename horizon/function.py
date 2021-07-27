@@ -14,11 +14,8 @@ class Function:
 
         all_vars = list()
         for name, val in used_vars.items():
-            if hasattr(val, '__iter__'):
-                for item in val:
-                    all_vars.append(item)
-            else:
-                all_vars.append(val)
+            for item in val:
+                all_vars.append(item)
 
         self.vars = used_vars # todo isn't there another way to get the variables from the function g?
 
@@ -239,20 +236,15 @@ class FunctionsContainer:
         container_impl['n' + str(node)] = dict()
 
         # TODO be careful about ordering
+        # todo I really hate this implementation! Find a better one for used_vars
         for fun_name, fun in container.items():
-            # self.logger.debug('implementing function "{}" at node {}.'.format(fun_name, node))
-            # print('Function is active on nodes: {}'.format(fun.getNodes()))
-            # print('Function depends on variables: {}'.format(fun.getVariables()))
-            # implement constraint only if constraint is present in node k
             if node in fun.getNodes():
                 used_vars = list()
                 for name, val in fun.getVariables().items():
-                    if hasattr(val, '__iter__'):
-                        for item in val:
-                            var = self.state_vars.getVarImpl(name, node + item.offset)
-                            used_vars.append(var)
-                    else:
-                        var = self.state_vars.getVarImpl(name, node + val.offset)
+                    for item in val:
+                        var = self.state_vars.getVarImpl(name, node + item.offset)
+                        if var is None:
+                            raise Exception(f'Variable out of scope: {item} does not exist at node {node}')
                         used_vars.append(var)
 
                 f_impl = fun._project(node, used_vars)

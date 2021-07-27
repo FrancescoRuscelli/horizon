@@ -91,6 +91,7 @@ class StateVariable(cs.SX):
 
         new_tag = createTag(self.tag, node)
         # todo here the problem is that I don't want a full state_variable (BOUNDS are useless here)
+        # todo how to do?
         var = self.__class__(new_tag, self.dim, self.nodes)
         var.offset = int(node)
 
@@ -182,7 +183,6 @@ class StateVariables:
         self.nodes = nodes
 
         self.state_var = OrderedDict()
-
         self.state_var_impl = OrderedDict()
 
     def setVar(self, var_type, name, dim):
@@ -212,6 +212,8 @@ class StateVariables:
 
     def getVarAbstrDict(self, past=True):
 
+        # todo dictionary with present, past and future instances --> x: x, x+1 // y: y // z: z, z-1
+        # how to do?
         if past:
             var_abstr_dict = dict()
             for name, var in self.state_var.items():
