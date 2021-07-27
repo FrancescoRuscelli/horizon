@@ -24,19 +24,17 @@ class Problem:
 
         self.nodes = N + 1
         # state variable to optimize
-        self.state_var_container = sv.StateVariables(self.nodes)
-        self.function_container = fc.FunctionsContainer(self.state_var_container, self.nodes, self.logger)
+        self.var_container = sv.VariablesContainer(self.nodes)
+        self.function_container = fc.FunctionsContainer(self.var_container, self.nodes, self.logger)
         self.prob = None
-        # just variables
-        # todo one could set also non state variable right?
-        self.var_container = list()
+
 
     def createStateVariable(self, name, dim):
-        var = self.state_var_container.setStateVar(name, dim)
+        var = self.var_container.setStateVar(name, dim)
         return var
 
     def createInputVariable(self, name, dim):
-        var = self.state_var_container.setInputVar(name, dim)
+        var = self.var_container.setInputVar(name, dim)
         return var
 
     # def setVariable(self, name, var):
@@ -51,10 +49,17 @@ class Problem:
     #         if var.getName() == name:
     #             return var
     #     return None
+    def getState(self):
+        state = list(self.var_container.getStateVars().values())
+        return state
+
+    def getInput(self):
+        input = list(self.var_container.getInputVars().values())
+        return input
 
     def _getUsedVar(self, f):
         used_var = dict()
-        for name_var, value_var in self.state_var_container.getVarAbstrDict().items():
+        for name_var, value_var in self.var_container.getVarAbstrDict().items():
             used_var[name_var] = list()
             for var in value_var:
                 if cs.depends_on(f, var):
@@ -111,8 +116,11 @@ class Problem:
 
     def setNNodes(self, n_nodes):
         self.nodes = n_nodes + 1 # todo because I decided so
-        self.state_var_container.setNNodes(self.nodes)
+        self.var_container.setNNodes(self.nodes)
         self.function_container.setNNodes(self.nodes)
+
+    def getNNodes(self) -> int:
+        return self.nodes
 
     def createProblem(self, opts=None):
 
@@ -120,19 +128,19 @@ class Problem:
             self.opts = opts
 
         # this is to reset both the constraints and the cost functions everytime I create a problem
-        self.state_var_container.clear()
+        self.var_container.clear()
         self.function_container.clear()
 
         for k in range(self.nodes):
         # implement the abstract state variable with the current node
-            self.state_var_container.update(k)
+            self.var_container.update(k)
 
         for k in range(self.nodes):
         # implement the constraints and the cost functions with the current node
             self.function_container.update(k)
 
         j = self.function_container.getCostFImplSum()
-        w = self.state_var_container.getVarImplList()
+        w = self.var_container.getVarImplList()
         g = self.function_container.getCnstrFList()
 
         # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
@@ -169,17 +177,17 @@ class Problem:
             self.logger.warning('Problem is not created. Nothing to solve!')
             return 0
 
-        self.state_var_container.updateBounds()
-        self.state_var_container.updateInitialGuess()
+        self.var_container.updateBounds()
+        self.var_container.updateInitialGuess()
 
-        w0 = self.state_var_container.getInitialGuessList()
+        w0 = self.var_container.getInitialGuessList()
 
         if self.debug_mode:
-            self.logger.debug('Initial guess vector for variables: {}'.format(self.state_var_container.getInitialGuessList()))
+            self.logger.debug('Initial guess vector for variables: {}'.format(self.var_container.getInitialGuessList()))
 
 
-        lbw = self.state_var_container.getBoundsMinList()
-        ubw = self.state_var_container.getBoundsMaxList()
+        lbw = self.var_container.getBoundsMinList()
+        ubw = self.var_container.getBoundsMaxList()
 
         lbg = self.function_container.getLowerBoundsList()
         ubg = self.function_container.getUpperBoundsList()
@@ -188,7 +196,7 @@ class Problem:
         if self.debug_mode:
 
             j = self.function_container.getCostFImplSum()
-            w = self.state_var_container.getVarImplList()
+            w = self.var_container.getVarImplList()
             g = self.function_container.getCnstrFList()
 
             self.logger.debug('================')
@@ -227,10 +235,10 @@ class Problem:
         w_opt = sol['x'].full().flatten()
 
         # split solution for each variable
-        solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.state_var_container.getVarAbstrDict(past=False).items()}
+        solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
-        for node, val in self.state_var_container.getVarImplDict().items():
+        for node, val in self.var_container.getVarImplDict().items():
         
             for name, var in val.items():
                 dim = var['var'].shape[0]
@@ -244,14 +252,14 @@ class Problem:
         return solution_dict
 
     def getStateVariables(self):
-        return self.state_var_container.getVarAbstrDict()
+        return self.var_container.getVarAbstrDict()
 
     def getConstraints(self):
         return self.function_container.getCnstrFDict()
 
     def scopeNodeVars(self, node):
 
-        return self.state_var_container.getVarImplAtNode(node)
+        return self.var_container.getVarImplAtNode(node)
 
     def scopeNodeConstraints(self, node):
         return self.function_container.getCnstrFImplAtNode(node)
@@ -261,7 +269,7 @@ class Problem:
 
     def serialize(self):
 
-        self.state_var_container.serialize()
+        self.var_container.serialize()
         self.function_container.serialize()
 
 
@@ -285,7 +293,7 @@ class Problem:
 
     def deserialize(self):
 
-        self.state_var_container.deserialize()
+        self.var_container.deserialize()
         self.function_container.deserialize()
 
         if self.prob:
@@ -302,15 +310,34 @@ class Problem:
 
 if __name__ == '__main__':
 
+    import horizon.utils.transcription_methods as tm
+    import horizon.utils.integrators as int
     nodes = 10
     prb = Problem(nodes, logging_level=logging.DEBUG)
     x = prb.createStateVariable('x', 2)
+    v = prb.createStateVariable('v', 2)
+    u = prb.createInputVariable('u', 2)
     xprev = x.getVarOffset(-1)
     xnext = x.getVarOffset(+1)
     print(x)
     print(xprev)
     print(xnext)
-    danieli = prb.createConstraint('danieli', x + xprev, range(0, 10))
+    # danieli = prb.createConstraint('danieli', x + xprev, range(1, 10))
+
+    dt = 0.01
+    state_dot = cs.vertcat(v, u)
+    # opts = dict()
+    # opts['tf'] = dt
+    # dae = dict()
+    # dae['x'] = cs.vertcat(*prb.getState())
+    # dae['p'] = cs.vertcat(*prb.getInput())
+    # dae['ode'] = state_dot
+    # dae['quad'] = cs.sumsqr(u)
+
+    # integrator = int.RK4(dae, opts, 'SX')
+    hl = tm.TranscriptionsHandler(prb, 0.01, state_dot=state_dot)
+    # hl.set_integrator(integrator)
+    hl.set_multiple_shooting()
 
     prb.createProblem()
 
