@@ -5,7 +5,6 @@ from collections import OrderedDict
 import pickle
 import time
 
-
 class Function:
     def __init__(self, name, f, used_vars, nodes):
 
@@ -13,9 +12,14 @@ class Function:
         self.name = name
         self.nodes = []
 
-        self.vars = used_vars  # todo isn't there another way to get the variables from the function g?
+        all_vars = list()
+        for name, val in used_vars.items():
+            for item in val:
+                all_vars.append(item)
 
-        self.fun = cs.Function(name, list(self.vars.values()), [self.f])
+        self.vars = used_vars # todo isn't there another way to get the variables from the function g?
+
+        self.fun = cs.Function(name, all_vars, [self.f])
         self.fun_impl = dict()
 
         self.setNodes(nodes)
@@ -50,7 +54,7 @@ class Function:
             self.nodes.clear()
 
         # adding to function nodes
-        for i in nodes:  # unraveled_nodes:
+        for i in nodes: #unraveled_nodes:
             if i not in self.nodes:
                 self.nodes.append(i)
                 self.nodes.sort()
@@ -101,6 +105,7 @@ class Constraint(Function):
 
         super().__init__(name, f, used_vars, nodes)
 
+        # todo setBounds
         if bounds is not None:
 
             if 'nodes' not in bounds:
@@ -153,6 +158,7 @@ class Constraint(Function):
         self.setLowerBounds(lb, nodes)
         self.setUpperBounds(ub, nodes)
 
+
     def getLowerBounds(self, node):
         lb = self.bounds['n' + str(node)]['lb']
         return lb
@@ -171,14 +177,13 @@ class Constraint(Function):
             self.nodes.clear()
 
         # adding to function nodes
-        for i in nodes:  # unraveled_nodes:
+        for i in nodes: #unraveled_nodes:
             if i not in self.nodes:
                 self.nodes.append(i)
                 self.nodes.sort()
                 if 'n' + str(i) not in self.bounds:
-                    self.bounds['n' + str(i)] = dict(lb=np.full(self.f.shape[0], -np.inf),
-                                                     ub=np.full(self.f.shape[0], np.inf))
-
+                    self.bounds['n' + str(i)] = dict(lb=np.full(self.f.shape[0], 0.),
+                                                     ub=np.full(self.f.shape[0], 0.))
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):
@@ -186,7 +191,6 @@ class CostFunction(Function):
 
     def getType(self):
         return 'costfunction'
-
 
 class FunctionsContainer:
     def __init__(self, state_vars, nodes, logger=None):
@@ -239,17 +243,16 @@ class FunctionsContainer:
         container_impl['n' + str(node)] = dict()
 
         # TODO be careful about ordering
+        # todo I really hate this implementation! Find a better one for used_vars
         for fun_name, fun in container.items():
-            # self.logger.debug('implementing function "{}" at node {}.'.format(fun_name, node))
-            # print('Function is active on nodes: {}'.format(fun.getNodes()))
-            # print('Function depends on variables: {}'.format(fun.getVariables()))
-            # implement constraint only if constraint is present in node k
             if node in fun.getNodes():
                 used_vars = list()
                 for name, val in fun.getVariables().items():
-                    var = self.state_vars.getVarImpl(name, node)
-                    # print('used abstract var "{}" implemented as {}'.format(name, var))
-                    used_vars.append(var)
+                    for item in val:
+                        var = self.state_vars.getVarImpl(name, node + item.offset)
+                        if var is None:
+                            raise Exception(f'Variable out of scope: {item} does not exist at node {node}')
+                        used_vars.append(var)
 
                 f_impl = fun._project(node, used_vars)
                 if fun.getType() == 'constraint':
@@ -261,8 +264,7 @@ class FunctionsContainer:
 
                 container_impl['n' + str(node)].update({fun_name: fun_dict})
                 # print('==================================================')
-                # self.logger.debug('Implemented function "{}" of type {}: {} with vars {}'.format(fun_name, fun.getType(), f_impl, used_vars))
-                self.logger.debug(f'Implemented function "{fun_name}" of type {fun.getType()} with size {f_impl.shape}')
+                self.logger.debug(f'Implemented function "{fun_name}" of type {fun.getType()}: {f_impl} with vars {used_vars} at node {node}')
 
     def getCnstrDim(self):
 
@@ -327,8 +329,8 @@ class FunctionsContainer:
         j = 0
         for node in self.cnstr_impl.values():
             for elem in node.values():
-                lbg[j:j + elem['lb'].shape[0]] = elem['lb']
-                j = j + elem['lb'].shape[0]
+                lbg[j:j+elem['lb'].shape[0]] = elem['lb']
+                j = j+elem['lb'].shape[0]
 
         return lbg
 
@@ -400,10 +402,14 @@ class FunctionsContainer:
                 self.costfun_impl[node][name] = cs.SX.deserialize(elem)
 
 
+
+
+
 if __name__ == '__main__':
+
     x = cs.SX.sym('x', 2)
     y = cs.SX.sym('y', 2)
-    fun = x + y
+    fun = x+y
     used_var = dict(x=x, y=y)
     funimpl = Function('dan', fun, used_var, 1)
 
@@ -413,3 +419,5 @@ if __name__ == '__main__':
     print(funimpl_serialized)
     print('===DEPICKLING===')
     funimpl_new = pickle.loads(funimpl_serialized)
+
+
