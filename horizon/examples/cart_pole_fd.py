@@ -5,7 +5,9 @@ import casadi as cs
 import numpy as np
 import logging
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.ros.replay_trajectory import replay_trajectory
+
 import matplotlib.pyplot as plt
 import os
 
@@ -19,7 +21,8 @@ nq = kindyn.nq()
 nv = kindyn.nv()
 
 # OPTIMIZATION PARAMETERS
-ns = 100  # number of shooting nodes
+ns = 40  # number of shooting nodes
+use_ms = False
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -58,7 +61,7 @@ q_init = [0., 0.]
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
 
-tau_lims = np.array([300])
+tau_lims = np.array([3000])
 tau_init = [0]
 
 q.setBounds(q_min, q_max)
@@ -71,9 +74,11 @@ u.setBounds(-tau_lims, tau_lims)
 prb.createCostFunction("tau", cs.sumsqr(tau), nodes=range(ns))
 
 # Constraints
-x_int = F_integrator(x0=x_prev, p=u_prev)
-#prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
-integrators.make_direct_collocation(prob=prb, x=x, x_prev=x_prev, xdot=xdot, degree=3, dt=tf/ns)
+if use_ms:
+    x_int = F_integrator(x0=x_prev, p=u_prev)
+    prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+else:
+    integrators.make_direct_collocation(prob=prb, x=x, x_prev=x_prev, xdot=xdot, degree=3, dt=tf/ns)
 prb.createConstraint("up", q[1] - np.pi, nodes=ns, bounds=dict(lb = [0], ub = [0]))
 prb.createConstraint("final_qdot", qdot - np.array([0., 0.]), nodes=ns, bounds=dict(lb = np.zeros(2).tolist(), ub = np.zeros(2).tolist()))
 
@@ -91,11 +96,10 @@ plt.plot(time, q_hist[1,:])
 plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[m]}$', size = 20)
-plt.show()
 
+# plot
+plt = plotter.PlotterHorizon(sol=solution)
+plt.plotVariables()
 
-
-
-
-
-
+joint_list=["cart_joint", "pole_joint"]
+replay_trajectory(tf/ns, joint_list, q_hist).replay(is_floating_base=False)
