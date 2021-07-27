@@ -14,7 +14,7 @@ urdf = rospy.get_param('robot_description')
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
 # OPTIMIZATION PARAMETERS
-ns = 30  # number of shooting nodes
+ns = 40  # number of shooting nodes
 nc = 4  # number of contacts
 nq = kindyn.nq()  # number of DoFs - NB: 7 DoFs floating base (quaternions)
 DoF = nq - 7  # Contacts + anchor_rope + rope
@@ -100,20 +100,20 @@ dt.setInitialGuess(dt_init)
 
 # SET UP COST FUNCTION
 lift_node = 10
-touch_down_node = 20
+touch_down_node = 30
 q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.9, 0.0, 0.0, 0.0, 1.0]).tolist()
 
 prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes= list(range(lift_node, touch_down_node)))
 #prb.createCostFunction("floating_base_quaternion", 0.1*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
 prb.createCostFunction("min_qdot", 10.*cs.dot(qdot, qdot))
-prb.createCostFunction("min_qddot", 0.001*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
+#prb.createCostFunction("min_qddot", 0.001*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
 
 f1_prev = prb.createInputVariable("f1", nf, -1)
 f2_prev = prb.createInputVariable("f2", nf, -1)
 f3_prev = prb.createInputVariable("f3", nf, -1)
 f4_prev = prb.createInputVariable("f4", nf, -1)
-prb.createCostFunction("min_deltaforce", 0.001*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
-                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)), nodes= list(range(1, ns)))
+#prb.createCostFunction("min_deltaforce", 0.001*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
+#                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)), nodes= list(range(1, ns)))
 
 # Constraints
 q_prev = prb.createStateVariable("q", nq, -1)
