@@ -182,7 +182,8 @@ class Constraint(Function):
                 self.nodes.append(i)
                 self.nodes.sort()
                 if 'n' + str(i) not in self.bounds:
-                    self.bounds['n' + str(i)] = dict(lb=np.full(self.f.shape[0], -np.inf), ub=np.full(self.f.shape[0], np.inf))
+                    self.bounds['n' + str(i)] = dict(lb=np.full(self.f.shape[0], 0.),
+                                                     ub=np.full(self.f.shape[0], 0.))
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):
