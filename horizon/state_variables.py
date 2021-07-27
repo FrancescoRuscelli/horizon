@@ -29,13 +29,13 @@ class StateVariable(cs.SX):
 
         nodes = misc.checkNodes(nodes, range(self.nodes))
 
-        if isinstance(bounds, (list, int, float)):
-            bounds = np.array(bounds)
+        # mybound = handle_numeric_input(bounds) TODO
+        if isinstance(bounds, (int, float)):
+            bounds = np.array([bounds])
         else:
-            bounds = bounds.flatten()
+            bounds = np.array(bounds).flatten()
 
-        dim = bounds.shape[0] if bounds.shape else 1
-        if dim != self.dim:
+        if bounds.shape[0] != self.dim:
             raise Exception('Wrong dimension of lower bounds inserted.')
 
         for node in nodes:
@@ -45,14 +45,14 @@ class StateVariable(cs.SX):
 
         nodes = misc.checkNodes(nodes, range(self.nodes))
 
-        if isinstance(bounds, (list, int, float)):
-            bounds = np.array(bounds)
+         # mybound = handle_numeric_input(bounds) TODO
+        if isinstance(bounds, (int, float)):
+            bounds = np.array([bounds])
         else:
-            bounds = bounds.flatten()
+            bounds = np.array(bounds).flatten()
 
-        dim = bounds.shape[0] if bounds.shape else 1
-        if dim != self.dim:
-            raise Exception('Wrong dimension of upper bounds inserted.')
+        if bounds.shape[0] != self.dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
 
         for node in nodes:
             self.var_impl['n' + str(node)]['ub'] = bounds
@@ -65,14 +65,14 @@ class StateVariable(cs.SX):
 
         nodes = misc.checkNodes(nodes, range(self.nodes))
 
-        if isinstance(val, (list, int, float)):
-            val = np.array(val)
+        # mybound = handle_numeric_input(bounds) TODO
+        if isinstance(val, (int, float)):
+            val = np.array([val])
         else:
-            val = val.flatten()
+            val = np.array(val).flatten()
 
-        dim = val.shape[0] if val.shape else 1
-        if dim != self.dim:
-            raise Exception('Wrong dimension of initial guess inserted.')
+        if val.shape[0] != self.dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
 
         for node in nodes:
             self.var_impl['n' + str(node)]['w0'] = val
@@ -153,21 +153,6 @@ class InputVariable(StateVariable):
         super(InputVariable, self).__init__(tag, dim, nodes)
         self.nodes = nodes-1
 
-    # def getNNodes(self):
-    #     return self.nodes-1
-    #
-    # def _project(self):
-    #     # state_var_impl --> dict
-    #     #  - key: nodes (n0, n1, ...)
-    #     #  - val: dict with name and value of implemented variable
-    #     for n in range(self.nodes-1):
-    #         var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
-    #         self.var_impl['n' + str(n)] = dict()
-    #         self.var_impl['n' + str(n)]['var'] = var_impl
-    #         self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
-    #         self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
-    #         self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
-
 class StateVariables:
     def __init__(self, nodes, logger=None):
 
@@ -210,8 +195,7 @@ class StateVariables:
     def getVarsDim(self):
         var_dim_tot = 0
         for var in self.state_var.values():
-            if isinstance(var, StateVariable):
-                var_dim_tot += var.shape[0] * var.getNNodes()
+            var_dim_tot += var.shape[0] * var.getNNodes()
         return var_dim_tot
 
 

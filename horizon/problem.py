@@ -31,6 +31,9 @@ class Problem:
         # todo one could set also non state variable right?
         self.var_container = list()
 
+    def getNNodes(self) -> int:
+        return self.nodes
+
     def createStateVariable(self, name, dim, prev_nodes=None):
         var = self.state_var_container.setStateVar(name, dim, prev_nodes)
         return var
@@ -65,15 +68,17 @@ class Problem:
     #         return self.function[fun_type](**kwargs)
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
-
+        
+        # get nodes as a list
         nodes = misc.checkNodes(nodes, range(self.nodes))
 
+        # get vars that constraint depends upon
         used_var = self._getUsedVar(g)
 
         if self.debug_mode:
-            # self.logger.debug('Creating Constraint Function "{}": {} with abstract variables {}, active in nodes: {}'.format(name, g, used_var, nodes))
-            self.logger.debug('Creating Constraint Function "{}": active in nodes: {}'.format(name, nodes))
+            self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes}')
 
+        # create internal representation of a constraint
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
 
         self.function_container.addFunction(fun)
@@ -87,8 +92,7 @@ class Problem:
         used_var = self._getUsedVar(j)
 
         if self.debug_mode:
-            # self.logger.debug('Creating Cost Function "{}": {} with abstract variables {},  active in nodes: {}'.format(name, j, used_var, nodes))
-            self.logger.debug('Creating Cost Function "{}": active in nodes: {}'.format(name, nodes))
+            self.logger.debug(f'Creating Cost Function "{name}": active in nodes: {nodes}')
 
         fun = fc.CostFunction(name, j, used_var, nodes)
 
@@ -122,7 +126,7 @@ class Problem:
         self.function_container.clear()
 
         for k in range(self.nodes):  # todo decide if N or N+1
-            self.logger.debug('Node {}:'.format(k))
+            self.logger.debug(f'Node {k}:')
             # implement the abstract state variable with the current node
             self.state_var_container.update(k)
             # implement the constraints and the cost functions with the current node
@@ -147,7 +151,7 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        if opts is not None:
+        if self.opts is not None:
             if "nlpsol.ipopt" in self.opts:
                 if self.opts["nlpsol.ipopt"]:
                     self.solver = cs.nlpsol('solver', 'ipopt', self.prob)
