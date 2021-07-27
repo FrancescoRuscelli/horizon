@@ -5,7 +5,7 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 import geometry_msgs.msg
 import time
-import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
+from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 from copy import deepcopy
 
 try:

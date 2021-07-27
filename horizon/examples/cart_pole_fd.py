@@ -21,8 +21,8 @@ nq = kindyn.nq()
 nv = kindyn.nv()
 
 # OPTIMIZATION PARAMETERS
-ns = 40  # number of shooting nodes
-use_ms = False
+ns = 100  # number of shooting nodes
+use_ms = True
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -51,7 +51,7 @@ tf = 5.0  # [s]
 L = 0.5*cs.dot(u, u)  # Objective term
 dae = {'x': x, 'p': u, 'ode': xdot, 'quad': L}
 opts = {'tf': tf/ns}
-F_integrator = integrators.RK4(dae, opts, "SX")
+F_integrator = integrators.RK4(dae, opts)
 
 # Limits
 q_min = [-0.5, -2.*np.pi]

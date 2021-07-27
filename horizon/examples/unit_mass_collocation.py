@@ -29,7 +29,7 @@ x_prev = cs.vertcat(p_prev, v_prev)
 xdot = cs.vertcat(v, F)
 l = cs.sumsqr(F)  # useless
 
-use_ms = True
+use_ms = False
 if use_ms:  # multiple shooting
     my_integrator = make_integrator(x, xdot, F, l, dt)
     ms = prob.createConstraint('ms', my_integrator(x_prev, F_prev)[0] - x, nodes=range(1, N+1))
