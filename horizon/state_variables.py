@@ -12,28 +12,31 @@ Formerly
 '''
 # todo create function checker to check if nodes are in self.nodes and if everything is ok with the input (no dict, no letters...)
 
-class Variable(cs.SX):
-    def __init__(self, tag, dim, nodes):
-        super(Variable, self).__init__(cs.SX.sym(tag, dim))
+class AbstractVariable(cs.SX):
+    def __init__(self, tag, dim):
+        super(AbstractVariable, self).__init__(cs.SX.sym(tag, dim))
 
         self.tag = tag
         self.dim = dim
+        self.offset = 0
+
+class Variable(AbstractVariable):
+    def __init__(self, tag, dim, nodes):
+        super(Variable, self).__init__(tag, dim)
+
         self.nodes = nodes
 
         # self.var = cs.SX.sym(tag, dim)
-        self.var_offset = list()
+        self.var_offset = dict()
         self.var_impl = dict()
-
-        self.offset = 0
 
         # todo project it as soon as I create the variable. Ok?
         self._project()
 
     def setLowerBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        nodes = misc.checkNodes(nodes, self.nodes)
 
-        # mybound = handle_numeric_input(bounds) TODO
         if isinstance(bounds, (int, float)):
             bounds = np.array([bounds])
         else:
@@ -47,7 +50,7 @@ class Variable(cs.SX):
 
     def setUpperBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        nodes = misc.checkNodes(nodes, self.nodes)
 
          # mybound = handle_numeric_input(bounds) TODO
         if isinstance(bounds, (int, float)):
@@ -67,7 +70,7 @@ class Variable(cs.SX):
 
     def setInitialGuess(self, val, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        nodes = misc.checkNodes(nodes, self.nodes)
 
         # mybound = handle_numeric_input(bounds) TODO
         if isinstance(val, (int, float)):
@@ -86,16 +89,19 @@ class Variable(cs.SX):
         if node > 0:
             node = f'+{node}'
 
-        createTag = lambda name, node: name + str(node) if node is not None else name
+        if node in self.var_offset:
+            return self.var_offset[node]
+        else:
 
+            createTag = lambda name, node: name + str(node) if node is not None else name
 
-        new_tag = createTag(self.tag, node)
-        # todo here the problem is that I don't want a full state_variable (BOUNDS are useless here)
-        # todo how to do?
-        var = self.__class__(new_tag, self.dim, self.nodes)
-        var.offset = int(node)
+            new_tag = createTag(self.tag, node)
+            # todo here the problem is that I don't want a full state_variable (BOUNDS are useless here)
+            # todo how to do?
+            var = AbstractVariable(new_tag, self.dim)
+            var.offset = int(node)
 
-        self.var_offset.append(var)
+            self.var_offset[node] = var
         return var
 
     def getVarOffsetDict(self):
@@ -114,7 +120,7 @@ class Variable(cs.SX):
         # self.var_impl.clear()
         new_var_impl = dict()
 
-        for n in range(self.nodes):
+        for n in self.nodes:
             if 'n' + str(n) in self.var_impl:
                 new_var_impl['n' + str(n)] = self.var_impl['n' + str(n)]
             else:
@@ -165,7 +171,7 @@ class Variable(cs.SX):
         return initial_guess
 
     def getNNodes(self):
-        return self.nodes
+        return len(self.nodes)
 
     def __reduce__(self):
         return (self.__class__, (self.tag, self.dim, self.nodes, ))
@@ -174,26 +180,29 @@ class Variable(cs.SX):
 class InputVariable(Variable):
     def __init__(self, tag, dim, nodes):
         super(InputVariable, self).__init__(tag, dim, nodes)
-        self.nodes = nodes-1
 
 class StateVariable(Variable):
     def __init__(self, tag, dim, nodes):
         super(StateVariable, self).__init__(tag, dim, nodes)
 
-class State:
-    def __init__(self, *args : StateVariable):
+class AbstractState:
+    def __init__(self, *args: AbstractVariable):
 
         self.state_vars = [item for item in args]
+
+    def getList(self):
+        return self.state_vars
+
+class State(AbstractState):
+    def __init__(self, *args : StateVariable):
+        super().__init__(*args)
 
     def getVarOffset(self, offset):
         var_list = list()
         for var in self.state_vars:
             var_list.append(var.getVarOffset(offset))
 
-        return self.__class__(*var_list)
-
-    def getList(self):
-        return self.state_vars
+        return AbstractState(*var_list)
 
     def getVars(self):
         return cs.vertcat(*self.state_vars)
@@ -211,23 +220,29 @@ class VariablesContainer:
         self.vars = OrderedDict()
         self.vars_impl = OrderedDict()
 
-    def setVar(self, var_type, name, dim):
+    def createVar(self, var_type, name, dim, active_nodes):
 
-        var = var_type(name, dim, self.nodes)
+        active_nodes = misc.checkNodes(active_nodes, range(self.nodes))
+
+        var = var_type(name, dim, active_nodes)
         self.vars[name] = var
 
         if self.logger:
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('Setting variable {} as {}'.format(name, var_type))
+                self.logger.debug('Creating variable {} as {}'.format(name, var_type))
 
+        return var
+
+    def setVar(self, name, dim, active_nodes):
+        var = self.createVar(Variable, name, dim, active_nodes)
         return var
 
     def setStateVar(self, name, dim):
-        var = self.setVar(StateVariable, name, dim)
+        var = self.createVar(StateVariable, name, dim, range(self.nodes))
         return var
 
     def setInputVar(self, name, dim):
-        var = self.setVar(InputVariable, name, dim)
+        var = self.createVar(InputVariable, name, dim, range(self.nodes-1))
         return var
 
     def getVarsDim(self):
@@ -261,7 +276,7 @@ class VariablesContainer:
             for name, var in self.vars.items():
                 var_abstr_dict[name] = list()
                 var_abstr_dict[name].append(var)
-                for var_offset in var.getVarOffsetDict():
+                for var_offset in var.getVarOffsetDict().values():
                     var_abstr_dict[name].append(var_offset)
         else:
             # todo beware of deep copy

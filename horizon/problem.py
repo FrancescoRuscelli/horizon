@@ -30,9 +30,6 @@ class Problem:
 
         self.state = sv.State()
 
-    def getNNodes(self) -> int:
-        return self.nodes
-
     def createStateVariable(self, name, dim):
         var = self.var_container.setStateVar(name, dim)
         self.state.addVariable(var)
@@ -244,7 +241,6 @@ class Problem:
 
         pos = 0
         for node, val in self.var_container.getVarImplDict().items():
-
             for name, var in val.items():
                 dim = var['var'].shape[0]
                 node_number = int(node[node.index('n') + 1:])
@@ -316,25 +312,29 @@ class Problem:
 if __name__ == '__main__':
 
     import horizon.utils.transcription_methods as tm
-    import horizon.utils.integrators as int
+    import horizon.utils.integrators as integ
     nodes = 10
     prb = Problem(nodes, logging_level=logging.DEBUG)
     x = prb.createStateVariable('x', 2)
     v = prb.createStateVariable('v', 2)
     u = prb.createInputVariable('u', 2)
+
+    print(x.getNNodes())
+    print(u.getNNodes())
+
+    print(prb.var_container.getVarsDim())
+    danieli = prb.createConstraint('danieli', x)
     xprev = x.getVarOffset(-1)
+    xprev_copy = x.getVarOffset(-1)
     xnext = x.getVarOffset(+1)
 
+    print(id(xprev))
+    print(id(xprev_copy))
+    exit()
     state = prb.getState()
     state_prev = state.getVarOffset(-1)
-    print(state_prev.getList())
-    print(state_prev.getVars())
 
-    exit()
-    print(x)
-    print(xprev)
-    print(xnext)
-    # danieli = prb.createConstraint('danieli', x + xprev, range(1, 10))
+
 
     dt = 0.01
     state_dot = cs.vertcat(v, u)
@@ -346,12 +346,14 @@ if __name__ == '__main__':
     # dae['ode'] = state_dot
     # dae['quad'] = cs.sumsqr(u)
 
-    # integrator = int.RK4(dae, opts, cs.SX)
+    # integrator = integ.RK4(dae, opts, cs.SX)
     hl = tm.TranscriptionsHandler(prb, 0.01, state_dot=state_dot)
     # hl.set_integrator(integrator)
     hl.setMultipleShooting()
 
-    prb.createProblem()
+    prb.createProblem({'nlpsol.ipopt': 10})
+
+    prb.solveProblem()
 
     exit()
     # ==================================================================================================================

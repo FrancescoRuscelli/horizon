@@ -26,7 +26,11 @@ F = prob.createInputVariable('force', dim=1)
 if use_transcription_methods:
 
     print('using utility "transcription_methods"')
-    x = cs.vertcat(prob.getState().getVars())
+    state = prob.getState()
+    state_prev = state.getVarOffset(-1)
+    x = cs.vertcat(state.getVars())
+
+
     xdot = cs.vertcat(v, F)
     l = cs.sumsqr(F)  # useless
 
