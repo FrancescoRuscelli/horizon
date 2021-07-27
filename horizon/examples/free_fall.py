@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import logging
 
-import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
 import rospy
 import casadi as cs
 import numpy as np
@@ -11,7 +10,7 @@ from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
 # Switch between suspended and free fall
-FREE_FALL = True
+FREE_FALL = False
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
@@ -110,16 +109,16 @@ prb.createCostFunction("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]), 
 prb.createCostFunction("min_f1", 1000.*cs.dot(f1, f1), list(range(1, ns)))
 prb.createCostFunction("min_f2", 1000.*cs.dot(f2, f2), list(range(1, ns)))
 
-frope_prev = prb.createInputVariable("frope", nf, -1)
+frope_prev = frope.getVarOffset(-1)
 prb.createCostFunction("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), list(range(1, ns)))
 
 # Constraints
 prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))
 prb.createConstraint("qdotinit", qdot, nodes=0, bounds=dict(lb=qdot_init, ub=qdot_init))
 
-q_prev = prb.createStateVariable("q", nq, -1)
-qdot_prev = prb.createStateVariable("qdot", nv, -1)
-qddot_prev = prb.createInputVariable("qddot", nv, -1)
+q_prev = q.getVarOffset(-1)
+qdot_prev = qdot.getVarOffset(-1)
+qddot_prev = qddot.getVarOffset(-1)
 x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
 x_int = F_integrator(x0=x_prev, p=qddot_prev)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))

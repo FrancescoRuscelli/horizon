@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import logging
 
-import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
 import rospy
 import casadi as cs
 import numpy as np
@@ -108,18 +107,18 @@ prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_
 prb.createCostFunction("min_qdot", 10.*cs.dot(qdot, qdot))
 #prb.createCostFunction("min_qddot", 0.001*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
 
-f1_prev = prb.createInputVariable("f1", nf, -1)
-f2_prev = prb.createInputVariable("f2", nf, -1)
-f3_prev = prb.createInputVariable("f3", nf, -1)
-f4_prev = prb.createInputVariable("f4", nf, -1)
+f1_prev = f1.getVarOffset(-1)
+f2_prev = f2.getVarOffset(-1)
+f3_prev = f3.getVarOffset(-1)
+f4_prev = f4.getVarOffset(-1)
 #prb.createCostFunction("min_deltaforce", 0.001*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
 #                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)), nodes= list(range(1, ns)))
 
 # Constraints
-q_prev = prb.createStateVariable("q", nq, -1)
-qdot_prev = prb.createStateVariable("qdot", nv, -1)
-qddot_prev = prb.createInputVariable("qddot", nv, -1)
-dt_prev = prb.createInputVariable("dt", 1, -1)
+q_prev = q.getVarOffset(-1)
+qdot_prev = qdot.getVarOffset(-1)
+qddot_prev = qddot.getVarOffset(-1)
+dt_prev = dt.getVarOffset(-1)
 x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
 x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt_prev)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))

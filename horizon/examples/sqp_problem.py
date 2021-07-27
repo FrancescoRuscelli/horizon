@@ -37,12 +37,12 @@ print(f"F_integrator: {F_integrator}")
 
 # Cost function
 prb.createCostFunction('min_v', cs.vertcat(dx, du), nodes=list(range(0, N)))
-dx_prev = prb.createInputVariable('dx', 2, -1)
+dx_prev = dx.getVarOffset(-1)
 prb.createCostFunction('min_dx_prev', dx_prev, nodes=list(range(N, N+1)))
 
 
 # Constraints
-du_prev = prb.createInputVariable('du', 1, -1)
+du_prev = du.getVarOffset(-1)
 x_int = F_integrator(x0=dx_prev, p=du_prev)
 prb.createConstraint("multiple_shooting", x_int["xf"] - dx, nodes=list(range(1, N+1)))
 
