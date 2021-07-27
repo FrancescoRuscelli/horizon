@@ -34,19 +34,19 @@ class Problem:
     def getNNodes(self) -> int:
         return self.nodes
 
-    def createStateVariable(self, name, dim, prev_nodes=None):
-        var = self.state_var_container.setStateVar(name, dim, prev_nodes)
+    def createStateVariable(self, name, dim):
+        var = self.state_var_container.setStateVar(name, dim)
         return var
 
-    def createInputVariable(self, name, dim, prev_nodes=None):
-        var = self.state_var_container.setInputVar(name, dim, prev_nodes)
+    def createInputVariable(self, name, dim):
+        var = self.state_var_container.setInputVar(name, dim)
         return var
 
     # def setVariable(self, name, var):
 
-        # assert (isinstance(var, (cs.casadi.SX, cs.casadi.MX)))
-        # setattr(Problem, name, var)
-        # self.var_container.append(name)
+    # assert (isinstance(var, (cs.casadi.SX, cs.casadi.MX)))
+    # setattr(Problem, name, var)
+    # self.var_container.append(name)
 
     # def getStateVariable(self, name):
     #
@@ -58,8 +58,10 @@ class Problem:
     def _getUsedVar(self, f):
         used_var = dict()
         for name_var, value_var in self.state_var_container.getVarAbstrDict().items():
-            if cs.depends_on(f, value_var):
-                used_var[name_var] = value_var
+            used_var[name_var] = list()
+            for var in value_var:
+                if cs.depends_on(f, var):
+                    used_var[name_var].append(var)
 
         return used_var
 
@@ -125,14 +127,13 @@ class Problem:
         self.state_var_container.clear()
         self.function_container.clear()
 
-        for k in range(self.nodes):  # todo decide if N or N+1
-            self.logger.debug(f'Node {k}:')
-            # implement the abstract state variable with the current node
+        for k in range(self.nodes):
+        # implement the abstract state variable with the current node
             self.state_var_container.update(k)
-            # implement the constraints and the cost functions with the current node
-            self.function_container.update(k)
 
-            self.logger.debug('===========================================')
+        for k in range(self.nodes):
+        # implement the constraints and the cost functions with the current node
+            self.function_container.update(k)
 
         j = self.function_container.getCostFImplSum()
         w = self.state_var_container.getVarImplList()
@@ -305,6 +306,19 @@ class Problem:
 
 if __name__ == '__main__':
 
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createStateVariable('x', 2)
+    xprev = x.getVarOffset(-1)
+    xnext = x.getVarOffset(+1)
+    print(x)
+    print(xprev)
+    print(xnext)
+    danieli = prb.createConstraint('danieli', x + xprev, range(0, 10))
+
+    prb.createProblem()
+
+    exit()
     # ==================================================================================================================
     # ======================================= bounds as list but also other stuff =====================================
     # ==================================================================================================================
