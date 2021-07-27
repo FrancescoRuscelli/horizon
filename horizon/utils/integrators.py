@@ -1,9 +1,28 @@
 import casadi as cs
 import horizon.problem as prb
-import casadi as cs 
 import numpy as np
 
-def RK4(dae, opts, casadi_type):
+def EULER(dae, opts=None, casadi_type=cs.SX):
+    """
+    Implements an integration scheme based on Euler integration (http://www.cmth.ph.ic.ac.uk/people/a.mackinnon/Lectures/compphys/node4.html):
+        x = x + dt*xdot(x,u)
+    Args:
+        dae: a dictionary containing
+            'x': state
+            'p': control
+            'ode': a function of the state and control returning the derivative of the state
+            'quad': quadrature term
+        opts: a dictionary containing 'tf': integration time
+        NOTE: this term can be used to take into account also a final time to optimize
+        casadi_type: 'SX' or 'MX'
+
+    Returns: Function('F_RK', [X0_RK, U_RK], [X_RK, Q_RK], ['x0', 'p'], ['xf', 'qf']) or
+             Function('F_RK', [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], ['x0', 'p', 'time'], ['xf', 'qf'])
+        which given in input the actual state X0_RK and control U_RK returns the integrated state X_RK and quadrature term Q_RK
+
+    """
+    if opts is None:
+        opts = dict()
     x = dae['x']
     qddot = dae['p']
     xdot = dae['ode']
@@ -14,16 +33,119 @@ def RK4(dae, opts, casadi_type):
     nx = x.size1()
     nv = qddot.size1()
 
-    if casadi_type == 'MX':
-        X0_RK = cs.MX.sym('X0_RK', nx)
-        U_RK = cs.MX.sym('U_RK', nv)
-    elif casadi_type == 'SX':
-        X0_RK = cs.SX.sym('X0_RK', nx)
-        U_RK = cs.SX.sym('U_RK', nv)
-    else:
-        raise Exception('Input casadi_type can be only SX or MX!')
+    X0_RK = casadi_type.sym('X0_RK', nx)
+    U_RK = casadi_type.sym('U_RK', nv)
 
-    DT_RK = opts['tf']
+    if 'tf' in opts:
+        DT_RK = opts['tf']
+    else:
+        DT_RK = casadi_type.sym('DT_RK', 1)
+
+    X_RK = X0_RK
+    Q_RK = 0
+
+    k1, k1_q = f_RK(X_RK, U_RK)
+
+    X_RK = X_RK + DT_RK * k1
+    Q_RK = Q_RK + DT_RK * k1_q
+
+    if 'tf' in opts:
+        f = cs.Function('F_RK', [X0_RK, U_RK], [X_RK, Q_RK], ['x0', 'p'], ['xf', 'qf'])
+    else:
+        f = cs.Function('F_RK', [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], ['x0', 'p', 'time'], ['xf', 'qf'])
+    return f
+
+def RK2(dae, opts=None, casadi_type=cs.SX):
+    """
+        Implements an integration scheme based on 2nd-order Runge-Kutta integration (http://www.cmth.ph.ic.ac.uk/people/a.mackinnon/Lectures/compphys/node11.html):
+        Args:
+            dae: a dictionary containing
+                'x': state
+                'p': control
+                'ode': a function of the state and control returning the derivative of the state
+                'quad': quadrature term
+            opts: a dictionary containing 'tf': integration time
+            NOTE: this term can be used to take into account also a final time to optimize
+            casadi_type: 'SX' or 'MX'
+
+        Returns: Function('F_RK', [X0_RK, U_RK], [X_RK, Q_RK], ['x0', 'p'], ['xf', 'qf']) or
+             Function('F_RK', [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], ['x0', 'p', 'time'], ['xf', 'qf'])
+            which given in input the actual state X0_RK and control U_RK returns the integrated state X_RK and quadrature term Q_RK
+
+        """
+    if opts is None:
+        opts = dict()
+    x = dae['x']
+    qddot = dae['p']
+    xdot = dae['ode']
+    L = dae['quad']
+
+    f_RK = cs.Function('f_RK', [x, qddot], [xdot, L])
+
+    nx = x.size1()
+    nv = qddot.size1()
+
+    X0_RK = casadi_type.sym('X0_RK', nx)
+    U_RK = casadi_type.sym('U_RK', nv)
+
+    if 'tf' in opts:
+        DT_RK = opts['tf']
+    else:
+        DT_RK = casadi_type.sym('DT_RK', 1)
+
+    X_RK = X0_RK
+    Q_RK = 0
+
+    k1, k1_q = f_RK(X_RK, U_RK)
+    k2, k2_q = f_RK(X_RK + DT_RK / 2. * k1, U_RK)
+
+    X_RK = X_RK + DT_RK * k2
+    Q_RK = Q_RK + DT_RK * k2_q
+
+    if 'tf' in opts:
+        f = cs.Function('F_RK', [X0_RK, U_RK], [X_RK, Q_RK], ['x0', 'p'], ['xf', 'qf'])
+    else:
+        f = cs.Function('F_RK', [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], ['x0', 'p', 'time'], ['xf', 'qf'])
+    return f
+
+def RK4(dae, opts=None, casadi_type=cs.SX):
+    """
+        Implements an integration scheme based on 4th-order Runge-Kutta integration:
+        Args:
+            dae: a dictionary containing
+                'x': state
+                'p': control
+                'ode': a function of the state and control returning the derivative of the state
+                'quad': quadrature term
+            opts: a dictionary containing 'tf': integration time
+            NOTE: this term can be used to take into account also a final time to optimize
+            casadi_type: 'SX' or 'MX'
+
+        Returns: Function('F_RK', [X0_RK, U_RK], [X_RK, Q_RK], ['x0', 'p'], ['xf', 'qf']) or
+             Function('F_RK', [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], ['x0', 'p', 'time'], ['xf', 'qf'])
+            which given in input the actual state X0_RK and control U_RK returns the integrated state X_RK and quadrature term Q_RK
+
+    """
+    if opts is None:
+        opts = dict()
+    x = dae['x']
+    qddot = dae['p']
+    xdot = dae['ode']
+    L = dae['quad']
+
+    f_RK = cs.Function('f_RK', [x, qddot], [xdot, L])
+
+    nx = x.size1()
+    nv = qddot.size1()
+
+    X0_RK = casadi_type.sym('X0_RK', nx)
+    U_RK = casadi_type.sym('U_RK', nv)
+
+    if 'tf' in opts:
+        DT_RK = opts['tf']
+    else:
+        DT_RK = casadi_type.sym('DT_RK', 1)
+
     X_RK = X0_RK
     Q_RK = 0
 
@@ -35,8 +157,47 @@ def RK4(dae, opts, casadi_type):
     X_RK = X_RK + DT_RK / 6. * (k1 + 2. * k2 + 2. * k3 + k4)
     Q_RK = Q_RK + DT_RK / 6. * (k1_q + 2. * k2_q + 2. * k3_q + k4_q)
 
-    return cs.Function('F_RK', [X0_RK, U_RK], [X_RK, Q_RK], ['x0', 'p'], ['xf', 'qf'])
+    if 'tf' in opts:
+        f = cs.Function('F_RK', [X0_RK, U_RK], [X_RK, Q_RK], ['x0', 'p'], ['xf', 'qf'])
+    else:
+        f = cs.Function('F_RK', [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], ['x0', 'p', 'time'], ['xf', 'qf'])
+    return f
 
+
+def LEAPFROG(dae, opts=None, casadi_type=cs.SX):
+    if opts is None:
+        opts = dict()
+    x = dae['x']
+    qddot = dae['p']
+    xdot = dae['ode']
+    L = dae['quad']
+
+    f_RK = cs.Function('f_RK', [x, qddot], [xdot, L])
+
+    nx = x.size1()
+    nv = qddot.size1()
+
+    X0_RK = casadi_type.sym('X0_RK', nx)
+    X0_PREV_RK = casadi_type.sym('X0_PREV_RK', nx)
+    U_RK = casadi_type.sym('U_RK', nv)
+
+    if 'tf' in opts:
+        DT_RK = opts['tf']
+    else:
+        DT_RK = casadi_type.sym('DT_RK', 1)
+
+    Q_RK = 0
+
+    k1, k1_q = f_RK(X0_RK, U_RK)
+
+    X_RK = X0_PREV_RK + 2. * DT_RK * k1
+    X_PREV_RK = X0_RK
+
+    if 'tf' in opts:
+        f = cs.Function('F_RK', [X0_RK, X0_PREV_RK, U_RK], [X_RK, X_PREV_RK, Q_RK], ['x0', 'x0_prev', 'p'], ['xf', 'xf_prev', 'qf'])
+    else:
+        f = cs.Function('F_RK', [X0_RK, X0_PREV_RK, U_RK, DT_RK], [X_RK, X_PREV_RK, Q_RK], ['x0', 'x0_prev', 'p', 'time'], ['xf', 'xf_prev', 'qf'])
+    return f
 
 def make_direct_collocation(prob: prb.Problem, 
                             x: cs.SX, 
@@ -130,3 +291,6 @@ def make_direct_collocation(prob: prb.Problem,
             # loop on basis polynomials
             xder += C[i+1, j]*collo[j]
         dyn = prob.createConstraint(f'collo_dyn_{i}', xder - xdot*dt, nodes=range(N))
+
+
+

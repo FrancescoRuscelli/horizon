@@ -11,7 +11,7 @@ from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
 # Switch between suspended and free fall
-FREE_FALL = False
+FREE_FALL = True
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
@@ -52,7 +52,7 @@ tf = 1.0  # [s]
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
 opts = {'tf': tf/ns}
-F_integrator = integrators.RK4(dae, opts, "SX")
+F_integrator = integrators.RK4(dae, opts, cs.SX)
 
 # Add bounds to STATE and CONTROL variables
 q_min = [-10.0, -10.0, -10.0, -1.0, -1.0, -1.0, -1.0,  # Floating base
@@ -177,7 +177,7 @@ for i in range(ns):
 # resampling
 dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anchor2': frope_hist}
-q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_hist_mapping, kindyn)
+q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf/ns, dt, dae, frame_force_hist_mapping, kindyn)
 
 
 PRINT = True
@@ -259,5 +259,5 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
               'rope_joint']
 
-replay_trajectory(dt, joint_list, q_res).replay()
+replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping).replay()
 
