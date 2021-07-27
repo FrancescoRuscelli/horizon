@@ -2,9 +2,13 @@ import numpy as np
 import rospy
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
-import tf as ros_tf
 import geometry_msgs.msg
 import time
+
+try:
+    import tf as ros_tf
+except ImportError:
+    print('will not use tf publisher')
 
 def normalize_quaternion(q):
 
