@@ -185,30 +185,38 @@ class StateVariable(Variable):
     def __init__(self, tag, dim, nodes):
         super(StateVariable, self).__init__(tag, dim, nodes)
 
-class AbstractState:
+class AbstractAggregate():
     def __init__(self, *args: AbstractVariable):
 
-        self.state_vars = [item for item in args]
+        self.var_list = [item for item in args]
 
-    def getList(self):
-        return self.state_vars
+    def __iter__(self):
+        yield from self.var_list
 
-class State(AbstractState):
-    def __init__(self, *args : StateVariable):
+class Aggregate(AbstractAggregate):
+    def __init__(self, *args):
         super().__init__(*args)
 
     def getVarOffset(self, offset):
         var_list = list()
-        for var in self.state_vars:
+        for var in self.var_list:
             var_list.append(var.getVarOffset(offset))
 
-        return AbstractState(*var_list)
+        return AbstractAggregate(*var_list)
 
     def getVars(self):
-        return cs.vertcat(*self.state_vars)
+        return cs.vertcat(*self.var_list)
 
     def addVariable(self, var):
-        self.state_vars.append(var)
+        self.var_list.append(var)
+
+class StateAggregate(Aggregate):
+    def __init__(self, *args: StateVariable):
+        super().__init__(*args)
+
+class InputAggregate(Aggregate):
+    def __init__(self, *args: InputVariable):
+        super().__init__(*args)
 
 
 class VariablesContainer:

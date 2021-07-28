@@ -12,7 +12,7 @@ class TranscriptionsHandler:
         self.state_dot = state_dot
         self.dt = dt
 
-        state_list = self.problem.getState().getList()
+        state_list = self.problem.getState()
         state_prev_list = list()
 
         for var in state_list:

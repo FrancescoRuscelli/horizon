@@ -28,15 +28,17 @@ class Problem:
         self.function_container = fc.FunctionsContainer(self.var_container, self.nodes, self.logger)
         self.prob = None
 
-        self.state = sv.State()
+        self.state_aggr = sv.StateAggregate()
+        self.input_aggr = sv.InputAggregate()
 
     def createStateVariable(self, name, dim):
         var = self.var_container.setStateVar(name, dim)
-        self.state.addVariable(var)
+        self.state_aggr.addVariable(var)
         return var
 
     def createInputVariable(self, name, dim):
         var = self.var_container.setInputVar(name, dim)
+        self.input_aggr.addVariable(var)
         return var
 
     # def setVariable(self, name, var):
@@ -52,11 +54,10 @@ class Problem:
     #             return var
     #     return None
     def getState(self):
-        return self.state
+        return self.state_aggr
 
     def getInput(self):
-        input = list(self.var_container.getInputVars().values())
-        return input
+        return self.input_aggr
 
     def _getUsedVar(self, f):
         used_var = dict()
