@@ -197,7 +197,6 @@ class sqp(object):
         self.__gmax = ubg
 
         self.__v_opt = self.__v0
-        print(type(self.__v_opt))
         for k in range(self.__max_iter):
 
             init = self.__reinitialize_qpsolver
