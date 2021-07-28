@@ -76,11 +76,11 @@ prb.createCostFunction("tau", cs.sumsqr(tau), nodes=range(ns))
 # Constraints
 if use_ms:
     x_int = F_integrator(x0=x_prev, p=u_prev)
-    prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+    prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns+1))
 else:
     integrators.make_direct_collocation(prob=prb, x=x, x_prev=x_prev, xdot=xdot, degree=3, dt=tf/ns)
-prb.createConstraint("up", q[1] - np.pi, nodes=ns, bounds=dict(lb = [0], ub = [0]))
-prb.createConstraint("final_qdot", qdot - np.array([0., 0.]), nodes=ns, bounds=dict(lb = np.zeros(2).tolist(), ub = np.zeros(2).tolist()))
+prb.createConstraint("up", q[1] - np.pi, nodes=ns)
+prb.createConstraint("final_qdot", qdot - np.array([0., 0.]), nodes=ns)
 
 # Creates problem
 opts = {"nlpsol.ipopt":True}
