@@ -1,34 +1,8 @@
 import casadi as cs
 import numpy as np
 from scipy.special import comb
+from horizon.utils import utils
 
-
-def jac(dict, var_string_list, function_string_list):
-    f = {}
-    for function in function_string_list:
-        f[function] = dict[function]
-
-    vars_dict = {}
-    X = []
-    for var in var_string_list:
-        vars_dict[var] = dict[var]
-        X.append(dict[var])
-
-    jac_list = []
-    jac_id_list = []
-    for function_key in f:
-        for var in var_string_list:
-            id = "D" + function_key + 'D' + var
-            jac_id_list.append(id)
-            jac_list.append(cs.jacobian(f[function_key], vars_dict[var]))
-
-    jac_map = {}
-    i = 0
-    for jac_id in jac_id_list:
-        jac_map[jac_id] = jac_list[i]
-        i += 1
-
-    return cs.Function('jacobian', X, jac_list, var_string_list, jac_id_list), jac_map
 
 
 class iterativeLQR:
@@ -133,15 +107,15 @@ class iterativeLQR:
                                        ['lf'])
 
         d = {'x': x, 'u': u, 'lf': final_cost}
-        self._jacobian_lf, _tmp_functions = jac(d, ['x', 'u'], ['lf'])
+        self._jacobian_lf, _tmp_functions = utils.jac(d, ['x', 'u'], ['lf'])
         dd = dict(list(d.items()) + list(_tmp_functions.items()))
-        self._hessian_lf, _ = jac(dd, ['x', 'u'], _tmp_functions.keys())
+        self._hessian_lf, _ = utils.jac(dd, ['x', 'u'], _tmp_functions.keys())
 
         # discrete dynamics & intermediate cost
         self._discretize()
 
         # constraints
-        self._constrained = final_constraint is not None or len(intermediate_constraints) is not 0
+        self._constrained = final_constraint != None or len(intermediate_constraints) != 0
         self._final_constraint = None
         self._constraint_to_go = None
 
@@ -203,7 +177,7 @@ class iterativeLQR:
                                          ['x', 'u'],
                                          ['h'])
 
-        self._inter_constr_jac, _ = jac({'x': x, 'u': u, 'h': cs.vertcat(*intermediate_constr_r_der)}, ['x', 'u'], ['h'])
+        self._inter_constr_jac, _ = utils.jac({'x': x, 'u': u, 'h': cs.vertcat(*intermediate_constr_r_der)}, ['x', 'u'], ['h'])
 
         self._has_inter_constr = self._inter_constr.size1_out('h') > 0
 
@@ -287,9 +261,9 @@ class iterativeLQR:
 
         # self._F = integrator.RK4(dae, {'tf': self._dt}, 'SX')
         d = {'x0': x, 'p': u, 'xf': x + self._dt * self._dynamics_ct(x, u), 'qf': self._dt * self._diff_inter_cost(x, u)}
-        self._jacobian_F, _tmp_functions = jac(d, ['x0', 'p'], ['xf', 'qf'])
+        self._jacobian_F, _tmp_functions = utils.jac(d, ['x0', 'p'], ['xf', 'qf'])
         dd = dict(list(d.items()) + list(_tmp_functions.items()))
-        self._hessian_F, _ = jac(dd, ['x0', 'p'], _tmp_functions.keys())
+        self._hessian_F, _ = utils.jac(dd, ['x0', 'p'], _tmp_functions.keys())
 
     def _linearize_quadratize(self):
         """

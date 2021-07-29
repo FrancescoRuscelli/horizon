@@ -1,6 +1,7 @@
 import casadi as cs
 import time
 import numpy
+from horizon.utils import utils
 
 
 def sqpsol(name, qp_solver, problem_dict, options_dict):
@@ -42,33 +43,6 @@ def osqpOptions():
     opts = {'osqp.osqp': {'verbose': False}}
 
     return opts
-
-def jac(dict, var_string_list, function_string_list):
-    f = {}
-    for function in function_string_list:
-        f[function] = dict[function]
-
-    vars_dict = {}
-    X = []
-    for var in var_string_list:
-        vars_dict[var] = dict[var]
-        X.append(dict[var])
-
-    jac_list = []
-    jac_id_list = []
-    for function_key in f:
-        for var in var_string_list:
-            id = "D" + function_key + 'D' + var
-            jac_id_list.append(id)
-            jac_list.append(cs.jacobian(f[function_key], vars_dict[var]))
-
-    jac_map = {}
-    i = 0
-    for jac_id in jac_id_list:
-        jac_map[jac_id] = jac_list[i]
-        i += 1
-
-    return cs.Function('jacobian', X, jac_list, var_string_list, jac_id_list), jac_map
 
 class sqp(object):
     """
@@ -117,12 +91,12 @@ class sqp(object):
 
         # Generate functions for the Jacobians
         # self.__Jac_r_fcn = self.__r_fcn.jac()
-        self.__Jac_r_fcn, _ = jac({'v': self.__x, 'r': self.__f}, ['v'], ['r'])
+        self.__Jac_r_fcn, _ = utils.jac({'v': self.__x, 'r': self.__f}, ['v'], ['r'])
 
         self.__Jac_g_fcn = []
         if self.__g is not None:
             # self.__Jac_g_fcn = self.__g_fcn.jac()
-            self.__Jac_g_fcn, _ = jac({'v': self.__x, 'g': self.__g}, ['v'], ['g'])
+            self.__Jac_g_fcn, _ = utils.jac({'v': self.__x, 'g': self.__g}, ['v'], ['g'])
 
         self.__v0 = []
         self.__vmin = []
@@ -256,7 +230,7 @@ class sqp(object):
         self.__r_fcn = cs.Function('r_fcn', {'v': self.__x, 'r': self.__f}, ['v'], ['r'])
         # Generate functions for the Jacobians
         # self.__Jac_r_fcn = self.__r_fcn.jac()
-        self.__Jac_r_fcn, _ = jac({'v': self.__x, 'r': self.__f}, ['v'], ['r'])
+        self.__Jac_r_fcn, _ = utils.jac({'v': self.__x, 'r': self.__f}, ['v'], ['r'])
 
     def g(self, g):
         """
@@ -267,7 +241,7 @@ class sqp(object):
         self.__g = g
         self.__g_fcn = cs.Function('g_fcn', {'v': self.__x, 'g': self.__g}, ['v'], ['g'])
         # self.__Jac_g_fcn = self.__g_fcn.jac()
-        self.__Jac_g_fcn, _ = jac({'v': self.__x, 'g': self.__g}, ['v'], ['g'])
+        self.__Jac_g_fcn, _ = utils.jac({'v': self.__x, 'g': self.__g}, ['v'], ['g'])
 
     def qpsolver_option_parser(self, qpsolver, options):
         parsed_options = {}
