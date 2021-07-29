@@ -1,6 +1,17 @@
 import casadi as cs
 
 def jac(dict, var_string_list, function_string_list):
+    """
+    Args:
+        dict: dictionary which maps variables and functions, eg. {'x': x, 'u': u, 'f': f}
+        var_string_list: list of variables in dict, eg. ['x', 'u']
+        function_string_list: list of functions in dict, eg. ['f']
+    Returns:
+        F: casadi Function for evaluation
+        jac: dictionary with expression of derivatives
+
+    NOTE: check /tests/jac_test.py for example of usage for Jacobian and Hessian computation
+    """
     f = {}
     for function in function_string_list:
         f[function] = dict[function]
@@ -25,7 +36,9 @@ def jac(dict, var_string_list, function_string_list):
         jac_map[jac_id] = jac_list[i]
         i += 1
 
-    return cs.Function('jacobian', X, jac_list, var_string_list, jac_id_list), jac_map
+    F = cs.Function('jacobian', X, jac_list, var_string_list, jac_id_list)
+
+    return F, jac_map
 
 
 def skew(q):
