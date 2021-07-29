@@ -141,11 +141,11 @@ class Variable(AbstractVariable):
         var_impl = self.var_impl['n' + str(node)]['var']
         return var_impl
 
-    def getBoundMin(self, node):
+    def getLowerBounds(self, node):
         bound_min = self.var_impl['n' + str(node)]['lb']
         return bound_min
 
-    def getBoundMax(self, node):
+    def getUpperBounds(self, node):
         bound_max = self.var_impl['n' + str(node)]['ub']
         return bound_max
 
@@ -195,6 +195,38 @@ class Aggregate(AbstractAggregate):
 
     def addVariable(self, var):
         self.var_list.append(var)
+
+    def setBounds(self, lb, ub, nodes=None):
+        self.setLowerBounds(lb, nodes)
+        self.setUpperBounds(ub, nodes)
+
+    def setLowerBounds(self, lb, nodes=None):
+        for var in self:
+            var.setLowerBounds(lb, nodes)
+
+    def setUpperBounds(self, ub, nodes=None):
+        for var in self:
+            var.setUpperBounds(ub, nodes)
+
+    def getBounds(self, node):
+        lb = self.getLowerBounds(node)
+        ub = self.getUpperBounds(node)
+
+        return lb, ub
+
+    def getLowerBounds(self, node):
+        lb_dict = dict()
+        for var in self:
+            lb_dict[var.tag] = var.getLowerBounds(node)
+
+        return lb_dict
+
+    def getUpperBounds(self, node):
+        ub_dict = dict()
+        for var in self:
+            ub_dict[var.tag] = var.getUpperBounds(node)
+
+        return ub_dict
 
 class StateAggregate(Aggregate):
     def __init__(self, *args: StateVariable):
@@ -370,8 +402,8 @@ class VariablesContainer:
                     self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
             # todo bounds are not necessary here
-            var_bound_min = self.vars[name].getBoundMin(k)
-            var_bound_max = self.vars[name].getBoundMax(k)
+            var_bound_min = self.vars[name].getLowerBounds(k)
+            var_bound_max = self.vars[name].getUpperBounds(k)
             initial_guess = self.vars[name].getInitialGuess(k)
             var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
             self.vars_impl['n' + str(k)].update({name: var_dict})
@@ -381,8 +413,8 @@ class VariablesContainer:
         for node in self.vars_impl.keys():
             for name, state_var in self.vars_impl[node].items():
                 k = node[node.index('n') + 1:]
-                state_var['lb'] = self.vars[name].getBoundMin(k)
-                state_var['ub'] = self.vars[name].getBoundMax(k)
+                state_var['lb'] = self.vars[name].getLowerBounds(k)
+                state_var['ub'] = self.vars[name].getUpperBounds(k)
             # self.state_var_impl
 
     def updateInitialGuess(self):
