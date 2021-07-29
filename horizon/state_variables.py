@@ -36,11 +36,7 @@ class Variable(AbstractVariable):
     def setLowerBounds(self, bounds, nodes=None):
 
         nodes = misc.checkNodes(nodes, self.nodes)
-
-        if isinstance(bounds, (int, float)):
-            bounds = np.array([bounds])
-        else:
-            bounds = np.array(bounds).flatten()
+        bounds = misc.checkValueEntry(bounds)
 
         if bounds.shape[0] != self.dim:
             raise Exception('Wrong dimension of lower bounds inserted.')
@@ -51,12 +47,7 @@ class Variable(AbstractVariable):
     def setUpperBounds(self, bounds, nodes=None):
 
         nodes = misc.checkNodes(nodes, self.nodes)
-
-         # mybound = handle_numeric_input(bounds) TODO
-        if isinstance(bounds, (int, float)):
-            bounds = np.array([bounds])
-        else:
-            bounds = np.array(bounds).flatten()
+        bounds = misc.checkValueEntry(bounds)
 
         if bounds.shape[0] != self.dim:
             raise Exception('Wrong dimension of lower bounds inserted.')
@@ -71,12 +62,7 @@ class Variable(AbstractVariable):
     def setInitialGuess(self, val, nodes=None):
 
         nodes = misc.checkNodes(nodes, self.nodes)
-
-        # mybound = handle_numeric_input(bounds) TODO
-        if isinstance(val, (int, float)):
-            val = np.array([val])
-        else:
-            val = np.array(val).flatten()
+        val = misc.checkValueEntry(val)
 
         if val.shape[0] != self.dim:
             raise Exception('Wrong dimension of lower bounds inserted.')
