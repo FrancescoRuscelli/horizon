@@ -30,8 +30,11 @@ class Problem:
 
         self.state_aggr = sv.StateAggregate()
         self.input_aggr = sv.InputAggregate()
+        self.state_der: cs.SX = None
 
     def createStateVariable(self, name, dim):
+        if self.state_der is not None:
+            raise RuntimeError('createStateVariable must be called *before* setDynamics')
         var = self.var_container.setStateVar(name, dim)
         self.state_aggr.addVariable(var)
         return var
@@ -53,11 +56,20 @@ class Problem:
     #         if var.getName() == name:
     #             return var
     #     return None
-    def getState(self):
+    def getState(self) -> sv.StateAggregate:
         return self.state_aggr
 
-    def getInput(self):
+    def getInput(self) -> sv.InputAggregate:
         return self.input_aggr
+
+    def setDynamics(self, xdot: cs.SX):
+        nx = self.getState().getVars().shape[0]
+        if xdot.shape[0] != nx:
+            raise ValueError(f'state derivative dimension mismatch ({xdot.shape[0]} != {nx})')
+        self.state_der = xdot
+
+    def getDynamics(self) -> cs.SX:
+        return self.state_der
 
     def _getUsedVar(self, f):
         used_var = dict()
