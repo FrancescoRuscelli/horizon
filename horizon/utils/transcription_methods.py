@@ -31,8 +31,7 @@ class TranscriptionsHandler:
 
 
 
-    def setDefaultIntegrator(self):
-        # todo cost should be optional
+    def setDefaultIntegrator(self, type='RK4'):
 
         opts = dict()
         opts['tf'] = self.dt
@@ -41,9 +40,9 @@ class TranscriptionsHandler:
         dae['x'] = self.state
         dae['p'] = self.input
         dae['ode'] = self.state_dot
-        dae['quad'] = cs.sumsqr(self.input)
+        dae['quad'] = 0  # note: we don't use the quadratue fn here
 
-        self.integrator = integ.RK4(dae=dae, opts=opts, casadi_type=cs.SX)
+        self.integrator = integ.__dict__[type](dae=dae, opts=opts, casadi_type=cs.SX)
 
     def setIntegrator(self, integrator):
         self.integrator = integrator
