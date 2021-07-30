@@ -25,7 +25,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _cost(N+1, Cost(_nx, _nu)),
     _value(N+1, Cost(_nx, _nu)),
     _dyn(N, Dynamics(_nx, _nu)),
-    _res(N, BackwardPassResult(_nx, _nu))
+    _bp_res(N, BackwardPassResult(_nx, _nu)),
+    _fp_res(_nx, _nu, _N)
 {
     // compute expression for derivative of dynamics
     _df = _f.factory("df", {"x", "u"}, {"jac:f:x", "jac:f:u"});
@@ -54,10 +55,6 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
                            {"x", "u"}, {"l"});
     setIntermediateCost(std::vector<cs::Function>(_N, l));
     setFinalCost(lf);
-
-    // test...
-    linearize_quadratize();
-    backward_pass();
 }
 
 void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inter_cost)
@@ -76,6 +73,21 @@ void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inte
 void IterativeLQR::setFinalCost(const casadi::Function &final_cost)
 {
     _cost.back().setCost(final_cost);
+}
+
+void IterativeLQR::setInitialState(const Eigen::VectorXd &x0)
+{
+    _xtrj.col(0) = x0;
+}
+
+const Eigen::MatrixXd &IterativeLQR::getStateTrajectory() const
+{
+    return _xtrj;
+}
+
+const Eigen::MatrixXd &IterativeLQR::getInputTrajectory() const
+{
+    return _utrj;
 }
 
 void IterativeLQR::linearize_quadratize()
@@ -110,22 +122,22 @@ void IterativeLQR::backward_pass_iter(int i)
     // some shorthands
 
     // value function
-    auto& value_next = _value[i+1];
-    auto& Snext = value_next.Q;
-    auto& snext = value_next.q;
+    const auto& value_next = _value[i+1];
+    const auto& Snext = value_next.Q;
+    const auto& snext = value_next.q;
 
     // intermediate cost
-    auto& cost = _cost[i];
-    auto& r = cost.r;
-    auto& q = cost.q;
-    auto& Q = cost.Q;
-    auto& R = cost.R;
-    auto& P = cost.P;
+    const auto& cost = _cost[i];
+    const auto& r = cost.r;
+    const auto& q = cost.q;
+    const auto& Q = cost.Q;
+    const auto& R = cost.R;
+    const auto& P = cost.P;
 
     // dynamics
     auto& dyn = _dyn[i];
-    auto& A = dyn.A;
-    auto& B = dyn.B;
+    const auto& A = dyn.A;
+    const auto& B = dyn.B;
     auto& d = dyn.d;
 
     // defect from integrated current state -> d = F(x_i, u_i) - xnext
@@ -149,18 +161,20 @@ void IterativeLQR::backward_pass_iter(int i)
     // todo: second-order terms from dynamics
 
     // solve linear system to get ff and fb terms
-    // after solveInPlace we will have huHux = [l, L]
+    // after solveInPlace we will have huHux = [-l, -L]
     tmp.llt.compute(tmp.Huu);
     tmp.llt.solveInPlace(tmp.huHux);
 
     // todo: check solution for nan, unable to solve, etc
 
     // save solution
-    auto& res = _res[i];
+    auto& res = _bp_res[i];
     auto& L = res.Lfb;
     auto& l = res.du_ff;
-    L = tmp.huHux.rightCols(_nx);
-    l = tmp.huHux.col(0);
+    L = -tmp.huHux.rightCols(_nx);
+    l = -tmp.huHux.col(0);
+
+    std::cout << "solution at " << i << ": " << l.transpose() << "\n" << L << "\n";
 
     // save optimal value function
     auto& value = _value[i];
@@ -170,6 +184,57 @@ void IterativeLQR::backward_pass_iter(int i)
     S.noalias() = tmp.Hxx - L.transpose()*tmp.Huu*L;
     s.noalias() = tmp.hx + tmp.Hux.transpose()*l + L.transpose()*(tmp.hu + tmp.Huu*l);
 
+}
+
+bool IterativeLQR::forward_pass(double alpha)
+{
+    _fp_res.xtrj = _xtrj;
+    _fp_res.utrj = _utrj;
+
+    for(int i = 0; i < _N; i++)
+    {
+        forward_pass_iter(i, alpha);
+    }
+
+    // todo: add line search
+    // for now, we always accept the step
+    _xtrj = _fp_res.xtrj;
+    _utrj = _fp_res.utrj;
+
+    return true;
+}
+
+void IterativeLQR::forward_pass_iter(int i, double alpha)
+{
+    // note!
+    // this function will update the control at t = i, and
+    // the state at t = i+1
+
+    // some shorthands
+    const auto xnext = state(i+1);
+    const auto xi = state(i);
+    const auto ui = input(i);
+    auto xi_upd = _fp_res.xtrj.col(i);
+    tmp.dx = xi_upd - xi;
+
+    // dynamics
+    const auto& dyn = _dyn[i];
+    const auto& A = dyn.A;
+    const auto& B = dyn.B;
+    const auto& d = dyn.d;
+
+    // backward pass solution
+    const auto& res = _bp_res[i];
+    const auto& L = res.Lfb;
+    auto l = alpha * res.du_ff;
+
+    // update control
+    auto ui_upd = ui + l + L*tmp.dx;
+    _fp_res.utrj.col(i) = ui_upd;
+
+    // update next state
+    auto xnext_upd = xnext + (A + B*L)*tmp.dx + B*l + d;
+    _fp_res.xtrj.col(i+1) = xnext_upd;
 }
 
 void IterativeLQR::compute_defect(int i, Eigen::VectorXd &d)
@@ -257,6 +322,11 @@ IterativeLQR::BackwardPassResult::BackwardPassResult(int nx, int nu)
     du_ff.setZero(nu);
 }
 
+IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N)
+{
+    xtrj.setZero(nx, N);
+    utrj.setZero(nu, N);
+}
 
 int main()
 {
@@ -272,6 +342,8 @@ int main()
     std::cout << to_cs(A) << std::endl;
     std::cout << to_eig(to_cs(A)) << std::endl;
 }
+
+
 
 
 

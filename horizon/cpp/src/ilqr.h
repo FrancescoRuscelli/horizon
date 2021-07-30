@@ -16,16 +16,24 @@ public:
 
     void setFinalCost(const casadi::Function& final_cost);
 
+    void setInitialState(const Eigen::VectorXd& x0);
+
+    const Eigen::MatrixXd& getStateTrajectory() const;
+    const Eigen::MatrixXd& getInputTrajectory() const;
+
+    // all public to test things
+    void linearize_quadratize();
+    void compute_defect(int i, Eigen::VectorXd& d);
+    void backward_pass();
+    bool forward_pass(double alpha);
+    void backward_pass_iter(int i);
+    void forward_pass_iter(int i, double alpha);
+    Eigen::Ref<Eigen::VectorXd> state(int i);
+    Eigen::Ref<Eigen::VectorXd> input(int i);
+
 protected:
 
 private:
-
-    void linearize_quadratize();
-    void backward_pass();
-    void backward_pass_iter(int i);
-    void compute_defect(int i, Eigen::VectorXd& d);
-    Eigen::Ref<Eigen::VectorXd> state(int i);
-    Eigen::Ref<Eigen::VectorXd> input(int i);
 
     struct Dynamics
     {
@@ -34,6 +42,8 @@ private:
 
         // dynamics function
         casadi::Function f;
+
+        // dynamics jacobian
         casadi::Function df;
 
         // df/dx
@@ -55,7 +65,11 @@ private:
     {
         // original cost
         casadi::Function l;
+
+        // cost gradient
         casadi::Function dl;
+
+        // cost hessian
         casadi::Function ddl;
 
         /* Quadratized cost */
@@ -80,6 +94,14 @@ private:
         BackwardPassResult(int nx, int nu);
     };
 
+    struct ForwardPassResult
+    {
+        Eigen::MatrixXd xtrj;
+        Eigen::MatrixXd utrj;
+
+        ForwardPassResult(int nx, int nu, int N);
+    };
+
     struct Temporaries
     {
         Eigen::MatrixXd s_plus_S_d;
@@ -95,6 +117,8 @@ private:
         Eigen::MatrixXd huHux;
 
         Eigen::LLT<Eigen::MatrixXd> llt;
+
+        Eigen::VectorXd dx;
     };
 
     int _nx;
@@ -107,7 +131,10 @@ private:
     std::vector<Cost> _cost;
     std::vector<Cost> _value;
     std::vector<Dynamics> _dyn;
-    std::vector<BackwardPassResult> _res;
+
+    std::vector<BackwardPassResult> _bp_res;
+    ForwardPassResult _fp_res;
+
     Eigen::MatrixXd _xtrj;
     Eigen::MatrixXd _utrj;
 
