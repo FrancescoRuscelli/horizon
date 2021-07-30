@@ -38,8 +38,6 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
         d.df = _df;
     }
 
-    std::cout << _f << std::endl;
-    std::cout << _df << std::endl;
 
     // initialize trajectories
     _xtrj.setZero(_nx, _N+1);
@@ -49,9 +47,9 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     auto x = cs::SX::sym("x", _nx);
     auto u = cs::SX::sym("u", _nu);
     auto l = cs::Function("dfl_cost", {x, u},
-                          {2*cs::SX::sumsqr(x) + 3*cs::SX::sumsqr(u)},
+                          {0.5*cs::SX::sumsqr(u)},
                           {"x", "u"}, {"l"});
-    auto lf = cs::Function("dfl_cost_final", {x, u}, {cs::SX::sumsqr(x)},
+    auto lf = cs::Function("dfl_cost_final", {x, u}, {0.5*cs::SX::sumsqr(x)},
                            {"x", "u"}, {"l"});
     setIntermediateCost(std::vector<cs::Function>(_N, l));
     setFinalCost(lf);
@@ -174,8 +172,6 @@ void IterativeLQR::backward_pass_iter(int i)
     L = -tmp.huHux.rightCols(_nx);
     l = -tmp.huHux.col(0);
 
-    std::cout << "solution at " << i << ": " << l.transpose() << "\n" << L << "\n";
-
     // save optimal value function
     auto& value = _value[i];
     auto& S = value.Q;
@@ -265,10 +261,6 @@ void IterativeLQR::Dynamics::linearize(const Eigen::VectorXd &x, const Eigen::Ve
     auto res = df(std::vector<cs::DM>{to_cs(x), to_cs(u)});
     A = to_eig(res[0]);
     B = to_eig(res[1]);
-
-    std::cout << __func__ << std::endl;
-    std::cout << A << std::endl;
-    std::cout << B << std::endl;
 }
 
 IterativeLQR::Cost::Cost(int nx, int nu)
@@ -286,14 +278,8 @@ void IterativeLQR::Cost::setCost(const casadi::Function &cost)
     dl = l.factory("dl", {"x", "u"}, {"jac:l:x", "jac:l:u"});
     ddl = dl.factory("ddl", {"x", "u"}, {"jac:jac_l_x:x", "jac:jac_l_u:u", "jac:jac_l_u:x"});
 
+    // tbd: do something with this
     bool is_quadratic = ddl.jacobian().nnz_out() == 0;
-
-    std::cout << dl << std::endl;
-    std::cout << ddl << std::endl;
-    if(is_quadratic)
-    {
-        std::cout << "detected quadratic cost" << std::endl;
-    }
 }
 
 void IterativeLQR::Cost::quadratize(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
@@ -306,14 +292,6 @@ void IterativeLQR::Cost::quadratize(const Eigen::VectorXd &x, const Eigen::Vecto
     Q = to_eig(dd_res[0]);
     R = to_eig(dd_res[1]);
     P = to_eig(dd_res[2]);
-
-
-    std::cout << __func__ << std::endl;
-    std::cout << Q << std::endl;
-    std::cout << R << std::endl;
-    std::cout << P << std::endl;
-    std::cout << q << std::endl;
-    std::cout << r << std::endl;
 }
 
 IterativeLQR::BackwardPassResult::BackwardPassResult(int nx, int nu)
@@ -326,21 +304,6 @@ IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N)
 {
     xtrj.setZero(nx, N);
     utrj.setZero(nu, N);
-}
-
-int main()
-{
-    auto x = cs::SX::sym("x", 2);
-    auto u = cs::SX::sym("u", 3);
-    Eigen::MatrixXd A(2, 2);
-    A << 1, 2, 3, 4;
-    Eigen::MatrixXd B(2, 3);
-    B << 1, 2, 3, 4, 5, 6;
-    auto f = cs::Function("f", {x, u}, {cs::SX::mtimes(to_cs(A), x) + cs::SX::mtimes(to_cs(B), u)}, {"x", "u"}, {"f"});
-    IterativeLQR prob(f, 3);
-
-    std::cout << to_cs(A) << std::endl;
-    std::cout << to_eig(to_cs(A)) << std::endl;
 }
 
 

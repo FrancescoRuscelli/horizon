@@ -2,6 +2,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 #include <pybind11/embed.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 using namespace horizon;
@@ -44,7 +45,7 @@ PYBIND11_MODULE(pyilqr, m) {
 
     py::class_<IterativeLQR>(m, "IterativeLQR")
             .def(py::init(&construct))
-            .def("setIntermediateCost", set_final_cost_wrapper)
+            .def("setIntermediateCost", set_inter_cost_wrapper)
             .def("setFinalCost", set_final_cost_wrapper)
             .def("backward_pass", &IterativeLQR::backward_pass)
             .def("forward_pass", &IterativeLQR::forward_pass)

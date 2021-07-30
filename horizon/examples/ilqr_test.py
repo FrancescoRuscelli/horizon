@@ -9,7 +9,9 @@ pyilqr_build_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '
 sys.path.append(pyilqr_build_folder)
 import pyilqr
 
-N = 10
+from matplotlib import pyplot as plt
+
+N = 20
 
 pb = HorizonProblem(N)
 
@@ -17,9 +19,13 @@ x = pb.createStateVariable('x', 1)
 u = pb.createInputVariable('u', 1)
 
 fdyn = cs.Function('f', [x, u], [x + 0.1*u], ['x', 'u'], ['f'])
+l = cs.Function('f', [x, u], [10*cs.sumsqr(x+2) + 0.1*cs.sumsqr(u)], ['x', 'u'], ['l'])
+lf = cs.Function('f', [x, u], [1000*cs.sumsqr(x-2)], ['x', 'u'], ['l'])
 
 ilqr = pyilqr.IterativeLQR(fdyn, N)
-x0 = np.array([1])
+ilqr.setIntermediateCost([l]*N)
+ilqr.setFinalCost(lf)
+x0 = np.array([0])
 ilqr.setInitialState(x0)
 for _ in range(10):
     ilqr.linearize_quadratize()
@@ -28,4 +34,6 @@ for _ in range(10):
 
 xtrj = ilqr.getStateTrajectory()
 
-print(xtrj)
+plt.plot(xtrj.T)
+plt.title('State trajectory')
+plt.show()
