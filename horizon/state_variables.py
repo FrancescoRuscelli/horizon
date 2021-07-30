@@ -438,7 +438,6 @@ class VariablesContainer:
                 # get from state_var_impl the relative var
 
                 state_var_impl_list.append(val[var_abstract]['var'])
-                print(f'state_var_impl_list: {cs.vertcat(*state_var_impl_list)}')
 
         return cs.vertcat(*state_var_impl_list)
 
