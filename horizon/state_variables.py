@@ -172,14 +172,19 @@ class StateVariable(Variable):
         super(StateVariable, self).__init__(tag, dim, nodes)
 
 class AbstractAggregate():
-    def __init__(self, *args: AbstractVariable):
 
+    def __init__(self, *args: AbstractVariable):
         self.var_list = [item for item in args]
+
+    def getVars(self) -> cs.SX:
+        return cs.vertcat(*self.var_list)
 
     def __iter__(self):
         yield from self.var_list
 
+
 class Aggregate(AbstractAggregate):
+
     def __init__(self, *args):
         super().__init__(*args)
 
@@ -189,9 +194,6 @@ class Aggregate(AbstractAggregate):
             var_list.append(var.getVarOffset(offset))
 
         return AbstractAggregate(*var_list)
-
-    def getVars(self):
-        return cs.vertcat(*self.var_list)
 
     def addVariable(self, var):
         self.var_list.append(var)
