@@ -223,18 +223,10 @@ class Aggregate(AbstractAggregate):
         return lb, ub
 
     def getLowerBounds(self, node):
-        lb_dict = dict()
-        for var in self:
-            lb_dict[var.tag] = var.getLowerBounds(node)
-
-        return lb_dict
+        return np.hstack((var.getLowerBounds(node) for var in self))
 
     def getUpperBounds(self, node):
-        ub_dict = dict()
-        for var in self:
-            ub_dict[var.tag] = var.getUpperBounds(node)
-
-        return ub_dict
+        return np.hstack((var.getUpperBounds(node) for var in self))
 
 class StateAggregate(Aggregate):
     def __init__(self, *args: StateVariable):
