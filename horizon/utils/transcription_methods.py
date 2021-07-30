@@ -2,14 +2,14 @@ import casadi as cs
 import horizon.utils.integrators as integ
 
 class TranscriptionsHandler:
-    def __init__(self, prb, dt, state_dot=None, logger=None):
+    def __init__(self, prb, dt, logger=None):
 
         self.logger = logger
 
         self.problem = prb
         self.integrator = None
 
-        self.state_dot = state_dot
+        self.state_dot = prb.getDynamics()
         self.dt = dt
 
         state_list = self.problem.getState()
