@@ -2,3 +2,5 @@
 .idea
 
 casadi_horizon.egg-info/
+build/
+*.user
