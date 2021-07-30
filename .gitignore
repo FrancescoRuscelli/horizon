@@ -1,2 +1,6 @@
 *.pyc
 .idea
+build
+casadi_horizon.egg-info
+dist
+venv
