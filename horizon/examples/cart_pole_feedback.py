@@ -5,9 +5,8 @@ import casadi as cs
 import numpy as np
 import time
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
-from horizon.ros.replay_trajectory import replay_trajectory
-
+from horizon.utils import integrators
+from horizon.utils.transcription_methods import TranscriptionsHandler
 import matplotlib.pyplot as plt
 import os
 
@@ -23,6 +22,7 @@ nv = kindyn.nv()
 # OPTIMIZATION PARAMETERS
 ns = 20  # number of shooting nodes
 dt = 0.1
+tf = ns*dt  # [s]
 use_ms = True
 
 # Create horizon problem
@@ -31,6 +31,7 @@ prb = problem.Problem(ns)
 # Create problem STATE variables
 q = prb.createStateVariable("q", nq)
 qdot = prb.createStateVariable("qdot", nv)
+x = prb.getState().getVars()
 
 # Create problem CONTROL variables
 u = prb.createInputVariable("u", 1)
@@ -38,100 +39,91 @@ tau = cs.vertcat(u, 0)
 
 # Create dynamics
 fd = kindyn.aba()  # this is the forward dynamics function
-x = cs.vertcat(q, qdot)
 xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
-
-# Quantities at previous time step (to be removed!)
-q_prev = q.getVarOffset(-1)
-qdot_prev = qdot.getVarOffset(-1)
-u_prev = u.getVarOffset(-1)
-x_prev = cs.vertcat(q_prev, qdot_prev)
-
-# Formulate discrete time dynamics (for multiple shooting)
-tf = ns*dt  # [s]
-L = 0.5*cs.dot(u, u)  # Objective term
-dae = {'x': x, 'p': u, 'ode': xdot, 'quad': L}
-opts = {'tf': dt}
-F_integrator = integrators.EULER(dae, opts)
+prb.setDynamics(xdot)
 
 # Limits
-q_min = np.array([-0.5, -2.*np.pi])
-q_max = np.array([0.5, 2.*np.pi])
-q_init = np.array([0., np.pi-0.01])
-
+q_min = np.array([-1, -2.*np.pi])
+q_max = -q_min
 qdot_lims = np.array([100., 100.])
-qdot_init = [0., 0.]
+u_lims = np.array([1000])
 
-tau_lims = np.array([1000])
-tau_init = [0]
+# Initial values
+q_init = np.array([0., np.pi])
+qdot_init = [0., 0.]
 
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, nodes=0)
-q.setInitialGuess(q_init)
+q.setInitialGuess(q_init)  # note: this is important!!!
 qdot.setBounds(qdot_init, qdot_init, nodes=0)
-u.setBounds(-tau_lims, tau_lims)
+u.setBounds(-u_lims, u_lims)
 
 # Cost function
-prb.createCostFunction("track", cs.sumsqr(q - q_init), nodes=range(ns+1))
-prb.createCostFunction("damp", 0.01*cs.sumsqr(qdot), nodes=range(ns+1))
-prb.createCostFunction("reg", 1e-6*cs.sumsqr(u), nodes=range(ns))
+q_tgt = np.array([0.5, np.pi])  # forward 0.5m, and stay up!
+prb.createIntermediateCost("damp", 0.01*cs.sumsqr(qdot))
+prb.createIntermediateCost("reg", 1e-6*cs.sumsqr(u))
 
 # Final constraint
-prb.createConstraint("qfinal", q - q_init, nodes=ns)
-prb.createConstraint("qdotfinal", qdot, nodes=ns)
+prb.createFinalConstraint("qfinal", q - q_tgt)
+prb.createFinalConstraint("qdotfinal", qdot)
 
 # Dynamics
+th = TranscriptionsHandler(prb, dt)
 if use_ms:
-    x_int = F_integrator(x0=x_prev, p=u_prev)
-    prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns+1))
+    th.setDefaultIntegrator(type='EULER')
+    th.setMultipleShooting()
 else:
-    integrators.make_direct_collocation(prob=prb, x=x, x_prev=x_prev, xdot=xdot, degree=3, dt=tf/ns)
+    th.setDirectCollocation()
 
 
 # Creates problem
 prb.createProblem(opts={"nlpsol.ipopt": True})
-blocksqp_opts = {'hess_update': 4, 
-    'warmstart': True, 
+blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact 
+    'warmstart': False, 
     'max_iter': 1, 
     'print_iteration': False, 
+    'print_maxit_reached': False,
     'print_header': False, 
     'verbose_init': False,
     'print_time': 0,
     'opttol': 1e-4,
-    'qpsol_options': {
-        'printLevel': 'none',
-        'sparse': True
-    }
+    'linsol': 'ma27',
     }
 prb.setSolver(cs.nlpsol('sqp', 'blocksqp', prb.getProblem(), blocksqp_opts))
 
 
 class RealTimeIteration:
 
-    def __init__(self, dt: float) -> None:
+    def __init__(self, prb: problem.Problem, dt: float) -> None:
+        # define integrator to simulate the system (should be optional)
+        x = prb.getState().getVars()
+        u = prb.getInput().getVars()
+        xdot = prb.getDynamics()
+        dae = {'x': x, 'p': u, 'ode': xdot, 'quad': 0}
         self.integrator = integrators.RK4(dae, {'tf': dt})
+        
+        self.solution = None
+        self.state = prb.getState()
 
     def run(self, stateread: np.array):
     
         # set initial state
-        qread = stateread[0:2]
-        qdotread = stateread[2:4]
-        q.setBounds(lb=qread, ub=qread, nodes=0)
-        qdot.setBounds(lb=qdotread, ub=qdotread, nodes=0)
-
+        self.state.setBounds(lb=stateread, ub=stateread, nodes=0)
+        
         # solve
-        solution = prb.solveProblem()
+        self.solution = prb.solveProblem()
 
         # get control input to apply
-        u_opt = solution['u'][:, 0]
+        u_opt = self.solution['u'][:, 0]
 
-        # integrate input
+        # integrate input and return
         stateint = self.integrator(x0=stateread, p=u_opt)['xf'].toarray().flatten()
         return stateint, u_opt
 
+
 # the rti loop
-rti = RealTimeIteration(dt=0.01)
-stateread = np.array([0, np.pi-0.30, 0.0, 0.0])
+rti = RealTimeIteration(prb=prb, dt=0.01)
+stateread = np.array([-0.5, np.pi-0.30, 0.0, 0.0])
 states = []
 inputs = []
 times = []
