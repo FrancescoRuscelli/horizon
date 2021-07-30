@@ -143,14 +143,13 @@ class Problem:
         self.var_container.clear()
         self.function_container.clear()
 
-        for k in range(self.nodes):
         # implement the abstract state variable with the current node
-            self.var_container.update(k)
+        self.var_container.build()
 
-        for k in range(self.nodes):
         # implement the constraints and the cost functions with the current node
-            self.function_container.update(k)
+        self.function_container.build()
 
+        # get j, w, g
         j = self.function_container.getCostFImplSum()
         w = self.var_container.getVarImplList()
         g = self.function_container.getCnstrFList()
@@ -251,7 +250,7 @@ class Problem:
 
         pos = 0
         for node, val in self.var_container.getVarImplDict().items():
-            if node == 'n_none':
+            if node == 'nNone':
                 for name, var in val.items():
                     dim = var['var'].shape[0]
                     solution_dict[name][:, 0] = w_opt[pos:pos + dim]

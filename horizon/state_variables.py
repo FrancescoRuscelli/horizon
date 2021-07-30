@@ -407,16 +407,16 @@ class VariablesContainer:
 
     def getVarImpl(self, name, k):
 
+
+        if isinstance(self.vars[name], SingleVariable):
+            k = None
+
         node_name = 'n' + str(k)
 
-        if name in self.vars:
-            if isinstance(self.vars[name], SingleVariable):
-                var = self.vars_impl['n_none'][name]['var']
-            else:
-                if node_name in self.vars_impl:
-                    var = self.vars_impl[node_name][name]['var']
-                else:
-                    var = None
+        if node_name in self.vars_impl:
+            var = self.vars_impl[node_name][name]['var']
+        else:
+            var = None
 
         return var
 
@@ -442,93 +442,66 @@ class VariablesContainer:
 
         return cs.vertcat(*state_var_impl_list)
 
-    def getBoundsMinList(self):
+    def _getVarInfoList(self, bound_type):
 
         state_var_bound_list = np.zeros(self.getVarsDim())
 
         j = 0
         for node, val in self.vars_impl.items():
             for var_abstract in val.keys():
-                var = val[var_abstract]['lb']
-                dim = val[var_abstract]['lb'].shape[0]
-                state_var_bound_list[j:j+dim] = var
-                j = j + dim
-
-        return state_var_bound_list
-
-    def getBoundsMaxList(self):
-
-        state_var_bound_list = np.zeros(self.getVarsDim())
-
-        j = 0
-        for node, val in self.vars_impl.items():
-            for var_abstract in val.keys():
-                var = val[var_abstract]['ub']
-                dim = val[var_abstract]['ub'].shape[0]
+                var = val[var_abstract][bound_type]
+                dim = val[var_abstract][bound_type].shape[0]
                 state_var_bound_list[j:j + dim] = var
                 j = j + dim
 
-
         return state_var_bound_list
 
+    def getBoundsMinList(self):
+        return self._getVarInfoList('lb')
+
+    def getBoundsMaxList(self):
+        return self._getVarInfoList('ub')
+
     def getInitialGuessList(self):
+        return self._getVarInfoList('w0')
 
-        initial_guess_list = np.zeros(self.getVarsDim())
+    def _fillVar(self, name, node, val):
+        # todo bounds are not necessary here
+        node_name = 'n' + str(node)
+        var_impl = self.vars[name].getImpl(node)
+        var_bound_min = self.vars[name].getLowerBounds(node)
+        var_bound_max = self.vars[name].getUpperBounds(node)
+        initial_guess = self.vars[name].getInitialGuess(node)
+        var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
+        self.vars_impl[node_name].update({name: var_dict})
 
-        j = 0
-        for node, val in self.vars_impl.items():
-            for var_abstract in val.keys():
-                var = val[var_abstract]['w0']
-                dim = val[var_abstract]['w0'].shape[0]
-                initial_guess_list[j:j + dim] = var
-                j = j + dim
+        if self.logger:
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
-        return initial_guess_list
 
     def build(self):
+        '''
+        fill the dictionary "state_var_impl"
+           - key: nodes (nNone, n0, n1, ...) nNone contains single variables that are not projected in nodes
+           - val: dict with name and value of implemented variable
+        '''
 
         # contains single vars that do not need to be projected
-        self.vars_impl['n_none'] = dict()
+        self.vars_impl['nNone'] = dict()
 
-        for node in self.nodes:
+        for node in range(self.nodes):
+            # contains vars that are projected along the nodes
             self.vars_impl['n' + str(node)] = dict()
 
-    def update(self, k):
-        # state_var_impl --> dict
-        #  - key: nodes (n0, n1, ...)
-        #  - val: dict with name and value of implemented variable
+            for name, val in self.vars.items():
 
-        self.vars_impl['n' + str(k)] = dict()
-        # implementation of current state variable
+                if isinstance(val, SingleVariable):
+                    self._fillVar(name, None, val)
+                    continue
 
-        for name, val in self.vars.items():
-
-            if isinstance(val, SingleVariable):
-                var_impl = self.vars[name].getImpl(k)
-                var_bound_min = self.vars[name].getLowerBounds(k)
-                var_bound_max = self.vars[name].getUpperBounds(k)
-                initial_guess = self.vars[name].getInitialGuess(k)
-                var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
-                if 'n_none' in self.vars_impl:
-                    self.vars_impl['n_none'].update({name: var_dict})
-                else:
-                    self.vars_impl['n_none'] = {name : var_dict}
-                    self.vars_impl.move_to_end('n_none', last=False)
-                continue
-
-            if k in self.vars[name].getNodes():
-                var_impl = self.vars[name].getImpl(k)
-
-                if self.logger:
-                    if self.logger.isEnabledFor(logging.DEBUG):
-                        self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
-
-                # todo bounds are not necessary here
-                var_bound_min = self.vars[name].getLowerBounds(k)
-                var_bound_max = self.vars[name].getUpperBounds(k)
-                initial_guess = self.vars[name].getInitialGuess(k)
-                var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
-                self.vars_impl['n' + str(k)].update({name: var_dict})
+                if node in self.vars[name].getNodes():
+                    self._fillVar(name, node, val)
 
     def updateBounds(self):
 
@@ -537,7 +510,6 @@ class VariablesContainer:
                 k = node[node.index('n') + 1:]
                 state_var['lb'] = self.vars[name].getLowerBounds(k)
                 state_var['ub'] = self.vars[name].getUpperBounds(k)
-            # self.state_var_impl
 
     def updateInitialGuess(self):
 
