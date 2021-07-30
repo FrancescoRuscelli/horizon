@@ -51,7 +51,7 @@ tf = 5.0  # [s]
 L = 0.5*cs.dot(u, u)  # Objective term
 dae = {'x': x, 'p': u, 'ode': xdot, 'quad': L}
 opts = {'tf': tf/ns}
-F_integrator = integrators.RK4(dae, opts)
+F_integrator = integrators.EULER(dae, opts)
 
 # Limits
 q_min = [-0.5, -2.*np.pi]
