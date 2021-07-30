@@ -200,9 +200,6 @@ def LEAPFROG(dae, opts=None, casadi_type=cs.SX):
     return f
 
 def make_direct_collocation(prob: prb.Problem, 
-                            x: cs.SX, 
-                            x_prev: cs.SX,
-                            xdot: cs.SX, 
                             degree: int, 
                             dt: float) -> None:
 
@@ -226,6 +223,11 @@ def make_direct_collocation(prob: prb.Problem,
 
     # some constants
     N = prob.getNNodes() - 1
+
+    # get dynamics, state at current and previous iter
+    xdot = prob.getDynamics()
+    x = prob.getState().getVars()
+    x_prev = prob.getState().getVarOffset(-1).getVars()
 
     # create additional variables (states at collocation points)
     collo = [prob.createInputVariable(f'collo_x_{i}', dim=x.shape[0]) for i in range(d)]
