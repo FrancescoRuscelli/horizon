@@ -75,8 +75,10 @@ class Problem:
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
 
-        # get nodes as a list
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        if nodes is None:
+            nodes = range(self.nodes)
+        else:
+            nodes = misc.checkNodes(nodes, range(self.nodes))
 
         # get vars that constraint depends upon
         used_var = self._getUsedVar(g)
@@ -93,7 +95,10 @@ class Problem:
 
     def createCostFunction(self, name, j, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        if nodes is None:
+            nodes = range(self.nodes)
+        else:
+            nodes = misc.checkNodes(nodes, range(self.nodes))
 
         used_var = self._getUsedVar(j)
 

@@ -124,7 +124,11 @@ class Constraint(Function):
 
     def setLowerBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, self.nodes)
+        if nodes is None:
+            nodes = self.nodes
+        else:
+            nodes = misc.checkNodes(nodes, self.nodes)
+
         bounds = misc.checkValueEntry(bounds)
 
         for node in nodes:
@@ -135,7 +139,11 @@ class Constraint(Function):
 
     def setUpperBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, self.nodes)
+        if nodes is None:
+            nodes = self.nodes
+        else:
+            nodes = misc.checkNodes(nodes, self.nodes)
+
         bounds = misc.checkValueEntry(bounds)
 
         for node in nodes:
