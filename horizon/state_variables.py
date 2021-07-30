@@ -203,12 +203,18 @@ class Aggregate(AbstractAggregate):
         self.setUpperBounds(ub, nodes)
 
     def setLowerBounds(self, lb, nodes=None):
+        idx = 0
         for var in self:
-            var.setLowerBounds(lb, nodes)
+            nv = var.shape[0]
+            var.setLowerBounds(lb[idx:idx+nv], nodes)
+            idx += nv
 
     def setUpperBounds(self, ub, nodes=None):
+        idx = 0
         for var in self:
-            var.setUpperBounds(ub, nodes)
+            nv = var.shape[0]
+            var.setUpperBounds(ub[idx:idx+nv], nodes)
+            idx += nv
 
     def getBounds(self, node):
         lb = self.getLowerBounds(node)
