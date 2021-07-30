@@ -64,3 +64,5 @@ class TranscriptionsHandler:
         ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
 
 
+    def setDirectCollocation(self, degree=3):
+        integ.make_direct_collocation(prob=self.problem, degree=degree, dt=self.dt)
