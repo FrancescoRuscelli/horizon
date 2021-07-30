@@ -41,6 +41,10 @@ class Problem:
         self.input_aggr.addVariable(var)
         return var
 
+    def createVariable(self, name, dim, nodes=None):
+        var = self.var_container.setVar(name, dim, nodes)
+        return var
+
     # def setVariable(self, name, var):
 
     # assert (isinstance(var, (cs.casadi.SX, cs.casadi.MX)))
@@ -218,13 +222,13 @@ class Problem:
 
 
             # self.logger.debug('================')
-            # self.logger.debug('w: {}'.format(w))
-            # self.logger.debug('lbw: {}'.format(lbw))
-            # self.logger.debug('ubw: {}'.format(ubw))
-            # self.logger.debug('g: {}'.format(g))
-            # self.logger.debug('lbg: {}'.format(lbg))
-            # self.logger.debug('ubg: {}'.format(ubg))
-            # self.logger.debug('j: {}'.format(j))
+            self.logger.debug('w: {}'.format(w))
+            self.logger.debug('lbw: {}'.format(lbw))
+            self.logger.debug('ubw: {}'.format(ubw))
+            self.logger.debug('g: {}'.format(g))
+            self.logger.debug('lbg: {}'.format(lbg))
+            self.logger.debug('ubg: {}'.format(ubg))
+            self.logger.debug('j: {}'.format(j))
 
         # t_to_set_up = time.time() - t_start
         # print('T to set up:', t_to_set_up)
@@ -243,15 +247,24 @@ class Problem:
         w_opt = sol['x'].full().flatten()
 
         # split solution for each variable
-        solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.var_container.getVarAbstrDict(past=False).items()}
+        solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in self.var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
         for node, val in self.var_container.getVarImplDict().items():
-            for name, var in val.items():
-                dim = var['var'].shape[0]
-                node_number = int(node[node.index('n') + 1:])
-                solution_dict[name][:, node_number] = w_opt[pos:pos + dim]
-                pos = pos + dim
+            if node == 'n_none':
+                for name, var in val.items():
+                    dim = var['var'].shape[0]
+                    solution_dict[name][:, 0] = w_opt[pos:pos + dim]
+                    pos = pos + dim
+            else:
+                for name, var in val.items():
+                    node_number = int(node[node.index('n') + 1:])
+                    var_nodes = self.var_container.getVarAbstrDict(past=False)[name].getNodes()
+                    if node_number in var_nodes:
+                        dim = var['var'].shape[0]
+                        solution_dict[name][:, node_number - var_nodes[0]] = w_opt[pos:pos + dim]
+                        pos = pos + dim
+
 
 
         # t_to_finish = time.time() - t_start
@@ -323,24 +336,37 @@ if __name__ == '__main__':
     prb = Problem(nodes, logging_level=logging.DEBUG)
     x = prb.createStateVariable('x', 2)
     v = prb.createStateVariable('v', 2)
+    k = prb.createVariable('k', 2, range(2, 8))
     u = prb.createInputVariable('u', 2)
+    t_tot = prb.createVariable('t', 2)
+    t_tot.setBounds([100, 100], [100, 100])
 
-    print(x.getNNodes())
-    print(u.getNNodes())
 
-    print(prb.var_container.getVarsDim())
-    danieli = prb.createConstraint('danieli', x)
+    # danieli = prb.createConstraint('danieli', x-k, nodes=range(2, 8))
+    diosporco = prb.createConstraint('diosporcomaledetto', x - t_tot)
+    diosporco.setBounds([100, 100], [100, 100])
     xprev = x.getVarOffset(-1)
+
     xprev_copy = x.getVarOffset(-1)
     xnext = x.getVarOffset(+1)
 
-    print(id(xprev))
-    print(id(xprev_copy))
+    prb.createProblem({'nlpsol.ipopt': 10})
+
+    print(prb.getProblem()['x'])
+
+    prb.solveProblem()
+
+
     exit()
+    # print(id(xprev))
+    # print(id(xprev_copy))
+    # exit()
     state = prb.getState()
     state_prev = state.getVarOffset(-1)
 
-
+    state.setBounds([0, 0], [0, 0], 2)
+    print(state.getBounds(2))
+    exit()
 
     dt = 0.01
     state_dot = cs.vertcat(v, u)
@@ -475,7 +501,7 @@ if __name__ == '__main__':
     sucua = prb.createCostFunction('sucua', x*y, nodes=list(range(3, 15)))
     pellico = prb.createCostFunction('pellico', x-y, nodes=[0, 4, 6])
 
-    danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=3)
+    danieli.setBounds(lb=[-1, -1], ub=[1, 1], nodes=3)
 
     prb.createProblem({"nlpsol.ipopt":True})
 
