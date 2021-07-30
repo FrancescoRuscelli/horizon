@@ -238,7 +238,7 @@ class Variable(AbstractVariable):
         return bound_max
 
     def getBounds(self, node):
-        return [self.getBoundMin(node), self.getBoundMax(node)]
+        return [self.getLowerBounds(node), self.getUpperBounds(node)]
 
     def getInitialGuess(self, node):
         initial_guess = self.var_impl['n' + str(node)]['w0']
