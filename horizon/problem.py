@@ -103,6 +103,17 @@ class Problem:
 
         return fun
 
+    def createFinalConstraint(self, name, g, bounds=None):
+        u = self.getInput().getVars()
+        if cs.depends_on(g, u):
+            raise RuntimeError(f'final constraint "{name}" must not depend on the input')
+        return self.createConstraint(name, g, nodes=self.nodes-1, bounds=bounds)
+
+    def createIntermediateConstraint(self, name, g, nodes=None, bounds=None):
+        if nodes is None:
+            nodes = range(self.nodes-1)
+        return self.createConstraint(name, g, nodes=nodes, bounds=bounds)    
+
     def createCostFunction(self, name, j, nodes=None):
 
         nodes = misc.checkNodes(nodes, range(self.nodes))
@@ -117,6 +128,17 @@ class Problem:
         self.function_container.addFunction(fun)
 
         return fun
+
+    def createFinalCost(self, name, j):
+        u = self.getInput().getVars()
+        if cs.depends_on(j, u):
+            raise RuntimeError(f'final cost "{name}" must not depend on the input')
+        return self.createCostFunction(name, j, nodes=self.nodes-1,)
+
+    def createIntermediateCost(self, name, j, nodes=None):
+        if nodes is None:
+            nodes = range(self.nodes-1)
+        return self.createCostFunction(name, j, nodes=nodes)    
 
     def removeCostFunction(self, name):
 
