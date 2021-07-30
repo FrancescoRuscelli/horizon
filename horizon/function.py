@@ -125,11 +125,7 @@ class Constraint(Function):
     def setLowerBounds(self, bounds, nodes=None):
 
         nodes = misc.checkNodes(nodes, self.nodes)
-
-        if isinstance(bounds, list):
-            bounds = np.array(bounds)
-        else:
-            bounds = bounds.flatten()
+        bounds = misc.checkValueEntry(bounds)
 
         for node in nodes:
             if node in self.nodes:
@@ -140,11 +136,7 @@ class Constraint(Function):
     def setUpperBounds(self, bounds, nodes=None):
 
         nodes = misc.checkNodes(nodes, self.nodes)
-
-        if isinstance(bounds, list):
-            bounds = np.array(bounds)
-        else:
-            bounds = bounds.flatten()
+        bounds = misc.checkValueEntry(bounds)
 
         for node in nodes:
             if node in self.nodes:
