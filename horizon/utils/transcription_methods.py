@@ -2,14 +2,14 @@ import casadi as cs
 import horizon.utils.integrators as integ
 
 class TranscriptionsHandler:
-    def __init__(self, prb, dt, state_dot=None, logger=None):
+    def __init__(self, prb, dt, logger=None):
 
         self.logger = logger
 
         self.problem = prb
         self.integrator = None
 
-        self.state_dot = state_dot
+        self.state_dot = prb.getDynamics()
         self.dt = dt
 
         state_list = self.problem.getState()
@@ -31,8 +31,7 @@ class TranscriptionsHandler:
 
 
 
-    def setDefaultIntegrator(self):
-        # todo cost should be optional
+    def setDefaultIntegrator(self, type='RK4'):
 
         opts = dict()
         opts['tf'] = self.dt
@@ -41,9 +40,9 @@ class TranscriptionsHandler:
         dae['x'] = self.state
         dae['p'] = self.input
         dae['ode'] = self.state_dot
-        dae['quad'] = cs.sumsqr(self.input)
+        dae['quad'] = 0  # note: we don't use the quadratue fn here
 
-        self.integrator = integ.RK4(dae=dae, opts=opts, casadi_type=cs.SX)
+        self.integrator = integ.__dict__[type](dae=dae, opts=opts, casadi_type=cs.SX)
 
     def setIntegrator(self, integrator):
         self.integrator = integrator
@@ -65,3 +64,5 @@ class TranscriptionsHandler:
         ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
 
 
+    def setDirectCollocation(self, degree=3):
+        integ.make_direct_collocation(prob=self.problem, degree=degree, dt=self.dt)

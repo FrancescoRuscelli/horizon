@@ -30,8 +30,11 @@ class Problem:
 
         self.state_aggr = sv.StateAggregate()
         self.input_aggr = sv.InputAggregate()
+        self.state_der: cs.SX = None
 
     def createStateVariable(self, name, dim):
+        if self.state_der is not None:
+            raise RuntimeError('createStateVariable must be called *before* setDynamics')
         var = self.var_container.setStateVar(name, dim)
         self.state_aggr.addVariable(var)
         return var
@@ -57,11 +60,20 @@ class Problem:
     #         if var.getName() == name:
     #             return var
     #     return None
-    def getState(self):
+    def getState(self) -> sv.StateAggregate:
         return self.state_aggr
 
-    def getInput(self):
+    def getInput(self) -> sv.InputAggregate:
         return self.input_aggr
+
+    def setDynamics(self, xdot: cs.SX):
+        nx = self.getState().getVars().shape[0]
+        if xdot.shape[0] != nx:
+            raise ValueError(f'state derivative dimension mismatch ({xdot.shape[0]} != {nx})')
+        self.state_der = xdot
+
+    def getDynamics(self) -> cs.SX:
+        return self.state_der
 
     def _getUsedVar(self, f):
         used_var = dict()
@@ -97,6 +109,17 @@ class Problem:
 
         return fun
 
+    def createFinalConstraint(self, name, g, bounds=None):
+        u = self.getInput().getVars()
+        if cs.depends_on(g, u):
+            raise RuntimeError(f'final constraint "{name}" must not depend on the input')
+        return self.createConstraint(name, g, nodes=self.nodes-1, bounds=bounds)
+
+    def createIntermediateConstraint(self, name, g, nodes=None, bounds=None):
+        if nodes is None:
+            nodes = range(self.nodes-1)
+        return self.createConstraint(name, g, nodes=nodes, bounds=bounds)    
+
     def createCostFunction(self, name, j, nodes=None):
 
         if nodes is None:
@@ -114,6 +137,17 @@ class Problem:
         self.function_container.addFunction(fun)
 
         return fun
+
+    def createFinalCost(self, name, j):
+        u = self.getInput().getVars()
+        if cs.depends_on(j, u):
+            raise RuntimeError(f'final cost "{name}" must not depend on the input')
+        return self.createCostFunction(name, j, nodes=self.nodes-1,)
+
+    def createIntermediateCost(self, name, j, nodes=None):
+        if nodes is None:
+            nodes = range(self.nodes-1)
+        return self.createCostFunction(name, j, nodes=nodes)    
 
     def removeCostFunction(self, name):
 

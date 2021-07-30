@@ -263,14 +263,19 @@ class StateVariable(Variable):
         super(StateVariable, self).__init__(tag, dim, nodes)
 
 class AbstractAggregate():
-    def __init__(self, *args: AbstractVariable):
 
+    def __init__(self, *args: AbstractVariable):
         self.var_list = [item for item in args]
+
+    def getVars(self) -> cs.SX:
+        return cs.vertcat(*self.var_list)
 
     def __iter__(self):
         yield from self.var_list
 
+
 class Aggregate(AbstractAggregate):
+
     def __init__(self, *args):
         super().__init__(*args)
 
@@ -281,9 +286,6 @@ class Aggregate(AbstractAggregate):
 
         return AbstractAggregate(*var_list)
 
-    def getVars(self):
-        return cs.vertcat(*self.var_list)
-
     def addVariable(self, var):
         self.var_list.append(var)
 
@@ -292,12 +294,18 @@ class Aggregate(AbstractAggregate):
         self.setUpperBounds(ub, nodes)
 
     def setLowerBounds(self, lb, nodes=None):
+        idx = 0
         for var in self:
-            var.setLowerBounds(lb, nodes)
+            nv = var.shape[0]
+            var.setLowerBounds(lb[idx:idx+nv], nodes)
+            idx += nv
 
     def setUpperBounds(self, ub, nodes=None):
+        idx = 0
         for var in self:
-            var.setUpperBounds(ub, nodes)
+            nv = var.shape[0]
+            var.setUpperBounds(ub[idx:idx+nv], nodes)
+            idx += nv
 
     def getBounds(self, node):
         lb = self.getLowerBounds(node)
@@ -306,18 +314,10 @@ class Aggregate(AbstractAggregate):
         return lb, ub
 
     def getLowerBounds(self, node):
-        lb_dict = dict()
-        for var in self:
-            lb_dict[var.tag] = var.getLowerBounds(node)
-
-        return lb_dict
+        return np.hstack((var.getLowerBounds(node) for var in self))
 
     def getUpperBounds(self, node):
-        ub_dict = dict()
-        for var in self:
-            ub_dict[var.tag] = var.getUpperBounds(node)
-
-        return ub_dict
+        return np.hstack((var.getUpperBounds(node) for var in self))
 
 class StateAggregate(Aggregate):
     def __init__(self, *args: StateVariable):
