@@ -1,3 +1,5 @@
+import time
+
 import casadi as cs
 from horizon import function as fc
 from horizon import nodes as nd
@@ -168,10 +170,7 @@ class Problem:
     def getNNodes(self) -> int:
         return self.nodes
 
-    def createProblem(self, opts=None):
-
-        if opts is not None:
-            self.opts = opts
+    def createProblem(self, solver_type=cs.nlpsol, solver_plugin='ipopt', opts=None):
 
         # this is to reset both the constraints and the cost functions everytime I create a problem
         self.var_container.clear()
@@ -201,10 +200,7 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        if self.opts is not None:
-            if "nlpsol.ipopt" in self.opts:
-                if self.opts["nlpsol.ipopt"]:
-                    self.solver = cs.nlpsol('solver', 'ipopt', self.prob)
+        self.solver = solver_type('solver', solver_plugin, self.prob, opts)
 
     def getProblem(self):
         return self.prob
@@ -218,9 +214,13 @@ class Problem:
     def solveProblem(self):
 
         # t_start = time.time()
-        if self.solver is None:
+        if self.prob is None:
             self.logger.warning('Problem is not created. Nothing to solve!')
             return 0
+
+        if self.solver is None:
+            self.logger.warning('Solver not set. Using default solver nlpsol.ipopt!')
+            self._makeDefaultSolver()
 
         self.var_container.updateBounds()
         self.var_container.updateInitialGuess()
@@ -360,6 +360,12 @@ class Problem:
 
         return self
 
+class ClassTry:
+    def __init__(self, a):
+        self.dani = list()
+        for i in range(100000000):
+            self.dani.append(a)
+
 
 if __name__ == '__main__':
 
@@ -383,7 +389,10 @@ if __name__ == '__main__':
     xprev_copy = x.getVarOffset(-1)
     xnext = x.getVarOffset(+1)
 
-    prb.createProblem({'nlpsol.ipopt': 10})
+    opts = {'ipopt.tol': 1e-4,
+            'ipopt.max_iter': 2000}
+
+    prb.createProblem(opts=opts)
 
     print(prb.getProblem()['x'])
 
