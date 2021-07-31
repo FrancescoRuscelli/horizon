@@ -207,6 +207,8 @@ class Problem:
             solver_type = self.default_solver
         if solver_plugin is None:
             solver_plugin = self.default_solver_plugin
+        if opts is None:
+            opts = dict()
 
         self.solver = solver_type('solver', solver_plugin, self.prob, opts)
 
