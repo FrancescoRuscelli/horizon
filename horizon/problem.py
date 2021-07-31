@@ -16,6 +16,9 @@ class Problem:
 
         self.opts = None
         self.solver = None
+        self.default_solver = cs.nlpsol
+        self.default_solver_plugin = 'ipopt'
+
         self.logger = logging.getLogger('logger')
         self.logger.setLevel(level=logging_level)
         self.debug_mode = self.logger.isEnabledFor(logging.DEBUG)
@@ -170,7 +173,7 @@ class Problem:
     def getNNodes(self) -> int:
         return self.nodes
 
-    def createProblem(self, solver_type=cs.nlpsol, solver_plugin='ipopt', opts=None):
+    def createProblem(self, solver_type=None, solver_plugin=None, opts=None):
 
         # this is to reset both the constraints and the cost functions everytime I create a problem
         self.var_container.clear()
@@ -199,6 +202,11 @@ class Problem:
         #     self.logger.debug('constraints: {}'.format(g))
 
         self.prob = {'f': j, 'x': w, 'g': g}
+
+        if solver_type is None:
+            solver_type = self.default_solver
+        if solver_plugin is None:
+            solver_plugin = self.default_solver_plugin
 
         self.solver = solver_type('solver', solver_plugin, self.prob, opts)
 
