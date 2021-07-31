@@ -70,7 +70,7 @@ v.setBounds(lb=0, ub=0, nodes=N)
 prob.createCostFunction('cost', cs.sumsqr(F), nodes=range(N))  # TODO: intermediate vs final cost
 
 # solve
-prob.createProblem(opts={'nlpsol.ipopt': 10})
+prob.createProblem()
 solution = prob.solveProblem()
 
 # plot

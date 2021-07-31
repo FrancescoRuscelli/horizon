@@ -97,19 +97,21 @@ prb.createConstraint("q_init", q - q_init, nodes=0)
 prb.createConstraint("qdot_init", qdot - qdot_init, nodes=0)
 
 # MULTIPLE SHOOTING
-q_prev = prb.createStateVariable("q", nq, -1)
-qdot_prev = prb.createStateVariable("qdot", nv, -1)
-qddot_prev = prb.createInputVariable("qddot", nv, -1)
-x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
-x_int = F_integrator(x0=x_prev, p=qddot_prev)
+state = prb.getState()
+input = prb.getInput()
+
+state_prev = state.getVarOffset(-1)
+input_prev = input.getVarOffset(-1)
+
+x_prev, _ = utils.double_integrator_with_floating_base(state[0], state[1], input_prev[0])
+x_int = F_integrator(x0=x_prev, p=input_prev[0])
 
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, 2)))
 
-q_pprev = prb.createStateVariable("q", nq, -2)
-qdot_pprev = prb.createStateVariable("qdot", nv, -2)
-qddot_pprev = prb.createInputVariable("qddot", nv, -2)
-x_pprev, _ = utils.double_integrator_with_floating_base(q_pprev, qdot_pprev, qddot_pprev)
-x_int2 = F_integrator_LEAPFROG(x0=x_prev, x0_prev=x_pprev, p=qddot_prev)
+state_pprev = state.getVarOffset(-2)
+input_pprev = input.getVarOffset(-2)
+x_pprev, _ = utils.double_integrator_with_floating_base(state_pprev[0], state_pprev[1], input_pprev[0])
+x_int2 = F_integrator_LEAPFROG(x0=x_prev, x0_prev=x_pprev, p=input_pprev[0])
 prb.createConstraint("multiple_shooting2", x_int2["xf"] - x, nodes=list(range(2, ns + 1)))
 
 # INVERSE DYNAMICS
@@ -137,18 +139,14 @@ p_rope_init = FKRope(q=q_init)['ee_pos']
 p_rope = FKRope(q=q)['ee_pos']
 prb.createConstraint("rope_anchor_point", p_rope - p_rope_init)
 
-prb.createProblem()
-
-# SETUP SOLVER
 opts = {
     'ipopt.tol': 1e-3
     , 'ipopt.constr_viol_tol': 1e-3
     , 'ipopt.max_iter': 4000
-    , 'ipopt.linear_solver': 'ma57'
 }
 
-solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
-prb.setSolver(solver)
+prb.createProblem(opts=opts)
+
 
 solution = prb.solveProblem()
 

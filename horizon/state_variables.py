@@ -273,6 +273,9 @@ class AbstractAggregate():
     def __iter__(self):
         yield from self.var_list
 
+    def __getitem__(self, ind):
+        return self.var_list[ind]
+
 
 class Aggregate(AbstractAggregate):
 
