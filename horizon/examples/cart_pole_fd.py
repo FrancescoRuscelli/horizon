@@ -1,50 +1,46 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
+from casadi_kin_dyn import pycasadi_kin_dyn
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn
 from horizon.utils.transcription_methods import TranscriptionsHandler
-from horizon.utils.plotter import PlotterHorizon
+from horizon.utils import plotter
+from horizon.ros.replay_trajectory import replay_trajectory
+
 import matplotlib.pyplot as plt
 import os
-
-try:
-    from horizon.ros.replay_trajectory import *
-    do_replay = True
-except ImportError:
-    do_replay = False
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
-kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
+# Create casadi interface to pinocchio
+kindyn = pycasadi_kin_dyn.CasadiKinDyn(urdf)
 nq = kindyn.nq()
 nv = kindyn.nv()
 
-print("nq: ", nq)
-print("nv: ", nv)
-
 # OPTIMIZATION PARAMETERS
+ns = 100  # number of shooting nodes
 tf = 5.0  # [s]
-ns = 50  # number of shooting nodes
 dt = tf/ns
 use_ms = True
 
 # Create horizon problem
 prb = problem.Problem(ns)
 
-# Creates problem STATE variables
+# Create problem STATE variables
 q = prb.createStateVariable("q", nq)
 qdot = prb.createStateVariable("qdot", nv)
+x = prb.getState().getVars()
 
-# Creates problem CONTROL variables
-qddot = prb.createInputVariable("qddot", nv)
+# Create problem CONTROL variables
+u = prb.createInputVariable("u", 1)
+tau = cs.vertcat(u, 0)
 
-# Creates double integrator
-x, xdot = utils.double_integrator(q, qdot, qddot)
+# Create dynamics
+fd = kindyn.aba()  # this is the forward dynamics function
+xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
 prb.setDynamics(xdot)
 
 # Limits
@@ -55,21 +51,17 @@ q_init = [0., 0.]
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
 
-qddot_lims = np.array([1000., 1000.])
-qddot_init = [0., 0.]
+tau_lims = np.array([3000])
+tau_init = [0]
 
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, nodes=0)
-qdot.setBounds((-qdot_lims).tolist(), qdot_lims.tolist())
+qdot.setBounds(-qdot_lims, qdot_lims)
 qdot.setBounds(qdot_init, qdot_init, nodes=0)
-qddot.setBounds((-qddot_lims).tolist(), qddot_lims.tolist())
-
-q.setInitialGuess(q_init)
-qdot.setInitialGuess(qdot_init)
-qddot.setInitialGuess(qddot_init)
+u.setBounds(-tau_lims, tau_lims)
 
 # Cost function
-prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
+prb.createIntermediateCost("tau", cs.sumsqr(tau))
 
 # Dynamics
 th = TranscriptionsHandler(prb, dt)
@@ -79,16 +71,12 @@ if use_ms:
 else:
     th.setDirectCollocation()
 
+# Constraints
 prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
 
-
-tau_lims = np.array([1000., 0.])
-tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
-
 # Creates problem
-prb.createProblem(opts = {'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
+prb.createProblem()
 solution = prb.solveProblem()
 q_hist = solution["q"]
 
@@ -99,22 +87,12 @@ plt.plot(time, q_hist[1,:])
 plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[m]}$', size = 20)
-plt.show()
 
 plot_all = True
 if plot_all:
-    hplt = PlotterHorizon(prb)
+    hplt = plotter.PlotterHorizon(prb)
     hplt.plotVariables()
     hplt.plotFunctions()
 
-if do_replay:
-    joint_list=["cart_joint", "pole_joint"]
-    replay_trajectory(tf/ns, joint_list, q_hist).replay(is_floating_base=False)
-
-
-
-
-
-
-
-
+joint_list=["cart_joint", "pole_joint"]
+replay_trajectory(tf/ns, joint_list, q_hist).replay(is_floating_base=False)

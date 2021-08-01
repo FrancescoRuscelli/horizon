@@ -3,6 +3,7 @@ import numpy as np
 from horizon import misc_function as misc
 from collections import OrderedDict
 import pickle
+import time
 
 class Function:
     def __init__(self, name, f, used_vars, nodes):
@@ -11,9 +12,14 @@ class Function:
         self.name = name
         self.nodes = []
 
-        self.vars = used_vars #todo isn't there another way to get the variables from the function g?
+        all_vars = list()
+        for name, val in used_vars.items():
+            for item in val:
+                all_vars.append(item)
 
-        self.fun = cs.Function(name, list(self.vars.values()), [self.f])
+        # todo very careful about ordering! (however, list order should be persistent)
+        self.vars = used_vars # todo isn't there another way to get the variables from the function g?
+        self.fun = cs.Function(name, all_vars, [self.f])
         self.fun_impl = dict()
 
         self.setNodes(nodes)
@@ -35,6 +41,7 @@ class Function:
 
     def _project(self, node, used_vars):
         # print('projected fun "{}" with vars {}:'.format(self.fun, used_vars))
+        # todo are we 100% sure the order of the input variables is right?
         self.fun_impl['n' + str(node)] = self.fun(*used_vars)
         return self.fun_impl['n' + str(node)]
 
@@ -55,7 +62,6 @@ class Function:
 
     def getVariables(self):
         return self.vars
-        # return [var for name, var in self.var]
 
     def getType(self):
         return 'generic'
@@ -93,8 +99,9 @@ class Constraint(Function):
     def __init__(self, name, f, used_vars, nodes, bounds=None):
 
         self.bounds = dict()
+        # constraints are initialize to 0.: 0. <= x <= 0.
         for node in nodes:
-            self.bounds['n' + str(node)] = dict(lb=[-np.inf] * f.shape[0], ub=[np.inf] * f.shape[0])
+            self.bounds['n' + str(node)] = dict(lb=np.full(f.shape[0], 0.), ub=np.full(f.shape[0], 0.))
 
         super().__init__(name, f, used_vars, nodes)
 
@@ -103,6 +110,11 @@ class Constraint(Function):
 
             if 'nodes' not in bounds:
                 bounds['nodes'] = None
+            # if only one constraint is set, we assume:
+            if 'lb' not in bounds:  # -inf <= x <= ub
+                bounds['lb'] = np.full(f.shape[0], -np.inf)
+            if 'ub' not in bounds:  # lb <= x <= inf
+                bounds['ub'] = np.full(f.shape[0], np.inf)
 
             self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
 
@@ -115,28 +127,30 @@ class Constraint(Function):
         if nodes is None:
             nodes = self.nodes
         else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in self.nodes]
-            else:
-                nodes = [nodes] if nodes in self.nodes else []
+            nodes = misc.checkNodes(nodes, self.nodes)
+
+        bounds = misc.checkValueEntry(bounds)
 
         for node in nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
+
+        # print('function lower bounds: {}'.format(nodes))
 
     def setUpperBounds(self, bounds, nodes=None):
 
         if nodes is None:
             nodes = self.nodes
         else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in self.nodes]
-            else:
-                nodes = [nodes] if nodes in self.nodes else []
+            nodes = misc.checkNodes(nodes, self.nodes)
+
+        bounds = misc.checkValueEntry(bounds)
 
         for node in nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'ub': bounds})
+
+        # print('function upper bounds: {}'.format(nodes))
 
     def setBounds(self, lb, ub, nodes=None):
 
@@ -144,16 +158,25 @@ class Constraint(Function):
         self.setLowerBounds(lb, nodes)
         self.setUpperBounds(ub, nodes)
 
-    def getLowerBounds(self, node):
-        lb = self.bounds['n' + str(node)]['lb']
+    def _getVals(self, val_type, node):
+        if node is None:
+            vals = np.zeros([self.f.shape[0], len(self.nodes)])
+            for dim in range(self.f.shape[0]):
+                vals[dim, :] = np.hstack([self.bounds['n' + str(i)][val_type][dim] for i in self.nodes])
+        else:
+            vals = self.bounds['n' + str(node)][val_type]
+        return vals
+
+    def getLowerBounds(self, node=None):
+        lb = self._getVals('lb', node)
         return lb
 
-    def getUpperBounds(self, node):
-        ub = self.bounds['n' + str(node)]['ub']
+    def getUpperBounds(self, node=None):
+        ub = self._getVals('ub', node)
         return ub
 
-    def getBounds(self, nodes):
-        return [self.getLowerBounds(nodes), self.getUpperBounds(nodes)]
+    def getBounds(self, nodes=None):
+        return self.getLowerBounds(nodes), self.getUpperBounds(nodes)
 
     def setNodes(self, nodes, erasing=False):
         # unraveled_nodes = misc.unravelElements(nodes)
@@ -167,7 +190,8 @@ class Constraint(Function):
                 self.nodes.append(i)
                 self.nodes.sort()
                 if 'n' + str(i) not in self.bounds:
-                    self.bounds['n' + str(i)] = dict(lb=[-np.inf] * self.f.shape[0], ub=[np.inf] * self.f.shape[0])
+                    self.bounds['n' + str(i)] = dict(lb=np.full(self.f.shape[0], 0.),
+                                                     ub=np.full(self.f.shape[0], 0.))
 
 class CostFunction(Function):
     def __init__(self, name, f, used_vars, nodes):
@@ -189,7 +213,6 @@ class FunctionsContainer:
 
         self.costfun_container = OrderedDict()
         self.costfun_impl = OrderedDict()
-
 
     def addFunction(self, fun):
         if fun.getType() == 'constraint':
@@ -219,39 +242,46 @@ class FunctionsContainer:
     def getCostFDict(self):
         return self.costfun_container
 
-    def update(self, node):
-        self.updateFun(node, self.cnstr_container, self.cnstr_impl)
-        self.updateFun(node, self.costfun_container, self.costfun_impl)
+    def build(self):
+        self.updateFun(self.cnstr_container, self.cnstr_impl)
+        self.updateFun(self.costfun_container, self.costfun_impl)
 
-    def updateFun(self, node, container, container_impl):
+    def updateFun(self, container, container_impl):
 
-        container_impl['n' + str(node)] = dict()
+        for node in range(self.nodes):
+            container_impl['n' + str(node)] = dict()
 
-        # TODO be careful about ordering
-        for fun_name, fun in container.items():
-            # self.logger.debug('implementing function "{}" at node {}.'.format(fun_name, node))
-            # print('Function is active on nodes: {}'.format(fun.getNodes()))
-            # print('Function depends on variables: {}'.format(fun.getVariables()))
-            # implement constraint only if constraint is present in node k
-            if node in fun.getNodes():
-                used_vars = list()
-                for name, val in fun.getVariables().items():
-                    var = self.state_vars.getVarImpl(name, node)
-                    # print('used abstract var "{}" implemented as {}'.format(name, var))
-                    used_vars.append(var)
+            # TODO be careful about ordering
+            # todo I really hate this implementation! Find a better one for used_vars
+            for fun_name, fun in container.items():
+                if node in fun.getNodes():
+                    used_vars = list()
+                    for name, val in fun.getVariables().items():
+                        for item in val:
+                            var = self.state_vars.getVarImpl(name, node + item.offset)
+                            if var is None:
+                                raise Exception(f'Variable out of scope: {item} does not exist at node {node}')
+                            used_vars.append(var)
 
+                    f_impl = fun._project(node, used_vars)
+                    if fun.getType() == 'constraint':
+                        lb = fun.getLowerBounds(node)
+                        ub = fun.getUpperBounds(node)
+                        fun_dict = dict(val=f_impl, lb=lb, ub=ub)
+                    else:
+                        fun_dict = f_impl
 
-                f_impl = fun._project(node, used_vars)
-                if fun.getType() == 'constraint':
-                    lb = fun.getLowerBounds(node)
-                    ub = fun.getUpperBounds(node)
-                    fun_dict = dict(val=f_impl, lb=lb, ub=ub)
-                else:
-                    fun_dict = f_impl
+                    container_impl['n' + str(node)].update({fun_name: fun_dict})
+                    # print('==================================================')
+                    self.logger.debug(f'Implemented function "{fun_name}" of type {fun.getType()}: {f_impl} with vars {used_vars} at node {node}')
 
-                container_impl['n' + str(node)].update({fun_name: fun_dict})
-                # print('==================================================')
-                self.logger.debug('Implemented function "{}" of type {}: {} with vars {}'.format(fun_name, fun.getType(), f_impl, used_vars))
+    def getCnstrDim(self):
+
+        total_dim = 0
+        for cnstr in self.cnstr_container.values():
+            total_dim += cnstr.getDim()[0] * len(cnstr.getNodes())
+
+        return total_dim
 
     def getCnstrFImpl(self, name, node):
         if 'n' + str(node) in self.cnstr_impl:
@@ -294,18 +324,26 @@ class FunctionsContainer:
         return cs.vertcat(*cnstr_impl)
 
     def getLowerBoundsList(self):
-        lbg = list()
+
+        lbg = np.zeros(self.getCnstrDim())
+
+        j = 0
         for node in self.cnstr_impl.values():
             for elem in node.values():
-                lbg += elem['lb']
+                lbg[j:j+elem['lb'].shape[0]] = elem['lb']
+                j = j+elem['lb'].shape[0]
 
         return lbg
 
     def getUpperBoundsList(self):
-        ubg = list()
+
+        ubg = np.zeros(self.getCnstrDim())
+
+        j = 0
         for node in self.cnstr_impl.values():
             for elem in node.values():
-                ubg += elem['ub']
+                ubg[j:j + elem['ub'].shape[0]] = elem['ub']
+                j = j + elem['ub'].shape[0]
 
         return ubg
 
@@ -345,7 +383,6 @@ class FunctionsContainer:
         for node, item in self.costfun_impl.items():
             for name, elem in item.items():
                 self.costfun_impl[node][name] = elem.serialize()
-
 
     def deserialize(self):
 

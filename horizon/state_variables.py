@@ -1,27 +1,112 @@
-import pprint
-
 import casadi as cs
 from collections import OrderedDict
 import logging
 import numpy as np
-import copy
 import pickle
+import horizon.misc_function as misc
+import pprint
 
 '''
 now the StateVariable is only abstract at the very beginning.
 Formerly
 '''
-
 # todo create function checker to check if nodes are in self.nodes and if everything is ok with the input (no dict, no letters...)
-class StateVariable(cs.SX):
-    def __init__(self, tag, dim, nodes):
-        super(StateVariable, self).__init__(cs.SX.sym(tag, dim))
+
+class AbstractVariable(cs.SX):
+    def __init__(self, tag, dim):
+        super(AbstractVariable, self).__init__(cs.SX.sym(tag, dim))
 
         self.tag = tag
         self.dim = dim
+        self.offset = 0
+
+    def getDim(self):
+        return self.dim
+
+class SingleVariable(AbstractVariable):
+    def __init__(self, tag, dim, dummy_nodes):
+        super(SingleVariable, self).__init__(tag, dim)
+
+        self.var_impl = dict()
+        # todo do i create another var or do I use the SX var inside SingleVariable?
+        self.var_impl['var'] = cs.SX.sym(self.tag + '_impl', self.dim)
+        self.var_impl['lb'] = np.full(self.dim, -np.inf)
+        self.var_impl['ub'] = np.full(self.dim, np.inf)
+        self.var_impl['w0'] = np.zeros(self.dim)
+
+    def setLowerBounds(self, bounds):
+
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self.dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
+
+        self.var_impl['lb'] = bounds
+
+    def setUpperBounds(self, bounds):
+
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self.dim:
+            raise Exception('Wrong dimension of upper bounds inserted.')
+
+        self.var_impl['ub'] = bounds
+
+    def setBounds(self, lb, ub):
+        self.setLowerBounds(lb)
+        self.setUpperBounds(ub)
+
+    def setInitialGuess(self, val):
+
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self.dim:
+            raise Exception('Wrong dimension of initial guess inserted.')
+
+        self.var_impl['w0'] = val
+
+    def getImpl(self, dummy_node):
+
+        var_impl = self.var_impl['var']
+        return var_impl
+
+    def _getVals(self, val_type, dummy_node):
+        if dummy_node is None:
+            vals = np.array([self.var_impl[val_type]]).T
+        else:
+            vals = self.var_impl[val_type]
+
+        return vals
+
+    def getLowerBounds(self, dummy_node=None):
+        return self._getVals('lb', dummy_node)
+
+    def getUpperBounds(self, dummy_node=None):
+        return self._getVals('ub', dummy_node)
+
+    def getBounds(self, dummy_node=None):
+        return self.getLowerBounds(dummy_node), self.getUpperBounds(dummy_node)
+
+    def getInitialGuess(self, dummy_node=None):
+        return self._getVals('w0', dummy_node)
+
+    def getNodes(self):
+        return [-1]
+
+    def getVarOffsetDict(self):
+        return dict()
+
+    def getImplDim(self):
+        return self.shape[0]
+
+class Variable(AbstractVariable):
+    def __init__(self, tag, dim, nodes):
+        super(Variable, self).__init__(tag, dim)
+
         self.nodes = nodes
 
         # self.var = cs.SX.sym(tag, dim)
+        self.var_offset = dict()
         self.var_impl = dict()
 
         # todo project it as soon as I create the variable. Ok?
@@ -30,12 +115,14 @@ class StateVariable(cs.SX):
     def setLowerBounds(self, bounds, nodes=None):
 
         if nodes is None:
-            nodes = list(range(0, self.nodes))
+            nodes = self.nodes
         else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in range(self.nodes)]
-            else:
-                nodes = [nodes] if nodes in range(self.nodes) else []
+            nodes = misc.checkNodes(nodes, self.nodes)
+
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self.dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
 
         for node in nodes:
             self.var_impl['n' + str(node)]['lb'] = bounds
@@ -43,12 +130,14 @@ class StateVariable(cs.SX):
     def setUpperBounds(self, bounds, nodes=None):
 
         if nodes is None:
-            nodes = list(range(0, self.nodes))
+            nodes = self.nodes
         else:
-            if isinstance(nodes, list):
-                nodes = [node for node in nodes if node in range(self.nodes)]
-            else:
-                nodes = [nodes] if nodes in range(self.nodes) else []
+            nodes = misc.checkNodes(nodes, self.nodes)
+
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self.dim:
+            raise Exception('Wrong dimension of upper bounds inserted.')
 
         for node in nodes:
             self.var_impl['n' + str(node)]['ub'] = bounds
@@ -60,16 +149,42 @@ class StateVariable(cs.SX):
     def setInitialGuess(self, val, nodes=None):
 
         if nodes is None:
-            nodes = [0, self.nodes]
-
-        if isinstance(nodes, list):
-            for n in range(nodes[0], nodes[1]):
-                self.var_impl['n' + str(n)]['w0'] = val
+            nodes = self.nodes
         else:
-            self.var_impl['n' + str(nodes)]['w0'] = val
+            nodes = misc.checkNodes(nodes, self.nodes)
+
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self.dim:
+            raise Exception('Wrong dimension of initial guess inserted.')
+
+        for node in nodes:
+            self.var_impl['n' + str(node)]['w0'] = val
+
+    def getVarOffset(self, node):
+
+        if node > 0:
+            node = f'+{node}'
+
+        if node in self.var_offset:
+            return self.var_offset[node]
+        else:
+
+            createTag = lambda name, node: name + str(node) if node is not None else name
+
+            new_tag = createTag(self.tag, node)
+            var = AbstractVariable(new_tag, self.dim)
+            var.offset = int(node)
+
+            self.var_offset[node] = var
+        return var
+
+    def getVarOffsetDict(self):
+        return self.var_offset
 
     def _setNNodes(self, n_nodes):
 
+        # todo this is because I must manage Variable, InputVariable, StateVariable in different ways.
         self.nodes = n_nodes
         self._project()
 
@@ -81,16 +196,16 @@ class StateVariable(cs.SX):
         # self.var_impl.clear()
         new_var_impl = dict()
 
-        for n in range(self.nodes):
+        for n in self.nodes:
             if 'n' + str(n) in self.var_impl:
                 new_var_impl['n' + str(n)] = self.var_impl['n' + str(n)]
             else:
                 var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
                 new_var_impl['n' + str(n)] = dict()
                 new_var_impl['n' + str(n)]['var'] = var_impl
-                new_var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
-                new_var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
-                new_var_impl['n' + str(n)]['w0'] = [0] * self.dim
+                new_var_impl['n' + str(n)]['lb'] = np.full(self.dim, -np.inf)
+                new_var_impl['n' + str(n)]['ub'] = np.full(self.dim, np.inf)
+                new_var_impl['n' + str(n)]['w0'] = np.zeros(self.dim)
 
         self.var_impl = new_var_impl
 
@@ -116,211 +231,307 @@ class StateVariable(cs.SX):
         var_impl = self.var_impl['n' + str(node)]['var']
         return var_impl
 
-    def getBoundMin(self, node):
-        bound_min = self.var_impl['n' + str(node)]['lb']
-        return bound_min
+    def _getVals(self, val_type, node):
+        if node is None:
+            vals = np.zeros([self.shape[0], len(self.nodes)])
+            for dim in range(self.shape[0]):
+                vals[dim, :] = np.hstack([self.var_impl['n' + str(i)][val_type][dim] for i in self.nodes])
+        else:
+            vals = self.var_impl['n' + str(node)][val_type]
+        return vals
 
-    def getBoundMax(self, node):
-        bound_max = self.var_impl['n' + str(node)]['ub']
-        return bound_max
+    def getLowerBounds(self, node=None):
+        return self._getVals('lb', node)
 
-    def getBounds(self, node):
-        return [self.getBoundMin(node), self.getBoundMax(node)]
+    def getUpperBounds(self, node=None):
+        return self._getVals('ub', node)
 
-    def getInitialGuess(self, node):
-        initial_guess = self.var_impl['n' + str(node)]['w0']
-        return initial_guess
+    def getBounds(self, node=None):
+        return self.getLowerBounds(node), self.getUpperBounds(node)
 
-    def getNNodes(self):
+    def getInitialGuess(self, node=None):
+        return self._getVals('w0', node)
+
+    def getImplDim(self):
+        return self.shape[0] * len(self.getNodes())
+
+    def getNodes(self):
         return self.nodes
 
     def __reduce__(self):
         return (self.__class__, (self.tag, self.dim, self.nodes, ))
 
 
-class InputVariable(StateVariable):
+class InputVariable(Variable):
     def __init__(self, tag, dim, nodes):
         super(InputVariable, self).__init__(tag, dim, nodes)
-        self.nodes = nodes-1
 
-    # def getNNodes(self):
-    #     return self.nodes-1
-    #
-    # def _project(self):
-    #     # state_var_impl --> dict
-    #     #  - key: nodes (n0, n1, ...)
-    #     #  - val: dict with name and value of implemented variable
-    #     for n in range(self.nodes-1):
-    #         var_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
-    #         self.var_impl['n' + str(n)] = dict()
-    #         self.var_impl['n' + str(n)]['var'] = var_impl
-    #         self.var_impl['n' + str(n)]['lb'] = [-np.inf] * self.dim
-    #         self.var_impl['n' + str(n)]['ub'] = [np.inf] * self.dim
-    #         self.var_impl['n' + str(n)]['w0'] = [0] * self.dim
+class StateVariable(Variable):
+    def __init__(self, tag, dim, nodes):
+        super(StateVariable, self).__init__(tag, dim, nodes)
 
-class StateVariables:
+class AbstractAggregate():
+
+    def __init__(self, *args: AbstractVariable):
+        self.var_list = [item for item in args]
+
+    def getVars(self) -> cs.SX:
+        return cs.vertcat(*self.var_list)
+
+    def __iter__(self):
+        yield from self.var_list
+
+    def __getitem__(self, ind):
+        return self.var_list[ind]
+
+
+class Aggregate(AbstractAggregate):
+
+    def __init__(self, *args):
+        super().__init__(*args)
+
+    def getVarOffset(self, offset):
+        var_list = list()
+        for var in self.var_list:
+            var_list.append(var.getVarOffset(offset))
+
+        return AbstractAggregate(*var_list)
+
+    def addVariable(self, var):
+        self.var_list.append(var)
+
+    def setBounds(self, lb, ub, nodes=None):
+        self.setLowerBounds(lb, nodes)
+        self.setUpperBounds(ub, nodes)
+
+    def setLowerBounds(self, lb, nodes=None):
+        idx = 0
+        for var in self:
+            nv = var.shape[0]
+            var.setLowerBounds(lb[idx:idx+nv], nodes)
+            idx += nv
+
+    def setUpperBounds(self, ub, nodes=None):
+        idx = 0
+        for var in self:
+            nv = var.shape[0]
+            var.setUpperBounds(ub[idx:idx+nv], nodes)
+            idx += nv
+
+    def getBounds(self, node):
+        lb = self.getLowerBounds(node)
+        ub = self.getUpperBounds(node)
+
+        return lb, ub
+
+    def getLowerBounds(self, node):
+        return np.hstack((var.getLowerBounds(node) for var in self))
+
+    def getUpperBounds(self, node):
+        return np.hstack((var.getUpperBounds(node) for var in self))
+
+class StateAggregate(Aggregate):
+    def __init__(self, *args: StateVariable):
+        super().__init__(*args)
+
+class InputAggregate(Aggregate):
+    def __init__(self, *args: InputVariable):
+        super().__init__(*args)
+
+
+class VariablesContainer:
     def __init__(self, nodes, logger=None):
 
         self.logger = logger
         self.nodes = nodes
 
-        self.state_var = OrderedDict()
-        self.state_var_prev = OrderedDict()
-        self.state_var_impl = OrderedDict()
+        self.vars = OrderedDict()
+        self.vars_impl = OrderedDict()
 
-    def setVar(self, var_type, name, dim, prev_nodes):
+    def createVar(self, var_type, name, dim, active_nodes):
 
-        # todo what if 'prev_nodes' it is a list
-        createTag = lambda name, node: name + str(node) if node is not None else name
-        checkExistence = lambda name, node: True if prev_nodes is None else True if name in self.state_var else False
-        tag = createTag(name, prev_nodes)
+        if active_nodes is not None:
+            active_nodes = misc.checkNodes(active_nodes, range(self.nodes))
+
+        var = var_type(name, dim, active_nodes)
+        self.vars[name] = var
 
         if self.logger:
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('Setting variable {} with tag {} as {}'.format(name, tag, var_type))
+                self.logger.debug('Creating variable {} as {}'.format(name, var_type))
 
-        if checkExistence(name, prev_nodes):
-            var = var_type(tag, dim, self.nodes)
-            if prev_nodes is None:
-                self.state_var[tag] = var
-            else:
-                self.state_var_prev[tag] = var
-            return var
+        return var
+
+    def setVar(self, name, dim, active_nodes=None):
+        if active_nodes is None:
+            var_type = SingleVariable
         else:
-            raise Exception('Yet to declare the present variable!')
+            var_type = Variable
 
-    def setStateVar(self, name, dim, prev_nodes=None):
-        var = self.setVar(StateVariable, name, dim, prev_nodes)
+        var = self.createVar(var_type, name, dim, active_nodes)
         return var
 
-    def setInputVar(self, name, dim, prev_nodes=None):
-        var = self.setVar(InputVariable, name, dim, prev_nodes)
+    def setStateVar(self, name, dim):
+        var = self.createVar(StateVariable, name, dim, range(self.nodes))
         return var
+
+    def setInputVar(self, name, dim):
+        var = self.createVar(InputVariable, name, dim, range(self.nodes-1))
+        return var
+
+    def getVarsDim(self):
+        var_dim_tot = 0
+        for var in self.vars.values():
+            var_dim_tot += var.getImplDim()
+        return var_dim_tot
+
+    def getStateVars(self):
+        state_vars = dict()
+        for name, var in self.vars.items():
+            if isinstance(var, StateVariable):
+                state_vars[name] = var
+
+        return state_vars
+
+    def getInputVars(self):
+        input_vars = dict()
+        for name, var in self.vars.items():
+            if isinstance(var, InputVariable):
+                input_vars[name] = var
+
+        return input_vars
+
+    def getVarAbstrDict(self, past=True):
+
+        if past:
+            var_abstr_dict = dict()
+            for name, var in self.vars.items():
+                var_abstr_dict[name] = list()
+                var_abstr_dict[name].append(var)
+                for var_offset in var.getVarOffsetDict().values():
+                    var_abstr_dict[name].append(var_offset)
+        else:
+            # todo beware of deep copy
+            var_abstr_dict = self.vars
+
+        return var_abstr_dict
 
     def getVarImpl(self, name, k):
+
+
+        if isinstance(self.vars[name], SingleVariable):
+            k = None
+
         node_name = 'n' + str(k)
 
-        if name.find('-') == -1:
-            if node_name in self.state_var_impl:
-                var = self.state_var_impl[node_name][name]['var']
-            else:
-                var = None
+        if node_name in self.vars_impl:
+            var = self.vars_impl[node_name][name]['var']
         else:
-            var_name = name[:name.index('-')]
-            k_prev = int(name[name.index('-'):])
-            node_prev = 'n' + str(k+k_prev)
-            if node_name in self.state_var_impl:
-                var = self.state_var_impl[node_prev][var_name]['var']
-            else:
-                var = None
+            var = None
 
         return var
 
     def getVarImplAtNode(self, k):
-        return self.state_var_impl['n' + str(k)]
+        return self.vars_impl['n' + str(k)]
 
     def getVarImplDict(self):
-        return self.state_var_impl
+        return self.vars_impl
 
     def getVarImplList(self):
+        '''
+        return: SX vector (vertcat) of all the implemented variables at each node
+            used by problem.py to retrieve the final vector of optimization variables
+        '''
 
         state_var_impl_list = list()
-        for node, val in self.state_var_impl.items():
+        for val in self.vars_impl.values():
             for var_abstract in val.keys():
                 # get from state_var_impl the relative var
-
-                # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
 
                 state_var_impl_list.append(val[var_abstract]['var'])
 
         return cs.vertcat(*state_var_impl_list)
 
-    def getBoundsMinList(self):
+    def _getVarInfoList(self, bound_type):
 
-        state_var_bound_list = list()
+        state_var_bound_list = np.zeros(self.getVarsDim())
 
-        for node, val in self.state_var_impl.items():
+        j = 0
+        for node, val in self.vars_impl.items():
             for var_abstract in val.keys():
-
-                state_var_bound_list += val[var_abstract]['lb']
+                var = val[var_abstract][bound_type]
+                dim = val[var_abstract][bound_type].shape[0]
+                state_var_bound_list[j:j + dim] = var
+                j = j + dim
 
         return state_var_bound_list
+
+    def getBoundsMinList(self):
+        return self._getVarInfoList('lb')
 
     def getBoundsMaxList(self):
-
-        state_var_bound_list = list()
-
-        for node, val in self.state_var_impl.items():
-            for var_abstract in val.keys():
-                # get from state_var_impl the relative var
-                # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
-                state_var_bound_list += val[var_abstract]['ub']
-
-        return state_var_bound_list
-
-    def getVarAbstrDict(self, past=True):
-        # this is used to check the variable existing in the function. It requires all the variables and the previous variables
-        if past:
-            var_abstr_dict = {**self.state_var, **self.state_var_prev}
-        else:
-            var_abstr_dict = self.state_var
-
-        return var_abstr_dict
+        return self._getVarInfoList('ub')
 
     def getInitialGuessList(self):
+        return self._getVarInfoList('w0')
 
-        initial_guess_list = list()
+    def _fillVar(self, name, node, val):
+        # todo bounds are not necessary here
+        node_name = 'n' + str(node)
+        var_impl = self.vars[name].getImpl(node)
+        var_bound_min = self.vars[name].getLowerBounds(node)
+        var_bound_max = self.vars[name].getUpperBounds(node)
+        initial_guess = self.vars[name].getInitialGuess(node)
+        var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
+        self.vars_impl[node_name].update({name: var_dict})
 
-        for node, val in self.state_var_impl.items():
-            for var_abstract in val.keys():
-                # get from state_var_impl the relative var
-                # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
-                initial_guess_list += val[var_abstract]['w0']
+        if self.logger:
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
-        return initial_guess_list
 
-    def update(self, k):
-        # state_var_impl --> dict
-        #  - key: nodes (n0, n1, ...)
-        #  - val: dict with name and value of implemented variable
+    def build(self):
+        '''
+        fill the dictionary "state_var_impl"
+           - key: nodes (nNone, n0, n1, ...) nNone contains single variables that are not projected in nodes
+           - val: dict with name and value of implemented variable
+        '''
 
-        self.state_var_impl['n' + str(k)] = dict()
-        # implementation of current state variable
-        for name, val in self.state_var.items():
-            if isinstance(val, InputVariable) and k == self.nodes-1:
-                continue
+        # contains single vars that do not need to be projected
+        self.vars_impl['nNone'] = dict()
 
-            var_impl = self.state_var[name].getImpl(k)
+        for node in range(self.nodes):
+            # contains vars that are projected along the nodes
+            self.vars_impl['n' + str(node)] = dict()
 
-            if self.logger:
-                if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
+            for name, val in self.vars.items():
 
-            # todo bounds are not necessary here
-            var_bound_min = self.state_var[name].getBoundMin(k)
-            var_bound_max = self.state_var[name].getBoundMax(k)
-            initial_guess = self.state_var[name].getInitialGuess(k)
-            var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
-            self.state_var_impl['n' + str(k)].update({name: var_dict})
+                if isinstance(val, SingleVariable):
+                    self._fillVar(name, None, val)
+                    continue
+
+                if node in self.vars[name].getNodes():
+                    self._fillVar(name, node, val)
 
     def updateBounds(self):
 
-        for node in self.state_var_impl.keys():
-            for name, state_var in self.state_var_impl[node].items():
+        for node in self.vars_impl.keys():
+            for name, state_var in self.vars_impl[node].items():
                 k = node[node.index('n') + 1:]
-                state_var['lb'] = self.state_var[name].getBoundMin(k)
-                state_var['ub'] = self.state_var[name].getBoundMax(k)
-            # self.state_var_impl
+                state_var['lb'] = self.vars[name].getLowerBounds(k)
+                state_var['ub'] = self.vars[name].getUpperBounds(k)
 
     def updateInitialGuess(self):
 
-        for node in self.state_var_impl.keys():
-            for name, state_var in self.state_var_impl[node].items():
+        for node in self.vars_impl.keys():
+            for name, state_var in self.vars_impl[node].items():
                 k = node[node.index('n') + 1:]
-                state_var['w0'] = self.state_var[name].getInitialGuess(k)
+                state_var['w0'] = self.vars[name].getInitialGuess(k)
 
     def setNNodes(self, n_nodes):
 
+        raise Exception('state_variables.py: method setNNodes is TBD.')
+        # todo this is because I must manage Variable, InputVariable, StateVariable and SingleVariable in different ways.
         # this is required to update the self.state_var_impl EACH time a new number of node is set
         # removed_nodes = [node for node in range(self.nodes) if node not in range(n_nodes)]
         # for node in removed_nodes:
@@ -328,14 +539,11 @@ class StateVariables:
         #         del self.state_var_impl['n' + str(node)]
 
         self.nodes = n_nodes
-        for var in self.state_var.values():
+        for var in self.vars.values():
             var._setNNodes(self.nodes)
-        for var in self.state_var_prev.values():
-            var._setNNodes(self.nodes)
-
 
     def clear(self):
-        self.state_var_impl.clear()
+        self.vars_impl.clear()
 
 
     def serialize(self):
@@ -349,9 +557,9 @@ class StateVariables:
         #     print('state_var_prev', type(value))
         #     self.state_var_prev[name] = value.serialize()
 
-        for node, item in self.state_var_impl.items():
+        for node, item in self.vars_impl.items():
             for name, elem in item.items():
-                self.state_var_impl[node][name]['var'] = elem['var'].serialize()
+                self.vars_impl[node][name]['var'] = elem['var'].serialize()
 
     def deserialize(self):
 
@@ -361,16 +569,19 @@ class StateVariables:
         # for name, value in self.state_var_prev.items():
         #     self.state_var_prev[name] = cs.SX.deserialize(value)
 
-        for node, item in self.state_var_impl.items():
+        for node, item in self.vars_impl.items():
             for name, elem in item.items():
-                self.state_var_impl[node][name]['var'] = cs.SX.deserialize(elem['var'])
+                self.vars_impl[node][name]['var'] = cs.SX.deserialize(elem['var'])
 
     # def __reduce__(self):
     #     return (self.__class__, (self.nodes, self.logger, ))
 
 if __name__ == '__main__':
 
-    # x = StateVariable('x', 2, 4)
+    x = StateVariable('x', 2, 4)
+    u = InputVariable('u', 2, 4)
+    print(isinstance(u, StateVariable))
+    exit()
     # x._project()
     # print('before serialization:', x)
     # print('bounds:', x.getBounds(2))
@@ -396,17 +607,30 @@ if __name__ == '__main__':
     # print([id(val['var']) for val in x.var_impl.values()])
 
     n_nodes = 10
-    sv = StateVariables(n_nodes)
-    sv.setStateVar('x', 2)
+    sv = VariablesContainer(n_nodes)
+    x = sv.setStateVar('x', 2)
+    x_prev = x.createAbstrNode(-1)
+
+    print(x_prev)
+    print(type(x_prev))
+    print(type(x))
+
+    exit()
+    sv.setStateVar('x', 2, -1)
     sv.setStateVar('y', 2)
+
     for k in range(n_nodes):
         sv.update(k)
 
-    print(sv.state_var)
-    print(sv.state_var_prev)
-    print(sv.state_var_impl)
-    print(sv.getVarAbstrDict())
-    print(sv.getVarImplDict())
+    # print(sv.state_var)
+    # print(sv.state_var_prev)
+    pprint.pprint(sv.vars_impl)
+    # pprint.pprint(sv.getVarAbstrDict())
+    # pprint.pprint(sv.getVarImplDict())
+    # pprint.pprint(sv.getVarImpl('x-1', 1))
+
+
+    exit()
     # x_prev = sv.setVar('x', 2, -2)
     #
     # for i in range(4):
@@ -426,8 +650,8 @@ if __name__ == '__main__':
     print('===DEPICKLING===')
     sv_new = pickle.loads(sv_serialized)
 
-    print(sv_new.state_var)
+    print(sv_new.vars)
     print(sv_new.state_var_prev)
-    print(sv_new.state_var_impl)
+    print(sv_new.vars_impl)
     print(sv_new.getVarAbstrDict())
     print(sv_new.getVarImplDict())

@@ -11,7 +11,7 @@ from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
 # Switch between suspended and free fall
-FREE_FALL = False
+FREE_FALL = True
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')
@@ -52,7 +52,7 @@ tf = 1.0  # [s]
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
 opts = {'tf': tf/ns}
-F_integrator = integrators.RK4(dae, opts, "SX")
+F_integrator = integrators.RK4(dae, opts, cs.SX)
 
 # Add bounds to STATE and CONTROL variables
 q_min = [-10.0, -10.0, -10.0, -1.0, -1.0, -1.0, -1.0,  # Floating base
@@ -110,18 +110,21 @@ prb.createCostFunction("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]), 
 prb.createCostFunction("min_f1", 1000.*cs.dot(f1, f1), list(range(1, ns)))
 prb.createCostFunction("min_f2", 1000.*cs.dot(f2, f2), list(range(1, ns)))
 
-frope_prev = prb.createInputVariable("frope", nf, -1)
+frope_prev = frope.getVarOffset(-1)
 prb.createCostFunction("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), list(range(1, ns)))
 
 # Constraints
 prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))
 prb.createConstraint("qdotinit", qdot, nodes=0, bounds=dict(lb=qdot_init, ub=qdot_init))
 
-q_prev = prb.createStateVariable("q", nq, -1)
-qdot_prev = prb.createStateVariable("qdot", nv, -1)
-qddot_prev = prb.createInputVariable("qddot", nv, -1)
-x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
-x_int = F_integrator(x0=x_prev, p=qddot_prev)
+state = prb.getState()
+state_prev = state.getVarOffset(-1)
+input = prb.getInput()
+input_prev = input.getVarOffset(-1)
+
+x_prev, _ = utils.double_integrator_with_floating_base(state_prev[0], state_prev[1], input_prev[0])
+x_int = F_integrator(x0=x_prev, p=input_prev[0])
+
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
@@ -158,6 +161,12 @@ prb.setSolver(solver)
 
 solution = prb.solveProblem()
 
+plot_all = True
+if plot_all:
+    hplt = plotter.PlotterHorizon(prb)
+    hplt.plotVariables()
+    hplt.plotFunctions()
+
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]
 qddot_hist = solution["qddot"]
@@ -177,7 +186,7 @@ for i in range(ns):
 # resampling
 dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anchor2': frope_hist}
-q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf, dt, dae, frame_force_hist_mapping, kindyn)
+q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf/ns, dt, dae, frame_force_hist_mapping, kindyn)
 
 
 PRINT = True
@@ -259,5 +268,5 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
               'rope_joint']
 
-replay_trajectory(dt, joint_list, q_res).replay()
+replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping).replay()
 
