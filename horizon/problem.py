@@ -231,10 +231,6 @@ class Problem:
             self.logger.warning('Problem is not created. Nothing to solve!')
             return 0
 
-        if self.solver is None:
-            self.logger.warning('Solver not set. Using default solver nlpsol.ipopt!')
-            self._makeDefaultSolver()
-
         self.var_container.updateBounds()
         self.var_container.updateInitialGuess()
 
