@@ -317,6 +317,36 @@ class Problem:
     def getStateVariables(self):
         return self.var_container.getVarAbstrDict()
 
+    def evalFun(self, fun):
+
+        print(f'function evaluated: {fun}')
+
+        """
+        input: name of the function to evaluate
+        return: fun evaluated at all nodes using the solution of horizon problem
+        """
+        if self.solution is None:
+            raise Exception('The solution of the horizon problem is not computed yet. Cannot evaluate function.')
+
+        fun_to_evaluate = fun.getFunction()
+        all_vars = list()
+        for var_name, var_list in fun.getVariables().items():
+            print(f'var_name: {var_name}')
+            print(f'var_list: {var_list}')
+            print(f'solution var: {self.solution[var_name]}')
+            print(f'nodes: {np.array(fun.getNodes())}')
+            for var in var_list:
+                print(f'offset: {var.offset}')
+                print(f'columns: {np.array(fun.getNodes()) + var.offset}')
+                # careful about ordering
+                # todo this is very ugly, but what can I do (wanted to do it without the if)
+                if isinstance(var, sv.SingleVariable):
+                    all_vars.append(self.solution[var_name])
+                else:
+                    all_vars.append(self.solution[var_name][:, np.array(fun.getNodes()) + var.offset])
+
+        fun_evaluated = fun_to_evaluate(*all_vars).toarray()
+        return fun_evaluated
     def getConstraints(self):
         return self.function_container.getCnstrFDict()
 
