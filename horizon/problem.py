@@ -340,9 +340,6 @@ class Problem:
         return fun
 
     def evalFun(self, fun):
-
-        print(f'function evaluated: {fun}')
-
         """
         input: name of the function to evaluate
         return: fun evaluated at all nodes using the solution of horizon problem
