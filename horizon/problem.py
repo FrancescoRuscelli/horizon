@@ -353,13 +353,7 @@ class Problem:
         fun_to_evaluate = fun.getFunction()
         all_vars = list()
         for var_name, var_list in fun.getVariables().items():
-            print(f'var_name: {var_name}')
-            print(f'var_list: {var_list}')
-            print(f'solution var: {self.solution[var_name]}')
-            print(f'nodes: {np.array(fun.getNodes())}')
             for var in var_list:
-                print(f'offset: {var.offset}')
-                print(f'columns: {np.array(fun.getNodes()) + var.offset}')
                 # careful about ordering
                 # todo this is very ugly, but what can I do (wanted to do it without the if)
                 if isinstance(var, sv.SingleVariable):
