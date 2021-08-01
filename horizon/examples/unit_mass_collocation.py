@@ -74,5 +74,8 @@ prob.createProblem()
 solution = prob.solveProblem()
 
 # plot
-plt = plotter.PlotterHorizon(sol=solution)
-plt.plotVariables()
+plot_all = True
+if plot_all:
+    hplt = plotter.PlotterHorizon(prob)
+    hplt.plotVariables()
+    hplt.plotFunctions()

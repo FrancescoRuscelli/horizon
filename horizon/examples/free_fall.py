@@ -161,6 +161,12 @@ prb.setSolver(solver)
 
 solution = prb.solveProblem()
 
+plot_all = True
+if plot_all:
+    hplt = plotter.PlotterHorizon(prb)
+    hplt.plotVariables()
+    hplt.plotFunctions()
+
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]
 qddot_hist = solution["qddot"]

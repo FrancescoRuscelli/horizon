@@ -16,6 +16,7 @@ class Problem:
 
         self.opts = None
         self.solver = None
+        self.solution = None
         self.default_solver = cs.nlpsol
         self.default_solver_plugin = 'ipopt'
 
@@ -83,10 +84,12 @@ class Problem:
     def _getUsedVar(self, f):
         used_var = dict()
         for name_var, value_var in self.var_container.getVarAbstrDict().items():
-            used_var[name_var] = list()
             for var in value_var:
                 if cs.depends_on(f, var):
+                    if name_var not in used_var:
+                        used_var[name_var] = list()
                     used_var[name_var].append(var)
+
 
         return used_var
 
@@ -105,7 +108,7 @@ class Problem:
         used_var = self._getUsedVar(g)
 
         if self.debug_mode:
-            self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes}')
+            self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes} using vars {used_var}')
 
         # create internal representation of a constraint
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
@@ -312,10 +315,29 @@ class Problem:
 
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
-        return solution_dict
+        self.solution = solution_dict
+        return self.solution
 
-    def getStateVariables(self):
-        return self.var_container.getVarAbstrDict()
+    def getSolution(self):
+        return self.solution
+
+    def getVariables(self, name=None):
+
+        if name is None:
+            var = self.var_container.getVarAbstrDict(past=False)
+        else:
+            var = self.var_container.getVarAbstrDict(past=False)[name]
+
+        return var
+
+    def getConstraints(self, name=None):
+
+        if name is None:
+            fun = self.function_container.getCnstrFDict()
+        else:
+            fun = self.function_container.getCnstrFDict()[name]
+
+        return fun
 
     def evalFun(self, fun):
 
@@ -347,8 +369,6 @@ class Problem:
 
         fun_evaluated = fun_to_evaluate(*all_vars).toarray()
         return fun_evaluated
-    def getConstraints(self):
-        return self.function_container.getCnstrFDict()
 
     def scopeNodeVars(self, node):
 
