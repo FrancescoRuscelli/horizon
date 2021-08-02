@@ -6,7 +6,7 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
