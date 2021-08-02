@@ -25,17 +25,20 @@ public:
 
     // all public to test things
     void linearize_quadratize();
-    void compute_defect(int i, Eigen::VectorXd& d);
     void backward_pass();
     bool forward_pass(double alpha);
-    void backward_pass_iter(int i);
-    void forward_pass_iter(int i, double alpha);
     Eigen::Ref<Eigen::VectorXd> state(int i);
     Eigen::Ref<Eigen::VectorXd> input(int i);
 
 protected:
 
 private:
+
+    void backward_pass_iter(int i);
+    void handle_constraints(int i);
+    void forward_pass_iter(int i, double alpha);
+    void compute_defect(int i, Eigen::VectorXd& d);
+    void set_default_cost();
 
     struct Dynamics
     {
@@ -61,8 +64,48 @@ private:
 
         Dynamics(int nx, int nu);
 
+        Eigen::Ref<const Eigen::VectorXd> integrate(const Eigen::VectorXd& x,
+                                                    const Eigen::VectorXd& u);
+
         void linearize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
 
+        void setDynamics(casadi::Function f);
+
+    };
+
+    struct Constraint
+    {
+        // constraint function
+        casadi_utils::WrappedFunction f;
+
+        // constraint jacobian
+        casadi_utils::WrappedFunction df;
+
+        // dh/dx
+        const Eigen::MatrixXd& C() const;
+
+        // dh/du
+        const Eigen::MatrixXd& D() const;
+
+        // constraint value
+        Eigen::Ref<const Eigen::VectorXd> h() const;
+
+        // valid flag
+        bool valid;
+
+        void linearize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
+
+        void setConstraint(casadi::Function h);
+
+    };
+
+    struct ConstraintToGo
+    {
+        Eigen::MatrixXd C;
+        Eigen::VectorXd h;
+        int dim;
+
+        ConstraintToGo(int nx);
     };
 
     struct IntermediateCost
@@ -141,10 +184,12 @@ private:
     casadi::Function _df;
 
     std::vector<IntermediateCost> _cost;
+    std::vector<Constraint> _constraint;
     std::vector<ValueFunction> _value;
     std::vector<Dynamics> _dyn;
 
     std::vector<BackwardPassResult> _bp_res;
+    ConstraintToGo _constraint_to_go;
     ForwardPassResult _fp_res;
 
     Eigen::MatrixXd _xtrj;

@@ -28,33 +28,21 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _value(N+1, ValueFunction(_nx)),
     _dyn(N, Dynamics(_nx, _nu)),
     _bp_res(N, BackwardPassResult(_nx, _nu)),
+    _constraint_to_go(_nx),
     _fp_res(_nx, _nu, _N)
 {
-    // compute expression for derivative of dynamics
-    _df = _f.factory("df", {"x", "u"}, {"jac:f:x", "jac:f:u"});
-
-    // set it to dynamics
+    // set dynamics
     for(auto& d : _dyn)
     {
-        d.f = _f;
-        d.df = _df;
+        d.setDynamics(_f);
     }
-
 
     // initialize trajectories
     _xtrj.setZero(_nx, _N+1);
     _utrj.setZero(_nu, _N);
 
-    // a default cost
-    auto x = cs::SX::sym("x", _nx);
-    auto u = cs::SX::sym("u", _nu);
-    auto l = cs::Function("dfl_cost", {x, u},
-                          {0.5*cs::SX::sumsqr(u)},
-                          {"x", "u"}, {"l"});
-    auto lf = cs::Function("dfl_cost_final", {x, u}, {0.5*cs::SX::sumsqr(x)},
-                           {"x", "u"}, {"l"});
-    setIntermediateCost(std::vector<cs::Function>(_N, l));
-    setFinalCost(lf);
+    // a default cost so that it works out of the box
+    set_default_cost();
 }
 
 void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inter_cost)
@@ -141,6 +129,7 @@ void IterativeLQR::backward_pass_iter(int i)
     const auto B = dyn.B();
     auto& d = dyn.d;
 
+
     // defect from integrated current state -> d = F(x_i, u_i) - xnext
     compute_defect(i, d);
 
@@ -155,6 +144,7 @@ void IterativeLQR::backward_pass_iter(int i)
     tmp.Hxx.noalias() = Q + A.transpose()*tmp.S_A;
     tmp.Hux.noalias() = P + B.transpose()*tmp.S_A;
 
+    // set huHux = [hu Hux]
     tmp.huHux.resize(_nu, 1+_nx);
     tmp.huHux.col(0) = tmp.hu;
     tmp.huHux.rightCols(_nx) = tmp.Hux;
@@ -187,6 +177,7 @@ void IterativeLQR::backward_pass_iter(int i)
 
 bool IterativeLQR::forward_pass(double alpha)
 {
+    // start from current trajectory
     _fp_res.xtrj = _xtrj;
     _fp_res.utrj = _utrj;
 
@@ -238,8 +229,21 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
 
 void IterativeLQR::compute_defect(int i, Eigen::VectorXd &d)
 {
-    auto xint = _f(std::vector<cs::DM>{to_cs(state(i)), to_cs(input(i))})[0];
-    d = to_eig(xint) - state(i+1);
+    auto xint = _dyn[i].integrate(state(i), input(i));
+    d = xint - state(i+1);
+}
+
+void IterativeLQR::set_default_cost()
+{
+    auto x = cs::SX::sym("x", _nx);
+    auto u = cs::SX::sym("u", _nu);
+    auto l = cs::Function("dfl_cost", {x, u},
+                          {0.5*cs::SX::sumsqr(u)},
+                          {"x", "u"}, {"l"});
+    auto lf = cs::Function("dfl_cost_final", {x, u}, {0.5*cs::SX::sumsqr(x)},
+                           {"x", "u"}, {"l"});
+    setIntermediateCost(std::vector<cs::Function>(_N, l));
+    setFinalCost(lf);
 }
 
 Eigen::Ref<Eigen::VectorXd> IterativeLQR::state(int i)
@@ -267,11 +271,25 @@ IterativeLQR::Dynamics::Dynamics(int nx, int nu)
     d.setZero(nx);
 }
 
+Eigen::Ref<const Eigen::VectorXd> IterativeLQR::Dynamics::integrate(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
+{
+    f.setInput(0, x);
+    f.setInput(1, u);
+    f.call();
+    return f.getOutput(0);
+}
+
 void IterativeLQR::Dynamics::linearize(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
 {
     df.setInput(0, x);
     df.setInput(1, u);
     df.call();
+}
+
+void IterativeLQR::Dynamics::setDynamics(casadi::Function _f)
+{
+    f = _f;
+    df = _f.factory("df", {"x", "u"}, {"jac:f:x", "jac:f:u"});
 }
 
 Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::IntermediateCost::Q() const
@@ -281,7 +299,8 @@ Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::IntermediateCost::Q() const
 
 Eigen::Ref<const Eigen::VectorXd> IterativeLQR::IntermediateCost::q() const
 {
-    return dl.getOutput(0);
+    // note: gradient is a row vector for casadi
+    return dl.getOutput(0).row(0);
 }
 
 Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::IntermediateCost::R() const
@@ -291,7 +310,8 @@ Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::IntermediateCost::R() const
 
 Eigen::Ref<const Eigen::VectorXd> IterativeLQR::IntermediateCost::r() const
 {
-    return dl.getOutput(1);
+    // note: gradient is a row vector for casadi
+    return dl.getOutput(1).row(0);
 }
 
 Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::IntermediateCost::P() const
@@ -345,4 +365,34 @@ IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N)
     utrj.setZero(nu, N);
 }
 
+IterativeLQR::ConstraintToGo::ConstraintToGo(int nx):
+    dim(0)
+{
+    const int c_max = nx*10;  // todo: better estimate
+    C.setZero(c_max, nx);
+    h.setZero(c_max);
+}
 
+IterativeLQR::Constraint::Constraint()
+{
+    valid = false;
+}
+
+void IterativeLQR::Constraint::linearize(const Eigen::VectorXd& x, const Eigen::VectorXd& u)
+{
+    // compute constraint value
+    f.setInput(0, x);
+    f.setInput(1, u);
+    f.call();
+
+    // compute constraint jacobian
+    df.setInput(0, x);
+    df.setInput(1, u);
+    df.call();
+}
+
+void IterativeLQR::Constraint::setConstraint(casadi::Function h)
+{
+    f = h;
+    df = h.factory("dh", {"x", "u"}, {"jac:h:x", "jac:h:u"});
+}

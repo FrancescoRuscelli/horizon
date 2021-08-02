@@ -33,9 +33,7 @@ void WrappedFunction::setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi)
 {
     if(xi.size() != _f.size1_in(i))
     {
-        abort();
         throw std::invalid_argument(_f.name() + ": input size mismatch");
-
     }
 
     _in_buf[i] = xi.data();
@@ -60,7 +58,7 @@ const Eigen::MatrixXd& WrappedFunction::getOutput(int i) const
     return _out_matrix[i];
 }
 
-casadi::Function &WrappedFunction::function()
+casadi::Function& WrappedFunction::function()
 {
     return _f;
 }
