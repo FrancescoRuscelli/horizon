@@ -9,6 +9,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # ilqr library
 add_library(ilqr STATIC
     src/ilqr.cpp
+    src/wrapped_function.cpp
 )
 
 target_link_libraries(ilqr Eigen3::Eigen casadi)

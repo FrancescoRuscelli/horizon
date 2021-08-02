@@ -24,8 +24,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _nu(fdyn.size1_in(1)),
     _N(N),
     _f(fdyn),
-    _cost(N+1, Cost(_nx, _nu)),
-    _value(N+1, Cost(_nx, _nu)),
+    _cost(N+1, IntermediateCost(_nx, _nu)),
+    _value(N+1, ValueFunction(_nx)),
     _dyn(N, Dynamics(_nx, _nu)),
     _bp_res(N, BackwardPassResult(_nx, _nu)),
     _fp_res(_nx, _nu, _N)
@@ -108,7 +108,8 @@ void IterativeLQR::linearize_quadratize()
 void IterativeLQR::backward_pass()
 {
     // initialize backward recursion from final cost
-    _value.back() = _cost.back();
+    _value.back().S = _cost.back().Q();
+    _value.back().s = _cost.back().q();
 
     // backward pass
     for(int i = _N-1; i >= 0; i--)
@@ -123,21 +124,21 @@ void IterativeLQR::backward_pass_iter(int i)
 
     // value function
     const auto& value_next = _value[i+1];
-    const auto& Snext = value_next.Q;
-    const auto& snext = value_next.q;
+    const auto& Snext = value_next.S;
+    const auto& snext = value_next.s;
 
     // intermediate cost
     const auto& cost = _cost[i];
-    const auto& r = cost.r;
-    const auto& q = cost.q;
-    const auto& Q = cost.Q;
-    const auto& R = cost.R;
-    const auto& P = cost.P;
+    const auto r = cost.r();
+    const auto q = cost.q();
+    const auto Q = cost.Q();
+    const auto R = cost.R();
+    const auto P = cost.P();
 
     // dynamics
     auto& dyn = _dyn[i];
-    const auto& A = dyn.A;
-    const auto& B = dyn.B;
+    const auto A = dyn.A();
+    const auto B = dyn.B();
     auto& d = dyn.d;
 
     // defect from integrated current state -> d = F(x_i, u_i) - xnext
@@ -176,8 +177,8 @@ void IterativeLQR::backward_pass_iter(int i)
 
     // save optimal value function
     auto& value = _value[i];
-    auto& S = value.Q;
-    auto& s = value.q;
+    auto& S = value.S;
+    auto& s = value.s;
 
     S.noalias() = tmp.Hxx - L.transpose()*tmp.Huu*L;
     s.noalias() = tmp.hx + tmp.Hux.transpose()*l + L.transpose()*(tmp.hu + tmp.Huu*l);
@@ -217,8 +218,8 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
 
     // dynamics
     const auto& dyn = _dyn[i];
-    const auto& A = dyn.A;
-    const auto& B = dyn.B;
+    const auto A = dyn.A();
+    const auto B = dyn.B();
     const auto& d = dyn.d;
 
     // backward pass solution
@@ -251,49 +252,85 @@ Eigen::Ref<Eigen::VectorXd> IterativeLQR::input(int i)
     return _utrj.col(i);
 }
 
+const Eigen::MatrixXd &IterativeLQR::Dynamics::A() const
+{
+    return df.getOutput(0);
+}
+
+const Eigen::MatrixXd &IterativeLQR::Dynamics::B() const
+{
+    return df.getOutput(1);
+}
+
 IterativeLQR::Dynamics::Dynamics(int nx, int nu)
 {
-    A.setZero(nx, nx);
-    B.setZero(nx, nu);
     d.setZero(nx);
 }
 
 void IterativeLQR::Dynamics::linearize(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
 {
-    auto res = df(std::vector<cs::DM>{to_cs(x), to_cs(u)});
-    A = to_eig(res[0]);
-    B = to_eig(res[1]);
+    df.setInput(0, x);
+    df.setInput(1, u);
+    df.call();
 }
 
-IterativeLQR::Cost::Cost(int nx, int nu)
+Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::IntermediateCost::Q() const
 {
-    Q.setZero(nx, nx);
-    R.setZero(nu, nu);
-    P.setZero(nu, nx);
-    q.setZero(nx);
-    r.setZero(nu);
+    return ddl.getOutput(0);
 }
 
-void IterativeLQR::Cost::setCost(const casadi::Function &cost)
+Eigen::Ref<const Eigen::VectorXd> IterativeLQR::IntermediateCost::q() const
+{
+    return dl.getOutput(0);
+}
+
+Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::IntermediateCost::R() const
+{
+    return ddl.getOutput(1);
+}
+
+Eigen::Ref<const Eigen::VectorXd> IterativeLQR::IntermediateCost::r() const
+{
+    return dl.getOutput(1);
+}
+
+Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::IntermediateCost::P() const
+{
+    return ddl.getOutput(2);
+}
+
+IterativeLQR::IntermediateCost::IntermediateCost(int nx, int nu)
+{
+}
+
+void IterativeLQR::IntermediateCost::setCost(const casadi::Function &cost)
 {
     l = cost;
-    dl = l.factory("dl", {"x", "u"}, {"jac:l:x", "jac:l:u"});
-    ddl = dl.factory("ddl", {"x", "u"}, {"jac:jac_l_x:x", "jac:jac_l_u:u", "jac:jac_l_u:x"});
+    dl = l.function().factory("dl", {"x", "u"}, {"jac:l:x", "jac:l:u"});
+    ddl = dl.function().factory("ddl", {"x", "u"}, {"jac:jac_l_x:x", "jac:jac_l_u:u", "jac:jac_l_u:x"});
 
     // tbd: do something with this
-    bool is_quadratic = ddl.jacobian().nnz_out() == 0;
+    bool is_quadratic = ddl.function().jacobian().nnz_out() == 0;
 }
 
-void IterativeLQR::Cost::quadratize(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
+void IterativeLQR::IntermediateCost::quadratize(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
 {
-    auto d_res = dl(std::vector<cs::DM>{to_cs(x), to_cs(u)});
-    q = to_eig(d_res[0]).row(0);
-    r = to_eig(d_res[1]).row(0);
+    // compute cost gradient
+    dl.setInput(0, x);
+    dl.setInput(1, u);
+    dl.call();
 
-    auto dd_res = ddl(std::vector<cs::DM>{to_cs(x), to_cs(u)});
-    Q = to_eig(dd_res[0]);
-    R = to_eig(dd_res[1]);
-    P = to_eig(dd_res[2]);
+    // compute cost hessian
+    ddl.setInput(0, x);
+    ddl.setInput(1, u);
+    ddl.call();
+
+}
+
+IterativeLQR::ValueFunction::ValueFunction(int nx)
+{
+    S.setZero(nx, nx);
+    s.setZero(nx);
 }
 
 IterativeLQR::BackwardPassResult::BackwardPassResult(int nx, int nu)
@@ -308,88 +345,4 @@ IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N)
     utrj.setZero(nu, N);
 }
 
-WrappedFunction::WrappedFunction(casadi::Function f):
-    _f(f)
-{
-    // resize work vectors
-    _iw.assign(_f.sz_iw(), 0);
-    _dw.assign(_f.sz_w(), 0.);
 
-    // resize input buffers
-    _in_buf.assign(_f.n_in(), nullptr);
-
-    // create memory for output data
-    for(int i = 0; i < _f.n_out(); i++)
-    {
-        const auto& sp = _f.sparsity_out(i);
-
-        // allocate memory for all nonzero elements of this output
-        _out_data.emplace_back(sp.nnz(), 0.);
-
-        // push the allocated buffer address to a vector
-        _out_buf.push_back(_out_data.back().data());
-
-        // allocate a zero dense matrix to store the output
-        _out_matrix.emplace_back(Eigen::MatrixXd::Zero(sp.size1(), sp.size2()));
-    }
-}
-
-void WrappedFunction::setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi)
-{
-    _in_buf[i] = xi.data();
-}
-
-void WrappedFunction::call()
-{
-    // call function (allocation-free)
-    _f(_in_buf.data(), _out_buf.data(), _iw.data(), _dw.data(), 0);
-
-    // copy all outputs to dense matrices
-    for(int i = 0; i < _f.n_out(); i++)
-    {
-        csc_to_matrix(_f.sparsity_out(i),
-                      _out_data[i],
-                      _out_matrix[i]);
-    }
-}
-
-const Eigen::MatrixXd& WrappedFunction::getOutput(int i) const
-{
-    return _out_matrix[i];
-}
-
-casadi::Function &WrappedFunction::function()
-{
-    return _f;
-}
-
-void WrappedFunction::csc_to_matrix(const casadi::Sparsity& sp,
-                                    const std::vector<double>& data,
-                                    Eigen::MatrixXd& matrix)
-{
-    // if dense output, do copy assignment which should be
-    // faster
-    if(sp.is_dense())
-    {
-        matrix = Eigen::MatrixXd::Map(data.data(),
-                                      matrix.rows(),
-                                      matrix.cols());
-        return;
-    }
-
-    int col_j = 0;
-    for(int k = 0; k < sp.nnz(); k++)
-    {
-        // current elem row index
-        int row_i = sp.row(k);
-
-        // update current elem col index
-        if(k == sp.colind(col_j + 1))
-        {
-            col_j++;
-        }
-
-        // copy data
-        matrix(row_i, col_j) =  data[k];
-    }
-}

@@ -43,18 +43,20 @@ private:
     public:
 
         // dynamics function
-        casadi::Function f;
+        casadi_utils::WrappedFunction f;
 
         // dynamics jacobian
-        casadi::Function df;
+        casadi_utils::WrappedFunction df;
 
         // df/dx
-        Eigen::MatrixXd A;
+        const Eigen::MatrixXd& A() const;
 
         // df/du
-        Eigen::MatrixXd B;
+        const Eigen::MatrixXd& B() const;
 
         // defect (or gap)
+        // this is not computed by this class, and
+        // must be filled from outside
         Eigen::VectorXd d;
 
         Dynamics(int nx, int nu);
@@ -63,29 +65,37 @@ private:
 
     };
 
-    struct Cost
+    struct IntermediateCost
     {
         // original cost
-        casadi::Function l;
+        casadi_utils::WrappedFunction l;
 
         // cost gradient
-        casadi::Function dl;
+        casadi_utils::WrappedFunction dl;
 
         // cost hessian
-        casadi::Function ddl;
+        casadi_utils::WrappedFunction ddl;
 
         /* Quadratized cost */
-        Eigen::MatrixXd Q;
-        Eigen::VectorXd q;
-        Eigen::MatrixXd R;
-        Eigen::VectorXd r;
-        Eigen::MatrixXd P;
+        Eigen::Ref<const Eigen::MatrixXd> Q() const;
+        Eigen::Ref<const Eigen::VectorXd> q() const;
+        Eigen::Ref<const Eigen::MatrixXd> R() const;
+        Eigen::Ref<const Eigen::VectorXd> r() const;
+        Eigen::Ref<const Eigen::MatrixXd> P() const;
 
-        Cost(int nx, int nu);
+        IntermediateCost(int nx, int nu);
 
         void setCost(const casadi::Function& cost);
 
         void quadratize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
+    };
+
+    struct ValueFunction
+    {
+        Eigen::MatrixXd S;
+        Eigen::VectorXd s;
+
+        ValueFunction(int nx);
     };
 
     struct BackwardPassResult
@@ -130,8 +140,8 @@ private:
     casadi::Function _f;
     casadi::Function _df;
 
-    std::vector<Cost> _cost;
-    std::vector<Cost> _value;
+    std::vector<IntermediateCost> _cost;
+    std::vector<ValueFunction> _value;
     std::vector<Dynamics> _dyn;
 
     std::vector<BackwardPassResult> _bp_res;
@@ -142,5 +152,7 @@ private:
 
     Temporaries tmp;
 };
+
+
 
 }
