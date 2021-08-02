@@ -102,7 +102,7 @@ void IterativeLQR::linearize_quadratize()
         _cost[i].quadratize(_xtrj.col(i), _utrj.col(i));
     }
 
-    _cost.back().quadratize(_xtrj.col(_N), Eigen::VectorXd());
+    _cost.back().quadratize(_xtrj.col(_N), _utrj.col(_N-1)); // note: input not used here!
 }
 
 void IterativeLQR::backward_pass()

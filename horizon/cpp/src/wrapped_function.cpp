@@ -31,6 +31,13 @@ WrappedFunction::WrappedFunction(casadi::Function f):
 
 void WrappedFunction::setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi)
 {
+    if(xi.size() != _f.size1_in(i))
+    {
+        abort();
+        throw std::invalid_argument(_f.name() + ": input size mismatch");
+
+    }
+
     _in_buf[i] = xi.data();
 }
 
