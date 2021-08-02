@@ -93,6 +93,8 @@ private:
         // valid flag
         bool valid;
 
+        Constraint();
+
         void linearize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
 
         void setConstraint(casadi::Function h);
@@ -106,6 +108,11 @@ private:
         int dim;
 
         ConstraintToGo(int nx);
+
+        void add(Eigen::Ref<const Eigen::MatrixXd> C,
+                 Eigen::Ref<const Eigen::VectorXd> h);
+
+        void clear();
     };
 
     struct IntermediateCost

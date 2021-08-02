@@ -25,6 +25,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _N(N),
     _f(fdyn),
     _cost(N+1, IntermediateCost(_nx, _nu)),
+    _constraint(N+1),
     _value(N+1, ValueFunction(_nx)),
     _dyn(N, Dynamics(_nx, _nu)),
     _bp_res(N, BackwardPassResult(_nx, _nu)),
@@ -95,9 +96,14 @@ void IterativeLQR::linearize_quadratize()
 
 void IterativeLQR::backward_pass()
 {
-    // initialize backward recursion from final cost
+    // initialize backward recursion from final cost..
     _value.back().S = _cost.back().Q();
     _value.back().s = _cost.back().q();
+
+    // ..and constraint
+    _constraint_to_go.clear();
+    _constraint_to_go.add(_constraint.back().C(),
+                          _constraint.back().h());
 
     // backward pass
     for(int i = _N-1; i >= 0; i--)
