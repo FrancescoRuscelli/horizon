@@ -407,14 +407,8 @@ class Problem:
 
         return self
 
-class ClassTry:
-    def __init__(self, a):
-        self.dani = list()
-        for i in range(100000000):
-            self.dani.append(a)
-
-
 if __name__ == '__main__':
+    # MULTIPLE SHOOTING
 
     import horizon.utils.transcription_methods as tm
     import horizon.utils.integrators as integ
