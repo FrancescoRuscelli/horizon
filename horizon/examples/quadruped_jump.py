@@ -102,17 +102,19 @@ lift_node = 10
 touch_down_node = 30
 q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.9, 0.0, 0.0, 0.0, 1.0]).tolist()
 
-prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes= list(range(lift_node, touch_down_node)))
-#prb.createCostFunction("floating_base_quaternion", 0.1*cs.dot(q[3:7] - q_fb_trg[3:7], q[3:7] - q_fb_trg[3:7]))
+prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes=list(range(lift_node, touch_down_node)))
 prb.createCostFunction("min_qdot", 10.*cs.dot(qdot, qdot))
-#prb.createCostFunction("min_qddot", 0.001*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
+#prb.createCostFunction("min_qddot", 1e-4*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
+#prb.createCostFunction("min_force", 1e-4*cs.dot( f1 + f2 + f3 + f4, f1 + f2 + f3 + f4), nodes=list(range(0, ns)))
 
-f1_prev = f1.getVarOffset(-1)
-f2_prev = f2.getVarOffset(-1)
-f3_prev = f3.getVarOffset(-1)
-f4_prev = f4.getVarOffset(-1)
-#prb.createCostFunction("min_deltaforce", 0.001*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
-#                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)), nodes= list(range(1, ns)))
+
+#f1_prev = f1.getVarOffset(-1)
+#f2_prev = f2.getVarOffset(-1)
+#f3_prev = f3.getVarOffset(-1)
+#f4_prev = f4.getVarOffset(-1)
+#prb.createCostFunction("min_deltaforce", 1e-4*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
+#                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)),
+#                                                      nodes= list(range(1, ns)))
 
 # Constraints
 q_prev = q.getVarOffset(-1)
@@ -200,7 +202,10 @@ for i in range(ns):
 # resampling
 dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'Contact3': f3_hist, 'Contact4': f4_hist}
-q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, dt_hist.flatten(), dt, dae, frame_force_hist_mapping, kindyn, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(
+                                                                        q_hist, qdot_hist, qddot_hist, dt_hist.flatten(),
+                                                                        dt, dae, frame_force_hist_mapping, kindyn,
+                                                                        cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
 PLOTS = True
 if PLOTS:
@@ -226,6 +231,27 @@ if PLOTS:
     plt.suptitle('$\mathrm{Base \ Forces \ Resampled}$', size=20)
     plt.xlabel('$\mathrm{[sec]}$', size=20)
     plt.ylabel('$\mathrm{[N]}$', size=20)
+
+    plt.figure()
+    for i in range(q_res.shape[0]):
+        plt.plot(time, q_res[i, :])
+    plt.suptitle('$\mathrm{q \ Resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{q}$', size=20)
+
+    plt.figure()
+    for i in range(qdot_res.shape[0]):
+        plt.plot(time, qdot_res[i, :])
+    plt.suptitle('$\mathrm{\dot{q} \ Resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{\dot{q}}$', size=20)
+
+    plt.figure()
+    for i in range(qddot_res.shape[0]):
+        plt.plot(time[:-1], qddot_res[i, :])
+    plt.suptitle('$\mathrm{\ddot{q} \ Resampled}$', size=20)
+    plt.xlabel('$\mathrm{[sec]}$', size=20)
+    plt.ylabel('$\mathrm{\ddot{q}}$', size=20)
 
     plt.show()
 
