@@ -6,6 +6,7 @@ import numpy as np
 from horizon import problem
 from horizon.utils import utils, casadi_kin_dyn
 from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.utils.plotter import PlotterHorizon
 import matplotlib.pyplot as plt
 import os
 
@@ -99,6 +100,12 @@ plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[m]}$', size = 20)
 plt.show()
+
+plot_all = True
+if plot_all:
+    hplt = PlotterHorizon(prb)
+    hplt.plotVariables()
+    hplt.plotFunctions()
 
 if do_replay:
     joint_list=["cart_joint", "pole_joint"]

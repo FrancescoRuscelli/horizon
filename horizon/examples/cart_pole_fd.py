@@ -88,9 +88,11 @@ plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[m]}$', size = 20)
 
-# plot
-plt = plotter.PlotterHorizon(sol=solution)
-plt.plotVariables()
+plot_all = True
+if plot_all:
+    hplt = plotter.PlotterHorizon(prb)
+    hplt.plotVariables()
+    hplt.plotFunctions()
 
 joint_list=["cart_joint", "pole_joint"]
 replay_trajectory(tf/ns, joint_list, q_hist).replay(is_floating_base=False)

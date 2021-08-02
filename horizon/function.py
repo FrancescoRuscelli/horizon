@@ -17,8 +17,8 @@ class Function:
             for item in val:
                 all_vars.append(item)
 
+        # todo very careful about ordering! (however, list order should be persistent)
         self.vars = used_vars # todo isn't there another way to get the variables from the function g?
-
         self.fun = cs.Function(name, all_vars, [self.f])
         self.fun_impl = dict()
 
@@ -41,6 +41,7 @@ class Function:
 
     def _project(self, node, used_vars):
         # print('projected fun "{}" with vars {}:'.format(self.fun, used_vars))
+        # todo are we 100% sure the order of the input variables is right?
         self.fun_impl['n' + str(node)] = self.fun(*used_vars)
         return self.fun_impl['n' + str(node)]
 
@@ -61,7 +62,6 @@ class Function:
 
     def getVariables(self):
         return self.vars
-        # return [var for name, var in self.var]
 
     def getType(self):
         return 'generic'
@@ -158,17 +158,25 @@ class Constraint(Function):
         self.setLowerBounds(lb, nodes)
         self.setUpperBounds(ub, nodes)
 
+    def _getVals(self, val_type, node):
+        if node is None:
+            vals = np.zeros([self.f.shape[0], len(self.nodes)])
+            for dim in range(self.f.shape[0]):
+                vals[dim, :] = np.hstack([self.bounds['n' + str(i)][val_type][dim] for i in self.nodes])
+        else:
+            vals = self.bounds['n' + str(node)][val_type]
+        return vals
 
-    def getLowerBounds(self, node):
-        lb = self.bounds['n' + str(node)]['lb']
+    def getLowerBounds(self, node=None):
+        lb = self._getVals('lb', node)
         return lb
 
-    def getUpperBounds(self, node):
-        ub = self.bounds['n' + str(node)]['ub']
+    def getUpperBounds(self, node=None):
+        ub = self._getVals('ub', node)
         return ub
 
-    def getBounds(self, nodes):
-        return [self.getLowerBounds(nodes), self.getUpperBounds(nodes)]
+    def getBounds(self, nodes=None):
+        return self.getLowerBounds(nodes), self.getUpperBounds(nodes)
 
     def setNodes(self, nodes, erasing=False):
         # unraveled_nodes = misc.unravelElements(nodes)

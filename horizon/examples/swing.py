@@ -4,7 +4,7 @@ import logging
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
@@ -143,8 +143,7 @@ opts = {
     'ipopt.tol': 1e-3
     , 'ipopt.constr_viol_tol': 1e-3
     , 'ipopt.max_iter': 4000
-    , 'ipopt.linear_solver': 'ma57'
-}
+    , 'ipopt.linear_solver': 'ma57'}
 
 solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
 prb.setSolver(solver)
@@ -228,6 +227,12 @@ if PRINT:
     plt.ylabel('$\mathrm{[sec]}$', size=20)
 
     plt.show()
+
+inbuild_plot = False
+if inbuild_plot:
+    hplt = plotter.PlotterHorizon(prb)
+    hplt.plotVariables()
+    hplt.plotFunctions()
 
 # REPLAY TRAJECTORY
 # resampling

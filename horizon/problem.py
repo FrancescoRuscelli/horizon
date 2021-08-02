@@ -16,6 +16,7 @@ class Problem:
 
         self.opts = None
         self.solver = None
+        self.__solution = None
         self.sol = None # store solution from solver
         self.default_solver = cs.nlpsol
         self.default_solver_plugin = 'ipopt'
@@ -84,10 +85,12 @@ class Problem:
     def _getUsedVar(self, f):
         used_var = dict()
         for name_var, value_var in self.var_container.getVarAbstrDict().items():
-            used_var[name_var] = list()
             for var in value_var:
                 if cs.depends_on(f, var):
+                    if name_var not in used_var:
+                        used_var[name_var] = list()
                     used_var[name_var].append(var)
+
 
         return used_var
 
@@ -106,7 +109,7 @@ class Problem:
         used_var = self._getUsedVar(g)
 
         if self.debug_mode:
-            self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes}')
+            self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes} using vars {used_var}')
 
         # create internal representation of a constraint
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
@@ -230,10 +233,6 @@ class Problem:
             self.logger.warning('Problem is not created. Nothing to solve!')
             return 0
 
-        if self.solver is None:
-            self.logger.warning('Solver not set. Using default solver nlpsol.ipopt!')
-            self._makeDefaultSolver()
-
         self.var_container.updateBounds()
         self.var_container.updateInitialGuess()
 
@@ -314,13 +313,51 @@ class Problem:
 
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
-        return solution_dict
+        self.__solution = solution_dict
+        return self.__solution
 
-    def getStateVariables(self):
-        return self.var_container.getVarAbstrDict()
+    def getSolution(self):
+        return self.__solution
 
-    def getConstraints(self):
-        return self.function_container.getCnstrFDict()
+    def getVariables(self, name=None):
+
+        if name is None:
+            var = self.var_container.getVarAbstrDict(past=False)
+        else:
+            var = self.var_container.getVarAbstrDict(past=False)[name]
+
+        return var
+
+    def getConstraints(self, name=None):
+
+        if name is None:
+            fun = self.function_container.getCnstrFDict()
+        else:
+            fun = self.function_container.getCnstrFDict()[name]
+
+        return fun
+
+    def evalFun(self, fun):
+        """
+        input: name of the function to evaluate
+        return: fun evaluated at all nodes using the solution of horizon problem
+        """
+        if self.__solution is None:
+            raise Exception('The solution of the horizon problem is not computed yet. Cannot evaluate function.')
+
+        fun_to_evaluate = fun.getFunction()
+        all_vars = list()
+        for var_name, var_list in fun.getVariables().items():
+            for var in var_list:
+                # careful about ordering
+                # todo this is very ugly, but what can I do (wanted to do it without the if)
+                if isinstance(var, sv.SingleVariable):
+                    all_vars.append(self.__solution[var_name])
+                else:
+                    all_vars.append(self.__solution[var_name][:, np.array(fun.getNodes()) + var.offset])
+
+        fun_evaluated = fun_to_evaluate(*all_vars).toarray()
+        return fun_evaluated
 
     def scopeNodeVars(self, node):
 

@@ -5,7 +5,7 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
@@ -116,11 +116,14 @@ prb.createCostFunction("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_
 prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))
 prb.createConstraint("qdotinit", qdot, nodes=0, bounds=dict(lb=qdot_init, ub=qdot_init))
 
-q_prev = q.getVarOffset(-1)
-qdot_prev = qdot.getVarOffset(-1)
-qddot_prev = qddot.getVarOffset(-1)
-x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
-x_int = F_integrator(x0=x_prev, p=qddot_prev)
+state = prb.getState()
+state_prev = state.getVarOffset(-1)
+input = prb.getInput()
+input_prev = input.getVarOffset(-1)
+
+x_prev, _ = utils.double_integrator_with_floating_base(state_prev[0], state_prev[1], input_prev[0])
+x_int = F_integrator(x0=x_prev, p=input_prev[0])
+
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
@@ -156,6 +159,12 @@ solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
 prb.setSolver(solver)
 
 solution = prb.solveProblem()
+
+plot_all = True
+if plot_all:
+    hplt = plotter.PlotterHorizon(prb)
+    hplt.plotVariables()
+    hplt.plotFunctions()
 
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]

@@ -70,29 +70,31 @@ class SingleVariable(AbstractVariable):
         var_impl = self.var_impl['var']
         return var_impl
 
-    def getLowerBounds(self, dummy_node):
-        bound_min = self.var_impl['lb']
-        return bound_min
+    def _getVals(self, val_type, dummy_node):
+        if dummy_node is None:
+            vals = np.array([self.var_impl[val_type]]).T
+        else:
+            vals = self.var_impl[val_type]
 
-    def getUpperBounds(self, dummy_node):
-        bound_max = self.var_impl['ub']
-        return bound_max
+        return vals
 
-    def getBounds(self, dummy_node):
-        return [self.getBoundMin(dummy_node), self.getBoundMax(dummy_node)]
+    def getLowerBounds(self, dummy_node=None):
+        return self._getVals('lb', dummy_node)
 
-    def getInitialGuess(self, dummy_node):
-        initial_guess = self.var_impl['w0']
-        return initial_guess
+    def getUpperBounds(self, dummy_node=None):
+        return self._getVals('ub', dummy_node)
+
+    def getBounds(self, dummy_node=None):
+        return self.getLowerBounds(dummy_node), self.getUpperBounds(dummy_node)
+
+    def getInitialGuess(self, dummy_node=None):
+        return self._getVals('w0', dummy_node)
 
     def getNodes(self):
         return [-1]
 
     def getVarOffsetDict(self):
         return dict()
-
-    # def getNodes(self):
-    #     return []
 
     def getImplDim(self):
         return self.shape[0]
@@ -229,20 +231,26 @@ class Variable(AbstractVariable):
         var_impl = self.var_impl['n' + str(node)]['var']
         return var_impl
 
-    def getLowerBounds(self, node):
-        bound_min = self.var_impl['n' + str(node)]['lb']
-        return bound_min
+    def _getVals(self, val_type, node):
+        if node is None:
+            vals = np.zeros([self.shape[0], len(self.nodes)])
+            for dim in range(self.shape[0]):
+                vals[dim, :] = np.hstack([self.var_impl['n' + str(i)][val_type][dim] for i in self.nodes])
+        else:
+            vals = self.var_impl['n' + str(node)][val_type]
+        return vals
 
-    def getUpperBounds(self, node):
-        bound_max = self.var_impl['n' + str(node)]['ub']
-        return bound_max
+    def getLowerBounds(self, node=None):
+        return self._getVals('lb', node)
 
-    def getBounds(self, node):
-        return [self.getLowerBounds(node), self.getUpperBounds(node)]
+    def getUpperBounds(self, node=None):
+        return self._getVals('ub', node)
 
-    def getInitialGuess(self, node):
-        initial_guess = self.var_impl['n' + str(node)]['w0']
-        return initial_guess
+    def getBounds(self, node=None):
+        return self.getLowerBounds(node), self.getUpperBounds(node)
+
+    def getInitialGuess(self, node=None):
+        return self._getVals('w0', node)
 
     def getImplDim(self):
         return self.shape[0] * len(self.getNodes())
@@ -272,6 +280,9 @@ class AbstractAggregate():
 
     def __iter__(self):
         yield from self.var_list
+
+    def __getitem__(self, ind):
+        return self.var_list[ind]
 
 
 class Aggregate(AbstractAggregate):
