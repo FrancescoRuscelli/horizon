@@ -1,6 +1,8 @@
 #include <casadi/casadi.hpp>
 #include <Eigen/Dense>
 
+#include "wrapped_function.h"
+
 namespace horizon
 {
 

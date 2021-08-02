@@ -6,6 +6,7 @@ find_package(casadi 3.5.5 REQUIRED)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
+# ilqr library
 add_library(ilqr STATIC
     src/ilqr.cpp
 )
@@ -19,3 +20,8 @@ find_package(pybind11 REQUIRED)
 
 pybind11_add_module(pyilqr pyilqr.cpp)
 target_link_libraries(pyilqr PUBLIC ilqr)
+
+
+# test executable
+add_executable(ilqr_test src/ilqr_test.cpp)
+target_link_libraries(ilqr_test ilqr)
