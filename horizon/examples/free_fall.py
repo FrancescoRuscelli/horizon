@@ -10,7 +10,7 @@ from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
 # Switch between suspended and free fall
-FREE_FALL = False
+FREE_FALL = True
 
 # Loading URDF model in pinocchio
 urdf = rospy.get_param('robot_description')

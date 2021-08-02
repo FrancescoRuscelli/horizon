@@ -76,9 +76,7 @@ prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
 
 # Creates problem
-opts = {"nlpsol.ipopt":True}
-prb.createProblem(opts)
-
+prb.createProblem()
 solution = prb.solveProblem()
 q_hist = solution["q"]
 

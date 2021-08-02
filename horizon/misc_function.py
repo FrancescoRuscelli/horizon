@@ -31,16 +31,16 @@ def listOfListFLOATtoINT(listOfList):
     return listOfList
 
 def checkNodes(nodes, nodes_self):
-    if nodes is None:
-        nodes = nodes_self
-    else:
-        if hasattr(nodes, "__iter__") and not isinstance(nodes, str):
-            nodes = [node for node in nodes if node in nodes_self]
-        elif isinstance(nodes, int):
-            nodes = [nodes] if nodes in nodes_self else []
-        else:
-            raise Exception('Type {} is not supported to specify nodes.'.format(type(nodes)))
 
+    if hasattr(nodes, "__iter__") and not isinstance(nodes, str):
+        nodes = [node for node in nodes if node in nodes_self]
+    elif isinstance(nodes, int):
+        nodes = [nodes] if nodes in nodes_self else []
+    else:
+        raise Exception('Type {} is not supported to specify nodes.'.format(type(nodes)))
+
+    # todo ADD WARNING if node (or nodes) are NOT present in own nodes.
+    #  (basically, when setting bounds for some node, it is left out because the var/fun does not exist in that node
     return nodes
 
 def checkValueEntry(val):

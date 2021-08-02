@@ -1,3 +1,5 @@
+import time
+
 import casadi as cs
 from horizon import function as fc
 from horizon import nodes as nd
@@ -15,6 +17,9 @@ class Problem:
         self.opts = None
         self.solver = None
         self.sol = None # store solution from solver
+        self.default_solver = cs.nlpsol
+        self.default_solver_plugin = 'ipopt'
+
         self.logger = logging.getLogger('logger')
         self.logger.setLevel(level=logging_level)
         self.debug_mode = self.logger.isEnabledFor(logging.DEBUG)
@@ -43,6 +48,10 @@ class Problem:
     def createInputVariable(self, name, dim):
         var = self.var_container.setInputVar(name, dim)
         self.input_aggr.addVariable(var)
+        return var
+
+    def createVariable(self, name, dim, nodes=None):
+        var = self.var_container.setVar(name, dim, nodes)
         return var
 
     # def setVariable(self, name, var):
@@ -88,8 +97,10 @@ class Problem:
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
 
-        # get nodes as a list
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        if nodes is None:
+            nodes = range(self.nodes)
+        else:
+            nodes = misc.checkNodes(nodes, range(self.nodes))
 
         # get vars that constraint depends upon
         used_var = self._getUsedVar(g)
@@ -117,7 +128,10 @@ class Problem:
 
     def createCostFunction(self, name, j, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        if nodes is None:
+            nodes = range(self.nodes)
+        else:
+            nodes = misc.checkNodes(nodes, range(self.nodes))
 
         used_var = self._getUsedVar(j)
 
@@ -160,23 +174,19 @@ class Problem:
     def getNNodes(self) -> int:
         return self.nodes
 
-    def createProblem(self, opts=None):
-
-        if opts is not None:
-            self.opts = opts
+    def createProblem(self, solver_type=None, solver_plugin=None, opts=None):
 
         # this is to reset both the constraints and the cost functions everytime I create a problem
         self.var_container.clear()
         self.function_container.clear()
 
-        for k in range(self.nodes):
         # implement the abstract state variable with the current node
-            self.var_container.update(k)
+        self.var_container.build()
 
-        for k in range(self.nodes):
         # implement the constraints and the cost functions with the current node
-            self.function_container.update(k)
+        self.function_container.build()
 
+        # get j, w, g
         j = self.function_container.getCostFImplSum()
         w = self.var_container.getVarImplList()
         g = self.function_container.getCnstrFList()
@@ -194,10 +204,15 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        if self.opts is not None:
-            if "nlpsol.ipopt" in self.opts:
-                if self.opts["nlpsol.ipopt"]:
-                    self.solver = cs.nlpsol('solver', 'ipopt', self.prob)
+        if self.solver is None:
+            if solver_type is None:
+                solver_type = self.default_solver
+            if solver_plugin is None:
+                solver_plugin = self.default_solver_plugin
+            if opts is None:
+                opts = dict()
+
+            self.solver = solver_type('solver', solver_plugin, self.prob, opts)
 
     def getProblem(self):
         return self.prob
@@ -211,9 +226,13 @@ class Problem:
     def solveProblem(self):
 
         # t_start = time.time()
-        if self.solver is None:
+        if self.prob is None:
             self.logger.warning('Problem is not created. Nothing to solve!')
             return 0
+
+        if self.solver is None:
+            self.logger.warning('Solver not set. Using default solver nlpsol.ipopt!')
+            self._makeDefaultSolver()
 
         self.var_container.updateBounds()
         self.var_container.updateInitialGuess()
@@ -248,13 +267,13 @@ class Problem:
 
 
             # self.logger.debug('================')
-            # self.logger.debug('w: {}'.format(w))
-            # self.logger.debug('lbw: {}'.format(lbw))
-            # self.logger.debug('ubw: {}'.format(ubw))
-            # self.logger.debug('g: {}'.format(g))
-            # self.logger.debug('lbg: {}'.format(lbg))
-            # self.logger.debug('ubg: {}'.format(ubg))
-            # self.logger.debug('j: {}'.format(j))
+            self.logger.debug('w: {}'.format(w))
+            self.logger.debug('lbw: {}'.format(lbw))
+            self.logger.debug('ubw: {}'.format(ubw))
+            self.logger.debug('g: {}'.format(g))
+            self.logger.debug('lbg: {}'.format(lbg))
+            self.logger.debug('ubg: {}'.format(ubg))
+            self.logger.debug('j: {}'.format(j))
 
         # t_to_set_up = time.time() - t_start
         # print('T to set up:', t_to_set_up)
@@ -273,15 +292,24 @@ class Problem:
         w_opt = self.sol['x'].full().flatten()
 
         # split solution for each variable
-        solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.var_container.getVarAbstrDict(past=False).items()}
+        solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in self.var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
         for node, val in self.var_container.getVarImplDict().items():
-            for name, var in val.items():
-                dim = var['var'].shape[0]
-                node_number = int(node[node.index('n') + 1:])
-                solution_dict[name][:, node_number] = w_opt[pos:pos + dim]
-                pos = pos + dim
+            if node == 'nNone':
+                for name, var in val.items():
+                    dim = var['var'].shape[0]
+                    solution_dict[name][:, 0] = w_opt[pos:pos + dim]
+                    pos = pos + dim
+            else:
+                for name, var in val.items():
+                    node_number = int(node[node.index('n') + 1:])
+                    var_nodes = self.var_container.getVarAbstrDict(past=False)[name].getNodes()
+                    if node_number in var_nodes:
+                        dim = var['var'].shape[0]
+                        solution_dict[name][:, node_number - var_nodes[0]] = w_opt[pos:pos + dim]
+                        pos = pos + dim
+
 
 
         # t_to_finish = time.time() - t_start
@@ -344,6 +372,12 @@ class Problem:
 
         return self
 
+class ClassTry:
+    def __init__(self, a):
+        self.dani = list()
+        for i in range(100000000):
+            self.dani.append(a)
+
 
 if __name__ == '__main__':
 
@@ -353,24 +387,40 @@ if __name__ == '__main__':
     prb = Problem(nodes, logging_level=logging.DEBUG)
     x = prb.createStateVariable('x', 2)
     v = prb.createStateVariable('v', 2)
+    k = prb.createVariable('k', 2, range(2, 8))
     u = prb.createInputVariable('u', 2)
+    t_tot = prb.createVariable('t', 2)
+    t_tot.setBounds([100, 100], [100, 100])
 
-    print(x.getNNodes())
-    print(u.getNNodes())
 
-    print(prb.var_container.getVarsDim())
-    danieli = prb.createConstraint('danieli', x)
+    # danieli = prb.createConstraint('danieli', x-k, nodes=range(2, 8))
+    diosporco = prb.createConstraint('diosporcomaledetto', x - t_tot)
+    diosporco.setBounds([100, 100], [100, 100])
     xprev = x.getVarOffset(-1)
+
     xprev_copy = x.getVarOffset(-1)
     xnext = x.getVarOffset(+1)
 
-    print(id(xprev))
-    print(id(xprev_copy))
+    opts = {'ipopt.tol': 1e-4,
+            'ipopt.max_iter': 2000}
+
+    prb.createProblem(opts=opts)
+
+    print(prb.getProblem()['x'])
+
+    prb.solveProblem()
+
+
     exit()
+    # print(id(xprev))
+    # print(id(xprev_copy))
+    # exit()
     state = prb.getState()
     state_prev = state.getVarOffset(-1)
 
-
+    state.setBounds([0, 0], [0, 0], 2)
+    print(state.getBounds(2))
+    exit()
 
     dt = 0.01
     state_dot = cs.vertcat(v, u)
@@ -505,7 +555,7 @@ if __name__ == '__main__':
     sucua = prb.createCostFunction('sucua', x*y, nodes=list(range(3, 15)))
     pellico = prb.createCostFunction('pellico', x-y, nodes=[0, 4, 6])
 
-    danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=3)
+    danieli.setBounds(lb=[-1, -1], ub=[1, 1], nodes=3)
 
     prb.createProblem({"nlpsol.ipopt":True})
 

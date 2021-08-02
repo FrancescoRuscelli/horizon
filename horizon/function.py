@@ -124,7 +124,11 @@ class Constraint(Function):
 
     def setLowerBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, self.nodes)
+        if nodes is None:
+            nodes = self.nodes
+        else:
+            nodes = misc.checkNodes(nodes, self.nodes)
+
         bounds = misc.checkValueEntry(bounds)
 
         for node in nodes:
@@ -135,7 +139,11 @@ class Constraint(Function):
 
     def setUpperBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, self.nodes)
+        if nodes is None:
+            nodes = self.nodes
+        else:
+            nodes = misc.checkNodes(nodes, self.nodes)
+
         bounds = misc.checkValueEntry(bounds)
 
         for node in nodes:
@@ -226,37 +234,38 @@ class FunctionsContainer:
     def getCostFDict(self):
         return self.costfun_container
 
-    def update(self, node):
-        self.updateFun(node, self.cnstr_container, self.cnstr_impl)
-        self.updateFun(node, self.costfun_container, self.costfun_impl)
+    def build(self):
+        self.updateFun(self.cnstr_container, self.cnstr_impl)
+        self.updateFun(self.costfun_container, self.costfun_impl)
 
-    def updateFun(self, node, container, container_impl):
+    def updateFun(self, container, container_impl):
 
-        container_impl['n' + str(node)] = dict()
+        for node in range(self.nodes):
+            container_impl['n' + str(node)] = dict()
 
-        # TODO be careful about ordering
-        # todo I really hate this implementation! Find a better one for used_vars
-        for fun_name, fun in container.items():
-            if node in fun.getNodes():
-                used_vars = list()
-                for name, val in fun.getVariables().items():
-                    for item in val:
-                        var = self.state_vars.getVarImpl(name, node + item.offset)
-                        if var is None:
-                            raise Exception(f'Variable out of scope: {item} does not exist at node {node}')
-                        used_vars.append(var)
+            # TODO be careful about ordering
+            # todo I really hate this implementation! Find a better one for used_vars
+            for fun_name, fun in container.items():
+                if node in fun.getNodes():
+                    used_vars = list()
+                    for name, val in fun.getVariables().items():
+                        for item in val:
+                            var = self.state_vars.getVarImpl(name, node + item.offset)
+                            if var is None:
+                                raise Exception(f'Variable out of scope: {item} does not exist at node {node}')
+                            used_vars.append(var)
 
-                f_impl = fun._project(node, used_vars)
-                if fun.getType() == 'constraint':
-                    lb = fun.getLowerBounds(node)
-                    ub = fun.getUpperBounds(node)
-                    fun_dict = dict(val=f_impl, lb=lb, ub=ub)
-                else:
-                    fun_dict = f_impl
+                    f_impl = fun._project(node, used_vars)
+                    if fun.getType() == 'constraint':
+                        lb = fun.getLowerBounds(node)
+                        ub = fun.getUpperBounds(node)
+                        fun_dict = dict(val=f_impl, lb=lb, ub=ub)
+                    else:
+                        fun_dict = f_impl
 
-                container_impl['n' + str(node)].update({fun_name: fun_dict})
-                # print('==================================================')
-                self.logger.debug(f'Implemented function "{fun_name}" of type {fun.getType()}: {f_impl} with vars {used_vars} at node {node}')
+                    container_impl['n' + str(node)].update({fun_name: fun_dict})
+                    # print('==================================================')
+                    self.logger.debug(f'Implemented function "{fun_name}" of type {fun.getType()}: {f_impl} with vars {used_vars} at node {node}')
 
     def getCnstrDim(self):
 
