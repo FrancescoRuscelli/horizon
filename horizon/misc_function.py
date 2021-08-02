@@ -1,3 +1,5 @@
+import numpy as np
+
 def unravelElements(elements):
     if isinstance(elements, int):
         unraveled_elem = [elements]
@@ -41,7 +43,13 @@ def checkNodes(nodes, nodes_self):
 
     return nodes
 
+def checkValueEntry(val):
+    if isinstance(val, (int, float)):
+        val = np.array([val])
+    else:
+        val = np.array(val).flatten()
 
+    return val
 
 if __name__ == '__main__':
     penis = [[1, 5], [3, 9], [12, 18]]

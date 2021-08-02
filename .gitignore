@@ -1,2 +1,4 @@
 *.pyc
 .idea
+
+casadi_horizon.egg-info/

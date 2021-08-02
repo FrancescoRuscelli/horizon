@@ -3,9 +3,9 @@
 from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
-import logging
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, casadi_kin_dyn
+from horizon.utils.transcription_methods import TranscriptionsHandler
 import matplotlib.pyplot as plt
 import os
 
@@ -27,8 +27,10 @@ print("nq: ", nq)
 print("nv: ", nv)
 
 # OPTIMIZATION PARAMETERS
+tf = 5.0  # [s]
 ns = 100  # number of shooting nodes
-use_ms = False
+dt = tf/ns
+use_ms = True
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -42,18 +44,7 @@ qddot = prb.createInputVariable("qddot", nv)
 
 # Creates double integrator
 x, xdot = utils.double_integrator(q, qdot, qddot)
-
-q_prev = q.getVarOffset(-1)
-qdot_prev = qdot.getVarOffset(-1)
-qddot_prev = qddot.getVarOffset(-1)
-x_prev, _ = utils.double_integrator(q_prev, qdot_prev, qddot_prev)
-
-# Formulate discrete time dynamics
-tf = 5.0  # [s]
-L = 0.5*cs.dot(qdot, qdot)  # Objective term
-dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
-opts = {'tf': tf/ns}
-F_integrator = integrators.RK4(dae, opts, cs.SX)
+prb.setDynamics(xdot)
 
 # Limits
 q_min = [-0.5, -2.*np.pi]
@@ -77,24 +68,23 @@ qdot.setInitialGuess(qdot_init)
 qddot.setInitialGuess(qddot_init)
 
 # Cost function
-l = F_integrator(x0=x, p=qddot)
-prb.createCostFunction("qddot", cs.dot(qddot, qddot), nodes=0)
-prb.createCostFunction("L", l["qf"], nodes=list(range(0, ns)))
+prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
-# Constraints
+# Dynamics
+th = TranscriptionsHandler(prb, dt)
 if use_ms:
-    x_int = F_integrator(x0=x_prev, p=qddot_prev)
-    prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns+1))
+    th.setDefaultIntegrator(type='EULER')
+    th.setMultipleShooting()
 else:
-    integrators.make_direct_collocation(prb, x, x_prev, xdot, degree=3, dt=tf/ns)
+    th.setDirectCollocation()
 
-prb.createConstraint("up", q[1] - np.pi, nodes=ns)
-prb.createConstraint("final_qdot", qdot - np.array([0., 0.]), nodes=ns)
+prb.createFinalConstraint("up", q[1] - np.pi)
+prb.createFinalConstraint("final_qdot", qdot)
 
 
 tau_lims = np.array([1000., 0.])
 tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-prb.createConstraint("inverse_dynamics", tau, nodes=range(ns), bounds=dict(lb=-tau_lims, ub=tau_lims))
+prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
 opts = {"nlpsol.ipopt": True}
