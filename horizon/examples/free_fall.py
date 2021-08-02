@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import logging
 
-import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
 import rospy
 import casadi as cs
 import numpy as np

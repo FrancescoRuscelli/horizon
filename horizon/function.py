@@ -323,6 +323,14 @@ class FunctionsContainer:
 
         return cs.vertcat(*cnstr_impl)
 
+    def getCostFList(self):
+        cost_impl = list()
+        for node in self.costfun_impl.values():
+            for elem in node.values():
+                cost_impl.append(elem)
+
+        return cs.vertcat(*cost_impl)
+
     def getLowerBoundsList(self):
 
         lbg = np.zeros(self.getCnstrDim())

@@ -1,5 +1,46 @@
 import casadi as cs
 
+def jac(dict, var_string_list, function_string_list):
+    """
+    Args:
+        dict: dictionary which maps variables and functions, eg. {'x': x, 'u': u, 'f': f}
+        var_string_list: list of variables in dict, eg. ['x', 'u']
+        function_string_list: list of functions in dict, eg. ['f']
+    Returns:
+        F: casadi Function for evaluation
+        jac: dictionary with expression of derivatives
+
+    NOTE: check /tests/jac_test.py for example of usage for Jacobian and Hessian computation
+    """
+    f = {}
+    for function in function_string_list:
+        f[function] = dict[function]
+
+    vars_dict = {}
+    X = []
+    for var in var_string_list:
+        vars_dict[var] = dict[var]
+        X.append(dict[var])
+
+    jac_list = []
+    jac_id_list = []
+    for function_key in f:
+        for var in var_string_list:
+            id = "D" + function_key + 'D' + var
+            jac_id_list.append(id)
+            jac_list.append(cs.jacobian(f[function_key], vars_dict[var]))
+
+    jac_map = {}
+    i = 0
+    for jac_id in jac_id_list:
+        jac_map[jac_id] = jac_list[i]
+        i += 1
+
+    F = cs.Function('jacobian', X, jac_list, var_string_list, jac_id_list)
+
+    return F, jac_map
+
+
 def skew(q):
     """
     Create skew matrix from vector part of quaternion

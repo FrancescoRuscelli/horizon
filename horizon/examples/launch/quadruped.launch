@@ -8,7 +8,7 @@
     </node>
     
     <!-- publish the mesh of the plane on rviz for visualization purposes -->
-    <node name="mesh_viz_plane" pkg="mesh_viz" type="mesh_viz_node" output="screen">
+    <!-- node name="mesh_viz_plane" pkg="mesh_viz" type="mesh_viz_node" output="screen">
         <param name="mesh_path" value="../stl/simple_box.stl" />
         <param name="scale_x" type="double" value="0.1"/>
         <param name="scale_y" type="double" value="2.0"/>
@@ -19,7 +19,7 @@
         <rosparam param="position">[0., 0., -0.77]</rosparam>
         <rosparam param="orientation">[0., 0.7, 0., 0.7]</rosparam>
         <rosparam param="rgba">[0.5, 0.5, 0.5, 0.5]</rosparam>
-    </node>
+    </node -->
     
     <!-- node type="rviz" name="rviz" pkg="rviz" args="-d quadruped.rviz" output="screen"/ -->
 
