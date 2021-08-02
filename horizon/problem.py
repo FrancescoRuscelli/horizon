@@ -16,7 +16,8 @@ class Problem:
 
         self.opts = None
         self.solver = None
-        self.solution = None
+        self.__solution = None
+        self.sol = None # store solution from solver
         self.default_solver = cs.nlpsol
         self.default_solver_plugin = 'ipopt'
 
@@ -206,14 +207,15 @@ class Problem:
 
         self.prob = {'f': j, 'x': w, 'g': g}
 
-        if solver_type is None:
-            solver_type = self.default_solver
-        if solver_plugin is None:
-            solver_plugin = self.default_solver_plugin
-        if opts is None:
-            opts = dict()
+        if self.solver is None:
+            if solver_type is None:
+                solver_type = self.default_solver
+            if solver_plugin is None:
+                solver_plugin = self.default_solver_plugin
+            if opts is None:
+                opts = dict()
 
-        self.solver = solver_type('solver', solver_plugin, self.prob, opts)
+            self.solver = solver_type('solver', solver_plugin, self.prob, opts)
 
     def getProblem(self):
         return self.prob
@@ -276,7 +278,7 @@ class Problem:
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
 
-        sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+        self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
 
         # t_to_solve = time.time() - t_start
         # print('T to solve:', t_to_solve)
@@ -286,7 +288,7 @@ class Problem:
             if not self.solver.stats()['success']:
                 raise Exception('Optimal solution NOT found.')
 
-        w_opt = sol['x'].full().flatten()
+        w_opt = self.sol['x'].full().flatten()
 
         # split solution for each variable
         solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in self.var_container.getVarAbstrDict(past=False).items()}
@@ -311,11 +313,11 @@ class Problem:
 
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
-        self.solution = solution_dict
-        return self.solution
+        self.__solution = solution_dict
+        return self.__solution
 
     def getSolution(self):
-        return self.solution
+        return self.__solution
 
     def getVariables(self, name=None):
 
@@ -340,7 +342,7 @@ class Problem:
         input: name of the function to evaluate
         return: fun evaluated at all nodes using the solution of horizon problem
         """
-        if self.solution is None:
+        if self.__solution is None:
             raise Exception('The solution of the horizon problem is not computed yet. Cannot evaluate function.')
 
         fun_to_evaluate = fun.getFunction()
@@ -350,9 +352,9 @@ class Problem:
                 # careful about ordering
                 # todo this is very ugly, but what can I do (wanted to do it without the if)
                 if isinstance(var, sv.SingleVariable):
-                    all_vars.append(self.solution[var_name])
+                    all_vars.append(self.__solution[var_name])
                 else:
-                    all_vars.append(self.solution[var_name][:, np.array(fun.getNodes()) + var.offset])
+                    all_vars.append(self.__solution[var_name][:, np.array(fun.getNodes()) + var.offset])
 
         fun_evaluated = fun_to_evaluate(*all_vars).toarray()
         return fun_evaluated
@@ -407,14 +409,8 @@ class Problem:
 
         return self
 
-class ClassTry:
-    def __init__(self, a):
-        self.dani = list()
-        for i in range(100000000):
-            self.dani.append(a)
-
-
 if __name__ == '__main__':
+    # MULTIPLE SHOOTING
 
     import horizon.utils.transcription_methods as tm
     import horizon.utils.integrators as integ
