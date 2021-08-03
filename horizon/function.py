@@ -153,6 +153,14 @@ class Constraint(Function):
         # print('function upper bounds: {}'.format(nodes))
 
     def setBounds(self, lb, ub, nodes=None):
+        """
+        Set bounds to variables.
+        Args:
+            lb: lower bounds
+            ub: upper bounds
+            nodes: nodes where bounds are applied (as iterable object)
+        NOTE: not bounded variables are bounded with [-inf, +inf]
+        """
 
         # todo wrong! check if lb and ub are the length of the variable!
         self.setLowerBounds(lb, nodes)

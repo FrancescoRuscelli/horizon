@@ -40,6 +40,15 @@ class Problem:
         self.state_der: cs.SX = None
 
     def createStateVariable(self, name, dim):
+        """
+        Create a state variable with name and dimension. The state variable is applied to all the specified nodes in the
+        problem plus the final state.
+        Args:
+            name: name of the variable
+            dim: dimension of the variable
+        Return:
+            var: variable
+        """
         if self.state_der is not None:
             raise RuntimeError('createStateVariable must be called *before* setDynamics')
         var = self.var_container.setStateVar(name, dim)
@@ -47,11 +56,29 @@ class Problem:
         return var
 
     def createInputVariable(self, name, dim):
+        """
+        Create an input (control) variable. The control variable is applied to all the nodes specified in the problem.
+        Args:
+            name: name of the variable
+            dim: dimension of the variable
+        Return:
+            var: variable
+        """
         var = self.var_container.setInputVar(name, dim)
         self.input_aggr.addVariable(var)
         return var
 
     def createVariable(self, name, dim, nodes=None):
+        """
+        Create a variable with:
+        Args:
+            name: variable name
+            dim: dimension of the variable
+            nodes: nodes where the variable is valid. NOTE: if nodes are NOT specified then the variable is considered as
+                a "single variable"
+        Return:
+            var: variable
+        """
         var = self.var_container.setVar(name, dim, nodes)
         return var
 
@@ -68,9 +95,19 @@ class Problem:
     #             return var
     #     return None
     def getState(self) -> sv.StateAggregate:
+        """
+        Retrieve aggregated state variables.
+        Return:
+            self.state_aggr: vertcat of state variables
+        """
         return self.state_aggr
 
     def getInput(self) -> sv.InputAggregate:
+        """
+        Retrieve aggregated input (control) variables.
+        Return:
+            self.input_aggr: vertcat of input variables
+        """
         return self.input_aggr
 
     def setDynamics(self, xdot: cs.SX):
@@ -130,6 +167,15 @@ class Problem:
         return self.createConstraint(name, g, nodes=nodes, bounds=bounds)    
 
     def createCostFunction(self, name, j, nodes=None):
+        """
+        Creates a generic cost piece of function with expression j, for certain nodes.
+        Args:
+            name: name of the piece of cost function
+            j: expression of the cost function (using defined variables)
+            nodes: nodes for which the piece of cost function is applied (as iterable)
+        Return:
+            fun: funciton object
+        """
 
         if nodes is None:
             nodes = range(self.nodes)

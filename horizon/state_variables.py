@@ -57,6 +57,11 @@ class SingleVariable(AbstractVariable):
         self.setUpperBounds(ub)
 
     def setInitialGuess(self, val):
+        """
+        Set initial value for a variable.
+        Args:
+            val: initial guess
+        """
 
         val = misc.checkValueEntry(val)
 
@@ -291,6 +296,14 @@ class Aggregate(AbstractAggregate):
         super().__init__(*args)
 
     def getVarOffset(self, offset):
+        """
+        Return a variable associated to a node defined by the offset.
+        Args:
+            offset: offset wrt the variable is considered.
+                E.g.: offset -1 is the previous node variable.
+        Return:
+            Variable at specified offset node
+        """
         var_list = list()
         for var in self.var_list:
             var_list.append(var.getVarOffset(offset))
