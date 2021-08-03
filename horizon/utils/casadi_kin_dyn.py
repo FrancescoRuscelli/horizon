@@ -2,6 +2,47 @@ from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
 
+def surface_point_contact(plane_dict, q, kindyn, frame):
+    """
+    Position ONLY constraint to lies into a plane: ax + by + cz +d = 0
+    todo:Add orientation as well
+    Args:
+        plane_dict: which contains following variables:
+                        - a
+                        - b
+                        - c
+                        - d
+                    to define the plane ax + by + cz +d = 0
+        q: position state variables
+        kindyn: casadi_kin_dyn object
+        frame: name of the point frame constrained in the plane
+    Returns:
+        constraint
+        lb
+        ub
+    """
+    P = np.array([0., 0., 0.])
+    d = 0.
+
+    if 'a' in plane_dict:
+        P[0] = plane_dict['a']
+    if 'b' in plane_dict:
+        P[1] = plane_dict['b']
+    if 'c' in plane_dict:
+        P[2] = plane_dict['c']
+
+    if 'd' in plane_dict:
+        d = plane_dict['d']
+
+    FK = cs.Function.deserialize(kindyn.fk(frame))
+    CLink_pos = FK(q=q)['ee_pos']
+
+    constraint = cs.dot(P, CLink_pos)
+    lb = -d
+    ub = -d
+    return constraint, lb, ub
+
+
 def linearized_friciton_cone(f, mu, R):
     """
     Args:
