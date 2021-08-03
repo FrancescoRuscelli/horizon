@@ -18,6 +18,8 @@ public:
 
     void setFinalCost(const casadi::Function& final_cost);
 
+    void setFinalConstraint(const casadi::Function& final_constraint);
+
     void setInitialState(const Eigen::VectorXd& x0);
 
     const Eigen::MatrixXd& getStateTrajectory() const;
@@ -34,10 +36,13 @@ protected:
 
 private:
 
+    struct ConstrainedDynamics;
+    struct ConstrainedCost;
+    typedef std::tuple<int, IterativeLQR::ConstrainedDynamics, IterativeLQR::ConstrainedCost> HandleConstraintsRetType;
+
     void backward_pass_iter(int i);
-    void handle_constraints(int i);
+    HandleConstraintsRetType handle_constraints(int i);
     void forward_pass_iter(int i, double alpha);
-    void compute_defect(int i, Eigen::VectorXd& d);
     void set_default_cost();
 
     struct Dynamics
@@ -69,6 +74,10 @@ private:
 
         void linearize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
 
+        void computeDefect(const Eigen::VectorXd& x,
+                           const Eigen::VectorXd& u,
+                           const Eigen::VectorXd& xnext);
+
         void setDynamics(casadi::Function f);
 
     };
@@ -91,7 +100,7 @@ private:
         Eigen::Ref<const Eigen::VectorXd> h() const;
 
         // valid flag
-        bool valid;
+        bool is_valid() const;
 
         Constraint();
 
@@ -103,16 +112,26 @@ private:
 
     struct ConstraintToGo
     {
-        Eigen::MatrixXd C;
-        Eigen::VectorXd h;
-        int dim;
-
         ConstraintToGo(int nx);
 
-        void add(Eigen::Ref<const Eigen::MatrixXd> C,
+        void set(Eigen::Ref<const Eigen::MatrixXd> C,
                  Eigen::Ref<const Eigen::VectorXd> h);
 
+        void set(const Constraint& constr);
+
         void clear();
+
+        int dim() const;
+
+        Eigen::Ref<const Eigen::MatrixXd> C() const;
+
+        Eigen::Ref<const Eigen::VectorXd> h() const;
+
+    private:
+
+        Eigen::Matrix<double, -1, -1, Eigen::RowMajor> _C;
+        Eigen::VectorXd _h;
+        int _dim;
     };
 
     struct IntermediateCost
@@ -127,17 +146,33 @@ private:
         casadi_utils::WrappedFunction ddl;
 
         /* Quadratized cost */
-        Eigen::Ref<const Eigen::MatrixXd> Q() const;
+        const Eigen::MatrixXd& Q() const;
         Eigen::Ref<const Eigen::VectorXd> q() const;
-        Eigen::Ref<const Eigen::MatrixXd> R() const;
+        const Eigen::MatrixXd& R() const;
         Eigen::Ref<const Eigen::VectorXd> r() const;
-        Eigen::Ref<const Eigen::MatrixXd> P() const;
+        const Eigen::MatrixXd& P() const;
 
         IntermediateCost(int nx, int nu);
 
         void setCost(const casadi::Function& cost);
 
         void quadratize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
+    };
+
+    struct ConstrainedDynamics
+    {
+        Eigen::Ref<const Eigen::MatrixXd> A;
+        Eigen::Ref<const Eigen::MatrixXd> B;
+        Eigen::Ref<const Eigen::VectorXd> d;
+    };
+
+    struct ConstrainedCost
+    {
+        Eigen::Ref<const Eigen::MatrixXd> Q;
+        Eigen::Ref<const Eigen::MatrixXd> R;
+        Eigen::Ref<const Eigen::MatrixXd> P;
+        Eigen::Ref<const Eigen::VectorXd> q;
+        Eigen::Ref<const Eigen::VectorXd> r;
     };
 
     struct ValueFunction
@@ -166,6 +201,7 @@ private:
 
     struct Temporaries
     {
+        // backward pass
         Eigen::MatrixXd s_plus_S_d;
         Eigen::MatrixXd S_A;
 
@@ -180,7 +216,31 @@ private:
 
         Eigen::LLT<Eigen::MatrixXd> llt;
 
+        // constraints
+        Eigen::MatrixXd C;
+        Eigen::MatrixXd D;
+        Eigen::VectorXd h;
+        Eigen::MatrixXd rotC;
+        Eigen::VectorXd roth;
+        Eigen::BDCSVD<Eigen::MatrixXd> svd;
+        Eigen::MatrixXd Lc;
+        Eigen::MatrixXd Lz;
+        Eigen::VectorXd lc;
+
+        // modified dynamics and cost due to
+        // constraints
+        Eigen::MatrixXd Ac;
+        Eigen::MatrixXd Bc;
+        Eigen::VectorXd dc;
+        Eigen::MatrixXd Qc;
+        Eigen::MatrixXd Rc;
+        Eigen::MatrixXd Pc;
+        Eigen::VectorXd qc;
+        Eigen::VectorXd rc;
+
+        // forward pass
         Eigen::VectorXd dx;
+
     };
 
     int _nx;
@@ -202,7 +262,7 @@ private:
     Eigen::MatrixXd _xtrj;
     Eigen::MatrixXd _utrj;
 
-    Temporaries tmp;
+    std::vector<Temporaries> _tmp;
 };
 
 
