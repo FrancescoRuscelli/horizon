@@ -13,9 +13,6 @@ class PlotterHorizon:
 
         self.prb = prb
         self.logger = logger
-        self.sol = prb.getSolution()
-        if self.sol is None:
-            raise Exception('Problem must contain a solution.')
 
     def _createPlotGrid(self, n_rows_max, n_plots, title):
 
@@ -38,9 +35,13 @@ class PlotterHorizon:
 
     def plotVariables(self):
 
-        fig, gs = self._createPlotGrid(3, len(self.sol), 'Variables')
+        sol = self.prb.getSolution()
+        if sol is None:
+            raise Exception('Problem must contain a solution.')
+
+        fig, gs = self._createPlotGrid(3, len(sol), 'Variables')
         i = 0
-        for key, val in self.sol.items():
+        for key, val in sol.items():
             ax = fig.add_subplot(gs[i])
             self._plotVar(val, ax, self.prb.getVariables(key))
 
@@ -57,7 +58,11 @@ class PlotterHorizon:
 
     def plotVariable(self, name):
 
-        val = self.sol[name]
+        sol = self.prb.getSolution()
+        if sol is None:
+            raise Exception('Problem must contain a solution.')
+
+        val = sol[name]
 
         fig, ax = plt.subplots()
         self._plotVar(val, ax, prb.getVariables(name))
@@ -67,6 +72,10 @@ class PlotterHorizon:
         ax.set(xlabel='nodes', ylabel='vals')
 
     def plotFunctions(self):
+
+        sol = self.prb.getSolution()
+        if sol is None:
+            raise Exception('Problem must contain a solution.')
 
         fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
 

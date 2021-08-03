@@ -379,6 +379,10 @@ class VariablesContainer:
         var = self.createVar(InputVariable, name, dim, range(self.nodes-1))
         return var
 
+    def setSingleVar(self, name, dim):
+        var = self.createVar(SingleVariable, name, dim, None)
+        return var
+
     def getVarsDim(self):
         var_dim_tot = 0
         for var in self.vars.values():
@@ -530,17 +534,23 @@ class VariablesContainer:
 
     def setNNodes(self, n_nodes):
 
-        raise Exception('state_variables.py: method setNNodes is TBD.')
-        # todo this is because I must manage Variable, InputVariable, StateVariable and SingleVariable in different ways.
         # this is required to update the self.state_var_impl EACH time a new number of node is set
         # removed_nodes = [node for node in range(self.nodes) if node not in range(n_nodes)]
         # for node in removed_nodes:
         #     if 'n' + str(node) in self.state_var_impl:
         #         del self.state_var_impl['n' + str(node)]
-
         self.nodes = n_nodes
         for var in self.vars.values():
-            var._setNNodes(self.nodes)
+            if isinstance(var, SingleVariable):
+                pass
+            elif isinstance(var, InputVariable):
+                var._setNNodes(list(range(self.nodes-1)))
+            elif isinstance(var, StateVariable):
+                var._setNNodes(list(range(self.nodes)))
+            elif isinstance(var, Variable):
+                var._setNNodes([node for node in var.getNodes() if node in list(range(self.nodes))])
+
+
 
     def clear(self):
         self.vars_impl.clear()
