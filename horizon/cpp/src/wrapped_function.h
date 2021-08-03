@@ -20,6 +20,8 @@ public:
     const Eigen::MatrixXd& getOutput(int i) const;
     casadi::Function& function();
 
+    bool is_valid() const;
+
 private:
 
     void csc_to_matrix(const casadi::Sparsity& sp,

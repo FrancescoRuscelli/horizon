@@ -63,6 +63,11 @@ casadi::Function& WrappedFunction::function()
     return _f;
 }
 
+bool WrappedFunction::is_valid() const
+{
+    return !_f.is_null();
+}
+
 void WrappedFunction::csc_to_matrix(const casadi::Sparsity& sp,
                                     const std::vector<double>& data,
                                     Eigen::MatrixXd& matrix)
