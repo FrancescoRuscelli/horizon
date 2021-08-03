@@ -2,14 +2,14 @@ import sys
 from functools import partial
 
 from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget,
-                             QLineEdit, QTableWidgetItem, QTableWidget, QCompleter, QHeaderView)
+                             QLineEdit, QTableWidgetItem, QTableWidget, QCompleter, QHeaderView, QDialogButtonBox)
 
 from PyQt5.QtGui import QPalette, QFont, QColor
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from horizon_gui.gui.widget1_ui import Ui_HorizonGUI
 from horizon_gui.custom_functions import highlighter
-from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate
+from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate, multi_slider
 from horizon_gui.definitions import CSS_DIR
 
 class MainInterface(QWidget, Ui_HorizonGUI):
@@ -31,14 +31,14 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         # self._init()
         # self.horizon_receiver = None
         self.horizon_receiver = horizon_receiver
-        N = horizon_receiver.getNodes()
+        self.nodes = horizon_receiver.getNodes()
 
         self.fun_keywords = list()
 
         # self._connectActions()
 
-        # spinbox to set old variables
-        self.SVNodeInput.setRange(-N, 0)
+        # spinbox to set offset variables
+        # self.varOffsetInput.setRange(-N, 0)
 
         self.layout_ct = QVBoxLayout(self.CTPage)
 
@@ -48,7 +48,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.layout_ct.addWidget(ct_title)
 
         # self.constraintLine = horizon_multi_line.HorizonMultiLine(self.horizon_receiver, 'constraint', nodes=N, logger=self.logger)
-        self.constraintLine = horizon_line.HorizonLine(self.horizon_receiver, 'constraint', nodes=N, logger=self.logger)
+        self.constraintLine = horizon_line.HorizonLine(self.horizon_receiver, 'constraint', nodes=self.nodes, logger=self.logger)
         self.constraintLine.setContentsMargins(0, 40, 0, 0)
         self.layout_ct.addWidget(self.constraintLine)
 
@@ -59,7 +59,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         cf_title.setAlignment(Qt.AlignCenter)
         self.layout_cf.addWidget(cf_title)
 
-        self.costfunctionLine = horizon_line.HorizonLine(self.horizon_receiver, 'costfunction', nodes=N, logger=self.logger)
+        self.costfunctionLine = horizon_line.HorizonLine(self.horizon_receiver, 'costfunction', nodes=self.nodes, logger=self.logger)
         self.costfunctionLine.setContentsMargins(0, 40, 0, 0)
         self.layout_cf.addWidget(self.costfunctionLine)
         self.ct_entry = self.setFunEditor(self.funBox)
@@ -69,10 +69,13 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         #
         # with open(CSS_DIR + '/button_old.css', 'r') as f:
         #     self.PlotButton.setStyleSheet(f.read())
-        self.SVAddButton.clicked.connect(self.generateStateVariable)
+        self.stateVarAddButton.clicked.connect(partial(self.generateVariable, 'state_var'))
+        self.inputVarAddButton.clicked.connect(partial(self.generateVariable, 'input_var'))
+        self.singleVarAddButton.clicked.connect(partial(self.generateVariable,'single_var'))
+        self.customVarAddButton.clicked.connect(self.openCustomVarOptions)
         self.funButton.clicked.connect(self.generateFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
-        self.SVTable.itemDoubleClicked.connect(self.openSV)
+        self.varTable.itemDoubleClicked.connect(self.openVar)
         self.switchPageButton.clicked.connect(self.switchPage)
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
         self.SingleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.constraintLine.Single))
@@ -139,9 +142,10 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.generic_sig.emit(str)
 
     def setBoxNodes(self, n_nodes):
+        self.nodes = n_nodes
         self.horizon_receiver.setHorizonNodes(n_nodes) # setting to casadi the new number of nodes
-        self.constraintLine.setHorizonNodes(n_nodes)
-        self.costfunctionLine.setHorizonNodes(n_nodes)
+        self.constraintLine.setHorizonNodes(n_nodes+1) # n_nodes+1 to account for the final node
+        self.costfunctionLine.setHorizonNodes(n_nodes+1) # n_nodes+1 to account for the final node
         # self.ledCreate.setReady(False)
         # self.ledSolve.setReady(False)
 
@@ -267,10 +271,10 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.highlighter.setDocument(self.funInput.document())
 
     # GUI
-    def openSV(self, item):
+    def openVar(self, item):
 
         # regardless of where I click, get the first item of the table
-        item = self.SVTable.item(self.SVTable.row(item), 0)
+        item = self.varTable.item(self.varTable.row(item), 0)
         # create window that emit a signal when closed
         self.temp_win = on_destroy_signal_window.DestroySignalWindow()
 
@@ -448,25 +452,23 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         model = self.completer.model()
         model.setStringList(self.fun_keywords)
 
-    def generateStateVariable(self):
+    def generateVariable(self, var_type, nodes=None):
 
         default_dim = 1
         default_past_node = 0
 
-        sv_name = self.SVNameInput.text()
-        sv_dim = self.SVDimInput.value()
-        sv_nodes = self.SVNodeInput.value()
+        var_name = self.varNameInput.text()
+        var_dim = self.varDimInput.value()
+        var_offset = self.varOffsetInput.value()
 
-        # todo put in gui_receiver?
-
-        flag, signal = self.horizon_receiver.addStateVariable(dict(name=sv_name, dim=sv_dim, prev=sv_nodes))
+        flag, signal = self.horizon_receiver.createVariable(var_type, var_name, var_dim, var_offset, nodes)
 
         if flag:
 
-            self.addStateVariableToGUI(sv_name)
-            self.SVNameInput.clear()
-            self.SVDimInput.setValue(default_dim)
-            self.SVNodeInput.setValue(default_past_node)
+            self.addStateVariableToGUI(var_name)
+            self.varNameInput.clear()
+            self.varDimInput.setValue(default_dim)
+            self.varOffsetInput.setValue(default_past_node)
 
             self.logger.info(signal)
             self.on_generic_sig(signal)
@@ -475,9 +477,43 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             self.ledSolve.setReady(False)
 
         else:
-            self.SVNameInput.setFocus()
+            self.varNameInput.setFocus()
             self.logger.warning(signal)
             self.on_generic_sig(signal)
+
+    def openCustomVarOptions(self):
+
+        self.box = QWidget()
+        layout_box = QVBoxLayout(self.box)
+
+        options = dict()
+        options['background_color'] = Qt.darkCyan
+        options['slice_color'] = Qt.darkMagenta
+        options['minmax_color'] = Qt.darkRed
+        options['ticks_color'] = Qt.darkGreen
+        node_selector = multi_slider.QMultiSlider(slider_range=[0, self.nodes, 1], options=options, number_bar=True)
+        layout_box.addWidget(node_selector)
+
+        widget_dialog = QWidget()
+        widget_dialog_layout = QHBoxLayout(widget_dialog)
+        no_button = QPushButton('Cancel')
+        yes_button = QPushButton('Create')
+
+
+        widget_dialog_layout.addWidget(no_button)
+        widget_dialog_layout.addWidget(yes_button)
+
+        layout_box.addWidget(widget_dialog)
+
+        no_button.clicked.connect(self.box.close)
+        yes_button.clicked.connect(partial(self.assembleCustomVar, node_selector))
+
+        self.box.show()
+
+    def assembleCustomVar(self, node_selector):
+
+        nodes = node_selector.getRanges()
+        self.generateVariable('custom_var', nodes)
 
     # GUI
     def _connectActions(self):
@@ -488,11 +524,11 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     # GUI
     def _addRowToSVTable(self, name):
 
-        row_pos = self.SVTable.rowCount()
-        self.SVTable.insertRow(row_pos)
+        row_pos = self.varTable.rowCount()
+        self.varTable.insertRow(row_pos)
 
-        self.SVTable.setItem(row_pos, 0, QTableWidgetItem(name))
-        self.SVTable.setItem(row_pos, 1, QTableWidgetItem(str(self.horizon_receiver.getVar(name)['dim'])))
+        self.varTable.setItem(row_pos, 0, QTableWidgetItem(name))
+        self.varTable.setItem(row_pos, 1, QTableWidgetItem(str(self.horizon_receiver.getVar(name)['dim'])))
 
         # self.SVTable.setCellWidget(row_pos, 2, scroll)
 

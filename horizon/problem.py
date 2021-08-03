@@ -51,6 +51,10 @@ class Problem:
         self.input_aggr.addVariable(var)
         return var
 
+    def createSingleVariable(self, name, dim):
+        var = self.var_container.setSingleVar(name, dim)
+        return var
+
     def createVariable(self, name, dim, nodes=None):
         var = self.var_container.setVar(name, dim, nodes)
         return var
@@ -412,6 +416,18 @@ class Problem:
 if __name__ == '__main__':
     # MULTIPLE SHOOTING
 
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createStateVariable('x', 2)
+    v = prb.createStateVariable('v', 2)
+    k = prb.createVariable('k', 2, range(2, 8))
+    u = prb.createInputVariable('u', 2)
+    t_tot = prb.createVariable('t', 2)
+    p = prb.createSingleVariable('p', 2)
+    t_tot.setBounds([100, 100], [100, 100])
+
+    prb.setNNodes(5)
+    exit()
     import horizon.utils.transcription_methods as tm
     import horizon.utils.integrators as integ
     nodes = 10

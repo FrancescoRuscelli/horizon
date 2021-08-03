@@ -19,25 +19,40 @@ class horizonImpl():
         self.sv_dict = dict()  # state variables
         self.fun_dict = dict() # functions
 
-        self.plt = plt.PlotterHorizon(logger=self.logger)
+        self.plt = plt.PlotterHorizon(self.casadi_prb)
         # self.active_fun_list = list()
 
-    def addStateVariable(self, data):
+    def _setVarGenerator(self, var_type):
+        if var_type == 'state_var':
+            return self.casadi_prb.createStateVariable
+        if var_type == 'input_var':
+            return self.casadi_prb.createInputVariable
+        if var_type == 'single_var':
+            return self.casadi_prb.createSingleVariable
+        if var_type == 'custom_var':
+            return self.casadi_prb.createVariable
 
-        name = data['name']
-        dim = data['dim']
-        prev = data['prev']
+    def createVariable(self, var_type, name, dim, offset, nodes=None):
 
-        flag, signal = self.checkStateVariable(name)
+        flag, signal = self.checkVariable(name)
+
         if flag:
-            if prev == 0:
-                var = self.casadi_prb.createStateVariable(name, dim)
+
+            if offset == 0:
+                if var_type == 'state_var':
+                    var = self.casadi_prb.createStateVariable(name, dim)
+                if var_type == 'input_var':
+                    var = self.casadi_prb.createInputVariable(name, dim)
+                if var_type == 'single_var':
+                    var = self.casadi_prb.createSingleVariable(name, dim)
+                if var_type == 'custom_var':
+                    var = self.casadi_prb.createVariable(name, dim, nodes)
             else:
-                var = self.casadi_prb.createStateVariable(name, dim, prev)
+                raise Exception('TBD prev/next state variables')
 
             self.sv_dict[name] = dict(var=var, dim=dim)
 
-            return True, signal
+            return True, signal + f'. Type: {type(var)}'
         else:
             return False, signal
 
@@ -124,19 +139,19 @@ class horizonImpl():
 
         return True, 'Function "{}" is acceptable. Adding..'.format(name)
 
-    def checkStateVariable(self, name):
+    def checkVariable(self, name):
 
         if name == "":
-            signal = "State Variable: Empty Value Not Allowed"
+            signal = "Variable: Empty Value Not Allowed"
             return False, signal
         elif name in self.sv_dict.keys():
-            signal = "State Variable: Already Inserted"
+            signal = "Variable: Already Inserted"
             return False, signal
         elif name.isnumeric():
-            signal = "State Variable: Invalid Name"
+            signal = "Variable: Invalid Name"
             return False, signal
 
-        return True, "State Variable: generated '{}'".format(name)
+        return True, "Variable: generated '{}'".format(name)
 
 
     def fromTxtToFun(self, str_fun):
@@ -249,15 +264,14 @@ class horizonImpl():
 
     def generate(self):
         try:
-            self.casadi_prb.createProblem({"nlpsol.ipopt":True})
+            self.casadi_prb.createProblem()
         except Exception as e:
             return self.logger.warning(e)
         return True
 
     def solve(self):
         try:
-            sol = self.casadi_prb.solveProblem()
-            self.plt.setSolution(sol)
+            self.casadi_prb.solveProblem()
         except Exception as e:
             return self.logger.warning(e)
         return True
