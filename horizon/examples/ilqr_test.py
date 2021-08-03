@@ -12,21 +12,23 @@ import pyilqr
 
 from matplotlib import pyplot as plt
 
-N = 20
+N = 10
 
 pb = HorizonProblem(N)
 
-x = pb.createStateVariable('x', 2)
-u = pb.createInputVariable('u', 2)
+x = pb.createStateVariable('x', 1)
+u = pb.createInputVariable('u', 1)
 
 fdyn = cs.Function('f', [x, u], [x + 0.1*u], ['x', 'u'], ['f'])
-l = cs.Function('f', [x, u], [0.1*cs.sumsqr(u)], ['x', 'u'], ['l'])
-lf = cs.Function('f', [x, u], [1000*(cs.sumsqr(x) - 4)**2], ['x', 'u'], ['l'])
+l = cs.Function('f', [x, u], [1e-6*cs.sumsqr(u)], ['x', 'u'], ['l'])
+lf = cs.Function('f', [x, u], [cs.sumsqr(x - 1)], ['x', 'u'], ['l'])
+cf = cs.Function('f', [x, u], [x - 2], ['x', 'u'], ['h'])
 
 ilqr = pyilqr.IterativeLQR(fdyn, N)
 ilqr.setIntermediateCost([l]*N)
 ilqr.setFinalCost(lf)
-x0 = np.array([1, 1])
+ilqr.setFinalConstraint(cf)
+x0 = np.array([3])
 ilqr.setInitialState(x0)
 for _ in range(10):
     ilqr.linearize_quadratize()
@@ -34,7 +36,7 @@ for _ in range(10):
     ilqr.forward_pass(1)
 
 xtrj = ilqr.getStateTrajectory()
-
-plt.plot(xtrj[0, :], xtrj[1, :])
+print(xtrj)
+plt.plot(xtrj.T)
 plt.title('State trajectory')
 plt.show()

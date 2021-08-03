@@ -2,24 +2,28 @@
 
 int main()
 {
-    auto x = casadi::SX::sym("x", 3);
-    auto u = casadi::SX::sym("u", 2);
-    auto A = casadi::DM::rand(3, 3);
-    auto B = casadi::DM::rand(3, 2);
-    casadi::Function f("f", {x, u}, {casadi::SX::mtimes(A, x)});
-    casadi_utils::WrappedFunction wf(f.factory("df", {"i0", "i1"}, {"jac:o0:i0", "jac:o0:i1"}));
+    auto x = casadi::SX::sym("x", 1);
+    auto u = casadi::SX::sym("u", 1);
+    auto f = casadi::Function("f", {x, u}, {x + 0.1*u}, {"x", "u"}, {"f"});
+    auto l = casadi::Function("l", {x, u}, {casadi::SX::sumsqr(u)*1e-6}, {"x", "u"}, {"l"});
+    auto lf = casadi::Function("l", {x, u}, {casadi::SX::sumsqr(x)*0.5}, {"x", "u"}, {"l"});
+    auto cf = casadi::Function("h", {x, u}, {x - 1}, {"x", "u"}, {"h"});
 
-    Eigen::VectorXd xval(3), uval(2);
-    xval << 1, 0, 0;
-    uval << 0, 1;
+    int N = 2;
+    horizon::IterativeLQR ilqr(f, N);
 
-    wf.setInput(0, xval);
-    wf.setInput(1, uval);
-    wf.call();
+    Eigen::VectorXd x0(1);
+    x0 << 0.0;
+    ilqr.setInitialState(x0);
 
-    std::cout << A << std::endl;
-    std::cout << B << std::endl;
+    ilqr.setIntermediateCost(std::vector<casadi::Function>(N, l));
+//    ilqr.setFinalCost(lf);
+    ilqr.setFinalConstraint(cf);
 
-    std::cout << wf.getOutput(0) << std::endl;
-    std::cout << wf.getOutput(1) << std::endl;
+    ilqr.linearize_quadratize();
+    ilqr.backward_pass();
+    ilqr.forward_pass(1);
+
+    std::cout << ilqr.getStateTrajectory() << std::endl;
+    std::cout << ilqr.getInputTrajectory() << std::endl;
 }
