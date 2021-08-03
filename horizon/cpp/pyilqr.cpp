@@ -40,6 +40,12 @@ auto set_final_cost_wrapper(IterativeLQR& self, py::object pyfn)
     self.setFinalCost(to_cpp(pyfn));
 }
 
+auto set_final_constraint_wrapper(IterativeLQR& self, py::object pyfn)
+{
+    self.setFinalConstraint(to_cpp(pyfn));
+}
+
+
 
 PYBIND11_MODULE(pyilqr, m) {
 
@@ -47,6 +53,7 @@ PYBIND11_MODULE(pyilqr, m) {
             .def(py::init(&construct))
             .def("setIntermediateCost", set_inter_cost_wrapper)
             .def("setFinalCost", set_final_cost_wrapper)
+            .def("setFinalConstraint", set_final_constraint_wrapper)
             .def("backward_pass", &IterativeLQR::backward_pass)
             .def("forward_pass", &IterativeLQR::forward_pass)
             .def("linearize_quadratize", &IterativeLQR::linearize_quadratize)
