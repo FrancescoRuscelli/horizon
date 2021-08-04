@@ -54,6 +54,7 @@ PYBIND11_MODULE(pyilqr, m) {
             .def("setIntermediateCost", set_inter_cost_wrapper)
             .def("setFinalCost", set_final_cost_wrapper)
             .def("setFinalConstraint", set_final_constraint_wrapper)
+            .def("solve", &IterativeLQR::solve)
             .def("backward_pass", &IterativeLQR::backward_pass)
             .def("forward_pass", &IterativeLQR::forward_pass)
             .def("linearize_quadratize", &IterativeLQR::linearize_quadratize)

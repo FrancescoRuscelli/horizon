@@ -18,6 +18,151 @@ Eigen::MatrixXd to_eig(const cs::DM& cas)
     return Eigen::MatrixXd::Map(cas_dense.ptr(), cas_dense.size1(), cas_dense.size2());
 }
 
+struct IterativeLQR::Dynamics
+{
+
+public:
+
+    // dynamics function
+    casadi_utils::WrappedFunction f;
+
+    // dynamics jacobian
+    casadi_utils::WrappedFunction df;
+
+    // df/dx
+    const Eigen::MatrixXd& A() const;
+
+    // df/du
+    const Eigen::MatrixXd& B() const;
+
+    // defect (or gap)
+    Eigen::VectorXd d;
+
+    Dynamics(int nx, int nu);
+
+    VecConstRef integrate(VecConstRef x, VecConstRef u);
+
+    void linearize(VecConstRef x, VecConstRef u);
+
+    void computeDefect(VecConstRef x, VecConstRef u, VecConstRef xnext);
+
+    void setDynamics(casadi::Function f);
+
+};
+
+struct IterativeLQR::Constraint
+{
+    // constraint function
+    casadi_utils::WrappedFunction f;
+
+    // constraint jacobian
+    casadi_utils::WrappedFunction df;
+
+    // dh/dx
+    const Eigen::MatrixXd& C() const;
+
+    // dh/du
+    const Eigen::MatrixXd& D() const;
+
+    // constraint value
+    VecConstRef h() const;
+
+    // valid flag
+    bool is_valid() const;
+
+    Constraint();
+
+    void linearize(VecConstRef x, VecConstRef u);
+
+    void setConstraint(casadi::Function h);
+
+};
+
+struct IterativeLQR::IntermediateCost
+{
+    // original cost
+    casadi_utils::WrappedFunction l;
+
+    // cost gradient
+    casadi_utils::WrappedFunction dl;
+
+    // cost hessian
+    casadi_utils::WrappedFunction ddl;
+
+    /* Quadratized cost */
+    const Eigen::MatrixXd& Q() const;
+    VecConstRef q() const;
+    const Eigen::MatrixXd& R() const;
+    VecConstRef r() const;
+    const Eigen::MatrixXd& P() const;
+
+    IntermediateCost(int nx, int nu);
+
+    void setCost(const casadi::Function& cost);
+
+    void quadratize(VecConstRef x, VecConstRef u);
+};
+
+struct IterativeLQR::Temporaries
+{
+    // backward pass
+    Eigen::MatrixXd s_plus_S_d;
+    Eigen::MatrixXd S_A;
+
+    Eigen::MatrixXd Huu;
+    Eigen::MatrixXd Hux;
+    Eigen::MatrixXd Hxx;
+
+    Eigen::VectorXd hx;
+    Eigen::VectorXd hu;
+
+    Eigen::MatrixXd huHux;
+
+    Eigen::LLT<Eigen::MatrixXd> llt;
+
+    // constraints
+    Eigen::MatrixXd C;
+    Eigen::MatrixXd D;
+    Eigen::VectorXd h;
+    Eigen::MatrixXd rotC;
+    Eigen::VectorXd roth;
+    Eigen::BDCSVD<Eigen::MatrixXd> svd;
+    Eigen::MatrixXd Lc;
+    Eigen::MatrixXd Lz;
+    Eigen::VectorXd lc;
+
+    // modified dynamics and cost due to
+    // constraints
+    Eigen::MatrixXd Ac;
+    Eigen::MatrixXd Bc;
+    Eigen::VectorXd dc;
+    Eigen::MatrixXd Qc;
+    Eigen::MatrixXd Rc;
+    Eigen::MatrixXd Pc;
+    Eigen::VectorXd qc;
+    Eigen::VectorXd rc;
+
+    // forward pass
+    Eigen::VectorXd dx;
+
+};
+
+struct IterativeLQR::ConstrainedDynamics
+{
+    Eigen::Ref<const Eigen::MatrixXd> A;
+    Eigen::Ref<const Eigen::MatrixXd> B;
+    Eigen::Ref<const Eigen::VectorXd> d;
+};
+
+struct IterativeLQR::ConstrainedCost
+{
+    Eigen::Ref<const Eigen::MatrixXd> Q;
+    Eigen::Ref<const Eigen::MatrixXd> R;
+    Eigen::Ref<const Eigen::MatrixXd> P;
+    Eigen::Ref<const Eigen::VectorXd> q;
+    Eigen::Ref<const Eigen::VectorXd> r;
+};
+
 IterativeLQR::IterativeLQR(cs::Function fdyn,
                            int N):
     _nx(fdyn.size1_in(0)),
@@ -46,6 +191,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     // a default cost so that it works out of the box
     set_default_cost();
 }
+
 
 void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inter_cost)
 {
@@ -83,6 +229,20 @@ const Eigen::MatrixXd &IterativeLQR::getStateTrajectory() const
 const Eigen::MatrixXd &IterativeLQR::getInputTrajectory() const
 {
     return _utrj;
+}
+
+bool IterativeLQR::solve(int max_iter)
+{
+    // tbd implement convergence check
+
+    for(int i = 0; i < max_iter; i++)
+    {
+        linearize_quadratize();
+        backward_pass();
+        forward_pass(1.0);
+    }
+
+    return true;
 }
 
 void IterativeLQR::linearize_quadratize()
@@ -324,9 +484,8 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 
 bool IterativeLQR::forward_pass(double alpha)
 {
-    // start from current trajectory
-    _fp_res.xtrj = _xtrj;
-    _fp_res.utrj = _utrj;
+    // initialize forward pass with initial state
+    _fp_res.xtrj.col(0) = _xtrj.col(0);
 
     for(int i = 0; i < _N; i++)
     {
@@ -351,7 +510,7 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
     const auto xnext = state(i+1);
     const auto xi = state(i);
     const auto ui = input(i);
-    auto xi_upd = _fp_res.xtrj.col(i);
+    const auto xi_upd = _fp_res.xtrj.col(i);
     auto& tmp = _tmp[i];
     tmp.dx = xi_upd - xi;
 
@@ -388,12 +547,12 @@ void IterativeLQR::set_default_cost()
     setFinalCost(lf);
 }
 
-Eigen::Ref<Eigen::VectorXd> IterativeLQR::state(int i)
+VecConstRef IterativeLQR::state(int i) const
 {
     return _xtrj.col(i);
 }
 
-Eigen::Ref<Eigen::VectorXd> IterativeLQR::input(int i)
+VecConstRef IterativeLQR::input(int i) const
 {
     return _utrj.col(i);
 }
@@ -413,7 +572,7 @@ IterativeLQR::Dynamics::Dynamics(int nx, int)
     d.setZero(nx);
 }
 
-Eigen::Ref<const Eigen::VectorXd> IterativeLQR::Dynamics::integrate(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
+Eigen::Ref<const Eigen::VectorXd> IterativeLQR::Dynamics::integrate(VecConstRef x, VecConstRef u)
 {
     f.setInput(0, x);
     f.setInput(1, u);
@@ -421,16 +580,14 @@ Eigen::Ref<const Eigen::VectorXd> IterativeLQR::Dynamics::integrate(const Eigen:
     return f.getOutput(0);
 }
 
-void IterativeLQR::Dynamics::linearize(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
+void IterativeLQR::Dynamics::linearize(VecConstRef x, VecConstRef u)
 {
     df.setInput(0, x);
     df.setInput(1, u);
     df.call();
 }
 
-void IterativeLQR::Dynamics::computeDefect(const Eigen::VectorXd& x,
-                                           const Eigen::VectorXd& u,
-                                           const Eigen::VectorXd& xnext)
+void IterativeLQR::Dynamics::computeDefect(VecConstRef x, VecConstRef u, VecConstRef xnext)
 {
     auto xint = integrate(x, u);
     d = xint - xnext;
@@ -484,7 +641,7 @@ void IterativeLQR::IntermediateCost::setCost(const casadi::Function &cost)
     static_cast<void>(is_quadratic);
 }
 
-void IterativeLQR::IntermediateCost::quadratize(const Eigen::VectorXd &x, const Eigen::VectorXd &u)
+void IterativeLQR::IntermediateCost::quadratize(VecConstRef x, VecConstRef u)
 {
     // compute cost gradient
     dl.setInput(0, x);
@@ -512,7 +669,7 @@ IterativeLQR::BackwardPassResult::BackwardPassResult(int nx, int nu)
 
 IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N)
 {
-    xtrj.setZero(nx, N);
+    xtrj.setZero(nx, N+1);
     utrj.setZero(nu, N);
 }
 
@@ -588,7 +745,7 @@ IterativeLQR::Constraint::Constraint()
 {
 }
 
-void IterativeLQR::Constraint::linearize(const Eigen::VectorXd& x, const Eigen::VectorXd& u)
+void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u)
 {
     if(!is_valid())
     {
@@ -611,3 +768,5 @@ void IterativeLQR::Constraint::setConstraint(casadi::Function h)
     f = h;
     df = h.factory("dh", {"x", "u"}, {"jac:h:x", "jac:h:u"});
 }
+
+IterativeLQR::~IterativeLQR() = default;

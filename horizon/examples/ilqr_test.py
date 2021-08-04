@@ -30,10 +30,7 @@ ilqr.setFinalCost(lf)
 ilqr.setFinalConstraint(cf)
 x0 = np.array([3])
 ilqr.setInitialState(x0)
-for _ in range(10):
-    ilqr.linearize_quadratize()
-    ilqr.backward_pass()
-    ilqr.forward_pass(1)
+ilqr.solve(1)
 
 xtrj = ilqr.getStateTrajectory()
 print(xtrj)

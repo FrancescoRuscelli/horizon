@@ -1,10 +1,13 @@
 #include <casadi/casadi.hpp>
 #include <Eigen/Dense>
+#include <memory>
 
 #include "wrapped_function.h"
 
 namespace horizon
 {
+
+typedef Eigen::Ref<const Eigen::VectorXd> VecConstRef;
 
 class IterativeLQR
 {
@@ -22,6 +25,8 @@ public:
 
     void setInitialState(const Eigen::VectorXd& x0);
 
+    bool solve(int max_iter);
+
     const Eigen::MatrixXd& getStateTrajectory() const;
     const Eigen::MatrixXd& getInputTrajectory() const;
 
@@ -29,8 +34,10 @@ public:
     void linearize_quadratize();
     void backward_pass();
     bool forward_pass(double alpha);
-    Eigen::Ref<Eigen::VectorXd> state(int i);
-    Eigen::Ref<Eigen::VectorXd> input(int i);
+    VecConstRef state(int i) const;
+    VecConstRef input(int i) const;
+
+    ~IterativeLQR();
 
 protected:
 
@@ -38,77 +45,18 @@ private:
 
     struct ConstrainedDynamics;
     struct ConstrainedCost;
-    typedef std::tuple<int, IterativeLQR::ConstrainedDynamics, IterativeLQR::ConstrainedCost> HandleConstraintsRetType;
+    typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost> HandleConstraintsRetType;
+    struct Dynamics;
+    struct Constraint;
+    struct IntermediateCost;
+    struct Temporaries;
 
     void backward_pass_iter(int i);
     HandleConstraintsRetType handle_constraints(int i);
     void forward_pass_iter(int i, double alpha);
     void set_default_cost();
 
-    struct Dynamics
-    {
-
-    public:
-
-        // dynamics function
-        casadi_utils::WrappedFunction f;
-
-        // dynamics jacobian
-        casadi_utils::WrappedFunction df;
-
-        // df/dx
-        const Eigen::MatrixXd& A() const;
-
-        // df/du
-        const Eigen::MatrixXd& B() const;
-
-        // defect (or gap)
-        // this is not computed by this class, and
-        // must be filled from outside
-        Eigen::VectorXd d;
-
-        Dynamics(int nx, int nu);
-
-        Eigen::Ref<const Eigen::VectorXd> integrate(const Eigen::VectorXd& x,
-                                                    const Eigen::VectorXd& u);
-
-        void linearize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
-
-        void computeDefect(const Eigen::VectorXd& x,
-                           const Eigen::VectorXd& u,
-                           const Eigen::VectorXd& xnext);
-
-        void setDynamics(casadi::Function f);
-
-    };
-
-    struct Constraint
-    {
-        // constraint function
-        casadi_utils::WrappedFunction f;
-
-        // constraint jacobian
-        casadi_utils::WrappedFunction df;
-
-        // dh/dx
-        const Eigen::MatrixXd& C() const;
-
-        // dh/du
-        const Eigen::MatrixXd& D() const;
-
-        // constraint value
-        Eigen::Ref<const Eigen::VectorXd> h() const;
-
-        // valid flag
-        bool is_valid() const;
-
-        Constraint();
-
-        void linearize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
-
-        void setConstraint(casadi::Function h);
-
-    };
+    
 
     struct ConstraintToGo
     {
@@ -125,54 +73,13 @@ private:
 
         Eigen::Ref<const Eigen::MatrixXd> C() const;
 
-        Eigen::Ref<const Eigen::VectorXd> h() const;
+        VecConstRef h() const;
 
     private:
 
         Eigen::Matrix<double, -1, -1, Eigen::RowMajor> _C;
         Eigen::VectorXd _h;
         int _dim;
-    };
-
-    struct IntermediateCost
-    {
-        // original cost
-        casadi_utils::WrappedFunction l;
-
-        // cost gradient
-        casadi_utils::WrappedFunction dl;
-
-        // cost hessian
-        casadi_utils::WrappedFunction ddl;
-
-        /* Quadratized cost */
-        const Eigen::MatrixXd& Q() const;
-        Eigen::Ref<const Eigen::VectorXd> q() const;
-        const Eigen::MatrixXd& R() const;
-        Eigen::Ref<const Eigen::VectorXd> r() const;
-        const Eigen::MatrixXd& P() const;
-
-        IntermediateCost(int nx, int nu);
-
-        void setCost(const casadi::Function& cost);
-
-        void quadratize(const Eigen::VectorXd& x, const Eigen::VectorXd& u);
-    };
-
-    struct ConstrainedDynamics
-    {
-        Eigen::Ref<const Eigen::MatrixXd> A;
-        Eigen::Ref<const Eigen::MatrixXd> B;
-        Eigen::Ref<const Eigen::VectorXd> d;
-    };
-
-    struct ConstrainedCost
-    {
-        Eigen::Ref<const Eigen::MatrixXd> Q;
-        Eigen::Ref<const Eigen::MatrixXd> R;
-        Eigen::Ref<const Eigen::MatrixXd> P;
-        Eigen::Ref<const Eigen::VectorXd> q;
-        Eigen::Ref<const Eigen::VectorXd> r;
     };
 
     struct ValueFunction
@@ -199,49 +106,7 @@ private:
         ForwardPassResult(int nx, int nu, int N);
     };
 
-    struct Temporaries
-    {
-        // backward pass
-        Eigen::MatrixXd s_plus_S_d;
-        Eigen::MatrixXd S_A;
-
-        Eigen::MatrixXd Huu;
-        Eigen::MatrixXd Hux;
-        Eigen::MatrixXd Hxx;
-
-        Eigen::VectorXd hx;
-        Eigen::VectorXd hu;
-
-        Eigen::MatrixXd huHux;
-
-        Eigen::LLT<Eigen::MatrixXd> llt;
-
-        // constraints
-        Eigen::MatrixXd C;
-        Eigen::MatrixXd D;
-        Eigen::VectorXd h;
-        Eigen::MatrixXd rotC;
-        Eigen::VectorXd roth;
-        Eigen::BDCSVD<Eigen::MatrixXd> svd;
-        Eigen::MatrixXd Lc;
-        Eigen::MatrixXd Lz;
-        Eigen::VectorXd lc;
-
-        // modified dynamics and cost due to
-        // constraints
-        Eigen::MatrixXd Ac;
-        Eigen::MatrixXd Bc;
-        Eigen::VectorXd dc;
-        Eigen::MatrixXd Qc;
-        Eigen::MatrixXd Rc;
-        Eigen::MatrixXd Pc;
-        Eigen::VectorXd qc;
-        Eigen::VectorXd rc;
-
-        // forward pass
-        Eigen::VectorXd dx;
-
-    };
+    
 
     int _nx;
     int _nu;
