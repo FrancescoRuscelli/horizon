@@ -76,6 +76,11 @@ class horizonImpl():
 
         flag, signal = self.checkActiveFunction(name)
 
+        active_nodes = None
+        for var in self.fun_dict[name]['used_vars']:
+            print(var.getNodes())
+
+
         if flag:
             if fun_type == 'constraint':
                 try:
@@ -89,7 +94,6 @@ class horizonImpl():
             elif fun_type == 'costfunction':
                 try:
                     active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
-                    # self.active_fun_list.append(active_fun)
                     self.fun_dict[name].update({'active': active_fun})
                 except Exception as e:
                     return False, e
@@ -187,20 +191,25 @@ class horizonImpl():
         try:
             res = parser.expr(modified_fun)
         except Exception as e:
-            self.logger.warning(e)
+            self.logger.warning('gui_receiver.py: {}'.format(e))
             return fun
 
         code = res.compile()
-
 
         # todo add try exception + logger
 
         try:
             fun = eval(code)
         except Exception as e:
-            self.logger.warning(e)
+            self.logger.warning('gui_receiver.py: {}'.format(e))
 
-        return fun
+        used_variables = list()
+        for var in self.sv_dict.values():
+            if cs.depends_on(fun, var["var"]):
+                used_variables.append(var["var"])
+
+
+        return fun, used_variables
 
     def editFunction(self, name, str_fun):
 
@@ -216,6 +225,7 @@ class horizonImpl():
             return False, signal
 
     def updateFunctionNodes(self, name, nodes):
+        print(nodes)
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
     def updateFunctionUpperBounds(self, name, ub, nodes):
@@ -251,13 +261,11 @@ class horizonImpl():
 
     def _createAndAppendFun(self, name, str_fun):
 
-        fun = self.fromTxtToFun(str_fun)
-        # TODO I can probably do a wrapper function in casadi self.createFunction(name, fun, type)
-        # TODO HOW ABOUT GENERIC FUNCTION? Should i do a casadi function for them?
+        fun, used_vars = self.fromTxtToFun(str_fun)
         # fill horizon_receiver.fun_dict and funList
-        # TODO add fun type??
+
         if fun is not None:
-            self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None)
+            self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None, used_vars=used_vars)
             return True
         else:
             return False
@@ -266,14 +274,14 @@ class horizonImpl():
         try:
             self.casadi_prb.createProblem()
         except Exception as e:
-            return self.logger.warning(e)
+            self.logger.warning('gui_receiver.py: {}'.format(e))
         return True
 
     def solve(self):
         try:
             self.casadi_prb.solveProblem()
         except Exception as e:
-            return self.logger.warning(e)
+            self.logger.warning('gui_receiver.py: {}'.format(e))
         return True
 
     def getInfoAtNodes(self, node):

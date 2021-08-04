@@ -258,7 +258,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
                 self.logger.info(signal)
                 self.on_generic_sig(signal)
             else:
-                self.logger.warning(signal)
+                self.logger.warning('main_interface.py'.format(signal))
                 self.on_generic_sig(signal)
 
             self.temp_line_edit.setDisabled(True)
@@ -422,7 +422,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             self.funNameInput.setFocus()
             self.funInput.clear()
 
-            self.logger.warning(signal)
+            self.logger.warning('main_inteface.py: {}'.format(signal))
             self.on_generic_sig(signal)
 
     # GUI
@@ -478,7 +478,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         else:
             self.varNameInput.setFocus()
-            self.logger.warning(signal)
+            self.logger.warning('main_interface {}'.format(signal))
             self.on_generic_sig(signal)
 
     def openCustomVarOptions(self):

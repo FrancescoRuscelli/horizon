@@ -7,7 +7,7 @@ class ConsoleLogger(logging.Handler, QTextEdit):
         QTextEdit.__init__(self, parent)
 
         self.setReadOnly(True)
-        self.setFormatter(logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(message)s', datefmt='[%H:%M:%S]'))
+        self.setFormatter(logging.Formatter(fmt='%(asctime)s - %(levelname)s {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s', datefmt='[%H:%M:%S]'))
 
     def emit(self, record):
         msg = self.format(record)

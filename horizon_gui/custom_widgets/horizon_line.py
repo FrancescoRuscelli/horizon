@@ -274,13 +274,14 @@ class HorizonLine(QScrollArea):
         table_constr.setHorizontalHeaderLabels(['Name', 'Function', 'Lower Bounds', 'Upper Bounds'])
         info_box_layout.addWidget(table_constr, 1, 1)
 
-        for name, item in cnstrs.items():
-            rowPosition = table_constr.rowCount()
-            table_constr.insertRow(rowPosition)
-            table_constr.setItem(rowPosition, 0, QTableWidgetItem(name))
-            table_constr.setItem(rowPosition, 1, QTableWidgetItem((str(item['val']))))
-            table_constr.setItem(rowPosition, 2, QTableWidgetItem((str(item['lb']))))
-            table_constr.setItem(rowPosition, 3, QTableWidgetItem((str(item['ub']))))
+        if cnstrs is not None:
+            for name, item in cnstrs.items():
+                rowPosition = table_constr.rowCount()
+                table_constr.insertRow(rowPosition)
+                table_constr.setItem(rowPosition, 0, QTableWidgetItem(name))
+                table_constr.setItem(rowPosition, 1, QTableWidgetItem((str(item['val']))))
+                table_constr.setItem(rowPosition, 2, QTableWidgetItem((str(item['lb']))))
+                table_constr.setItem(rowPosition, 3, QTableWidgetItem((str(item['ub']))))
 
         table_constr.resizeColumnsToContents()
 
@@ -294,10 +295,11 @@ class HorizonLine(QScrollArea):
         table_costfun.setHorizontalHeaderLabels(['Name', 'Function'])
         info_box_layout.addWidget(table_costfun, 2, 1)
 
-        for name, item in costfuns.items():
-            rowPosition = table_costfun.rowCount()
-            table_costfun.insertRow(rowPosition)
-            table_costfun.setItem(rowPosition, 0, QTableWidgetItem(name))
-            table_costfun.setItem(rowPosition, 1, QTableWidgetItem((str(item))))
+        if cnstrs is not None:
+            for name, item in costfuns.items():
+                rowPosition = table_costfun.rowCount()
+                table_costfun.insertRow(rowPosition)
+                table_costfun.setItem(rowPosition, 0, QTableWidgetItem(name))
+                table_costfun.setItem(rowPosition, 1, QTableWidgetItem((str(item))))
 
         table_costfun.resizeColumnsToContents()
