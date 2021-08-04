@@ -447,13 +447,6 @@ void IterativeLQR::backward_pass_iter(int i)
     L = -tmp.huHux.rightCols(_nx);
     l = -tmp.huHux.col(0);
 
-    // map to original input u
-    if(has_constraints)
-    {
-        l = lc + Lz*l;
-        L = Lc + Lz*L;
-    }
-
     // save optimal value function
     auto& value = _value[i];
     auto& S = value.S;
@@ -461,6 +454,13 @@ void IterativeLQR::backward_pass_iter(int i)
 
     S.noalias() = tmp.Hxx - L.transpose()*tmp.Huu*L;
     s.noalias() = tmp.hx + tmp.Hux.transpose()*l + L.transpose()*(tmp.hu + tmp.Huu*l);
+
+    // map to original input u
+    if(has_constraints)
+    {
+        l = lc + Lz*l;
+        L = Lc + Lz*L;
+    }
 
 }
 
