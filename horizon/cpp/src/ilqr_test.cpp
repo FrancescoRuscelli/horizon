@@ -20,9 +20,7 @@ int main()
 //    ilqr.setFinalCost(lf);
     ilqr.setFinalConstraint(cf);
 
-    ilqr.linearize_quadratize();
-    ilqr.backward_pass();
-    ilqr.forward_pass(1);
+    ilqr.solve(1);
 
     std::cout << ilqr.getStateTrajectory() << std::endl;
     std::cout << ilqr.getInputTrajectory() << std::endl;

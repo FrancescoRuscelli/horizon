@@ -61,6 +61,8 @@ struct IterativeLQR::Constraint
 
     void linearize(VecConstRef x, VecConstRef u);
 
+    void evaluate(VecConstRef x, VecConstRef u);
+
     void setConstraint(casadi::Function h);
 
 };
@@ -87,6 +89,7 @@ struct IterativeLQR::IntermediateCost
 
     void setCost(const casadi::Function& cost);
 
+    double evaluate(VecConstRef x, VecConstRef u);
     void quadratize(VecConstRef x, VecConstRef u);
 };
 
@@ -184,6 +187,10 @@ struct IterativeLQR::ForwardPassResult
 {
     Eigen::MatrixXd xtrj;
     Eigen::MatrixXd utrj;
+    double cost;
+    double step_length;
+    double constraint_violation;
+    double defect_norm;
 
     ForwardPassResult(int nx, int nu, int N);
 };
@@ -299,6 +306,11 @@ void IterativeLQR::setInitialState(const Eigen::VectorXd &x0)
     _xtrj.col(0) = x0;
 }
 
+void IterativeLQR::setIterationCallback(const CallbackType &cb)
+{
+    _iter_cb = cb;
+}
+
 const Eigen::MatrixXd &IterativeLQR::getStateTrajectory() const
 {
     return _xtrj;
@@ -318,6 +330,7 @@ bool IterativeLQR::solve(int max_iter)
         linearize_quadratize();
         backward_pass();
         forward_pass(1.0);
+        report_result();
     }
 
     return true;
@@ -340,6 +353,22 @@ void IterativeLQR::linearize_quadratize()
     // note: these are only function of the state!
     _cost.back().quadratize(state(_N), input(_N-1)); // note: input not used here!
     _constraint.back().linearize(state(_N), input(_N-1)); // note: input not used here!
+}
+
+void IterativeLQR::report_result()
+{
+    if(!_iter_cb)
+    {
+        return;
+    }
+
+    // call iteration callback
+    _iter_cb(_xtrj,
+             _utrj,
+             _fp_res->step_length,
+             _fp_res->cost,
+             _fp_res->defect_norm,
+             _fp_res->constraint_violation);
 }
 
 void IterativeLQR::backward_pass()
@@ -565,9 +594,16 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 
 bool IterativeLQR::forward_pass(double alpha)
 {
+    // reset cost
+    _fp_res->cost = 0.0;
+    _fp_res->defect_norm = 0.0;
+    _fp_res->constraint_violation = 0.0;
+    _fp_res->step_length = 0.0;
+
     // initialize forward pass with initial state
     _fp_res->xtrj.col(0) = _xtrj.col(0);
 
+    // do forward pass
     for(int i = 0; i < _N; i++)
     {
         forward_pass_iter(i, alpha);
@@ -613,6 +649,25 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
     // update next state
     auto xnext_upd = xnext + (A + B*L)*tmp.dx + B*l + d;
     _fp_res->xtrj.col(i+1) = xnext_upd;
+
+    // compute cost on current trajectory
+    double cost = _cost[i].evaluate(_fp_res->xtrj.col(i), _fp_res->utrj.col(i));
+    _fp_res->cost += cost;
+
+    // compute defects on current trajectory
+    _dyn[i].computeDefect(_fp_res->xtrj.col(i), _fp_res->utrj.col(i), _fp_res->xtrj.col(i+1));
+    _fp_res->defect_norm += _dyn[i].d.cwiseAbs().sum();
+
+    // compute constraint violation on current trajectory
+    if(_constraint[i].is_valid())
+    {
+        _constraint[i].evaluate(_fp_res->xtrj.col(i), _fp_res->utrj.col(i));
+        _fp_res->constraint_violation += _constraint[i].h().cwiseAbs().sum();
+    }
+
+    // compute step length
+    _fp_res->step_length += l.cwiseAbs().sum();
+
 }
 
 void IterativeLQR::set_default_cost()
@@ -720,6 +775,16 @@ void IterativeLQR::IntermediateCost::setCost(const casadi::Function &cost)
     // tbd: do something with this
     bool is_quadratic = ddl.function().jacobian().nnz_out() == 0;
     static_cast<void>(is_quadratic);
+}
+
+double IterativeLQR::IntermediateCost::evaluate(VecConstRef x, VecConstRef u)
+{
+    // compute cost value
+    l.setInput(0, x);
+    l.setInput(1, u);
+    l.call();
+
+    return l.getOutput(0).value();
 }
 
 void IterativeLQR::IntermediateCost::quadratize(VecConstRef x, VecConstRef u)
@@ -874,6 +939,19 @@ void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u)
     df.setInput(0, x);
     df.setInput(1, u);
     df.call();
+}
+
+void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
+{
+    if(!is_valid())
+    {
+        return;
+    }
+
+    // compute constraint value
+    f.setInput(0, x);
+    f.setInput(1, u);
+    f.call();
 }
 
 void IterativeLQR::Constraint::setConstraint(casadi::Function h)

@@ -10,6 +10,13 @@ namespace horizon
 typedef Eigen::Ref<const Eigen::VectorXd> VecConstRef;
 typedef Eigen::Ref<const Eigen::MatrixXd> MatConstRef;
 
+typedef std::function<bool(const Eigen::MatrixXd& xtrj,
+                           const Eigen::MatrixXd& utrj,
+                           double step_length,
+                           double total_cost,
+                           double defect_norm,
+                           double constraint_violation)> CallbackType;
+
 
 class IterativeLQR
 {
@@ -33,17 +40,16 @@ public:
 
     void setInitialState(const Eigen::VectorXd& x0);
 
+    void setIterationCallback(const CallbackType& cb);
+
     bool solve(int max_iter);
 
     const Eigen::MatrixXd& getStateTrajectory() const;
 
     const Eigen::MatrixXd& getInputTrajectory() const;
 
-    // all public to test things
-    void linearize_quadratize();
-    void backward_pass();
-    bool forward_pass(double alpha);
     VecConstRef state(int i) const;
+
     VecConstRef input(int i) const;
 
     ~IterativeLQR();
@@ -65,8 +71,12 @@ private:
 
     typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost> HandleConstraintsRetType;
 
+    void linearize_quadratize();
+    void report_result();
+    void backward_pass();
     void backward_pass_iter(int i);
     HandleConstraintsRetType handle_constraints(int i);
+    bool forward_pass(double alpha);
     void forward_pass_iter(int i, double alpha);
     void set_default_cost();
 
@@ -87,6 +97,8 @@ private:
     Eigen::MatrixXd _utrj;
 
     std::vector<Temporaries> _tmp;
+
+    CallbackType _iter_cb;
 };
 
 
