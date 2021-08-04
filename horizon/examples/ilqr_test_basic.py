@@ -1,6 +1,5 @@
 import sys
 import os
-from casadi.casadi import sumsqr
 
 import numpy as np
 import casadi as cs
@@ -12,22 +11,24 @@ import pyilqr
 
 from matplotlib import pyplot as plt
 
-N = 10
+N = 2
 
 pb = HorizonProblem(N)
 
 x = pb.createStateVariable('x', 1)
 u = pb.createInputVariable('u', 1)
 
-fdyn = cs.Function('f', [x, u], [x + 0.1*u], ['x', 'u'], ['f'])
-l = cs.Function('f', [x, u], [1e-6*cs.sumsqr(u)], ['x', 'u'], ['l'])
-lf = cs.Function('f', [x, u], [cs.sumsqr(x - 1)], ['x', 'u'], ['l'])
-cf = cs.Function('f', [x, u], [x - 2], ['x', 'u'], ['h'])
+fdyn = cs.Function('dyn', [x, u], [x + 0.1*u], ['x', 'u'], ['f'])
+l = cs.Function('l', [x, u], [1e-6*cs.sumsqr(u)], ['x', 'u'], ['l'])
+lf = cs.Function('lf', [x, u], [cs.sumsqr(x - 1)], ['x', 'u'], ['l'])
+cf = cs.Function('cf', [x, u], [x - 2], ['x', 'u'], ['h'])
+c = cs.Function('c', [x, u], [x + 2], ['x', 'u'], ['h'])
+
 
 ilqr = pyilqr.IterativeLQR(fdyn, N)
 ilqr.setIntermediateCost([l]*N)
-ilqr.setFinalCost(lf)
 ilqr.setFinalConstraint(cf)
+ilqr.setIntermediateConstraint(1, c)
 x0 = np.array([3])
 ilqr.setInitialState(x0)
 ilqr.solve(1)

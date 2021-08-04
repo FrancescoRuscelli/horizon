@@ -5,19 +5,6 @@ using namespace casadi_utils;
 
 namespace cs = casadi;
 
-cs::DM to_cs(const Eigen::MatrixXd& eig)
-{
-    cs::DM ret(cs::Sparsity::dense(eig.rows(), eig.cols()));
-    std::copy(eig.data(), eig.data() + eig.size(), ret.ptr());
-    return ret;
-}
-
-Eigen::MatrixXd to_eig(const cs::DM& cas)
-{
-    auto cas_dense = cs::DM::densify(cas, 0);
-    return Eigen::MatrixXd::Map(cas_dense.ptr(), cas_dense.size1(), cas_dense.size2());
-}
-
 struct IterativeLQR::Dynamics
 {
 
@@ -147,20 +134,74 @@ struct IterativeLQR::Temporaries
 
 };
 
+struct IterativeLQR::ConstraintToGo
+{
+    ConstraintToGo(int nx, int nu);
+
+    void set(MatConstRef C, VecConstRef h);
+
+    void set(const Constraint& constr);
+
+    void propagate_backwards(MatConstRef A, MatConstRef B, VecConstRef d);
+
+    void add(const Constraint& constr);
+
+    void clear();
+
+    int dim() const;
+
+    MatConstRef C() const;
+
+    MatConstRef D() const;
+
+    VecConstRef h() const;
+
+private:
+
+    Eigen::Matrix<double, -1, -1, Eigen::RowMajor> _C;
+    Eigen::Matrix<double, -1, -1, Eigen::RowMajor> _D;
+    Eigen::VectorXd _h;
+    int _dim;
+};
+
+struct IterativeLQR::ValueFunction
+{
+    Eigen::MatrixXd S;
+    Eigen::VectorXd s;
+
+    ValueFunction(int nx);
+};
+
+struct IterativeLQR::BackwardPassResult
+{
+    Eigen::MatrixXd Lfb;
+    Eigen::VectorXd du_ff;
+
+    BackwardPassResult(int nx, int nu);
+};
+
+struct IterativeLQR::ForwardPassResult
+{
+    Eigen::MatrixXd xtrj;
+    Eigen::MatrixXd utrj;
+
+    ForwardPassResult(int nx, int nu, int N);
+};
+
 struct IterativeLQR::ConstrainedDynamics
 {
-    Eigen::Ref<const Eigen::MatrixXd> A;
-    Eigen::Ref<const Eigen::MatrixXd> B;
-    Eigen::Ref<const Eigen::VectorXd> d;
+    MatConstRef A;
+    MatConstRef B;
+    VecConstRef d;
 };
 
 struct IterativeLQR::ConstrainedCost
 {
-    Eigen::Ref<const Eigen::MatrixXd> Q;
-    Eigen::Ref<const Eigen::MatrixXd> R;
-    Eigen::Ref<const Eigen::MatrixXd> P;
-    Eigen::Ref<const Eigen::VectorXd> q;
-    Eigen::Ref<const Eigen::VectorXd> r;
+    MatConstRef Q;
+    MatConstRef R;
+    MatConstRef P;
+    VecConstRef q;
+    VecConstRef r;
 };
 
 IterativeLQR::IterativeLQR(cs::Function fdyn,
@@ -168,20 +209,19 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _nx(fdyn.size1_in(0)),
     _nu(fdyn.size1_in(1)),
     _N(N),
-    _f(fdyn),
     _cost(N+1, IntermediateCost(_nx, _nu)),
     _constraint(N+1),
     _value(N+1, ValueFunction(_nx)),
     _dyn(N, Dynamics(_nx, _nu)),
     _bp_res(N, BackwardPassResult(_nx, _nu)),
-    _constraint_to_go(_nx),
-    _fp_res(_nx, _nu, _N),
+    _constraint_to_go(std::make_unique<ConstraintToGo>(_nx, _nu)),
+    _fp_res(std::make_unique<ForwardPassResult>(_nx, _nu, _N)),
     _tmp(_N)
 {
     // set dynamics
     for(auto& d : _dyn)
     {
-        d.setDynamics(_f);
+        d.setDynamics(fdyn);
     }
 
     // initialize trajectories
@@ -206,9 +246,42 @@ void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inte
     }
 }
 
+void IterativeLQR::setIntermediateCost(int k, const casadi::Function &inter_cost)
+{
+    if(k > _N || k < 0)
+    {
+        throw std::invalid_argument("wrong intermediate cost node index");
+    }
+
+    _cost[k].setCost(inter_cost);
+}
+
 void IterativeLQR::setFinalCost(const casadi::Function &final_cost)
 {
     _cost.back().setCost(final_cost);
+}
+
+void IterativeLQR::setIntermediateConstraint(int k, const casadi::Function &inter_constraint)
+{
+    if(k > _N || k < 0)
+    {
+        throw std::invalid_argument("wrong intermediate constraint node index");
+    }
+
+    _constraint[k].setConstraint(inter_constraint);
+}
+
+void IterativeLQR::setIntermediateConstraint(const std::vector<casadi::Function> &inter_constraint)
+{
+    if(inter_constraint.size() != _N)
+    {
+        throw std::invalid_argument("wrong intermediate constraint length");
+    }
+
+    for(int i = 0; i < _N; i++)
+    {
+        _constraint[i].setConstraint(inter_constraint[i]);
+    }
 }
 
 void IterativeLQR::setFinalConstraint(const casadi::Function &final_constraint)
@@ -271,7 +344,7 @@ void IterativeLQR::backward_pass()
     _value.back().s = _cost.back().q();
 
     // ..and constraint
-    _constraint_to_go.set(_constraint.back());
+    _constraint_to_go->set(_constraint.back());
 
     // backward pass
     for(int i = _N-1; i >= 0; i--)
@@ -284,6 +357,7 @@ void IterativeLQR::backward_pass_iter(int i)
 {
     // constraint handling
     auto [nz, cdyn, ccost] = handle_constraints(i);
+
     const bool has_constraints = nz != _nu;
 
     // note: after handling constraints, we're actually optimizing an
@@ -410,9 +484,6 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 
     // ..workspace
     auto& tmp = _tmp[i];
-    auto& C = tmp.C;
-    auto& D = tmp.D;
-    auto& h = tmp.h;
     auto& svd = tmp.svd;
     auto& rotC = tmp.rotC;
     auto& roth = tmp.roth;
@@ -421,7 +492,8 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     auto& Lz = tmp.Lz;
 
     // no constraint to handle, do nothing
-    if(_constraint_to_go.dim() == 0)
+    if(_constraint_to_go->dim() == 0 &&
+            !_constraint[i].is_valid())
     {
         ConstrainedDynamics cd = {A, B, d};
         ConstrainedCost cc = {Q, R, P, q, r};
@@ -429,12 +501,16 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     }
 
     // back-propagate constraint to go from next step to current step
-    C = _constraint_to_go.C() * A;
-    D = _constraint_to_go.C() * B;
-    h = _constraint_to_go.h() - _constraint_to_go.C()*d;
+    _constraint_to_go->propagate_backwards(A, B, d);
+
+    // add current step intermediate constraint
+    _constraint_to_go->add(_constraint[i]);
+    auto C = _constraint_to_go->C();
+    auto D = _constraint_to_go->D();
+    auto h = _constraint_to_go->h();
 
     // number of constraints
-    int nc = _constraint_to_go.dim();
+    int nc = _constraint_to_go->dim();
 
     // svd of input matrix
     const double sv_ratio_thr = 1e-3;
@@ -460,8 +536,8 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     Lz.noalias() = V.rightCols(ns_dim);
 
     // remove satisfied constraints from constraint to go
-    _constraint_to_go.set(rotC.bottomRows(nc - rank),
-                          roth.tail(nc - rank));
+    _constraint_to_go->set(rotC.bottomRows(nc - rank),
+                           roth.tail(nc - rank));
 
     // modified cost and dynamics due to uc = uc(x, z)
     // note: our new control input will be z!
@@ -469,7 +545,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     tmp.Bc.noalias() = B*Lz;
     tmp.dc.noalias() = d + B*lc;
 
-    tmp.qc.noalias() = q + Lc.transpose()*(r + R*lc) + P.transpose()*Lc;
+    tmp.qc.noalias() = q + Lc.transpose()*(r + R*lc) + P.transpose()*lc;
     tmp.rc.noalias() = Lz.transpose()*(r + R*lc);
     tmp.Qc.noalias() = Q + Lc.transpose()*R*Lc + Lc.transpose()*P + P.transpose()*Lc;
     tmp.Rc.noalias() = Lz.transpose()*R*Lz;
@@ -485,7 +561,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 bool IterativeLQR::forward_pass(double alpha)
 {
     // initialize forward pass with initial state
-    _fp_res.xtrj.col(0) = _xtrj.col(0);
+    _fp_res->xtrj.col(0) = _xtrj.col(0);
 
     for(int i = 0; i < _N; i++)
     {
@@ -494,8 +570,8 @@ bool IterativeLQR::forward_pass(double alpha)
 
     // todo: add line search
     // for now, we always accept the step
-    _xtrj = _fp_res.xtrj;
-    _utrj = _fp_res.utrj;
+    _xtrj = _fp_res->xtrj;
+    _utrj = _fp_res->utrj;
 
     return true;
 }
@@ -510,7 +586,7 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
     const auto xnext = state(i+1);
     const auto xi = state(i);
     const auto ui = input(i);
-    const auto xi_upd = _fp_res.xtrj.col(i);
+    const auto xi_upd = _fp_res->xtrj.col(i);
     auto& tmp = _tmp[i];
     tmp.dx = xi_upd - xi;
 
@@ -527,11 +603,11 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
 
     // update control
     auto ui_upd = ui + l + L*tmp.dx;
-    _fp_res.utrj.col(i) = ui_upd;
+    _fp_res->utrj.col(i) = ui_upd;
 
     // update next state
     auto xnext_upd = xnext + (A + B*L)*tmp.dx + B*l + d;
-    _fp_res.xtrj.col(i+1) = xnext_upd;
+    _fp_res->xtrj.col(i+1) = xnext_upd;
 }
 
 void IterativeLQR::set_default_cost()
@@ -673,22 +749,21 @@ IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N)
     utrj.setZero(nu, N);
 }
 
-IterativeLQR::ConstraintToGo::ConstraintToGo(int nx):
+IterativeLQR::ConstraintToGo::ConstraintToGo(int nx, int nu):
     _dim(0)
 {
     const int c_max = nx*10;  // todo: better estimate
     _C.setZero(c_max, nx);
     _h.setZero(c_max);
+    _D.setZero(c_max, nu);
 }
 
-void IterativeLQR::ConstraintToGo::set(Eigen::Ref<const Eigen::MatrixXd> C_to_add,
-                                       Eigen::Ref<const Eigen::VectorXd> h_to_add)
+void IterativeLQR::ConstraintToGo::set(MatConstRef C, VecConstRef h)
 {
-    _dim = h_to_add.size();
-    _C.topRows(_dim) = C_to_add;
-    _h.head(_dim) = h_to_add;
-
-    // todo: check we don't overflow the matrix!
+    _dim = h.size();
+    _C.topRows(_dim) = C;
+    _h.head(_dim) = h;
+    _D.array().topRows(_dim) = 0;  // note! we assume no input dependence here!
 }
 
 void IterativeLQR::ConstraintToGo::set(const IterativeLQR::Constraint &constr)
@@ -698,7 +773,35 @@ void IterativeLQR::ConstraintToGo::set(const IterativeLQR::Constraint &constr)
         return;
     }
 
-    set(constr.C(), constr.h());
+    _dim = constr.h().size();
+    _C.topRows(_dim) = constr.C();
+    _h.head(_dim) = constr.h();
+    _D.array().topRows(_dim) = 0;  // note! we assume no input dependence here!
+}
+
+void IterativeLQR::ConstraintToGo::propagate_backwards(MatConstRef A,
+                                                       MatConstRef B,
+                                                       VecConstRef d)
+{
+    // tbd: avoid allocations
+
+    _D.topRows(_dim) = C()*B;
+    _h.head(_dim) = h() + C()*d;  // note: check sign!
+    _C.topRows(_dim) = C()*A;  // note: C must be modified last!
+}
+
+void IterativeLQR::ConstraintToGo::add(const Constraint &constr)
+{
+    if(!constr.is_valid())
+    {
+        return;
+    }
+
+    const int constr_size = constr.h().size();
+    _C.middleRows(_dim, constr_size) = constr.C();
+    _D.middleRows(_dim, constr_size) = constr.D();
+    _h.segment(_dim, constr_size) = constr.h();
+    _dim += constr_size;
 }
 
 void IterativeLQR::ConstraintToGo::clear()
@@ -714,6 +817,11 @@ int IterativeLQR::ConstraintToGo::dim() const
 Eigen::Ref<const Eigen::MatrixXd> IterativeLQR::ConstraintToGo::C() const
 {
     return _C.topRows(_dim);
+}
+
+MatConstRef IterativeLQR::ConstraintToGo::D() const
+{
+    return _D.topRows(_dim);
 }
 
 Eigen::Ref<const Eigen::VectorXd> IterativeLQR::ConstraintToGo::h() const
