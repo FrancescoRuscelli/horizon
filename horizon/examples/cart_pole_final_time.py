@@ -25,12 +25,12 @@ ns = 100  # number of shooting nodes
 # Create horizon problem
 prb = problem.Problem(ns)
 
-# Create problem STATE variables
+# Create problem STATE variables: x = [q, qdot]
 q = prb.createStateVariable("q", nq)
 qdot = prb.createStateVariable("qdot", nv)
 x = prb.getState().getVars()
 
-# Create problem CONTROL variables
+# Create problem CONTROL variables: tau = [u, 0], embed underactuation in control
 u = prb.createInputVariable("u", 1)
 tau = cs.vertcat(u, 0.)
 
@@ -38,9 +38,9 @@ tau = cs.vertcat(u, 0.)
 tf = prb.createVariable("tf", 1)
 
 # Create dynamics
-fd = kindyn.aba()  # this is the forward dynamics function
-qddot = fd(q=q, v=qdot, tau=tau)['a']
-x, xdot = utils.double_integrator(q, qdot, qddot)
+fd = kindyn.aba()  # this is the forward dynamics function:
+qddot = fd(q=q, v=qdot, tau=tau)['a'] # qddot = M^-1(tau - h)
+x, xdot = utils.double_integrator(q, qdot, qddot) # xdot = [qdot, qddot]
 
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': u, 'ode': xdot, 'quad': L}

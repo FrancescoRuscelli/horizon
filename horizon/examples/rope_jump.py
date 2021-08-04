@@ -95,13 +95,15 @@ q_trg = np.array([-.4, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
 
 x_distance = -0.4
 prb.createCostFunction("wall_distance", 100.*cs.sumsqr(q[0] - x_distance), nodes=list(range(lift_node, touch_down_node)))
-prb.createCostFunction("min_vel", cs.sumsqr(qdot))
+prb.createCostFunction("min_qdot", cs.sumsqr(qdot))
+#prb.createCostFunction("min_legs_vel", cs.sumsqr(qdot[6:12]), nodes=list(range(lift_node, touch_down_node)))
+#prb.createCostFunction("min_base_vel", cs.sumsqr(qdot[0:6]), nodes=list(range(lift_node, ns+1)))
 f1_prev = f1.getVarOffset(-1)
 f2_prev = f2.getVarOffset(-1)
 prb.createCostFunction("min_df", 0.0001*cs.sumsqr(f1-f1_prev + f2-f2_prev), nodes=list(range(1, ns)))
 
 qddot_prev = qddot.getVarOffset(-1)
-prb.createCostFunction("min_jerk", 0.0001*cs.sumsqr(qddot-qddot_prev), nodes=list(range(1, ns)))
+#prb.createCostFunction("min_jerk", 0.0003*cs.sumsqr(qddot-qddot_prev), nodes=list(range(1, ns)))
 
 # Constraints
 state = prb.getState()
@@ -212,37 +214,8 @@ dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anchor2': frope_hist}
 q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist,
                                                                                                      dt_hist.flatten(), dt, dae, frame_force_hist_mapping,
-                                                                                                     kindyn,cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+                                                                                                     kindyn, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
-PLOTS = True
-goal = q_trg[0]*np.ones(ns)
-if PLOTS:
-    time  = [0]
-    labels = [str(time[0])]
-    ticks = [3,7,10,57,69, 70]
-    k = 1
-    for i in dt_hist:
-        time.append(time[k-1] + i)
-        if k in ticks:
-            l = '%s' % float('%.2g' % time[k])
-            labels.append(l)
-        else:
-            labels.append("")
-        k+=1
-
-
-    plt.figure(1)
-    plt.suptitle('$\mathrm{Floating \ - \ Base \ X \ Trajectory}$', size=20)
-    plt.plot(time, q_hist[0, :], linewidth=3.0, color='blue')
-    plt.plot(time, goal, linewidth=3.0, color='red', linestyle='--')
-    plt.xticks(time, labels)
-    axes = plt.gca()
-    axes.set_ylim([-0.5, 0.3])
-    plt.grid()
-    plt.xlabel('$\mathrm{[sec]}$', size=20)
-    plt.ylabel('$\mathrm{[m]}$', size=20)
-
-    plt.show()
 
 
 
