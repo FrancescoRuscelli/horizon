@@ -51,6 +51,28 @@ def checkValueEntry(val):
 
     return val
 
+def ravelElements(list_values):
+    list_ranges = list()
+    first = list_values[0]
+    if len(list_values) == 1:
+        list_ranges.append([first, list_values[0]])
+    else:
+        for i in range(1, len(list_values)):
+            if list_values[i] - list_values[i - 1] > 1:
+                last = list_values[i-1]
+                list_ranges.append([first, last])
+                first = list_values[i]
+
+            if i ==len(list_values)-1:
+                last = list_values[i]
+                list_ranges.append([first, last])
+
+    return list_ranges
+
 if __name__ == '__main__':
     penis = [[1, 5], [3, 9], [12, 18]]
-    print(unravelElements(penis))
+    unr_elem = unravelElements(penis)
+    print(unr_elem)
+
+    another = [20]
+    print(ravelElements(another))

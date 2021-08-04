@@ -76,15 +76,9 @@ class horizonImpl():
 
         flag, signal = self.checkActiveFunction(name)
 
-        active_nodes = None
-        for var in self.fun_dict[name]['used_vars']:
-            print(var.getNodes())
-
-
         if flag:
             if fun_type == 'constraint':
                 try:
-                    # self.logger.info('Adding function: {}'.format(self.fun_dict[name]))
                     active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'])
                     # self.active_fun_list.append(active_fun)
                     self.fun_dict[name].update({'active': active_fun})
@@ -225,7 +219,6 @@ class horizonImpl():
             return False, signal
 
     def updateFunctionNodes(self, name, nodes):
-        print(nodes)
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
     def updateFunctionUpperBounds(self, name, ub, nodes):

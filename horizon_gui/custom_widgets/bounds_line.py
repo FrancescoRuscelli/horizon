@@ -21,7 +21,7 @@ class BoundsLine(QWidget):
     lbChanged = pyqtSignal(int, list)
     ubChanged = pyqtSignal(int, list)
 
-    def __init__(self, name, nodes=0, dim=1, initial_bounds=None, parent=None):
+    def __init__(self, name, nodes=0, dim=1, disabled_nodes=None, initial_bounds=None, parent=None):
         super().__init__(parent)
 
         self.name = name
@@ -82,6 +82,12 @@ class BoundsLine(QWidget):
         self.selected = []
         self.setNodes(nodes)
 
+        if disabled_nodes is None:
+            disabled_nodes = []
+
+        self.disabled_nodes = disabled_nodes
+        self.hideNodes(self.disabled_nodes)
+
         QApplication.instance().focusChanged.connect(self.on_focusChanged)
 
     def setNodes(self, nodes):
@@ -117,8 +123,6 @@ class BoundsLine(QWidget):
 
     def createCustomSpinboxLine(self, parent, updatefun, values, color_base=None, color_selected=None):
 
-
-
         for i in range(self.dim):
             for j in range(self.n_nodes):
                 n_i = InfinitySpinBox(color_base=color_base, color_selected=color_selected)
@@ -126,7 +130,6 @@ class BoundsLine(QWidget):
                 n_i.valueChanged.connect(self.multipleSet)
                 n_i.valueChanged.connect(partial(updatefun, i, j))
                 parent.addWidget(n_i, i, j)
-
 
     def hideNodes(self, node_list):
         for item in self.bounds_widgets:
@@ -146,7 +149,7 @@ class BoundsLine(QWidget):
             for i in range(self.dim):
                 for j in range(self.n_nodes):
                     spinbox = layout.itemAtPosition(i, j).widget()
-                    if j in node_list:
+                    if j in node_list and j not in self.disabled_nodes:
                         spinbox.show()
 
     def mousePressEvent(self, event):

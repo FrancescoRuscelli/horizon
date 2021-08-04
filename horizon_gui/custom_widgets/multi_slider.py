@@ -173,6 +173,18 @@ class QMultiSlider(QtWidgets.QWidget):
         return 1
 
     def disableValues(self, min, max):
+        for slice in self.slices:
+            if max >= slice.getValues()[1] >= min > slice.getValues()[0]:
+                slice.setMax(min - 1)
+            if min <= slice.getValues()[0] <= max < slice.getValues()[1]:
+                slice.setMin(max + 1)
+            if slice.getValues()[0] < min and slice.getValues()[1] > max:
+                slice_min = slice.getValues()[0]
+                slice_max = slice.getValues()[1]
+                self._removeSlice(slice)
+                self._addSlice(Slice(slice_min, min - 1))
+                self._addSlice(Slice(max + 1, slice_max))
+
         disabled_value = AbstractSlice(min, max)
         self._addSlice(disabled_value)
 
@@ -454,6 +466,8 @@ class QMultiSlider(QtWidgets.QWidget):
             # and I'm setting it as the minimum in the mouseMoveEvent.
             # so the active_slice can only get to that minimum.
             # same for the maximum
+            size = float(self.width() - 2 * self.bar_width - 1)
+            single_step_display = int(size * (self.single_step - self.start) / self.scale) + self.bar_width
 
             active_min = 0
             for slice in self.slices:
@@ -462,6 +476,9 @@ class QMultiSlider(QtWidgets.QWidget):
                         if self._fromValueToDisplay(slice)[1] > active_min:
                             active_min = self._fromValueToDisplay(slice)[1]
 
+            if active_min != 0:
+                active_min = active_min + single_step_display
+
             active_max = self.width()
             for slice in self.slices:
                 if isinstance(slice, AbstractSlice):
@@ -469,10 +486,9 @@ class QMultiSlider(QtWidgets.QWidget):
                         if self._fromValueToDisplay(slice)[0] < active_max:
                             active_max = self._fromValueToDisplay(slice)[0]
 
-            size = float(self.width() - 2 * self.bar_width - 1)
-            single_step_display = int(size * (self.single_step - self.start) / self.scale) + self.bar_width
-            active_min = active_min + single_step_display
-            active_max = active_max - single_step_display
+            if active_max != self.width():
+                active_max = active_max - single_step_display
+
             size = self.width() # the length of the whole slider bar
             # start pos --> the position clicked
             # getPos --> the current position
@@ -632,13 +648,14 @@ if (__name__ == "__main__"):
     app = QtWidgets.QApplication(sys.argv)
     # mywidget = MyWidget()
     # mywidget.show()
-    hslider = QMultiSlider([0, 30, 1], values=[7,9], number_bar=True)
+    hslider = QMultiSlider([0, 30, 1], number_bar=True)
 
-    hslider.disableValues(0, 2)
-    hslider.disableValues(5, 5)
+    hslider.disableValues(0, 8)
+    hslider.disableValues(28, 30)
+    # hslider.disableValues(15, 18)
 
-    hslider.disableValues(20, 25)
-    hslider.disableValues(26, 30)
+    # hslider.disableValues(20, 25)
+    # hslider.disableValues(26, 30)
 
     hslider.show()
 

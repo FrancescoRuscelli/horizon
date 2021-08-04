@@ -9,7 +9,7 @@ from horizon_gui.custom_widgets.function_tab import FunctionTabWidget
 from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 
 from horizon_gui.custom_widgets.on_destroy_signal_window import DestroySignalWindow
-from horizon.misc_function import listOfListFLOATtoINT, unravelElements
+from horizon.misc_function import listOfListFLOATtoINT, unravelElements, ravelElements
 from functools import partial
 import os
 
@@ -180,6 +180,7 @@ class HorizonLine(QScrollArea):
         source_item = QStandardItemModel()
         source_item.dropMimeData(event.mimeData(), Qt.CopyAction, 0, 0, QModelIndex())
         fun_name = source_item.item(0, 0).text()
+
         # fun = source_item.item(0, 0).data(Qt.UserRole)
         self.active_fun_horizon.emit()
         self.addFunctionToHorizon(fun_name)
@@ -188,12 +189,12 @@ class HorizonLine(QScrollArea):
     def on_repeated_fun(self, str):
         self.repeated_fun.emit(str)
 
-    def addFunctionToSingleLine(self, name, dim, initial_bounds):
-        self.function_tab.addFunctionToGUI(name, dim, initial_bounds)
+    def addFunctionToSingleLine(self, name, dim, disabled_nodes, initial_bounds):
+        self.function_tab.addFunctionToGUI(name, dim, disabled_nodes, initial_bounds)
         self.updateMarginsSingleLine()
 
-    def addFunctionToMultiLine(self, name):
-        self.multi_function_box.addFunctionToGUI(name)
+    def addFunctionToMultiLine(self, name, disabled_nodes):
+        self.multi_function_box.addFunctionToGUI(name, disabled_nodes)
         self.updateMarginsMultiLine()
 
     def addFunctionToHorizon(self, name):
@@ -201,10 +202,21 @@ class HorizonLine(QScrollArea):
 
         dim = self.horizon_receiver.getFunction(name)['active'].getDim()[0]
         initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
+        used_vars = self.horizon_receiver.getFunction(name)['used_vars']
+
+        available_nodes = set(range(self.n_nodes))
+        for var in used_vars:
+            if not var.getNodes() == [-1]: # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
+                available_nodes.intersection_update(var.getNodes())
+
+        disabled_nodes = [node for node in range(self.n_nodes) if node not in available_nodes]
+
+        disabled_nodes = ravelElements(disabled_nodes)
+
         if flag:
 
-            self.addFunctionToSingleLine(name, dim, initial_bounds)
-            self.addFunctionToMultiLine(name)
+            self.addFunctionToSingleLine(name, dim, disabled_nodes, initial_bounds)
+            self.addFunctionToMultiLine(name, disabled_nodes)
             self.logger.info(signal)
         else:
             self.logger.warning(signal)
