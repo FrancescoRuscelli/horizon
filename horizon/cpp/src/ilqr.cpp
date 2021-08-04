@@ -1,9 +1,12 @@
 #include "ilqr.h"
+#include "wrapped_function.h"
 
 using namespace horizon;
 using namespace casadi_utils;
 
 namespace cs = casadi;
+
+utils::Timer::TocCallback on_timer_toc;
 
 struct IterativeLQR::Dynamics
 {
@@ -211,6 +214,8 @@ struct IterativeLQR::ConstrainedCost
     VecConstRef r;
 };
 
+
+
 IterativeLQR::IterativeLQR(cs::Function fdyn,
                            int N):
     _nx(fdyn.size1_in(0)),
@@ -225,6 +230,12 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _fp_res(std::make_unique<ForwardPassResult>(_nx, _nu, _N)),
     _tmp(_N)
 {
+    // set timer callback
+    on_timer_toc = [this](const char * name, double usec)
+    {
+        _prof_info.timings[name].push_back(usec);
+    };
+
     // set dynamics
     for(auto& d : _dyn)
     {
@@ -321,15 +332,25 @@ const Eigen::MatrixXd &IterativeLQR::getInputTrajectory() const
     return _utrj;
 }
 
+const utils::ProfilingInfo& IterativeLQR::getProfilingInfo() const
+{
+    return _prof_info;
+}
+
 bool IterativeLQR::solve(int max_iter)
 {
     // tbd implement convergence check
 
     for(int i = 0; i < max_iter; i++)
     {
+        TIC(solve)
+
         linearize_quadratize();
         backward_pass();
         forward_pass(1.0);
+
+        TOC(solve)
+
         report_result();
     }
 
@@ -338,11 +359,16 @@ bool IterativeLQR::solve(int max_iter)
 
 void IterativeLQR::linearize_quadratize()
 {
+    TIC(linearize_quadratize)
+
     for(int i = 0; i < _N; i++)
     {
+        TIC(linearize_quadratize_inner)
+
         auto xi = state(i);
         auto ui = input(i);
         auto xnext = state(i+1);
+
         _dyn[i].linearize(xi, ui);
         _dyn[i].computeDefect(xi, ui, xnext);
         _constraint[i].linearize(xi, ui);
@@ -373,6 +399,8 @@ void IterativeLQR::report_result()
 
 void IterativeLQR::backward_pass()
 {
+    TIC(backward_pass)
+
     // initialize backward recursion from final cost..
     _value.back().S = _cost.back().Q();
     _value.back().s = _cost.back().q();
@@ -389,6 +417,8 @@ void IterativeLQR::backward_pass()
 
 void IterativeLQR::backward_pass_iter(int i)
 {
+    TIC(backward_pass_inner)
+
     // constraint handling
     auto [nz, cdyn, ccost] = handle_constraints(i);
 
@@ -500,6 +530,8 @@ void IterativeLQR::backward_pass_iter(int i)
 
 IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 {
+    TIC(handle_constraints_inner)
+
     // some shorthands for..
 
     // ..intermediate cost
@@ -594,6 +626,8 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 
 bool IterativeLQR::forward_pass(double alpha)
 {
+    TIC(forward_pass)
+
     // reset cost
     _fp_res->cost = 0.0;
     _fp_res->defect_norm = 0.0;
@@ -619,6 +653,8 @@ bool IterativeLQR::forward_pass(double alpha)
 
 void IterativeLQR::forward_pass_iter(int i, double alpha)
 {
+    TIC(forward_pass_inner)
+
     // note!
     // this function will update the control at t = i, and
     // the state at t = i+1
@@ -718,6 +754,7 @@ Eigen::Ref<const Eigen::VectorXd> IterativeLQR::Dynamics::integrate(VecConstRef 
 
 void IterativeLQR::Dynamics::linearize(VecConstRef x, VecConstRef u)
 {
+    TIC(linearize_dynamics_inner)
     df.setInput(0, x);
     df.setInput(1, u);
     df.call();
@@ -725,6 +762,7 @@ void IterativeLQR::Dynamics::linearize(VecConstRef x, VecConstRef u)
 
 void IterativeLQR::Dynamics::computeDefect(VecConstRef x, VecConstRef u, VecConstRef xnext)
 {
+    TIC(compute_defect_inner)
     auto xint = integrate(x, u);
     d = xint - xnext;
 }
@@ -789,6 +827,8 @@ double IterativeLQR::IntermediateCost::evaluate(VecConstRef x, VecConstRef u)
 
 void IterativeLQR::IntermediateCost::quadratize(VecConstRef x, VecConstRef u)
 {
+    TIC(quadratize_inner)
+
     // compute cost gradient
     dl.setInput(0, x);
     dl.setInput(1, u);
@@ -930,6 +970,8 @@ void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u)
         return;
     }
 
+    TIC(linearize_constraint_inner)
+
     // compute constraint value
     f.setInput(0, x);
     f.setInput(1, u);
@@ -947,6 +989,8 @@ void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
     {
         return;
     }
+
+    TIC(evaluate_constraint_inner)
 
     // compute constraint value
     f.setInput(0, x);

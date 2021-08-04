@@ -2,6 +2,9 @@
 
 PYBIND11_MODULE(pyilqr, m) {
 
+    py::class_<utils::ProfilingInfo>(m, "ProfilingInfo")
+            .def_readonly("timings", &utils::ProfilingInfo::timings);
+
     py::class_<IterativeLQR>(m, "IterativeLQR")
             .def(py::init(&construct))
             .def("setIntermediateCost", set_inter_cost_wrapper)
@@ -11,6 +14,7 @@ PYBIND11_MODULE(pyilqr, m) {
             .def("setFinalCost", set_final_cost_wrapper)
             .def("setFinalConstraint", set_final_constraint_wrapper)
             .def("solve", &IterativeLQR::solve)
+            .def("getProfilingInfo", &IterativeLQR::getProfilingInfo)
             .def("setIterationCallback", &IterativeLQR::setIterationCallback)
             .def("getStateTrajectory", &IterativeLQR::getStateTrajectory)
             .def("getInputTrajectory", &IterativeLQR::getInputTrajectory)

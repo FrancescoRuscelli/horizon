@@ -11,15 +11,17 @@ import matplotlib.pyplot as plt
 
 np.set_printoptions(suppress=True, precision=3)
 
-pyilqr_build_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'build')
-sys.path.append(pyilqr_build_folder)
-import pyilqr
+# pyilqr_build_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'build')
+# sys.path.append(pyilqr_build_folder)
+# import pyilqr
+
+from horizon.solvers import pyilqr
 
 from matplotlib import pyplot as plt
 
 # create problem
 N = 100
-dt = 0.1
+dt = 0.03
 pb = HorizonProblem(N)
 
 # create variables
@@ -85,6 +87,24 @@ plt.draw()
 
 # solve!
 ilqr.solve(10)
+prof_info = ilqr.getProfilingInfo()
+
+# print timings
+
+print('\n\ntimings (inner):')
+for k, v in prof_info.timings.items():
+    if '_inner' not in k:
+        continue
+    print(f'{k[:-6]:30}{np.mean(v)} us')
+
+
+print('\ntimings (iter):')
+
+for k, v in prof_info.timings.items():
+    if '_inner' in k:
+        continue
+    print(f'{k:30}{np.mean(v)} us')
+
 
 # keep last plot alive
 plt.ioff()

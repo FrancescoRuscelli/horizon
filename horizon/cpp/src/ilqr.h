@@ -2,7 +2,7 @@
 #include <Eigen/Dense>
 #include <memory>
 
-#include "wrapped_function.h"
+#include "profiling.h"
 
 namespace horizon
 {
@@ -47,6 +47,8 @@ public:
     const Eigen::MatrixXd& getStateTrajectory() const;
 
     const Eigen::MatrixXd& getInputTrajectory() const;
+
+    const utils::ProfilingInfo& getProfilingInfo() const;
 
     VecConstRef state(int i) const;
 
@@ -99,6 +101,7 @@ private:
     std::vector<Temporaries> _tmp;
 
     CallbackType _iter_cb;
+    utils::ProfilingInfo _prof_info;
 };
 
 

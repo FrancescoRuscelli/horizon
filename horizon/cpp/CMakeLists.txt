@@ -1,16 +1,26 @@
 project(horizon)
 cmake_minimum_required(VERSION 3.0)
 
+# options
+option(HORIZON_PROFILING OFF "enable profiling features")
+
+if(${HORIZON_PROFILING})
+    add_definitions(-DHORIZON_PROFILING)
+endif()
+
 find_package(Eigen3 REQUIRED)
 find_package(casadi 3.5.5 REQUIRED)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(CMAKE_CXX_STANDARD 17)
 
+
+
 # ilqr library
 add_library(ilqr STATIC
     src/ilqr.cpp
     src/wrapped_function.cpp
+    src/profiling.cpp
 )
 
 target_link_libraries(ilqr Eigen3::Eigen casadi)
