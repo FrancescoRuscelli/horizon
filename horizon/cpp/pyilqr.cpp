@@ -15,7 +15,7 @@ PYBIND11_MODULE(pyilqr, m) {
             .def("forward_pass", &IterativeLQR::forward_pass)
             .def("linearize_quadratize", &IterativeLQR::linearize_quadratize)
             .def("getStateTrajectory", &IterativeLQR::getStateTrajectory)
-            .def("linearize_quadratize", &IterativeLQR::getInputTrajectory)
+            .def("getInputTrajectory", &IterativeLQR::getInputTrajectory)
             .def("setInitialState", &IterativeLQR::setInitialState)
             ;
 
