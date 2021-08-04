@@ -291,6 +291,11 @@ void IterativeLQR::setFinalConstraint(const casadi::Function &final_constraint)
 
 void IterativeLQR::setInitialState(const Eigen::VectorXd &x0)
 {
+    if(x0.size() != _nx)
+    {
+        throw std::invalid_argument("wrong initial state length");
+    }
+
     _xtrj.col(0) = x0;
 }
 
