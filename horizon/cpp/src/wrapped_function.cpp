@@ -6,11 +6,18 @@ using namespace casadi_utils;
 WrappedFunction::WrappedFunction(casadi::Function f):
     _f(f)
 {
+    if(f.sz_arg() != f.n_in() ||
+            f.sz_res() != f.n_out())
+    {
+        throw std::runtime_error("f.sz_arg() != f.n_in() || f.sz_res() != f.n_out() => contact the developers!!!");
+    }
+
     // resize work vectors
     _iw.assign(_f.sz_iw(), 0);
     _dw.assign(_f.sz_w(), 0.);
 
-    // resize input buffers
+    f.sz_arg()
+    // resize input buffers (note: sz_arg might be > n_in!!)
     _in_buf.assign(_f.n_in(), nullptr);
 
     // create memory for output data
@@ -42,7 +49,8 @@ void WrappedFunction::setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi)
 void WrappedFunction::call()
 {
     // call function (allocation-free)
-    _f(_in_buf.data(), _out_buf.data(), _iw.data(), _dw.data(), 0);
+    casadi_int mem = _f.checkout();
+    _f(_in_buf.data(), _out_buf.data(), _iw.data(), _dw.data(), mem);
 
     // copy all outputs to dense matrices
     for(int i = 0; i < _f.n_out(); i++)
@@ -51,6 +59,9 @@ void WrappedFunction::call()
                       _out_data[i],
                       _out_matrix[i]);
     }
+
+    // release mem (?)
+    _f.release(mem);
 }
 
 const Eigen::MatrixXd& WrappedFunction::getOutput(int i) const
