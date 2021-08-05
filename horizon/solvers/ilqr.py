@@ -102,6 +102,7 @@ class SolverILQR(Solver):
                 if np.all(ulb == uub):
                     value_list.append(self.u - ulb)
 
+        
         # check constraints    
         for fname, f in container.items():
             
@@ -139,9 +140,7 @@ class SolverILQR(Solver):
         
         # compute overall value
         total_value = combine_elements(value_list)
-        
-        print(f'{outname} at node {k:2}: {total_value}')
-
+    
         # wrap function
         l = cs.Function(f'{outname}_{k}', [self.x, self.u], [total_value], 
                             ['x', 'u'], [outname])
