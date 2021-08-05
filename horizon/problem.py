@@ -215,8 +215,7 @@ class Problem:
         w = self.var_container.getVarImplList()
         g = self.function_container.getCnstrFList()
         p = self.var_container.getParameterList()
-
-        print(p)
+        
         # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
         # self.logger.debug('constraints unraveled:', cs.vertcat(*self. ...))
         # self.logger.debug('cost functions unraveled:', cs.vertcat(*self. ...))
