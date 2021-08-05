@@ -88,6 +88,8 @@ class Problem:
         self.state_der = xdot
 
     def getDynamics(self) -> cs.SX:
+        if self.state_der is None:
+            raise ValueError('dynamics not defined, have you called setDynamics?')
         return self.state_der
 
     def _getUsedVar(self, f):
@@ -116,7 +118,6 @@ class Problem:
         # get vars that constraint depends upon
         used_var = self._getUsedVar(g)
 
-        print(used_var)
         if self.debug_mode:
             self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes} using vars {used_var}')
 
