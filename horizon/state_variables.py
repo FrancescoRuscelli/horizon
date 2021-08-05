@@ -341,10 +341,10 @@ class Aggregate(AbstractAggregate):
         return lb, ub
 
     def getLowerBounds(self, node):
-        return np.hstack((var.getLowerBounds(node) for var in self))
+        return np.hstack([var.getLowerBounds(node) for var in self])
 
     def getUpperBounds(self, node):
-        return np.hstack((var.getUpperBounds(node) for var in self))
+        return np.hstack([var.getUpperBounds(node) for var in self])
 
 class StateAggregate(Aggregate):
     def __init__(self, *args: StateVariable):
