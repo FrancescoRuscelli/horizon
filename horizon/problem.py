@@ -1,4 +1,5 @@
 import time
+from typing import Iterable
 
 import casadi as cs
 from horizon import function as fc
@@ -91,6 +92,15 @@ class Problem:
         if self.state_der is None:
             raise ValueError('dynamics not defined, have you called setDynamics?')
         return self.state_der
+
+    def setInitialState(self, x0: Iterable):
+        self.getState().setBounds(lb=x0, ub=x0, nodes=0)
+
+    def getInitialState(self) -> np.array:
+        lb, ub = self.getState().getBounds(node=0)
+        if np.any(lb != ub):
+            return None
+        return lb
 
     def _getUsedVar(self, f):
         used_var = dict()
