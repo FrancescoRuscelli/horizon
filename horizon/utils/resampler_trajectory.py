@@ -69,13 +69,40 @@ def resample_torques(p, v, a, node_time, dt, dae, frame_force_mapping, kindyn, f
 
     return p_res, v_res, a_res, frame_res_force_mapping, tau_res
 
+def resample_input(input, node_time, dt):
+    number_of_nodes = input.shape[1]+1
+    node_time_array = np.zeros([number_of_nodes])
+    if hasattr(node_time, "__iter__"):
+        for i in range(1, number_of_nodes):
+            node_time_array[i] = node_time_array[i - 1] + node_time[i - 1]
+    else:
+        for i in range(1, number_of_nodes):
+            node_time_array[i] = node_time_array[i - 1] + node_time
+
+    n_res = int(round(node_time_array[-1] / dt))
+
+    input_res = np.zeros([input.shape[0], n_res])
+
+    t = 0.
+    node = 0
+    i = 0
+    while i < input_res.shape[1] - 1:
+        input_res[:, i] = input[:, node]
+        t += dt
+        i += 1
+        if t > node_time_array[node + 1]:
+            node += 1
+
+    return input_res
+
+
 def second_order_resample_integrator(p, v, a, node_time, dt, dae):
     """
     Resample a solution with the given dt
     Args:
         p: position
         v: velocity
-        a: acceleration
+        a: input
         node_time: previous node time
         dt: resampling time
         dae: dynamic model
