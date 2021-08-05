@@ -8,7 +8,7 @@ from horizon_gui.custom_widgets.multi_slider import QMultiSlider
 class FunctionLine(QWidget):
     nodesChanged = pyqtSignal(str, list)
 
-    def __init__(self, name, n_nodes, options=None, parent=None):
+    def __init__(self, name, n_nodes, disabled_nodes=None, options=None, parent=None):
         super().__init__(parent)
 
         minimum_bar_height = 80
@@ -20,6 +20,9 @@ class FunctionLine(QWidget):
         self.hlayout = QHBoxLayout(self)
         self.hlayout.setAlignment(Qt.AlignTop)
         self.slider = QMultiSlider(slider_range=[0, self.n_nodes - 1, 1], values=[0, self.n_nodes-1], options=options)
+        # if disabled_nodes is not None:
+        # todo disable the necessary nodes
+        #     self.slider.disableValues()
         self.slider.setMinimumHeight(minimum_bar_height)
         self.slider.setMaximumHeight(maximum_bar_height)
         self.hlayout.addWidget(self.slider)

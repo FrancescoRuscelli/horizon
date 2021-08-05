@@ -59,7 +59,7 @@ def resample_torques(p, v, a, node_time, dt, dae, frame_force_mapping, kindyn, f
 
     tau_res = np.zeros(a_res.shape)
 
-    ID = casadi_kin_dyn.InverseDynamics(kindyn, frame_force_mapping.keys())
+    ID = casadi_kin_dyn.InverseDynamics(kindyn, frame_force_mapping.keys(), force_reference_frame)
     for i in range(ni):
         frame_force_map_i = dict()
         for frame, wrench in frame_res_force_mapping.items():

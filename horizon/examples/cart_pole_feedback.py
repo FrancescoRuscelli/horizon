@@ -75,21 +75,20 @@ if use_ms:
 else:
     th.setDirectCollocation()
 
-
-# Creates problem
-prb.createProblem(opts={"nlpsol.ipopt": True})
-blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact 
-    'warmstart': False, 
-    'max_iter': 1, 
-    'print_iteration': False, 
+blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact
+    'warmstart': False,
+    'max_iter': 1,
+    'print_iteration': False,
     'print_maxit_reached': False,
-    'print_header': False, 
+    'print_header': False,
     'verbose_init': False,
     'print_time': 0,
     'opttol': 1e-4,
     'linsol': 'ma27',
     }
-prb.setSolver(cs.nlpsol('sqp', 'blocksqp', prb.getProblem(), blocksqp_opts))
+
+# Creates problem
+prb.createProblem(solver_plugin='blocksqp', opts=blocksqp_opts)
 
 
 class RealTimeIteration:

@@ -26,9 +26,11 @@ import os
 
 
 class HorizonLine(QScrollArea):
-    add_fun_horizon = pyqtSignal(dict)
-    remove_fun_horizon = pyqtSignal(dict)
+    active_fun_horizon = pyqtSignal()
+    remove_fun_horizon = pyqtSignal()
     repeated_fun = pyqtSignal(str)
+    bounds_changed = pyqtSignal()
+    function_nodes_changed = pyqtSignal()
 
     def __init__(self, horizon, fun_type, nodes=0, logger=None, parent=None):
         super().__init__(parent)
@@ -73,8 +75,11 @@ class HorizonLine(QScrollArea):
 
         self.function_tab.tabCloseRequested.connect(self.removeActiveFunctionRequestFromIndex)
         self.function_tab.funNodesChanged.connect(partial(self.updateFunctionNodes, 'single'))
+        self.function_tab.funNodesChanged.connect(self.function_nodes_changed.emit)
         self.function_tab.funLbChanged.connect(self.updateFunctionLb)
+        self.function_tab.funLbChanged.connect(self.bounds_changed.emit)
         self.function_tab.funUbChanged.connect(self.updateFunctionUb)
+        self.function_tab.funUbChanged.connect(self.bounds_changed.emit)
 
 
     def _initMultiLine(self):
@@ -84,6 +89,7 @@ class HorizonLine(QScrollArea):
 
         self.multi_function_box.funCloseRequested.connect(self.removeActiveFunctionRequestFromName)
         self.multi_function_box.funNodesChanged.connect(partial(self.updateFunctionNodes, 'multi'))
+        self.multi_function_box.funNodesChanged.connect(self.function_nodes_changed.emit)
 
     def _initOptions(self):
 
@@ -121,15 +127,6 @@ class HorizonLine(QScrollArea):
         elif parent == 'single':
             self.multi_function_box.setFunctionNodes(fun_name, ranges)
 
-    # # todo isn't it better to pass a matrix with rows as dim and columns as nodes?
-    # def updateFunctionLbAll(self, fun_name, bounds):
-    #     print('function {} changed LOWER bounds: {}'.format(fun_name, bounds))
-    #     self.horizon_receiver.updateFunctionLowerBounds(fun_name, bounds)
-    #
-    # def updateFunctionUbAll(self, fun_name, bounds):
-    #     print('function {} changed UPPER bounds: {}'.format(fun_name, bounds))
-    #     self.horizon_receiver.updateFunctionLowerBounds(fun_name, )
-
     def updateFunctionLb(self, fun_name, node, bounds):
         # print('function {} changed at node {}, new LOWER bounds: {}'.format(fun_name, node, bounds.transpose()))
         self.horizon_receiver.updateFunctionLowerBounds(fun_name, bounds, node)
@@ -141,9 +138,6 @@ class HorizonLine(QScrollArea):
     def setHorizonNodes(self, nodes):
         # update nodes
         self.n_nodes = nodes
-        # update nodes in horizon
-        self.horizon_receiver.setHorizonNodes(nodes)
-
         # update nodes in first widget (nodes line)
         self.nodes_line.setBoxNodes(nodes)
 
@@ -187,15 +181,15 @@ class HorizonLine(QScrollArea):
         source_item.dropMimeData(event.mimeData(), Qt.CopyAction, 0, 0, QModelIndex())
         fun_name = source_item.item(0, 0).text()
         # fun = source_item.item(0, 0).data(Qt.UserRole)
-
+        self.active_fun_horizon.emit()
         self.addFunctionToHorizon(fun_name)
 
     @pyqtSlot()
     def on_repeated_fun(self, str):
         self.repeated_fun.emit(str)
 
-    def addFunctionToSingleLine(self, name, dim):
-        self.function_tab.addFunctionToGUI(name, dim)
+    def addFunctionToSingleLine(self, name, dim, initial_bounds):
+        self.function_tab.addFunctionToGUI(name, dim, initial_bounds)
         self.updateMarginsSingleLine()
 
     def addFunctionToMultiLine(self, name):
@@ -206,9 +200,10 @@ class HorizonLine(QScrollArea):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
 
         dim = self.horizon_receiver.getFunction(name)['active'].getDim()[0]
+        initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
         if flag:
 
-            self.addFunctionToSingleLine(name, dim)
+            self.addFunctionToSingleLine(name, dim, initial_bounds)
             self.addFunctionToMultiLine(name)
             self.logger.info(signal)
         else:
@@ -279,13 +274,14 @@ class HorizonLine(QScrollArea):
         table_constr.setHorizontalHeaderLabels(['Name', 'Function', 'Lower Bounds', 'Upper Bounds'])
         info_box_layout.addWidget(table_constr, 1, 1)
 
-        for name, item in cnstrs.items():
-            rowPosition = table_constr.rowCount()
-            table_constr.insertRow(rowPosition)
-            table_constr.setItem(rowPosition, 0, QTableWidgetItem(name))
-            table_constr.setItem(rowPosition, 1, QTableWidgetItem((str(item['val']))))
-            table_constr.setItem(rowPosition, 2, QTableWidgetItem((str(item['lb']))))
-            table_constr.setItem(rowPosition, 3, QTableWidgetItem((str(item['ub']))))
+        if cnstrs is not None:
+            for name, item in cnstrs.items():
+                rowPosition = table_constr.rowCount()
+                table_constr.insertRow(rowPosition)
+                table_constr.setItem(rowPosition, 0, QTableWidgetItem(name))
+                table_constr.setItem(rowPosition, 1, QTableWidgetItem((str(item['val']))))
+                table_constr.setItem(rowPosition, 2, QTableWidgetItem((str(item['lb']))))
+                table_constr.setItem(rowPosition, 3, QTableWidgetItem((str(item['ub']))))
 
         table_constr.resizeColumnsToContents()
 
@@ -299,10 +295,11 @@ class HorizonLine(QScrollArea):
         table_costfun.setHorizontalHeaderLabels(['Name', 'Function'])
         info_box_layout.addWidget(table_costfun, 2, 1)
 
-        for name, item in costfuns.items():
-            rowPosition = table_costfun.rowCount()
-            table_costfun.insertRow(rowPosition)
-            table_costfun.setItem(rowPosition, 0, QTableWidgetItem(name))
-            table_costfun.setItem(rowPosition, 1, QTableWidgetItem((str(item))))
+        if cnstrs is not None:
+            for name, item in costfuns.items():
+                rowPosition = table_costfun.rowCount()
+                table_costfun.insertRow(rowPosition)
+                table_costfun.setItem(rowPosition, 0, QTableWidgetItem(name))
+                table_costfun.setItem(rowPosition, 1, QTableWidgetItem((str(item))))
 
         table_costfun.resizeColumnsToContents()

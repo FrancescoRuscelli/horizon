@@ -70,9 +70,12 @@ v.setBounds(lb=0, ub=0, nodes=N)
 prob.createCostFunction('cost', cs.sumsqr(F), nodes=range(N))  # TODO: intermediate vs final cost
 
 # solve
-prob.createProblem(opts={'nlpsol.ipopt': 10})
+prob.createProblem(opts={'ipopt.max_iter': 10})
 solution = prob.solveProblem()
 
 # plot
-plt = plotter.PlotterHorizon(sol=solution)
-plt.plotVariables()
+plot_all = True
+if plot_all:
+    hplt = plotter.PlotterHorizon(prob)
+    hplt.plotVariables()
+    hplt.plotFunctions()

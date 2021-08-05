@@ -1,3 +1,5 @@
+import time
+
 import casadi as cs
 from horizon import function as fc
 from horizon import nodes as nd
@@ -14,6 +16,11 @@ class Problem:
 
         self.opts = None
         self.solver = None
+        self.__solution = None
+        self.sol = None # store solution from solver
+        self.default_solver = cs.nlpsol
+        self.default_solver_plugin = 'ipopt'
+
         self.logger = logging.getLogger('logger')
         self.logger.setLevel(level=logging_level)
         self.debug_mode = self.logger.isEnabledFor(logging.DEBUG)
@@ -43,6 +50,18 @@ class Problem:
         var = self.var_container.setInputVar(name, dim)
         self.input_aggr.addVariable(var)
         return var
+
+    def createSingleVariable(self, name, dim):
+        var = self.var_container.setSingleVar(name, dim)
+        return var
+
+    def createVariable(self, name, dim, nodes=None):
+        var = self.var_container.setVar(name, dim, nodes)
+        return var
+
+    def createParameter(self, name, dim):
+        par = self.var_container.setParameter(name, dim)
+        return par
 
     # def setVariable(self, name, var):
 
@@ -74,10 +93,12 @@ class Problem:
     def _getUsedVar(self, f):
         used_var = dict()
         for name_var, value_var in self.var_container.getVarAbstrDict().items():
-            used_var[name_var] = list()
             for var in value_var:
                 if cs.depends_on(f, var):
+                    if name_var not in used_var:
+                        used_var[name_var] = list()
                     used_var[name_var].append(var)
+
 
         return used_var
 
@@ -87,14 +108,17 @@ class Problem:
 
     def createConstraint(self, name, g, nodes=None, bounds=None):
 
-        # get nodes as a list
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        if nodes is None:
+            nodes = range(self.nodes)
+        else:
+            nodes = misc.checkNodes(nodes, range(self.nodes))
 
         # get vars that constraint depends upon
         used_var = self._getUsedVar(g)
 
+        print(used_var)
         if self.debug_mode:
-            self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes}')
+            self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes} using vars {used_var}')
 
         # create internal representation of a constraint
         fun = fc.Constraint(name, g, used_var, nodes, bounds)
@@ -116,7 +140,10 @@ class Problem:
 
     def createCostFunction(self, name, j, nodes=None):
 
-        nodes = misc.checkNodes(nodes, range(self.nodes))
+        if nodes is None:
+            nodes = range(self.nodes)
+        else:
+            nodes = misc.checkNodes(nodes, range(self.nodes))
 
         used_var = self._getUsedVar(j)
 
@@ -159,26 +186,23 @@ class Problem:
     def getNNodes(self) -> int:
         return self.nodes
 
-    def createProblem(self, opts=None):
-
-        if opts is not None:
-            self.opts = opts
+    def createProblem(self, solver_type=None, solver_plugin=None, opts=None):
 
         # this is to reset both the constraints and the cost functions everytime I create a problem
         self.var_container.clear()
         self.function_container.clear()
 
-        for k in range(self.nodes):
         # implement the abstract state variable with the current node
-            self.var_container.update(k)
+        self.var_container.build()
 
-        for k in range(self.nodes):
         # implement the constraints and the cost functions with the current node
-            self.function_container.update(k)
+        self.function_container.build()
 
+        # get j, w, g
         j = self.function_container.getCostFImplSum()
         w = self.var_container.getVarImplList()
         g = self.function_container.getCnstrFList()
+        p = self.var_container.getParameterList()
 
         # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
         # self.logger.debug('constraints unraveled:', cs.vertcat(*self. ...))
@@ -191,12 +215,17 @@ class Problem:
         #     self.logger.debug('state variables: {}'.format(w))
         #     self.logger.debug('constraints: {}'.format(g))
 
-        self.prob = {'f': j, 'x': w, 'g': g}
+        self.prob = {'f': j, 'x': w, 'g': g, 'p': p}
 
-        if self.opts is not None:
-            if "nlpsol.ipopt" in self.opts:
-                if self.opts["nlpsol.ipopt"]:
-                    self.solver = cs.nlpsol('solver', 'ipopt', self.prob)
+        if self.solver is None:
+            if solver_type is None:
+                solver_type = self.default_solver
+            if solver_plugin is None:
+                solver_plugin = self.default_solver_plugin
+            if opts is None:
+                opts = dict()
+
+            self.solver = solver_type('solver', solver_plugin, self.prob, opts)
 
     def getProblem(self):
         return self.prob
@@ -210,7 +239,7 @@ class Problem:
     def solveProblem(self):
 
         # t_start = time.time()
-        if self.solver is None:
+        if self.prob is None:
             self.logger.warning('Problem is not created. Nothing to solve!')
             return 0
 
@@ -229,6 +258,7 @@ class Problem:
         lbg = self.function_container.getLowerBoundsList()
         ubg = self.function_container.getUpperBoundsList()
 
+        p = self.var_container.getParameterValues()
 
         if self.debug_mode:
 
@@ -237,29 +267,29 @@ class Problem:
             g = self.function_container.getCnstrFList()
 
             self.logger.debug('================')
-            self.logger.debug('len w: {}'.format(w.shape))
-            self.logger.debug('len lbw: {}'.format(len(lbw)))
-            self.logger.debug('len ubw: {}'.format(len(ubw)))
-            self.logger.debug('len w0: {}'.format(len(w0)))
-            self.logger.debug('len g: {}'.format(g.shape))
-            self.logger.debug('len lbg: {}'.format(len(lbg)))
-            self.logger.debug('len ubg: {}'.format(len(ubg)))
+            self.logger.debug(f'len w: {w.shape}')
+            self.logger.debug(f'len lbw: {len(lbw)}')
+            self.logger.debug(f'len ubw: {len(ubw)}')
+            self.logger.debug(f'len w0: {len(w0)}')
+            self.logger.debug(f'len g: {g.shape}')
+            self.logger.debug(f'len lbg: {len(lbg)}')
+            self.logger.debug(f'len ubg: {len(ubg)}')
+            self.logger.debug(f'len p: {p.shape}')
 
 
             # self.logger.debug('================')
-            # self.logger.debug('w: {}'.format(w))
-            # self.logger.debug('lbw: {}'.format(lbw))
-            # self.logger.debug('ubw: {}'.format(ubw))
-            # self.logger.debug('g: {}'.format(g))
-            # self.logger.debug('lbg: {}'.format(lbg))
-            # self.logger.debug('ubg: {}'.format(ubg))
-            # self.logger.debug('j: {}'.format(j))
-
+            self.logger.debug(f'w: {w}')
+            self.logger.debug(f'lbw: {lbw}')
+            self.logger.debug(f'ubw: {ubw}')
+            self.logger.debug(f'g: {g}')
+            self.logger.debug(f'lbg: {lbg}')
+            self.logger.debug(f'ubg: {ubg}')
+            self.logger.debug(f'j: {j}')
+            self.logger.debug(f'p: {p}')
         # t_to_set_up = time.time() - t_start
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
-
-        sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+        self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
         # t_to_solve = time.time() - t_start
         # print('T to solve:', t_to_solve)
@@ -269,29 +299,76 @@ class Problem:
             if not self.solver.stats()['success']:
                 raise Exception('Optimal solution NOT found.')
 
-        w_opt = sol['x'].full().flatten()
+        w_opt = self.sol['x'].full().flatten()
 
         # split solution for each variable
-        solution_dict = {name: np.zeros([var.shape[0], var.getNNodes()]) for name, var in self.var_container.getVarAbstrDict(past=False).items()}
+        solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in self.var_container.getVarAbstrDict(past=False).items()}
 
         pos = 0
         for node, val in self.var_container.getVarImplDict().items():
-            for name, var in val.items():
-                dim = var['var'].shape[0]
-                node_number = int(node[node.index('n') + 1:])
-                solution_dict[name][:, node_number] = w_opt[pos:pos + dim]
-                pos = pos + dim
+            if node == 'nNone':
+                for name, var in val.items():
+                    dim = var['var'].shape[0]
+                    solution_dict[name][:, 0] = w_opt[pos:pos + dim]
+                    pos = pos + dim
+            else:
+                for name, var in val.items():
+                    node_number = int(node[node.index('n') + 1:])
+                    var_nodes = self.var_container.getVarAbstrDict(past=False)[name].getNodes()
+                    if node_number in var_nodes:
+                        dim = var['var'].shape[0]
+                        solution_dict[name][:, node_number - var_nodes[0]] = w_opt[pos:pos + dim]
+                        pos = pos + dim
+
 
 
         # t_to_finish = time.time() - t_start
         # print('T to finish:', t_to_finish)
-        return solution_dict
+        self.__solution = solution_dict
+        return self.__solution
 
-    def getStateVariables(self):
-        return self.var_container.getVarAbstrDict()
+    def getSolution(self):
+        return self.__solution
 
-    def getConstraints(self):
-        return self.function_container.getCnstrFDict()
+    def getVariables(self, name=None):
+
+        if name is None:
+            var = self.var_container.getVarAbstrDict(past=False)
+        else:
+            var = self.var_container.getVarAbstrDict(past=False)[name]
+
+        return var
+
+    def getConstraints(self, name=None):
+
+        if name is None:
+            fun = self.function_container.getCnstrFDict()
+        else:
+            fun = self.function_container.getCnstrFDict()[name]
+
+        return fun
+
+    def evalFun(self, fun):
+        """
+        input: name of the function to evaluate
+        return: fun evaluated at all nodes using the solution of horizon problem
+        """
+        if self.__solution is None:
+            raise Exception('The solution of the horizon problem is not computed yet. Cannot evaluate function.')
+
+        fun_to_evaluate = fun.getFunction()
+        all_vars = list()
+        for var_name, var_list in fun.getVariables().items():
+            for var in var_list:
+                # careful about ordering
+                # todo this is very ugly, but what can I do (wanted to do it without the if)
+                if isinstance(var, sv.SingleVariable):
+                    all_vars.append(self.__solution[var_name])
+                else:
+                    all_vars.append(self.__solution[var_name][:, np.array(fun.getNodes()) + var.offset])
+
+        fun_evaluated = fun_to_evaluate(*all_vars).toarray()
+        return fun_evaluated
 
     def scopeNodeVars(self, node):
 
@@ -343,33 +420,105 @@ class Problem:
 
         return self
 
-
 if __name__ == '__main__':
+    # MULTIPLE SHOOTING
 
+    # x = cs.SX.sym('x', 1)
+    # y = cs.SX.sym('y', 1)
+    # p = cs.SX.sym('z', 1)
+    # k = cs.SX.sym('k', 1)
+    #
+    # w = cs.vertcat(x, y)
+    # j = 0
+    # g = x*k + y*p
+    # prob = {'f': j, 'x': w, 'g': g, 'p': cs.vertcat(p, k)}
+    #
+    # solver = cs.nlpsol('solver', 'ipopt', prob)
+    #
+    # sol = solver(x0=[0, 0], lbx=[-1, -1], ubx=[1, 1], lbg=[2], ubg=[2], p=[])
+    #
+    # print(sol)
+    # exit()
+
+
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createStateVariable('x', 2)
+    y = prb.createStateVariable('v', 2)
+    p = prb.createParameter('p', 2)
+    k = prb.createParameter('k', 2)
+
+    diosporco = prb.createIntermediateConstraint('diosporcomaledetto', x+p)
+
+    prb.createProblem()
+
+    p.assign([5, 4])
+    k.assign([2, 2])
+
+    prb.solveProblem()
+
+    exit()
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createInputVariable('x', 2)
+    diosporco = prb.createIntermediateConstraint('diosporcomaledetto', x)
+
+    prb.createProblem()
+    prb.solveProblem()
+    exit()
+
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createStateVariable('x', 2)
+    v = prb.createStateVariable('v', 2)
+    k = prb.createVariable('k', 2, range(2, 8))
+    u = prb.createInputVariable('u', 2)
+    t_tot = prb.createVariable('t', 2)
+    p = prb.createSingleVariable('p', 2)
+    t_tot.setBounds([100, 100], [100, 100])
+
+    prb.setNNodes(5)
+    exit()
     import horizon.utils.transcription_methods as tm
     import horizon.utils.integrators as integ
     nodes = 10
     prb = Problem(nodes, logging_level=logging.DEBUG)
     x = prb.createStateVariable('x', 2)
     v = prb.createStateVariable('v', 2)
+    k = prb.createVariable('k', 2, range(2, 8))
     u = prb.createInputVariable('u', 2)
+    t_tot = prb.createVariable('t', 2)
+    t_tot.setBounds([100, 100], [100, 100])
 
-    print(x.getNNodes())
-    print(u.getNNodes())
 
-    print(prb.var_container.getVarsDim())
-    danieli = prb.createConstraint('danieli', x)
+    # danieli = prb.createConstraint('danieli', x-k, nodes=range(2, 8))
+    diosporco = prb.createConstraint('diosporcomaledetto', x - t_tot)
+    diosporco.setBounds([100, 100], [100, 100])
     xprev = x.getVarOffset(-1)
+
     xprev_copy = x.getVarOffset(-1)
     xnext = x.getVarOffset(+1)
 
-    print(id(xprev))
-    print(id(xprev_copy))
+    opts = {'ipopt.tol': 1e-4,
+            'ipopt.max_iter': 2000}
+
+    prb.createProblem(opts=opts)
+
+    print(prb.getProblem()['x'])
+
+    prb.solveProblem()
+
+
     exit()
+    # print(id(xprev))
+    # print(id(xprev_copy))
+    # exit()
     state = prb.getState()
     state_prev = state.getVarOffset(-1)
 
-
+    state.setBounds([0, 0], [0, 0], 2)
+    print(state.getBounds(2))
+    exit()
 
     dt = 0.01
     state_dot = cs.vertcat(v, u)
@@ -504,7 +653,7 @@ if __name__ == '__main__':
     sucua = prb.createCostFunction('sucua', x*y, nodes=list(range(3, 15)))
     pellico = prb.createCostFunction('pellico', x-y, nodes=[0, 4, 6])
 
-    danieli.setBounds(lb=[-1, -1], ub=[1,1], nodes=3)
+    danieli.setBounds(lb=[-1, -1], ub=[1, 1], nodes=3)
 
     prb.createProblem({"nlpsol.ipopt":True})
 

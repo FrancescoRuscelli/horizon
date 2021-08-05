@@ -20,6 +20,101 @@ class AbstractVariable(cs.SX):
         self.dim = dim
         self.offset = 0
 
+    def getDim(self):
+        return self.dim
+
+class Parameter(AbstractVariable):
+    def __init__(self, tag, dim):
+        super(Parameter, self).__init__(tag, dim)
+        self.value = np.zeros(self.dim)
+
+    def assign(self, vals):
+        vals = misc.checkValueEntry(vals)
+
+        if vals.shape[0] != self.dim:
+            raise Exception('Wrong dimension of parameter values inserted.')
+
+        self.value = vals
+
+    def getValue(self):
+        return self.value
+
+class SingleVariable(AbstractVariable):
+    def __init__(self, tag, dim, dummy_nodes):
+        super(SingleVariable, self).__init__(tag, dim)
+
+        self.var_impl = dict()
+        # todo do i create another var or do I use the SX var inside SingleVariable?
+        self.var_impl['var'] = cs.SX.sym(self.tag + '_impl', self.dim)
+        self.var_impl['lb'] = np.full(self.dim, -np.inf)
+        self.var_impl['ub'] = np.full(self.dim, np.inf)
+        self.var_impl['w0'] = np.zeros(self.dim)
+
+    def setLowerBounds(self, bounds):
+
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self.dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
+
+        self.var_impl['lb'] = bounds
+
+    def setUpperBounds(self, bounds):
+
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self.dim:
+            raise Exception('Wrong dimension of upper bounds inserted.')
+
+        self.var_impl['ub'] = bounds
+
+    def setBounds(self, lb, ub):
+        self.setLowerBounds(lb)
+        self.setUpperBounds(ub)
+
+    def setInitialGuess(self, val):
+
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self.dim:
+            raise Exception('Wrong dimension of initial guess inserted.')
+
+        self.var_impl['w0'] = val
+
+    def getImpl(self, dummy_node):
+
+        var_impl = self.var_impl['var']
+        return var_impl
+
+    def _getVals(self, val_type, dummy_node):
+        if dummy_node is None:
+            vals = np.array([self.var_impl[val_type]]).T
+        else:
+            vals = self.var_impl[val_type]
+
+        return vals
+
+    def getLowerBounds(self, dummy_node=None):
+        return self._getVals('lb', dummy_node)
+
+    def getUpperBounds(self, dummy_node=None):
+        return self._getVals('ub', dummy_node)
+
+    def getBounds(self, dummy_node=None):
+        return self.getLowerBounds(dummy_node), self.getUpperBounds(dummy_node)
+
+    def getInitialGuess(self, dummy_node=None):
+        return self._getVals('w0', dummy_node)
+
+    def getNodes(self):
+        return [-1]
+
+    def getVarOffsetDict(self):
+        return dict()
+
+    def getImplDim(self):
+        return self.shape[0]
+
 class Variable(AbstractVariable):
     def __init__(self, tag, dim, nodes):
         super(Variable, self).__init__(tag, dim)
@@ -35,7 +130,11 @@ class Variable(AbstractVariable):
 
     def setLowerBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, self.nodes)
+        if nodes is None:
+            nodes = self.nodes
+        else:
+            nodes = misc.checkNodes(nodes, self.nodes)
+
         bounds = misc.checkValueEntry(bounds)
 
         if bounds.shape[0] != self.dim:
@@ -46,11 +145,15 @@ class Variable(AbstractVariable):
 
     def setUpperBounds(self, bounds, nodes=None):
 
-        nodes = misc.checkNodes(nodes, self.nodes)
+        if nodes is None:
+            nodes = self.nodes
+        else:
+            nodes = misc.checkNodes(nodes, self.nodes)
+
         bounds = misc.checkValueEntry(bounds)
 
         if bounds.shape[0] != self.dim:
-            raise Exception('Wrong dimension of lower bounds inserted.')
+            raise Exception('Wrong dimension of upper bounds inserted.')
 
         for node in nodes:
             self.var_impl['n' + str(node)]['ub'] = bounds
@@ -61,11 +164,15 @@ class Variable(AbstractVariable):
 
     def setInitialGuess(self, val, nodes=None):
 
-        nodes = misc.checkNodes(nodes, self.nodes)
+        if nodes is None:
+            nodes = self.nodes
+        else:
+            nodes = misc.checkNodes(nodes, self.nodes)
+
         val = misc.checkValueEntry(val)
 
         if val.shape[0] != self.dim:
-            raise Exception('Wrong dimension of lower bounds inserted.')
+            raise Exception('Wrong dimension of initial guess inserted.')
 
         for node in nodes:
             self.var_impl['n' + str(node)]['w0'] = val
@@ -82,8 +189,6 @@ class Variable(AbstractVariable):
             createTag = lambda name, node: name + str(node) if node is not None else name
 
             new_tag = createTag(self.tag, node)
-            # todo here the problem is that I don't want a full state_variable (BOUNDS are useless here)
-            # todo how to do?
             var = AbstractVariable(new_tag, self.dim)
             var.offset = int(node)
 
@@ -95,6 +200,7 @@ class Variable(AbstractVariable):
 
     def _setNNodes(self, n_nodes):
 
+        # todo this is because I must manage Variable, InputVariable, StateVariable in different ways.
         self.nodes = n_nodes
         self._project()
 
@@ -141,23 +247,32 @@ class Variable(AbstractVariable):
         var_impl = self.var_impl['n' + str(node)]['var']
         return var_impl
 
-    def getLowerBounds(self, node):
-        bound_min = self.var_impl['n' + str(node)]['lb']
-        return bound_min
+    def _getVals(self, val_type, node):
+        if node is None:
+            vals = np.zeros([self.shape[0], len(self.nodes)])
+            for dim in range(self.shape[0]):
+                vals[dim, :] = np.hstack([self.var_impl['n' + str(i)][val_type][dim] for i in self.nodes])
+        else:
+            vals = self.var_impl['n' + str(node)][val_type]
+        return vals
 
-    def getUpperBounds(self, node):
-        bound_max = self.var_impl['n' + str(node)]['ub']
-        return bound_max
+    def getLowerBounds(self, node=None):
+        return self._getVals('lb', node)
 
-    def getBounds(self, node):
-        return [self.getBoundMin(node), self.getBoundMax(node)]
+    def getUpperBounds(self, node=None):
+        return self._getVals('ub', node)
 
-    def getInitialGuess(self, node):
-        initial_guess = self.var_impl['n' + str(node)]['w0']
-        return initial_guess
+    def getBounds(self, node=None):
+        return self.getLowerBounds(node), self.getUpperBounds(node)
 
-    def getNNodes(self):
-        return len(self.nodes)
+    def getInitialGuess(self, node=None):
+        return self._getVals('w0', node)
+
+    def getImplDim(self):
+        return self.shape[0] * len(self.getNodes())
+
+    def getNodes(self):
+        return self.nodes
 
     def __reduce__(self):
         return (self.__class__, (self.tag, self.dim, self.nodes, ))
@@ -181,6 +296,9 @@ class AbstractAggregate():
 
     def __iter__(self):
         yield from self.var_list
+
+    def __getitem__(self, ind):
+        return self.var_list[ind]
 
 
 class Aggregate(AbstractAggregate):
@@ -246,9 +364,12 @@ class VariablesContainer:
         self.vars = OrderedDict()
         self.vars_impl = OrderedDict()
 
+        self.pars = OrderedDict()
+
     def createVar(self, var_type, name, dim, active_nodes):
 
-        active_nodes = misc.checkNodes(active_nodes, range(self.nodes))
+        if active_nodes is not None:
+            active_nodes = misc.checkNodes(active_nodes, range(self.nodes))
 
         var = var_type(name, dim, active_nodes)
         self.vars[name] = var
@@ -259,8 +380,13 @@ class VariablesContainer:
 
         return var
 
-    def setVar(self, name, dim, active_nodes):
-        var = self.createVar(Variable, name, dim, active_nodes)
+    def setVar(self, name, dim, active_nodes=None):
+        if active_nodes is None:
+            var_type = SingleVariable
+        else:
+            var_type = Variable
+
+        var = self.createVar(var_type, name, dim, active_nodes)
         return var
 
     def setStateVar(self, name, dim):
@@ -271,10 +397,34 @@ class VariablesContainer:
         var = self.createVar(InputVariable, name, dim, range(self.nodes-1))
         return var
 
+    def setSingleVar(self, name, dim):
+        var = self.createVar(SingleVariable, name, dim, None)
+        return var
+
+    def setParameter(self, name, dim):
+        par = Parameter(name, dim)
+        self.pars[name] = par
+
+        if self.logger:
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug(f'Creating parameter "{name}"')
+
+        return par
+
+    def getParameterDict(self):
+        return self.pars
+
+    def getParameterList(self):
+        return cs.vertcat(*self.pars.values())
+
+    def getParameterValues(self):
+        par_list = [par.getValue() for par in self.pars.values()]
+        return cs.vertcat(*par_list)
+
     def getVarsDim(self):
         var_dim_tot = 0
         for var in self.vars.values():
-            var_dim_tot += var.shape[0] * var.getNNodes()
+            var_dim_tot += var.getImplDim()
         return var_dim_tot
 
     def getStateVars(self):
@@ -295,8 +445,6 @@ class VariablesContainer:
 
     def getVarAbstrDict(self, past=True):
 
-        # todo dictionary with present, past and future instances --> x: x, x+1 // y: y // z: z, z-1
-        # how to do?
         if past:
             var_abstr_dict = dict()
             for name, var in self.vars.items():
@@ -312,6 +460,10 @@ class VariablesContainer:
 
     def getVarImpl(self, name, k):
 
+
+        if isinstance(self.vars[name], SingleVariable):
+            k = None
+
         node_name = 'n' + str(k)
 
         if node_name in self.vars_impl:
@@ -322,91 +474,89 @@ class VariablesContainer:
         return var
 
     def getVarImplAtNode(self, k):
-        return self.vars_impl['n' + str(k)]
+        if 'n' + str(k) in self.vars_impl:
+            return self.vars_impl['n' + str(k)]
+        else:
+            return None
 
     def getVarImplDict(self):
         return self.vars_impl
 
     def getVarImplList(self):
+        '''
+        return: SX vector (vertcat) of all the implemented variables at each node
+            used by problem.py to retrieve the final vector of optimization variables
+        '''
 
         state_var_impl_list = list()
-        for node, val in self.vars_impl.items():
+        for val in self.vars_impl.values():
             for var_abstract in val.keys():
                 # get from state_var_impl the relative var
-
-                # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
 
                 state_var_impl_list.append(val[var_abstract]['var'])
 
         return cs.vertcat(*state_var_impl_list)
 
-    def getBoundsMinList(self):
-        # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
-        state_var_bound_list = np.zeros(self.getVarsDim())
-
-        j = 0
-        for node, val in self.vars_impl.items():
-            for var_abstract in val.keys():
-                var = val[var_abstract]['lb']
-                dim = val[var_abstract]['lb'].shape[0]
-                state_var_bound_list[j:j+dim] = var
-                j = j + dim
-
-        return state_var_bound_list
-
-    def getBoundsMaxList(self):
-        # todo right now, if a variable in state_var_impl is NOT in state_var, it won't be considered in state_var_impl_list
+    def _getVarInfoList(self, bound_type):
 
         state_var_bound_list = np.zeros(self.getVarsDim())
 
         j = 0
         for node, val in self.vars_impl.items():
             for var_abstract in val.keys():
-                var = val[var_abstract]['ub']
-                dim = val[var_abstract]['ub'].shape[0]
+                var = val[var_abstract][bound_type]
+                dim = val[var_abstract][bound_type].shape[0]
                 state_var_bound_list[j:j + dim] = var
                 j = j + dim
 
-
         return state_var_bound_list
 
+    def getBoundsMinList(self):
+        return self._getVarInfoList('lb')
+
+    def getBoundsMaxList(self):
+        return self._getVarInfoList('ub')
+
     def getInitialGuessList(self):
+        return self._getVarInfoList('w0')
 
-        initial_guess_list = np.zeros(self.getVarsDim())
+    def _fillVar(self, name, node, val):
+        # todo bounds are not necessary here
+        node_name = 'n' + str(node)
+        var_impl = self.vars[name].getImpl(node)
+        var_bound_min = self.vars[name].getLowerBounds(node)
+        var_bound_max = self.vars[name].getUpperBounds(node)
+        initial_guess = self.vars[name].getInitialGuess(node)
+        var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
+        self.vars_impl[node_name].update({name: var_dict})
 
-        j = 0
-        for node, val in self.vars_impl.items():
-            for var_abstract in val.keys():
-                var = val[var_abstract]['w0']
-                dim = val[var_abstract]['w0'].shape[0]
-                initial_guess_list[j:j + dim] = var
-                j = j + dim
+        if self.logger:
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
-        return initial_guess_list
 
-    def update(self, k):
-        # state_var_impl --> dict
-        #  - key: nodes (n0, n1, ...)
-        #  - val: dict with name and value of implemented variable
+    def build(self):
+        '''
+        fill the dictionary "state_var_impl"
+           - key: nodes (nNone, n0, n1, ...) nNone contains single variables that are not projected in nodes
+           - val: dict with name and value of implemented variable
+        '''
 
-        self.vars_impl['n' + str(k)] = dict()
-        # implementation of current state variable
-        for name, val in self.vars.items():
-            if isinstance(val, InputVariable) and k == self.nodes-1:
-                continue
+        # contains single vars that do not need to be projected
+        self.vars_impl['nNone'] = dict()
 
-            var_impl = self.vars[name].getImpl(k)
+        for node in range(self.nodes):
+            # contains vars that are projected along the nodes
+            self.vars_impl['n' + str(node)] = dict()
 
-            if self.logger:
-                if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
+            for name, val in self.vars.items():
 
-            # todo bounds are not necessary here
-            var_bound_min = self.vars[name].getLowerBounds(k)
-            var_bound_max = self.vars[name].getUpperBounds(k)
-            initial_guess = self.vars[name].getInitialGuess(k)
-            var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
-            self.vars_impl['n' + str(k)].update({name: var_dict})
+                if isinstance(val, SingleVariable):
+                    self._fillVar(name, None, val)
+                    continue
+
+                if node in self.vars[name].getNodes():
+                    self._fillVar(name, node, val)
 
     def updateBounds(self):
 
@@ -415,7 +565,6 @@ class VariablesContainer:
                 k = node[node.index('n') + 1:]
                 state_var['lb'] = self.vars[name].getLowerBounds(k)
                 state_var['ub'] = self.vars[name].getUpperBounds(k)
-            # self.state_var_impl
 
     def updateInitialGuess(self):
 
@@ -431,12 +580,17 @@ class VariablesContainer:
         # for node in removed_nodes:
         #     if 'n' + str(node) in self.state_var_impl:
         #         del self.state_var_impl['n' + str(node)]
-
         self.nodes = n_nodes
         for var in self.vars.values():
-            var._setNNodes(self.nodes)
-        # for var in self.state_var_prev.values():
-        #     var._setNNodes(self.nodes)
+            if isinstance(var, SingleVariable):
+                pass
+            elif isinstance(var, InputVariable):
+                var._setNNodes(list(range(self.nodes-1)))
+            elif isinstance(var, StateVariable):
+                var._setNNodes(list(range(self.nodes)))
+            elif isinstance(var, Variable):
+                var._setNNodes([node for node in var.getNodes() if node in list(range(self.nodes))])
+
 
 
     def clear(self):
