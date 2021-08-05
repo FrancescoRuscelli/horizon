@@ -59,10 +59,13 @@ class Problem:
         var = self.var_container.setVar(name, dim, nodes)
         return var
 
-    def createParameter(self, name, dim):
-        par = self.var_container.setParameter(name, dim)
+    def createParameter(self, name, dim, nodes=None):
+        par = self.var_container.setParameter(name, dim, nodes)
         return par
 
+    def createSingleParameter(self, name, dim):
+        par = self.var_container.setSingleParameter(name, dim)
+        return par
     # def setVariable(self, name, var):
 
     # assert (isinstance(var, (cs.casadi.SX, cs.casadi.MX)))
@@ -99,8 +102,17 @@ class Problem:
                         used_var[name_var] = list()
                     used_var[name_var].append(var)
 
-
         return used_var
+
+    def _getUsedPar(self, f):
+        used_par = dict()
+        for name_par, value_par in self.var_container.getParAbstrDict().items():
+            if cs.depends_on(f, value_par):
+                if name_par not in used_par:
+                    used_par[name_par] = list()
+                used_par[name_par].append(value_par)
+
+        return used_par
 
     # @classmethod
     # def createFunction(self, fun_type, **kwargs):
@@ -115,13 +127,13 @@ class Problem:
 
         # get vars that constraint depends upon
         used_var = self._getUsedVar(g)
+        used_par = self._getUsedPar(g)
 
-        print(used_var)
         if self.debug_mode:
             self.logger.debug(f'Creating Constraint Function "{name}": active in nodes: {nodes} using vars {used_var}')
 
         # create internal representation of a constraint
-        fun = fc.Constraint(name, g, used_var, nodes, bounds)
+        fun = fc.Constraint(name, g, used_var, used_par, nodes, bounds)
 
         self.function_container.addFunction(fun)
 
@@ -204,6 +216,7 @@ class Problem:
         g = self.function_container.getCnstrFList()
         p = self.var_container.getParameterList()
 
+        print(p)
         # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
         # self.logger.debug('constraints unraveled:', cs.vertcat(*self. ...))
         # self.logger.debug('cost functions unraveled:', cs.vertcat(*self. ...))
@@ -446,14 +459,18 @@ if __name__ == '__main__':
     x = prb.createStateVariable('x', 2)
     y = prb.createStateVariable('v', 2)
     p = prb.createParameter('p', 2)
-    k = prb.createParameter('k', 2)
+    single_p = prb.createSingleParameter('psingle', 2)
 
-    diosporco = prb.createIntermediateConstraint('diosporcomaledetto', x+p)
+    p.assign([2, 2], [4, 5, 6])
+
+    diosporco = prb.createIntermediateConstraint('diosporcomaledetto', x+single_p)
 
     prb.createProblem()
 
-    p.assign([5, 4])
-    k.assign([2, 2])
+    # k = prb.createParameter('k', 2)
+
+    # p.assign([5, 4])
+    # k.assign([2, 2])
 
     prb.solveProblem()
 

@@ -6,7 +6,7 @@ import pickle
 import time
 
 class Function:
-    def __init__(self, name, f, used_vars, nodes):
+    def __init__(self, name, f, used_vars, used_pars, nodes):
 
         self.f = f
         self.name = name
@@ -17,9 +17,16 @@ class Function:
             for item in val:
                 all_vars.append(item)
 
+        all_pars = list()
+        for name, val in used_pars.items():
+            for item in val:
+                all_pars.append(item)
+
+
         # todo very careful about ordering! (however, list order should be persistent)
         self.vars = used_vars # todo isn't there another way to get the variables from the function g?
-        self.fun = cs.Function(name, all_vars, [self.f])
+        self.pars = used_pars
+        self.fun = cs.Function(name, all_vars + all_pars, [self.f])
         self.fun_impl = dict()
 
         self.setNodes(nodes)
@@ -63,6 +70,9 @@ class Function:
     def getVariables(self):
         return self.vars
 
+    def getParameters(self):
+        return self.pars
+
     def getType(self):
         return 'generic'
 
@@ -96,14 +106,14 @@ class Function:
 
 
 class Constraint(Function):
-    def __init__(self, name, f, used_vars, nodes, bounds=None):
+    def __init__(self, name, f, used_vars, used_pars, nodes, bounds=None):
 
         self.bounds = dict()
         # constraints are initialize to 0.: 0. <= x <= 0.
         for node in nodes:
             self.bounds['n' + str(node)] = dict(lb=np.full(f.shape[0], 0.), ub=np.full(f.shape[0], 0.))
 
-        super().__init__(name, f, used_vars, nodes)
+        super().__init__(name, f, used_vars, used_pars, nodes)
 
         # todo setBounds
         if bounds is not None:
@@ -263,7 +273,15 @@ class FunctionsContainer:
                                 raise Exception(f'Variable out of scope: {item} does not exist at node {node}')
                             used_vars.append(var)
 
-                    f_impl = fun._project(node, used_vars)
+                    used_pars = list()
+                    for name, val in fun.getParameters().items():
+                        for item in val:
+                            var = self.state_vars.getParImpl(name, node)
+                            if var is None:
+                                raise Exception(f'Parameter out of scope: {item} does not exist at node {node}')
+                            used_pars.append(var)
+
+                    f_impl = fun._project(node, used_vars + used_pars)
                     if fun.getType() == 'constraint':
                         lb = fun.getLowerBounds(node)
                         ub = fun.getUpperBounds(node)

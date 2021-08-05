@@ -23,10 +23,13 @@ class AbstractVariable(cs.SX):
     def getDim(self):
         return self.dim
 
-class Parameter(AbstractVariable):
-    def __init__(self, tag, dim):
-        super(Parameter, self).__init__(tag, dim)
-        self.value = np.zeros(self.dim)
+class SingleParameter(AbstractVariable):
+    def __init__(self, tag, dim, dummy_nodes):
+        super(SingleParameter, self).__init__(tag, dim)
+
+        self.par_impl = dict()
+        self.par_impl['par'] = cs.SX.sym(self.tag + '_impl', self.dim)
+        self.par_impl['val'] = np.zeros(self.dim)
 
     def assign(self, vals):
         vals = misc.checkValueEntry(vals)
@@ -34,10 +37,89 @@ class Parameter(AbstractVariable):
         if vals.shape[0] != self.dim:
             raise Exception('Wrong dimension of parameter values inserted.')
 
-        self.value = vals
+        self.par_impl['val'] = vals
 
-    def getValue(self):
-        return self.value
+    def getImpl(self, node=None):
+        return self.par_impl['par']
+
+    def getNodes(self):
+        # todo what if I return all the nodes?
+        return [-1]
+
+    def getValue(self, dummy_node):
+        return self.par_impl['val']
+
+
+class Parameter(AbstractVariable):
+    def __init__(self, tag, dim, nodes):
+        super(Parameter, self).__init__(tag, dim)
+
+        self.par_impl = dict()
+
+        self.nodes = nodes
+        self._project()
+
+    def _project(self):
+        # state_var_impl --> dict
+        #  - key: nodes (n0, n1, ...)
+        #  - val: dict with name and value of implemented variable
+        # old_var_impl = copy.deepcopy(self.var_impl)
+        # self.var_impl.clear()
+        new_par_impl = dict()
+
+        for n in self.nodes:
+            if 'n' + str(n) in self.par_impl:
+                new_par_impl['n' + str(n)] = self.par_impl_dict['n' + str(n)]
+            else:
+                par_impl = cs.SX.sym(self.tag + '_' + str(n), self.dim)
+                new_par_impl['n' + str(n)] = dict()
+                new_par_impl['n' + str(n)]['par'] = par_impl
+                new_par_impl['n' + str(n)]['val'] = np.zeros(self.dim)
+
+        self.par_impl = new_par_impl
+
+    def getNodes(self):
+        return self.nodes
+
+    def assign(self, vals, nodes):
+
+        if nodes is None:
+            nodes = self.nodes
+        else:
+            nodes = misc.checkNodes(nodes, self.nodes)
+
+        vals = misc.checkValueEntry(vals)
+
+        if vals.shape[0] != self.dim:
+            raise Exception('Wrong dimension of parameter values inserted.')
+
+        for node in nodes:
+            self.par_impl['n' + str(node)]['value'] = vals
+
+    def getImpl(self, node=None):
+        if node is None:
+            vals = np.zeros([self.dim, len(self.nodes)])
+            for dim in range(self.dim):
+                vals[dim, :] = np.hstack([self.par_impl['n' + str(i)]['par'][dim] for i in self.nodes])
+        else:
+            vals = self.par_impl['n' + str(node)]['par']
+
+        return vals
+
+    def getValue(self, node=None):
+        if node is None:
+            vals = np.zeros([self.dim, len(self.nodes)])
+            for dim in range(self.dim):
+                vals[dim, :] = np.hstack([self.par_impl['n' + str(i)]['val'][dim] for i in self.nodes])
+        else:
+            vals = self.par_impl['n' + str(node)]['val']
+
+        return vals
+
+    def __reduce__(self):
+        return (self.__class__, (self.tag, self.dim, self.nodes,))
+
+
 
 class SingleVariable(AbstractVariable):
     def __init__(self, tag, dim, dummy_nodes):
@@ -107,6 +189,7 @@ class SingleVariable(AbstractVariable):
         return self._getVals('w0', dummy_node)
 
     def getNodes(self):
+        # todo what if I return all the nodes?
         return [-1]
 
     def getVarOffsetDict(self):
@@ -354,7 +437,24 @@ class InputAggregate(Aggregate):
     def __init__(self, *args: InputVariable):
         super().__init__(*args)
 
+# todo what if this is completely useless? at the end of the day, I need this Container for:
+#   .getVarAbstrDict() --> get all abstract variables (special attention for the past variables)
+#   .getVarImpl(): ---> get implemented variable at node
+#   .getVarImplList() ---> get all the implemented variables as list
+#   .getVarImplDict() ---> get all the implemented variables as dict
+#   Can I do something else? Right now .build() orders them like as follows:
+#            (nNone: [vars..]
+#                n0: [vars..],
+#                n1: [vars..], ...)
+#   but since order is everything I care about, is there a simpler way?
+#   for var in self.vars:
+#    all_impl += var.getAllImpl
+#   this is ordered with the variables and I probably don't need build?
+#            (x: [n0, n1, n2 ...]
+#             y: [n0, n1, n2, ...]
+#             z: [nNone, n0, n1, ...])
 
+#
 class VariablesContainer:
     def __init__(self, nodes, logger=None):
 
@@ -365,6 +465,7 @@ class VariablesContainer:
         self.vars_impl = OrderedDict()
 
         self.pars = OrderedDict()
+        self.pars_impl = OrderedDict()
 
     def createVar(self, var_type, name, dim, active_nodes):
 
@@ -401,8 +502,11 @@ class VariablesContainer:
         var = self.createVar(SingleVariable, name, dim, None)
         return var
 
-    def setParameter(self, name, dim):
-        par = Parameter(name, dim)
+    def setParameter(self, name, dim, nodes):
+        if nodes is None:
+            nodes = range(self.nodes)
+
+        par = Parameter(name, dim, nodes)
         self.pars[name] = par
 
         if self.logger:
@@ -411,15 +515,34 @@ class VariablesContainer:
 
         return par
 
-    def getParameterDict(self):
-        return self.pars
+    def setSingleParameter(self, name, dim):
+        par = SingleParameter(name, dim, None)
+        self.pars[name] = par
+
+        if self.logger:
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug(f'Creating single parameter "{name}"')
+
+        return par
 
     def getParameterList(self):
-        return cs.vertcat(*self.pars.values())
+
+        par_impl_list = list()
+        for node in self.pars_impl.values():
+            for parameter in node.keys():
+                # get from state_var_impl the relative var
+                par_impl_list.append(node[parameter]['par'])
+
+        return cs.vertcat(*par_impl_list)
 
     def getParameterValues(self):
-        par_list = [par.getValue() for par in self.pars.values()]
-        return cs.vertcat(*par_list)
+        par_impl_list = list()
+        for node in self.pars_impl.values():
+            for parameter in node.keys():
+                # get from state_var_impl the relative var
+                par_impl_list.append(node[parameter]['val'])
+
+        return cs.vertcat(*par_impl_list)
 
     def getVarsDim(self):
         var_dim_tot = 0
@@ -458,8 +581,25 @@ class VariablesContainer:
 
         return var_abstr_dict
 
-    def getVarImpl(self, name, k):
+    def getParAbstrDict(self):
+        # todo beware of deep copy
+        return self.pars
 
+    def getParImpl(self, name, k):
+        #
+        if isinstance(self.pars[name], SingleParameter):
+            k = None
+
+        node_name = 'n' + str(k)
+
+        if node_name in self.pars_impl:
+            var = self.pars_impl[node_name][name]['par']
+        else:
+            var = None
+
+        return var
+
+    def getVarImpl(self, name, k):
 
         if isinstance(self.vars[name], SingleVariable):
             k = None
@@ -534,6 +674,16 @@ class VariablesContainer:
             if self.logger.isEnabledFor(logging.DEBUG):
                 self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
+    def _fillPar(self, name, node, val):
+        node_name = 'n' + str(node)
+        par_impl = self.pars[name].getImpl(node)
+        par_value = self.pars[name].getValue(node)
+        par_dict = dict(par=par_impl, val=par_value)
+        self.pars_impl[node_name].update({name: par_dict})
+
+        if self.logger:
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), par_impl))
 
     def build(self):
         '''
@@ -544,6 +694,7 @@ class VariablesContainer:
 
         # contains single vars that do not need to be projected
         self.vars_impl['nNone'] = dict()
+        self.pars_impl['nNone'] = dict()
 
         for node in range(self.nodes):
             # contains vars that are projected along the nodes
@@ -557,6 +708,20 @@ class VariablesContainer:
 
                 if node in self.vars[name].getNodes():
                     self._fillVar(name, node, val)
+
+        for node in range(self.nodes):
+            self.pars_impl['n' + str(node)] = dict()
+
+            for name, val in self.pars.items():
+
+                if isinstance(val, SingleParameter):
+                    self._fillPar(name, None, val)
+                    continue
+
+                if node in self.pars[name].getNodes():
+                    self._fillPar(name, node, val)
+
+
 
     def updateBounds(self):
 
@@ -590,6 +755,12 @@ class VariablesContainer:
                 var._setNNodes(list(range(self.nodes)))
             elif isinstance(var, Variable):
                 var._setNNodes([node for node in var.getNodes() if node in list(range(self.nodes))])
+
+        for par in self.pars.values():
+            if isinstance(par, SingleParameter):
+                pass
+            elif isinstance(par, Parameter):
+                par._setNNodes([node for node in var.getNodes() if node in list(range(self.nodes))])
 
 
 
