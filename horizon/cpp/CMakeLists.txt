@@ -33,6 +33,9 @@ find_package(pybind11 REQUIRED)
 pybind11_add_module(pyilqr pyilqr.cpp)
 target_link_libraries(pyilqr PUBLIC ilqr)
 
+install(TARGETS pyilqr
+    DESTINATION horizon/solvers)
+
 
 # test executable
 add_executable(ilqr_test src/ilqr_test.cpp)
