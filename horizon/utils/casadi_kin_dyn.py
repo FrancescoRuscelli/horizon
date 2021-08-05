@@ -73,10 +73,54 @@ def linearized_friciton_cone(f, mu, R):
 
     return cs.mtimes(A_fr_R, f), [-np.inf, -np.inf, -np.inf, -np.inf, -np.inf], [0., 0., 0., 0., 0.]
 
+class ForwardDynamics():
+    """
+    Class which computes forward dynamics:
+    given generalized position, velocities, torques and contact forces, returns generalized accelerations
+    """
+    def __init__(self, kindyn, contact_frames = [], force_reference_frame = cas_kin_dyn.CasadiKinDyn.LOCAL):
+        """
+        Args:
+            kindyn: casadi_kin_dyn object
+            contact_frames: list of contact frames
+            force_reference_frame: this is the frame which is used to compute the Jacobian during the ID computation:
+                LOCAL (default)
+                WORLD
+                LOCAL_WORLD_ALIGNED
+        """
+        self.fd = kindyn.aba()
+        self.contact_jacobians = dict()
+        for frame in contact_frames:
+            self.contact_jacobians[frame] = cs.Function.deserialize(kindyn.jacobian(frame, force_reference_frame))
+
+    def call(self, q, qdot, tau, frame_force_mapping=dict()):
+        """
+                Computes generalized accelerations:
+                Args:
+                    q: joint positions
+                    qdot: joint velocities
+                    torques: joint torques
+                    frame_force_mapping: dictionary containing a map between frames and force variables e.g. {'lsole': F1} representing the frame
+                        where the force is acting (the force is expressed in force_reference_frame!)
+                Returns:
+                    qddot: generalized accelerations
+                """
+        JtF_sum = 0
+
+        for frame, wrench in frame_force_mapping.items():
+            J = self.contact_jacobians[frame](q=q)['J']
+            if wrench.shape[0] == 3:  # point contact
+                JtF = cs.mtimes(J[0:3, :].T, wrench)
+            else:  # surface contact
+                JtF = cs.mtimes(J.T, wrench)
+            JtF_sum += JtF
+        qddot = self.fd(q=q, v=qdot, tau=tau + JtF_sum)['a']
+        return qddot
+
 class InverseDynamics():
     """
     Class which computes inverse dynamics:
-    given generalized position, velocities and accelerations returns generalized torques
+    given generalized position, velocities, accelerations and contact forces, returns generalized torques
     """
     def __init__(self, kindyn, contact_frames = [], force_reference_frame = cas_kin_dyn.CasadiKinDyn.LOCAL):
         """
@@ -102,6 +146,8 @@ class InverseDynamics():
             qddot: joint accelerations
             frame_force_mapping: dictionary containing a map between frames and force variables e.g. {'lsole': F1} representing the frame
                 where the force is acting (the force is expressed in force_reference_frame!)
+        Returns:
+            tau: generalized torques
         """
         JtF_sum = 0
 
