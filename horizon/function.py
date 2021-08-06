@@ -35,7 +35,7 @@ class Function:
         return self.name
 
     def getDim(self):
-        return self.f.shape
+        return self.f.shape[0]
 
     def getFunction(self):
         return self.fun
@@ -123,8 +123,17 @@ class Constraint(Function):
             # if only one constraint is set, we assume:
             if 'lb' not in bounds:  # -inf <= x <= ub
                 bounds['lb'] = np.full(f.shape[0], -np.inf)
+            else:
+                if bounds['lb'].shape[0] != self.getDim():
+                    print(bounds['lb'])
+                    print(self.getDim())
+                    raise Exception('Wrong dimension of lower bounds inserted.')
+
             if 'ub' not in bounds:  # lb <= x <= inf
                 bounds['ub'] = np.full(f.shape[0], np.inf)
+            else:
+                if bounds['ub'].shape[0] != self.getDim():
+                    raise Exception('Wrong dimension of lower bounds inserted.')
 
             self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
 
@@ -141,6 +150,9 @@ class Constraint(Function):
 
         bounds = misc.checkValueEntry(bounds)
 
+        if bounds.shape[0] != self.getDim():
+            raise Exception('Wrong dimension of lower bounds inserted.')
+
         for node in nodes:
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
@@ -155,6 +167,9 @@ class Constraint(Function):
             nodes = misc.checkNodes(nodes, self.nodes)
 
         bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self.getDim():
+            raise Exception('Wrong dimension of lower bounds inserted.')
 
         for node in nodes:
             if node in self.nodes:
@@ -204,8 +219,8 @@ class Constraint(Function):
                                                      ub=np.full(self.f.shape[0], 0.))
 
 class CostFunction(Function):
-    def __init__(self, name, f, used_vars, nodes):
-        super().__init__(name, f, used_vars, nodes)
+    def __init__(self, name, f, used_vars, used_pars, nodes):
+        super().__init__(name, f, used_vars, used_pars, nodes)
 
     def getType(self):
         return 'costfunction'
@@ -297,7 +312,7 @@ class FunctionsContainer:
 
         total_dim = 0
         for cnstr in self.cnstr_container.values():
-            total_dim += cnstr.getDim()[0] * len(cnstr.getNodes())
+            total_dim += cnstr.getDim() * len(cnstr.getNodes())
 
         return total_dim
 
