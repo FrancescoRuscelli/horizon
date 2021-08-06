@@ -158,11 +158,12 @@ class Problem:
             nodes = misc.checkNodes(nodes, range(self.nodes))
 
         used_var = self._getUsedVar(j)
+        used_par = self._getUsedPar(j)
 
         if self.debug_mode:
             self.logger.debug(f'Creating Cost Function "{name}": active in nodes: {nodes}')
 
-        fun = fc.CostFunction(name, j, used_var, nodes)
+        fun = fc.CostFunction(name, j, used_var, used_par, nodes)
 
         self.function_container.addFunction(fun)
 
@@ -177,6 +178,7 @@ class Problem:
     def createIntermediateCost(self, name, j, nodes=None):
         if nodes is None:
             nodes = range(self.nodes-1)
+
         return self.createCostFunction(name, j, nodes=nodes)    
 
     def removeCostFunction(self, name):
@@ -215,7 +217,7 @@ class Problem:
         w = self.var_container.getVarImplList()
         g = self.function_container.getCnstrFList()
         p = self.var_container.getParameterList()
-        
+
         # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
         # self.logger.debug('constraints unraveled:', cs.vertcat(*self. ...))
         # self.logger.debug('cost functions unraveled:', cs.vertcat(*self. ...))
@@ -257,6 +259,7 @@ class Problem:
 
         self.var_container.updateBounds()
         self.var_container.updateInitialGuess()
+        self.var_container.updateParameters()
 
         w0 = self.var_container.getInitialGuessList()
 
@@ -301,6 +304,7 @@ class Problem:
         # t_to_set_up = time.time() - t_start
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
+
         self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
         # t_to_solve = time.time() - t_start
@@ -365,6 +369,7 @@ class Problem:
         input: name of the function to evaluate
         return: fun evaluated at all nodes using the solution of horizon problem
         """
+
         if self.__solution is None:
             raise Exception('The solution of the horizon problem is not computed yet. Cannot evaluate function.')
 
@@ -379,7 +384,17 @@ class Problem:
                 else:
                     all_vars.append(self.__solution[var_name][:, np.array(fun.getNodes()) + var.offset])
 
-        fun_evaluated = fun_to_evaluate(*all_vars).toarray()
+        all_pars = list()
+        for par_name, par_list in fun.getParameters().items():
+            for par in par_list:
+                # careful about ordering
+                # todo this is very ugly, but what can I do (wanted to do it without the if)
+                if isinstance(par, sv.SingleParameter):
+                    all_pars.append(self.var_container.getParameterValues(par_name))
+                else:
+                    all_pars.append(self.var_container.getParameterValues(par_name)[:, fun.getNodes()])
+
+        fun_evaluated = fun_to_evaluate(*(all_vars+all_pars)).toarray()
         return fun_evaluated
 
     def scopeNodeVars(self, node):
@@ -433,284 +448,4 @@ class Problem:
         return self
 
 if __name__ == '__main__':
-    # MULTIPLE SHOOTING
-
-    # x = cs.SX.sym('x', 1)
-    # y = cs.SX.sym('y', 1)
-    # p = cs.SX.sym('z', 1)
-    # k = cs.SX.sym('k', 1)
-    #
-    # w = cs.vertcat(x, y)
-    # j = 0
-    # g = x*k + y*p
-    # prob = {'f': j, 'x': w, 'g': g, 'p': cs.vertcat(p, k)}
-    #
-    # solver = cs.nlpsol('solver', 'ipopt', prob)
-    #
-    # sol = solver(x0=[0, 0], lbx=[-1, -1], ubx=[1, 1], lbg=[2], ubg=[2], p=[])
-    #
-    # print(sol)
-    # exit()
-
-
-    nodes = 10
-    prb = Problem(nodes, logging_level=logging.DEBUG)
-    x = prb.createStateVariable('x', 2)
-    y = prb.createStateVariable('v', 2)
-    p = prb.createParameter('p', 2)
-    single_p = prb.createSingleParameter('psingle', 2)
-
-    p.assign([2, 2], [4, 5, 6])
-
-    diosporco = prb.createIntermediateConstraint('diosporcomaledetto', x+single_p)
-
-    prb.createProblem()
-
-    # k = prb.createParameter('k', 2)
-
-    # p.assign([5, 4])
-    # k.assign([2, 2])
-
-    prb.solveProblem()
-
-    exit()
-    nodes = 10
-    prb = Problem(nodes, logging_level=logging.DEBUG)
-    x = prb.createInputVariable('x', 2)
-    diosporco = prb.createIntermediateConstraint('diosporcomaledetto', x)
-
-    prb.createProblem()
-    prb.solveProblem()
-    exit()
-
-    nodes = 10
-    prb = Problem(nodes, logging_level=logging.DEBUG)
-    x = prb.createStateVariable('x', 2)
-    v = prb.createStateVariable('v', 2)
-    k = prb.createVariable('k', 2, range(2, 8))
-    u = prb.createInputVariable('u', 2)
-    t_tot = prb.createVariable('t', 2)
-    p = prb.createSingleVariable('p', 2)
-    t_tot.setBounds([100, 100], [100, 100])
-
-    prb.setNNodes(5)
-    exit()
-    import horizon.utils.transcription_methods as tm
-    import horizon.utils.integrators as integ
-    nodes = 10
-    prb = Problem(nodes, logging_level=logging.DEBUG)
-    x = prb.createStateVariable('x', 2)
-    v = prb.createStateVariable('v', 2)
-    k = prb.createVariable('k', 2, range(2, 8))
-    u = prb.createInputVariable('u', 2)
-    t_tot = prb.createVariable('t', 2)
-    t_tot.setBounds([100, 100], [100, 100])
-
-
-    # danieli = prb.createConstraint('danieli', x-k, nodes=range(2, 8))
-    diosporco = prb.createConstraint('diosporcomaledetto', x - t_tot)
-    diosporco.setBounds([100, 100], [100, 100])
-    xprev = x.getVarOffset(-1)
-
-    xprev_copy = x.getVarOffset(-1)
-    xnext = x.getVarOffset(+1)
-
-    opts = {'ipopt.tol': 1e-4,
-            'ipopt.max_iter': 2000}
-
-    prb.createProblem(opts=opts)
-
-    print(prb.getProblem()['x'])
-
-    prb.solveProblem()
-
-
-    exit()
-    # print(id(xprev))
-    # print(id(xprev_copy))
-    # exit()
-    state = prb.getState()
-    state_prev = state.getVarOffset(-1)
-
-    state.setBounds([0, 0], [0, 0], 2)
-    print(state.getBounds(2))
-    exit()
-
-    dt = 0.01
-    state_dot = cs.vertcat(v, u)
-    # opts = dict()
-    # opts['tf'] = dt
-    # dae = dict()
-    # dae['x'] = cs.vertcat(*prb.getState())
-    # dae['p'] = cs.vertcat(*prb.getInput())
-    # dae['ode'] = state_dot
-    # dae['quad'] = cs.sumsqr(u)
-
-    # integrator = integ.RK4(dae, opts, cs.SX)
-    hl = tm.TranscriptionsHandler(prb, 0.01, state_dot=state_dot)
-    # hl.set_integrator(integrator)
-    hl.setMultipleShooting()
-
-    prb.createProblem({'nlpsol.ipopt': 10})
-
-    prb.solveProblem()
-
-    exit()
-    # ==================================================================================================================
-    # ======================================= bounds as list but also other stuff =====================================
-    # ==================================================================================================================
-
-    nodes = 10
-    prb = Problem(nodes, logging_level=logging.DEBUG)
-    x = prb.createStateVariable('x', 2)
-    y = prb.createStateVariable('y', 2)
-    z = prb.createInputVariable('z', 2)
-    danieli = prb.createConstraint('danieli', x+y, range(4, 10))
-
-    x.setBounds([2,2], [2,2])
-    danieli.setBounds([12, 12],[12, 12], list(range(4, 10)))
-    prb.createProblem({"nlpsol.ipopt":True})
-    sol = prb.solveProblem()
-
-    print(sol)
-    exit()
-
-
-    # ==================================================================================================================
-    # ==================================================================================================================
-    # ==================================================================================================================
-
-    # nodes = 8
-    # prb = Problem(nodes)
-    # x = prb.createStateVariable('x', 2)
-    # y = prb.createStateVariable('y', 2)
-    # danieli = prb.createConstraint('danieli', x+y)
-    #
-    # danieli.setBounds([12, 12],[12, 12], 4)
-    # prb.createProblem()
-    # sol = prb.solveProblem()
-    #
-    # print(sol)
-    # exit()
-    #
-    #
-    # print('===PICKLING===')
-    # prb = prb.serialize()
-    # prb_serialized = pickle.dumps(prb)
-    #
-    # print('===DEPICKLING===')
-    # prb_new = pickle.loads(prb_serialized)
-    # prb_new.deserialize()
-    #
-    # sv_new = prb_new.getStateVariables()
-    # cnstr_new = prb_new.getConstraints()
-    #
-    # # these two are different
-    # print('x', x)
-    # print('new x', sv_new['x'])
-    #
-    # # todo how to check if the new state variable x is used by all the constraints?
-    #
-    # # oebus = prb_new.createConstraint('oebus', x)  # should not work
-    # oebus = prb_new.createConstraint('oebus', sv_new['x'])  # should work
-    # prb_new.createProblem()
-    #
-    # exit()
-    # ==================================================================================================================
-    # ==================================================================================================================
-    # ==================================================================================================================
-    # nodes = 8
-    # prb = Problem(nodes)
-    # x = prb.createStateVariable('x', 2)
-    # y = prb.createStateVariable('y', 2)
-    # # todo something wrong here
-    # danieli = prb.createConstraint('danieli', x+y)
-    # sucua = prb.createCostFunction('sucua', x*y)
-    #
-    #
-    # prb.createProblem()
-    #
-    # print('===PICKLING===')
-    #
-    # prb = prb.serialize()
-    # prb_serialized = pickle.dumps(prb)
-    #
-    #
-    # print('===DEPICKLING===')
-    # prb_new = pickle.loads(prb_serialized)
-    # prb_new.deserialize()
-    #
-    # prb_new.createProblem()
-    # print(prb_new.prob)
-    #
-    # exit()
-    # ==================================================================================================================
-    # ==================================================================================================================
-    # ==================================================================================================================
-
-    nodes = 8
-    prb = Problem(nodes, logging_level=logging.INFO)
-    x = prb.createStateVariable('x', 2)
-    y = prb.createStateVariable('y', 2)
-
-    x.setBounds([-2, -2], [2, 2])
-
-    # todo this is allright but I have to remember that if I update the nodes (from 3 to 6 for example) i'm not updating the constraint nodes
-    # todo so if it was active on all the node before, then it will be active only on the node 1, 2, 3 (not on 4, 5, 6)
-
-
-    scoping_node = nodes
-    # print('var at nodes {}  BEFORE creating the problem: '.format(scoping_node), prb.scopeNodeVars(scoping_node))
-    # print('number of nodes of {}: {}'.format(x, x.getNNodes()))
-    # print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
-
-    # print('getVarImplList way before:', prb.state_var_container.getVarImplList())
-    danieli = prb.createConstraint('danieli', x+y)
-    sucua = prb.createCostFunction('sucua', x*y, nodes=list(range(3, 15)))
-    pellico = prb.createCostFunction('pellico', x-y, nodes=[0, 4, 6])
-
-    danieli.setBounds(lb=[-1, -1], ub=[1, 1], nodes=3)
-
-    prb.createProblem({"nlpsol.ipopt":True})
-
-    for i in range(nodes+1):
-        print(x.getBounds(i))
-
-    # print('var at nodes {}  AFTER creating the problem: '.format(scoping_node), prb.scopeNodeVars(scoping_node))
-    # print('getVarImplList before:', prb.state_var_container.getVarImplList())
-    new_n_nodes = 5
-    # print('================== Changing n. of nodes to {} =================='.format(new_n_nodes))
-    prb.setNNodes(new_n_nodes)
-    scoping_node = 8
-    # print('var at nodes {} AFTER changing the n. of nodes but BEFORE rebuilding: {}'.format(scoping_node, prb.scopeNodeVars(scoping_node)))
-    # print('number of nodes of {}: {}'.format(x, x.getNNodes()))
-    # print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
-    # print('getVarImplList after but before create:', prb.state_var_container.getVarImplList())
-    prb.createProblem()
-
-    # todo check why this is so
-    # print('after:', prb.state_var_container.getVarImplList())
-
-    scoping_node = 8
-    # print('var at nodes {} AFTER changing the n. of nodes but AFTER rebuilding: {}'.format(scoping_node, prb.scopeNodeVars(scoping_node))) # should not work
-    # print('number of nodes of {}: {}'.format(x, x.getNNodes()))
-    # print('bounds of function {} at node {} are: {}'.format(x, scoping_node, x.getBounds(scoping_node)))
-    # x.setBounds(10)
-    # danieli.setNodes([1,6])
-    prb.scopeNodeVars(2)
-
-
-    x.setBounds([2, 8], [2, 8], 5)
-
-    for i in range(new_n_nodes+1):
-        print(x.getBounds(i))
-
-    # todo what do I do?
-    # is it better to project the abstract variable as soon as it is created, to set the bounds and everything?
-    # or is it better to wait for the buildProblem to generate the projection of the abstract value along the horizon line?
-
-
-
-
-
-
+    pass

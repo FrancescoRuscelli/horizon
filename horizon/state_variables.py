@@ -94,7 +94,7 @@ class Parameter(AbstractVariable):
             raise Exception('Wrong dimension of parameter values inserted.')
 
         for node in nodes:
-            self.par_impl['n' + str(node)]['value'] = vals
+            self.par_impl['n' + str(node)]['val'] = vals
 
     def getImpl(self, node=None):
         if node is None:
@@ -535,14 +535,19 @@ class VariablesContainer:
 
         return cs.vertcat(*par_impl_list)
 
-    def getParameterValues(self):
+    def getParameterValues(self, name=None):
         par_impl_list = list()
-        for node in self.pars_impl.values():
-            for parameter in node.keys():
-                # get from state_var_impl the relative var
-                par_impl_list.append(node[parameter]['val'])
+        if name is None:
+            for node in self.pars_impl.values():
+                for parameter in node.keys():
+                    # get from state_var_impl the relative var
+                    par_impl_list.append(node[parameter]['val'])
 
-        return cs.vertcat(*par_impl_list)
+            return cs.vertcat(*par_impl_list)
+
+        else:
+            # todo can I do this elsewhere in getPar and getVar? it's nice!
+            return self.pars[name].getValue()
 
     def getVarsDim(self):
         var_dim_tot = 0
@@ -692,6 +697,7 @@ class VariablesContainer:
            - val: dict with name and value of implemented variable
         '''
 
+        # todo not sure about the timings, but here a dictionary with potentially MANY empty value is created.
         # contains single vars that do not need to be projected
         self.vars_impl['nNone'] = dict()
         self.pars_impl['nNone'] = dict()
@@ -711,7 +717,6 @@ class VariablesContainer:
 
         for node in range(self.nodes):
             self.pars_impl['n' + str(node)] = dict()
-
             for name, val in self.pars.items():
 
                 if isinstance(val, SingleParameter):
@@ -737,6 +742,13 @@ class VariablesContainer:
             for name, state_var in self.vars_impl[node].items():
                 k = node[node.index('n') + 1:]
                 state_var['w0'] = self.vars[name].getInitialGuess(k)
+
+    def updateParameters(self):
+
+        for node in self.pars_impl.keys():
+            for name, parameter in self.pars_impl[node].items():
+                k = node[node.index('n') + 1:]
+                parameter['val'] = self.pars[name].getValue(k)
 
     def setNNodes(self, n_nodes):
 
