@@ -7,9 +7,15 @@ from horizon import problem
 from horizon.utils.transcription_methods import TranscriptionsHandler
 from horizon.utils import plotter
 from horizon.ros.replay_trajectory import replay_trajectory
+from horizon.ros import utils as horizon_ros_utils
 
 import matplotlib.pyplot as plt
 import os
+import time
+
+
+horizon_ros_utils.roslaunch("horizon_examples", "cart_pole.launch")
+time.sleep(3.)
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')

@@ -10,6 +10,13 @@ from horizon.ros.replay_trajectory import replay_trajectory
 import matplotlib.pyplot as plt
 import os
 
+import os
+import time
+from horizon.ros import utils as horizon_ros_utils
+
+horizon_ros_utils.roslaunch("horizon_examples", "cart_pole.launch")
+time.sleep(3.)
+
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
