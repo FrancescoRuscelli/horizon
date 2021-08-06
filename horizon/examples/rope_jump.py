@@ -8,9 +8,16 @@ from horizon import problem
 from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
+import os
+import time
+from horizon.ros import utils as horizon_ros_utils
+
+horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
+time.sleep(3.)
 
 # Loading URDF model in pinocchio
-urdf = rospy.get_param('robot_description')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')
+urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
 # OPTIMIZATION PARAMETERS
@@ -226,6 +233,7 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'rope_joint']
 
 replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping).replay()
+
 
 
 

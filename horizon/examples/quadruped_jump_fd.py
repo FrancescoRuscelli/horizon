@@ -111,12 +111,13 @@ q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.9, 0.0, 0.0, 0.0, 1.0])
 
 prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes=list(range(lift_node, touch_down_node)))
 prb.createCostFunction("min_qdot", 50.*cs.dot(qdot, qdot))
-prb.createCostFunction("min_u", 0.001*cs.sumsqr(u), nodes=list(range(0, ns)))
-f1_prev = f1.getVarOffset(-1)
-f2_prev = f2.getVarOffset(-1)
-f3_prev = f3.getVarOffset(-1)
-f4_prev = f4.getVarOffset(-1)
-prb.createCostFunction("min_f", 0.001*cs.sumsqr(f1-f1_prev+f2-f2_prev+f3-f3_prev+f4-f4_prev), nodes=list(range(1, ns)))
+#prb.createCostFunction("min_f", 0.0001*cs.sumsqr(f1+f2+f3+f4), nodes=list(range(0, ns)))
+prb.createCostFunction("min_u", 0.0001*cs.sumsqr(u), nodes=list(range(0, ns)))
+#f1_prev = f1.getVarOffset(-1)
+#f2_prev = f2.getVarOffset(-1)
+#f3_prev = f3.getVarOffset(-1)
+#f4_prev = f4.getVarOffset(-1)
+#prb.createCostFunction("min_df", 0.001*cs.sumsqr(f1-f1_prev+f2-f2_prev+f3-f3_prev+f4-f4_prev), nodes=list(range(1, ns)))
 
 # Constraints
 q_prev = q.getVarOffset(-1)
@@ -155,8 +156,8 @@ for frame, f in zip(contact_names, forces):
 
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=qdot)['ee_vel_linear']
-    #prb.createConstraint(f"{frame}_vel_before_jump", v, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
-    #prb.createConstraint(f"{frame}_vel_after_jump", v, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+    prb.createConstraint(f"{frame}_vel_before_jump", v, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+    prb.createConstraint(f"{frame}_vel_after_jump", v, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
     fc, fc_lb, fc_ub = casadi_kin_dyn.linearized_friciton_cone(f, mu, R)
     prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=list(range(0, lift_node)), bounds=dict(lb=fc_lb, ub=fc_ub))
@@ -168,8 +169,8 @@ for frame, f in zip(contact_names, forces):
 # Create problem
 prb.createProblem()
 
-opts = {'ipopt.tol': 0.001,
-        'ipopt.constr_viol_tol': 0.001,
+opts = {'ipopt.tol': 0.01,
+        'ipopt.constr_viol_tol': 0.01,
         'ipopt.max_iter': 5000,
         'ipopt.linear_solver': 'ma57'}
 
@@ -200,13 +201,18 @@ for i in range(ns):
 # resampling
 dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'Contact3': f3_hist, 'Contact4': f4_hist}
-q_res, qdot_res, input_res = resampler_trajectory.second_order_resample_integrator(q_hist, qdot_hist, cs.vertcat(u_hist, f1_hist, f2_hist, f3_hist, f4_hist),
+q_res, qdot_res, input_res = resampler_trajectory.second_order_resample_integrator(q_hist, qdot_hist, np.array(cs.vertcat(u_hist, f1_hist, f2_hist, f3_hist, f4_hist)),
     dt_hist.flatten(), dt, dae)
 
 tau_res = resampler_trajectory.resample_input(tau_hist, dt_hist.flatten(), dt)
+f1_res = resampler_trajectory.resample_input(f1_hist, dt_hist.flatten(), dt)
+f2_res = resampler_trajectory.resample_input(f2_hist, dt_hist.flatten(), dt)
+f3_res = resampler_trajectory.resample_input(f3_hist, dt_hist.flatten(), dt)
+f4_res = resampler_trajectory.resample_input(f4_hist, dt_hist.flatten(), dt)
+
+frame_force_res_mapping = {'Contact1': f1_res, 'Contact2': f2_res, 'Contact3': f3_res, 'Contact4': f4_res}
 
 
-print("tau_res:", tau_res.shape)
 
 PLOTS = True
 if PLOTS:
@@ -247,12 +253,12 @@ if PLOTS:
     plt.xlabel('$\mathrm{[sec]}$', size=20)
     plt.ylabel('$\mathrm{\dot{q}}$', size=20)
 
-    plt.figure()
-    for i in range(qddot_res.shape[0]):
-        plt.plot(time[:-1], qddot_res[i, :])
-    plt.suptitle('$\mathrm{\ddot{q} \ Resampled}$', size=20)
-    plt.xlabel('$\mathrm{[sec]}$', size=20)
-    plt.ylabel('$\mathrm{\ddot{q}}$', size=20)
+    #plt.figure()
+    #for i in range(qddot_res.shape[0]):
+    #    plt.plot(time[:-1], qddot_res[i, :])
+    #plt.suptitle('$\mathrm{\ddot{q} \ Resampled}$', size=20)
+    #plt.xlabel('$\mathrm{[sec]}$', size=20)
+    #plt.ylabel('$\mathrm{\ddot{q}}$', size=20)
 
     plt.show()
 
@@ -265,6 +271,6 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'Contact4_x', 'Contact4_y', 'Contact4_z']
 
 
-repl = replay_trajectory(dt, joint_list, q_res)#, frame_force_res_mapping, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+repl = replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
 repl.sleep(1.)
 repl.replay()

@@ -33,33 +33,14 @@ def resample_torques(p, v, a, node_time, dt, dae, frame_force_mapping, kindyn, f
         """
 
     p_res, v_res, a_res = second_order_resample_integrator(p, v, a, node_time, dt, dae)
-    ni = a_res.shape[1]
+
     frame_res_force_mapping = dict()
-    for key in frame_force_mapping:
-        frame_res_force_mapping[key] = np.zeros([frame_force_mapping[key].shape[0], ni])
-
-    number_of_nodes = p.shape[1]
-    node_time_array = np.zeros([number_of_nodes])
-    if hasattr(node_time, "__iter__"):
-        for i in range(1, number_of_nodes):
-            node_time_array[i] = node_time_array[i-1] + node_time[i - 1]
-    else:
-        for i in range(1, number_of_nodes):
-            node_time_array[i] = node_time_array[i - 1] + node_time
-    t = 0.
-    node = 0
-    i = 0
-    while i < a_res.shape[1]-1:
-        for key in frame_force_mapping:
-            frame_res_force_mapping[key][:, i] = frame_force_mapping[key][:, node]
-        t += dt
-        i += 1
-        if t > node_time_array[node+1]:
-            node += 1
-
+    for frame, wrench in frame_force_mapping.items():
+        frame_res_force_mapping[frame] = resample_input(wrench, node_time, dt)
     tau_res = np.zeros(a_res.shape)
 
     ID = casadi_kin_dyn.InverseDynamics(kindyn, frame_force_mapping.keys(), force_reference_frame)
+    ni = a_res.shape[1]
     for i in range(ni):
         frame_force_map_i = dict()
         for frame, wrench in frame_res_force_mapping.items():
