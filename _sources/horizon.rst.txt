@@ -1,18 +1,18 @@
 horizon package
 ===============
 
-Subpackages
------------
+_Subpackages
+_-----------
 
-.. toctree::
+_.. toctree::
 
     _horizon.ros
     _horizon.solvers
     _horizon.tests
     _horizon.utils
 
-Submodules
-----------
+_Submodules
+_----------
 
 horizon.function module
 -----------------------
