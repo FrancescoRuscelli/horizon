@@ -49,12 +49,31 @@ def test_parameters():
 
     sol = prb.solveProblem()
 
-    exit()
+def test_singleVariable():
+    #  check if bounds are correct when setting them AFTER building the problem
+    nodes = 10
+
+    prb = Problem(nodes, crash_if_suboptimal=True)
+    x = prb.createStateVariable('x', 6)
+    u = prb.createSingleVariable('u', 2)
+
+    constr1 = prb.createIntermediateConstraint('constr', x[2] ** 2 + u[1:3])
+
+    constr1.setBounds(1, 1)
+
+    prb.createProblem()
+
+    x.setBounds([1, 1, 1, 1, 1, 1], [2, 2, 2, 2, 2, 2])
+
+    cos_fun = np.cos(np.linspace(0, 2*np.pi, 11))
+
+    sol = prb.solveProblem()
 
 
 if __name__ == '__main__':
     # test_singleParameter()
-    test_parameters()
+    # test_parameters()
+    test_singleVariable()
     exit()
 nodes = 10
 prb = Problem(nodes, logging_level=logging.DEBUG)
