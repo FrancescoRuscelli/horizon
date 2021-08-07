@@ -1,4 +1,4 @@
-horizon package
+horizon package lol
 ===============
 horizon.function module
 -----------------------
