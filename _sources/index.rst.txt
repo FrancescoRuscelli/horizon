@@ -8,9 +8,6 @@ Welcome to horizon's documentation!
 
 .. toctree::
    :maxdepth: 2
-   
-   includeme
-
 
 
 Indices and tables
