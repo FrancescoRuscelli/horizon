@@ -35,7 +35,6 @@
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="horizon 0.0.1 documentation" href="index.html"/>
         <link rel="up" title="horizon" href="modules.html"/>
-        <link rel="next" title="horizon.ros package" href="horizon.ros.html"/>
         <link rel="prev" title="horizon" href="modules.html"/> 
 
   
@@ -86,11 +85,7 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="modules.html">horizon</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">horizon package</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#subpackages">Subpackages</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="horizon.ros.html">horizon.ros package</a></li>
-<li class="toctree-l4"><a class="reference internal" href="horizon.solvers.html">horizon.solvers package</a></li>
-<li class="toctree-l4"><a class="reference internal" href="horizon.tests.html">horizon.tests package</a></li>
-<li class="toctree-l4"><a class="reference internal" href="horizon.utils.html">horizon.utils package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#subpackages">Subpackages</a><ul class="simple">
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#submodules">Submodules</a></li>
@@ -175,41 +170,6 @@
 <div class="section" id="subpackages">
 <h2>Subpackages<a class="headerlink" href="#subpackages" title="Permalink to this headline">¶</a></h2>
 <div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="horizon.ros.html">horizon.ros package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="horizon.ros.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.ros.html#module-horizon.ros.replay_trajectory">horizon.ros.replay_trajectory module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.ros.html#module-horizon.ros">Module contents</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="horizon.solvers.html">horizon.solvers package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="horizon.solvers.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.solvers.html#horizon-solvers-ilqr-module">horizon.solvers.ilqr module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.solvers.html#module-horizon.solvers.sqp">horizon.solvers.sqp module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.solvers.html#module-horizon.solvers">Module contents</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="horizon.tests.html">horizon.tests package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="horizon.tests.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.tests.html#module-horizon.tests.class_try">horizon.tests.class_try module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.tests.html#module-horizon.tests.horizon_old">horizon.tests.horizon_old module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.tests.html#horizon-tests-jac-test-module">horizon.tests.jac_test module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.tests.html#horizon-tests-test-parameters-module">horizon.tests.test_parameters module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.tests.html#module-horizon.tests">Module contents</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="horizon.utils.html">horizon.utils package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="horizon.utils.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.utils.html#module-horizon.utils.casadi_kin_dyn">horizon.utils.casadi_kin_dyn module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.utils.html#module-horizon.utils.integrators">horizon.utils.integrators module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.utils.html#module-horizon.utils.plotter">horizon.utils.plotter module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.utils.html#module-horizon.utils.resampler_trajectory">horizon.utils.resampler_trajectory module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.utils.html#module-horizon.utils.transcription_methods">horizon.utils.transcription_methods module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.utils.html#module-horizon.utils.utils">horizon.utils.utils module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="horizon.utils.html#module-horizon.utils">Module contents</a></li>
-</ul>
-</li>
-</ul>
 </div>
 </div>
 <div class="section" id="submodules">
@@ -219,7 +179,7 @@
 <span id="horizon-function-module"></span><h2>horizon.function module<a class="headerlink" href="#module-horizon.function" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="horizon.function.Constraint">
-<em class="property">class </em><code class="descclassname">horizon.function.</code><code class="descname">Constraint</code><span class="sig-paren">(</span><em>name: str, f: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae913ee50&gt;, used_vars: dict, used_pars: dict, nodes: Union[int, Iterable[T_co]], bounds: horizon.type_doc.BoundsDict = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.function.Constraint" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">horizon.function.</code><code class="descname">Constraint</code><span class="sig-paren">(</span><em>name: str, f: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfebe6820&gt;, used_vars: dict, used_pars: dict, nodes: Union[int, Iterable[T_co]], bounds: horizon.type_doc.BoundsDict = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.function.Constraint" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#horizon.function.Function" title="horizon.function.Function"><code class="xref py py-class docutils literal notranslate"><span class="pre">horizon.function.Function</span></code></a></p>
 <p>Constraint Function of Horizon.</p>
 <dl class="method">
@@ -382,7 +342,7 @@
 
 <dl class="class">
 <dt id="horizon.function.Function">
-<em class="property">class </em><code class="descclassname">horizon.function.</code><code class="descname">Function</code><span class="sig-paren">(</span><em>name: str, f: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2aea50c0d0&gt;, used_vars: dict, used_pars: dict, nodes: Union[int, Iterable[T_co]]</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.function.Function" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">horizon.function.</code><code class="descname">Function</code><span class="sig-paren">(</span><em>name: str, f: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeabce50&gt;, used_vars: dict, used_pars: dict, nodes: Union[int, Iterable[T_co]]</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.function.Function" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Function of Horizon: generic function of SX values from CASADI.</p>
 <p class="rubric">Notes</p>
@@ -418,7 +378,7 @@ An abstract function gets internally implemented at each node, using the variabl
 
 <dl class="method">
 <dt id="horizon.function.Function.getFunction">
-<code class="descname">getFunction</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2aea5bdeb0&gt;<a class="headerlink" href="#horizon.function.Function.getFunction" title="Permalink to this definition">¶</a></dt>
+<code class="descname">getFunction</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeabceb0&gt;<a class="headerlink" href="#horizon.function.Function.getFunction" title="Permalink to this definition">¶</a></dt>
 <dd><p>Getter for the CASADI function</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -954,7 +914,7 @@ of variables and functions, which are internally managed, evaluated and projecte
 by the framework.</p>
 <dl class="method">
 <dt id="horizon.problem.Problem.createConstraint">
-<code class="descname">createConstraint</code><span class="sig-paren">(</span><em>name: str</em>, <em>g: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8f34d00&gt;</em>, <em>nodes: Union[int</em>, <em>collections.abc.Iterable] = None</em>, <em>bounds: horizon.type_doc.BoundsDict = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createConstraint" title="Permalink to this definition">¶</a></dt>
+<code class="descname">createConstraint</code><span class="sig-paren">(</span><em>name: str</em>, <em>g: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeecea00&gt;</em>, <em>nodes: Union[int</em>, <em>collections.abc.Iterable] = None</em>, <em>bounds: horizon.type_doc.BoundsDict = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createConstraint" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create a Constraint Function of the optimization problem.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -977,7 +937,7 @@ by the framework.</p>
 
 <dl class="method">
 <dt id="horizon.problem.Problem.createCostFunction">
-<code class="descname">createCostFunction</code><span class="sig-paren">(</span><em>name: str</em>, <em>j: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8f42ca0&gt;</em>, <em>nodes: Union[int</em>, <em>collections.abc.Iterable] = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createCostFunction" title="Permalink to this definition">¶</a></dt>
+<code class="descname">createCostFunction</code><span class="sig-paren">(</span><em>name: str</em>, <em>j: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeeb6370&gt;</em>, <em>nodes: Union[int</em>, <em>collections.abc.Iterable] = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createCostFunction" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create a Cost Function of the optimization problem.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -999,7 +959,7 @@ by the framework.</p>
 
 <dl class="method">
 <dt id="horizon.problem.Problem.createFinalConstraint">
-<code class="descname">createFinalConstraint</code><span class="sig-paren">(</span><em>name: str</em>, <em>g: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8f42bb0&gt;</em>, <em>bounds: horizon.type_doc.BoundsDict = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createFinalConstraint" title="Permalink to this definition">¶</a></dt>
+<code class="descname">createFinalConstraint</code><span class="sig-paren">(</span><em>name: str</em>, <em>g: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeeb6b20&gt;</em>, <em>bounds: horizon.type_doc.BoundsDict = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createFinalConstraint" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create a Constraint Function only active on the last node of the optimization problem.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1021,7 +981,7 @@ by the framework.</p>
 
 <dl class="method">
 <dt id="horizon.problem.Problem.createFinalCost">
-<code class="descname">createFinalCost</code><span class="sig-paren">(</span><em>name: str</em>, <em>j: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8f42d00&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createFinalCost" title="Permalink to this definition">¶</a></dt>
+<code class="descname">createFinalCost</code><span class="sig-paren">(</span><em>name: str</em>, <em>j: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeeb6610&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createFinalCost" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create a Cost Function only active on the last node of the optimization problem.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1063,7 +1023,7 @@ by the framework.</p>
 
 <dl class="method">
 <dt id="horizon.problem.Problem.createIntermediateConstraint">
-<code class="descname">createIntermediateConstraint</code><span class="sig-paren">(</span><em>name: str</em>, <em>g: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8f42c40&gt;</em>, <em>nodes: Union[int</em>, <em>collections.abc.Iterable] = None</em>, <em>bounds: horizon.type_doc.BoundsDict = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createIntermediateConstraint" title="Permalink to this definition">¶</a></dt>
+<code class="descname">createIntermediateConstraint</code><span class="sig-paren">(</span><em>name: str</em>, <em>g: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeeb6be0&gt;</em>, <em>nodes: Union[int</em>, <em>collections.abc.Iterable] = None</em>, <em>bounds: horizon.type_doc.BoundsDict = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createIntermediateConstraint" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create a Constraint Function that can be active on all the nodes except the last one</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1086,7 +1046,7 @@ by the framework.</p>
 
 <dl class="method">
 <dt id="horizon.problem.Problem.createIntermediateCost">
-<code class="descname">createIntermediateCost</code><span class="sig-paren">(</span><em>name: str</em>, <em>j: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8f42d60&gt;</em>, <em>nodes: Union[int</em>, <em>collections.abc.Iterable] = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createIntermediateCost" title="Permalink to this definition">¶</a></dt>
+<code class="descname">createIntermediateCost</code><span class="sig-paren">(</span><em>name: str</em>, <em>j: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeeb6e20&gt;</em>, <em>nodes: Union[int</em>, <em>collections.abc.Iterable] = None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.createIntermediateCost" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create a Cost Function that can be active on all the nodes except the last one.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1290,7 +1250,7 @@ Parameters are specified before building the problem and can be ‘assigned’ a
 
 <dl class="method">
 <dt id="horizon.problem.Problem.getDynamics">
-<code class="descname">getDynamics</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8fa1c40&gt;<a class="headerlink" href="#horizon.problem.Problem.getDynamics" title="Permalink to this definition">¶</a></dt>
+<code class="descname">getDynamics</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfec96a30&gt;<a class="headerlink" href="#horizon.problem.Problem.getDynamics" title="Permalink to this definition">¶</a></dt>
 <dd><p>Getter of the system Dynamics used in the optimization problem.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1490,7 +1450,7 @@ Parameters are specified before building the problem and can be ‘assigned’ a
 
 <dl class="method">
 <dt id="horizon.problem.Problem.setDynamics">
-<code class="descname">setDynamics</code><span class="sig-paren">(</span><em>xdot: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8fa1af0&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.setDynamics" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setDynamics</code><span class="sig-paren">(</span><em>xdot: &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfec96e50&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.problem.Problem.setDynamics" title="Permalink to this definition">¶</a></dt>
 <dd><p>Setter of the system Dynamics used in the optimization problem.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1550,7 +1510,7 @@ Parameters are specified before building the problem and can be ‘assigned’ a
 Used to store more variables of the same nature.</p>
 <dl class="method">
 <dt id="horizon.state_variables.AbstractAggregate.getVars">
-<code class="descname">getVars</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f2ae8f42940&gt;<a class="headerlink" href="#horizon.state_variables.AbstractAggregate.getVars" title="Permalink to this definition">¶</a></dt>
+<code class="descname">getVars</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; &lt;sphinx.ext.autodoc.importer._MockObject object at 0x7f4dfeeb64f0&gt;<a class="headerlink" href="#horizon.state_variables.AbstractAggregate.getVars" title="Permalink to this definition">¶</a></dt>
 <dd><p>Getter for the variable stored in the aggregate.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -2813,8 +2773,6 @@ It asks each abstract variables (in self.pars) for its initial guess and set the
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="horizon.ros.html" class="btn btn-neutral float-right" title="horizon.ros package" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="modules.html" class="btn btn-neutral" title="horizon" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>

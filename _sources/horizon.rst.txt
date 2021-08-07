@@ -6,10 +6,10 @@ Subpackages
 
 .. toctree::
 
-    horizon.ros
-    horizon.solvers
-    horizon.tests
-    horizon.utils
+    _horizon.ros
+    _horizon.solvers
+    _horizon.tests
+    _horizon.utils
 
 Submodules
 ----------
