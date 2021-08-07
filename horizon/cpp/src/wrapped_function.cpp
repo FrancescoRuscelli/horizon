@@ -32,6 +32,9 @@ WrappedFunction::WrappedFunction(casadi::Function f):
 
         // allocate a zero dense matrix to store the output
         _out_matrix.emplace_back(Eigen::MatrixXd::Zero(sp.size1(), sp.size2()));
+
+        //allocate a zero sparse matrix to store the output
+        _out_matrix_sparse.emplace_back(Eigen::SparseMatrix<double>(sp.size1(), sp.size2()));
     }
 }
 
@@ -45,18 +48,30 @@ void WrappedFunction::setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi)
     _in_buf[i] = xi.data();
 }
 
-void WrappedFunction::call()
+
+
+void WrappedFunction::call(bool sparse)
 {
     // call function (allocation-free)
     casadi_int mem = _f.checkout();
     _f(_in_buf.data(), _out_buf.data(), _iw.data(), _dw.data(), mem);
 
-    // copy all outputs to dense matrices
+
     for(int i = 0; i < _f.n_out(); i++)
     {
-        csc_to_matrix(_f.sparsity_out(i),
-                      _out_data[i],
-                      _out_matrix[i]);
+        if(sparse)
+        {
+            csc_to_sparse_matrix(_f.sparsity_out(i),
+                                 _out_data[i],
+                                 _out_matrix_sparse[i]);
+        }
+        else
+        {
+            // copy all outputs to dense matrices
+            csc_to_matrix(_f.sparsity_out(i),
+                          _out_data[i],
+                          _out_matrix[i]);
+        }
     }
 
     // release mem (?)
@@ -68,6 +83,11 @@ const Eigen::MatrixXd& WrappedFunction::getOutput(int i) const
     return _out_matrix[i];
 }
 
+const Eigen::SparseMatrix<double>& WrappedFunction::getSparseOutput(int i) const
+{
+    return _out_matrix_sparse[i];
+}
+
 casadi::Function& WrappedFunction::function()
 {
     return _f;
@@ -76,6 +96,23 @@ casadi::Function& WrappedFunction::function()
 bool WrappedFunction::is_valid() const
 {
     return !_f.is_null();
+}
+
+
+void WrappedFunction::csc_to_sparse_matrix(const casadi::Sparsity& sp,
+                                           const std::vector<double>& data,
+                                           Eigen::SparseMatrix<double>& matrix)
+{
+    std::vector<casadi_int> output_row, output_col;
+    sp.get_triplet(output_row, output_col);
+
+    std::vector<Eigen::Triplet<double>> triplet_list;
+    for(unsigned int i = 0; i < data.size(); ++i)
+        triplet_list[i] = Eigen::Triplet<double>(output_row[i], output_col[i], data[i]);
+
+    matrix.setFromTriplets(triplet_list.begin(), triplet_list.end());
+
+
 }
 
 void WrappedFunction::csc_to_matrix(const casadi::Sparsity& sp,

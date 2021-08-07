@@ -23,8 +23,15 @@ add_library(ilqr STATIC
     src/profiling.cpp
 )
 
-target_link_libraries(ilqr Eigen3::Eigen casadi)
+# sqp library
+add_library(sqp STATIC
+    src/wrapped_function.cpp
+    src/profiling.cpp
+)
 
+
+target_link_libraries(ilqr Eigen3::Eigen casadi)
+target_link_libraries(sqp Eigen3::Eigen casadi)
 
 # python binding
 set(PYBIND11_PYTHON_VERSION 3)
@@ -40,3 +47,6 @@ install(TARGETS pyilqr
 # test executable
 add_executable(ilqr_test src/ilqr_test.cpp)
 target_link_libraries(ilqr_test ilqr)
+
+add_executable(sqp_test src/sqp_test.cpp)
+target_link_libraries(sqp_test sqp)
