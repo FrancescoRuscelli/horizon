@@ -336,7 +336,11 @@
 </li>
       <li><a href="horizon.solvers.html#horizon.solvers.sqp.sqp.get_hessian_computation_time">get_hessian_computation_time() (horizon.solvers.sqp.sqp method)</a>
 </li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.get_kkt_rcond">get_kkt_rcond() (horizon.solvers.ilqr.iterativeLQR method)</a>
+</li>
       <li><a href="horizon.solvers.html#horizon.solvers.sqp.sqp.get_qp_computation_time">get_qp_computation_time() (horizon.solvers.sqp.sqp method)</a>
+</li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.get_svd_thr">get_svd_thr() (horizon.solvers.ilqr.iterativeLQR method)</a>
 </li>
       <li><a href="horizon.html#horizon.function.Constraint.getBounds">getBounds() (horizon.function.Constraint method)</a>
 
@@ -574,6 +578,8 @@
 </li>
       <li><a href="horizon.solvers.html#module-horizon.solvers">horizon.solvers (module)</a>
 </li>
+      <li><a href="horizon.solvers.html#module-horizon.solvers.ilqr">horizon.solvers.ilqr (module)</a>
+</li>
       <li><a href="horizon.solvers.html#module-horizon.solvers.sqp">horizon.solvers.sqp (module)</a>
 </li>
       <li><a href="horizon.html#module-horizon.state_variables">horizon.state_variables (module)</a>
@@ -612,11 +618,21 @@
 </li>
       <li><a href="horizon.html#horizon.state_variables.InputVariable">InputVariable (class in horizon.state_variables)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="horizon.tests.html#horizon.tests.horizon_old.interpolator">interpolator() (in module horizon.tests.horizon_old)</a>
 </li>
       <li><a href="horizon.utils.html#horizon.utils.casadi_kin_dyn.InverseDynamics">InverseDynamics (class in horizon.utils.casadi_kin_dyn)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR">iterativeLQR (class in horizon.solvers.ilqr)</a>
+</li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.LinearConstraint">iterativeLQR.LinearConstraint (class in horizon.solvers.ilqr)</a>
+</li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.LinearDynamics">iterativeLQR.LinearDynamics (class in horizon.solvers.ilqr)</a>
+</li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.PropagateResult">iterativeLQR.PropagateResult (class in horizon.solvers.ilqr)</a>
+</li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.QuadraticCost">iterativeLQR.QuadraticCost (class in horizon.solvers.ilqr)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -722,6 +738,8 @@
 <h2 id="R">R</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.randomizeInitialGuess">randomizeInitialGuess() (horizon.solvers.ilqr.iterativeLQR method)</a>
+</li>
       <li><a href="horizon.html#horizon.problem.Problem.removeConstraint">removeConstraint() (horizon.problem.Problem method)</a>
 </li>
       <li><a href="horizon.html#horizon.problem.Problem.removeCostFunction">removeCostFunction() (horizon.problem.Problem method)</a>
@@ -768,6 +786,10 @@
         <li><a href="horizon.html#horizon.state_variables.VariablesContainer.serialize">(horizon.state_variables.VariablesContainer method)</a>
 </li>
       </ul></li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.set_kkt_rcond">set_kkt_rcond() (horizon.solvers.ilqr.iterativeLQR method)</a>
+</li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.set_svd_thr">set_svd_thr() (horizon.solvers.ilqr.iterativeLQR method)</a>
+</li>
       <li><a href="horizon.html#horizon.function.Constraint.setBounds">setBounds() (horizon.function.Constraint method)</a>
 
       <ul>
@@ -802,6 +824,8 @@
         <li><a href="horizon.tests.html#horizon.tests.horizon_old.Problem.setInitialGuess">(horizon.tests.horizon_old.Problem method)</a>
 </li>
       </ul></li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.setInitialState">setInitialState() (horizon.solvers.ilqr.iterativeLQR method)</a>
+</li>
       <li><a href="horizon.html#horizon.state_variables.VariablesContainer.setInputVar">setInputVar() (horizon.state_variables.VariablesContainer method)</a>
 </li>
       <li><a href="horizon.utils.html#horizon.utils.transcription_methods.TranscriptionsHandler.setIntegrator">setIntegrator() (horizon.utils.transcription_methods.TranscriptionsHandler method)</a>
@@ -818,6 +842,8 @@
       </ul></li>
       <li><a href="horizon.utils.html#horizon.utils.transcription_methods.TranscriptionsHandler.setMultipleShooting">setMultipleShooting() (horizon.utils.transcription_methods.TranscriptionsHandler method)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="horizon.html#horizon.function.FunctionsContainer.setNNodes">setNNodes() (horizon.function.FunctionsContainer method)</a>
 
       <ul>
@@ -826,8 +852,6 @@
         <li><a href="horizon.html#horizon.state_variables.VariablesContainer.setNNodes">(horizon.state_variables.VariablesContainer method)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="horizon.html#horizon.function.Constraint.setNodes">setNodes() (horizon.function.Constraint method)</a>
 
       <ul>
@@ -871,6 +895,8 @@
       <li><a href="horizon.utils.html#horizon.utils.utils.skew">skew() (in module horizon.utils.utils)</a>
 </li>
       <li><a href="horizon.ros.html#horizon.ros.replay_trajectory.replay_trajectory.sleep">sleep() (horizon.ros.replay_trajectory.replay_trajectory method)</a>
+</li>
+      <li><a href="horizon.solvers.html#horizon.solvers.ilqr.iterativeLQR.solve">solve() (horizon.solvers.ilqr.iterativeLQR method)</a>
 </li>
       <li><a href="horizon.html#horizon.problem.Problem.solveProblem">solveProblem() (horizon.problem.Problem method)</a>
 
