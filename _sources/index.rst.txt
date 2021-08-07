@@ -18,8 +18,9 @@ Features
 Install
 =======
 pip package is not supported yet, but until then:
- - clone the github `horizon repo <https://github.com/FrancescoRuscelli/horizon_gui>`_
+ - clone the github repo `horizon <https://github.com/FrancescoRuscelli/horizon_gui>`_
  - run ``python setup.py install``
+ 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
