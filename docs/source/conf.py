@@ -15,6 +15,7 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
+
 import stanford_theme
 
 # -- Project information -----------------------------------------------------
@@ -40,9 +41,15 @@ release = '0.0.1'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.githubpages'
+    'sphinx.ext.githubpages',
     'sphinx.ext.napoleon',
+    'sphinx.ext.todo',
 ]
+
+autodoc_mock_imports = ["casadi",
+                        "numpy.typing",
+                        "logging"]
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
