@@ -21,13 +21,17 @@ class BoundsLine(QWidget):
     lbChanged = pyqtSignal(int, list)
     ubChanged = pyqtSignal(int, list)
 
-    def __init__(self, name, nodes=0, dim=1, parent=None):
+    def __init__(self, name, nodes=0, dim=1, initial_bounds=None, parent=None):
         super().__init__(parent)
 
         self.name = name
 
-        self.lb = np.matrix(np.ones((dim, nodes)) * -np.inf)
-        self.ub = np.matrix(np.ones((dim, nodes)) * np.inf)
+        if initial_bounds is None:
+            self.lb = np.matrix(np.ones((dim, nodes)) * 0.)
+            self.ub = np.matrix(np.ones((dim, nodes)) * 0.)
+        else:
+            self.lb = initial_bounds[0]
+            self.ub = initial_bounds[1]
 
         self.min_color_base = "MediumSeaGreen"
         self.min_color_selected = "Crimson"

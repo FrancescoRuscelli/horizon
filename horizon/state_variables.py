@@ -23,6 +23,22 @@ class AbstractVariable(cs.SX):
     def getDim(self):
         return self.dim
 
+class Parameter(AbstractVariable):
+    def __init__(self, tag, dim):
+        super(Parameter, self).__init__(tag, dim)
+        self.value = np.zeros(self.dim)
+
+    def assign(self, vals):
+        vals = misc.checkValueEntry(vals)
+
+        if vals.shape[0] != self.dim:
+            raise Exception('Wrong dimension of parameter values inserted.')
+
+        self.value = vals
+
+    def getValue(self):
+        return self.value
+
 class SingleVariable(AbstractVariable):
     def __init__(self, tag, dim, dummy_nodes):
         super(SingleVariable, self).__init__(tag, dim)
@@ -338,10 +354,10 @@ class Aggregate(AbstractAggregate):
         return lb, ub
 
     def getLowerBounds(self, node):
-        return np.hstack((var.getLowerBounds(node) for var in self))
+        return np.hstack([var.getLowerBounds(node) for var in self])
 
     def getUpperBounds(self, node):
-        return np.hstack((var.getUpperBounds(node) for var in self))
+        return np.hstack([var.getUpperBounds(node) for var in self])
 
 class StateAggregate(Aggregate):
     def __init__(self, *args: StateVariable):
@@ -360,6 +376,8 @@ class VariablesContainer:
 
         self.vars = OrderedDict()
         self.vars_impl = OrderedDict()
+
+        self.pars = OrderedDict()
 
     def createVar(self, var_type, name, dim, active_nodes):
 
@@ -395,6 +413,26 @@ class VariablesContainer:
     def setSingleVar(self, name, dim):
         var = self.createVar(SingleVariable, name, dim, None)
         return var
+
+    def setParameter(self, name, dim):
+        par = Parameter(name, dim)
+        self.pars[name] = par
+
+        if self.logger:
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug(f'Creating parameter "{name}"')
+
+        return par
+
+    def getParameterDict(self):
+        return self.pars
+
+    def getParameterList(self):
+        return cs.vertcat(*self.pars.values())
+
+    def getParameterValues(self):
+        par_list = [par.getValue() for par in self.pars.values()]
+        return cs.vertcat(*par_list)
 
     def getVarsDim(self):
         var_dim_tot = 0
@@ -449,7 +487,10 @@ class VariablesContainer:
         return var
 
     def getVarImplAtNode(self, k):
-        return self.vars_impl['n' + str(k)]
+        if 'n' + str(k) in self.vars_impl:
+            return self.vars_impl['n' + str(k)]
+        else:
+            return None
 
     def getVarImplDict(self):
         return self.vars_impl

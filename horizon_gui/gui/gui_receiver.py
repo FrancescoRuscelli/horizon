@@ -5,6 +5,7 @@ import casadi as cs
 import math
 import pickle
 from logging import INFO, DEBUG
+from horizon.utils import plotter as plt
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -18,24 +19,40 @@ class horizonImpl():
         self.sv_dict = dict()  # state variables
         self.fun_dict = dict() # functions
 
+        self.plt = plt.PlotterHorizon(self.casadi_prb)
         # self.active_fun_list = list()
 
-    def addStateVariable(self, data):
+    def _setVarGenerator(self, var_type):
+        if var_type == 'state_var':
+            return self.casadi_prb.createStateVariable
+        if var_type == 'input_var':
+            return self.casadi_prb.createInputVariable
+        if var_type == 'single_var':
+            return self.casadi_prb.createSingleVariable
+        if var_type == 'custom_var':
+            return self.casadi_prb.createVariable
 
-        name = data['name']
-        dim = data['dim']
-        prev = data['prev']
+    def createVariable(self, var_type, name, dim, offset, nodes=None):
 
-        flag, signal = self.checkStateVariable(name)
+        flag, signal = self.checkVariable(name)
+
         if flag:
-            if prev == 0:
-                var = self.casadi_prb.createStateVariable(name, dim)
+
+            if offset == 0:
+                if var_type == 'state_var':
+                    var = self.casadi_prb.createStateVariable(name, dim)
+                if var_type == 'input_var':
+                    var = self.casadi_prb.createInputVariable(name, dim)
+                if var_type == 'single_var':
+                    var = self.casadi_prb.createSingleVariable(name, dim)
+                if var_type == 'custom_var':
+                    var = self.casadi_prb.createVariable(name, dim, nodes)
             else:
-                var = self.casadi_prb.createStateVariable(name, dim, prev)
+                raise Exception('TBD prev/next state variables')
 
             self.sv_dict[name] = dict(var=var, dim=dim)
 
-            return True, signal
+            return True, signal + f'. Type: {type(var)}'
         else:
             return False, signal
 
@@ -59,6 +76,11 @@ class horizonImpl():
 
         flag, signal = self.checkActiveFunction(name)
 
+        active_nodes = None
+        for var in self.fun_dict[name]['used_vars']:
+            print(var.getNodes())
+
+
         if flag:
             if fun_type == 'constraint':
                 try:
@@ -72,7 +94,6 @@ class horizonImpl():
             elif fun_type == 'costfunction':
                 try:
                     active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
-                    # self.active_fun_list.append(active_fun)
                     self.fun_dict[name].update({'active': active_fun})
                 except Exception as e:
                     return False, e
@@ -122,19 +143,19 @@ class horizonImpl():
 
         return True, 'Function "{}" is acceptable. Adding..'.format(name)
 
-    def checkStateVariable(self, name):
+    def checkVariable(self, name):
 
         if name == "":
-            signal = "State Variable: Empty Value Not Allowed"
+            signal = "Variable: Empty Value Not Allowed"
             return False, signal
         elif name in self.sv_dict.keys():
-            signal = "State Variable: Already Inserted"
+            signal = "Variable: Already Inserted"
             return False, signal
         elif name.isnumeric():
-            signal = "State Variable: Invalid Name"
+            signal = "Variable: Invalid Name"
             return False, signal
 
-        return True, "State Variable: generated '{}'".format(name)
+        return True, "Variable: generated '{}'".format(name)
 
 
     def fromTxtToFun(self, str_fun):
@@ -170,20 +191,25 @@ class horizonImpl():
         try:
             res = parser.expr(modified_fun)
         except Exception as e:
-            self.logger.warning(e)
+            self.logger.warning('gui_receiver.py: {}'.format(e))
             return fun
 
         code = res.compile()
-
 
         # todo add try exception + logger
 
         try:
             fun = eval(code)
         except Exception as e:
-            self.logger.warning(e)
+            self.logger.warning('gui_receiver.py: {}'.format(e))
 
-        return fun
+        used_variables = list()
+        for var in self.sv_dict.values():
+            if cs.depends_on(fun, var["var"]):
+                used_variables.append(var["var"])
+
+
+        return fun, used_variables
 
     def editFunction(self, name, str_fun):
 
@@ -199,6 +225,7 @@ class horizonImpl():
             return False, signal
 
     def updateFunctionNodes(self, name, nodes):
+        print(nodes)
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
     def updateFunctionUpperBounds(self, name, ub, nodes):
@@ -234,13 +261,11 @@ class horizonImpl():
 
     def _createAndAppendFun(self, name, str_fun):
 
-        fun = self.fromTxtToFun(str_fun)
-        # TODO I can probably do a wrapper function in casadi self.createFunction(name, fun, type)
-        # TODO HOW ABOUT GENERIC FUNCTION? Should i do a casadi function for them?
+        fun, used_vars = self.fromTxtToFun(str_fun)
         # fill horizon_receiver.fun_dict and funList
-        # TODO add fun type??
+
         if fun is not None:
-            self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None)
+            self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None, used_vars=used_vars)
             return True
         else:
             return False
@@ -249,14 +274,14 @@ class horizonImpl():
         try:
             self.casadi_prb.createProblem()
         except Exception as e:
-            return self.logger.warning(e)
+            self.logger.warning('gui_receiver.py: {}'.format(e))
         return True
 
     def solve(self):
         try:
             self.casadi_prb.solveProblem()
         except Exception as e:
-            return self.logger.warning(e)
+            self.logger.warning('gui_receiver.py: {}'.format(e))
         return True
 
     def getInfoAtNodes(self, node):
@@ -272,7 +297,7 @@ class horizonImpl():
         return vars, cnstrs, costfuns
 
     def plot(self):
-        pass
+        self.plt.plotVariables()
 
     def serialize(self):
 

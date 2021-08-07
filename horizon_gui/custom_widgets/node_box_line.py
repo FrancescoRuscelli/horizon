@@ -35,12 +35,13 @@ class NodeBoxLine(QWidget):
 
         for i in range(self.n_nodes):
             n_i = QPushButton("{}".format(i))
-            n_i.setStyleSheet('background-color: orange;')
+            if i != self.n_nodes-1:
+                n_i.setStyleSheet('background-color: orange;')
+            else:
+                n_i.setStyleSheet('background-color: red;')
             n_i.setObjectName('node_{}'.format(i))
             n_i.clicked.connect(partial(self.buttonPressed.emit, i))
             self.node_box_layout.addWidget(n_i)
-
-
 
 
 if __name__ == '__main__':

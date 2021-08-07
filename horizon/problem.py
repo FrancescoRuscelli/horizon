@@ -1,4 +1,5 @@
 import time
+from typing import Iterable
 
 import casadi as cs
 from horizon import function as fc
@@ -68,6 +69,10 @@ class Problem:
         self.input_aggr.addVariable(var)
         return var
 
+    def createSingleVariable(self, name, dim):
+        var = self.var_container.setSingleVar(name, dim)
+        return var
+
     def createVariable(self, name, dim, nodes=None):
         """
         Create a variable with:
@@ -81,6 +86,10 @@ class Problem:
         """
         var = self.var_container.setVar(name, dim, nodes)
         return var
+
+    def createParameter(self, name, dim):
+        par = self.var_container.setParameter(name, dim)
+        return par
 
     # def setVariable(self, name, var):
 
@@ -117,7 +126,18 @@ class Problem:
         self.state_der = xdot
 
     def getDynamics(self) -> cs.SX:
+        if self.state_der is None:
+            raise ValueError('dynamics not defined, have you called setDynamics?')
         return self.state_der
+
+    def setInitialState(self, x0: Iterable):
+        self.getState().setBounds(lb=x0, ub=x0, nodes=0)
+
+    def getInitialState(self) -> np.array:
+        lb, ub = self.getState().getBounds(node=0)
+        if np.any(lb != ub):
+            return None
+        return lb
 
     def _getUsedVar(self, f):
         used_var = dict()
@@ -239,6 +259,7 @@ class Problem:
         j = self.function_container.getCostFImplSum()
         w = self.var_container.getVarImplList()
         g = self.function_container.getCnstrFList()
+        p = self.var_container.getParameterList()
 
         # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
         # self.logger.debug('constraints unraveled:', cs.vertcat(*self. ...))
@@ -251,7 +272,7 @@ class Problem:
         #     self.logger.debug('state variables: {}'.format(w))
         #     self.logger.debug('constraints: {}'.format(g))
 
-        self.prob = {'f': j, 'x': w, 'g': g}
+        self.prob = {'f': j, 'x': w, 'g': g, 'p': p}
 
         if self.solver is None:
             if solver_type is None:
@@ -294,6 +315,7 @@ class Problem:
         lbg = self.function_container.getLowerBoundsList()
         ubg = self.function_container.getUpperBoundsList()
 
+        p = self.var_container.getParameterValues()
 
         if self.debug_mode:
 
@@ -302,29 +324,29 @@ class Problem:
             g = self.function_container.getCnstrFList()
 
             self.logger.debug('================')
-            self.logger.debug('len w: {}'.format(w.shape))
-            self.logger.debug('len lbw: {}'.format(len(lbw)))
-            self.logger.debug('len ubw: {}'.format(len(ubw)))
-            self.logger.debug('len w0: {}'.format(len(w0)))
-            self.logger.debug('len g: {}'.format(g.shape))
-            self.logger.debug('len lbg: {}'.format(len(lbg)))
-            self.logger.debug('len ubg: {}'.format(len(ubg)))
+            self.logger.debug(f'len w: {w.shape}')
+            self.logger.debug(f'len lbw: {len(lbw)}')
+            self.logger.debug(f'len ubw: {len(ubw)}')
+            self.logger.debug(f'len w0: {len(w0)}')
+            self.logger.debug(f'len g: {g.shape}')
+            self.logger.debug(f'len lbg: {len(lbg)}')
+            self.logger.debug(f'len ubg: {len(ubg)}')
+            self.logger.debug(f'len p: {p.shape}')
 
 
             # self.logger.debug('================')
-            self.logger.debug('w: {}'.format(w))
-            self.logger.debug('lbw: {}'.format(lbw))
-            self.logger.debug('ubw: {}'.format(ubw))
-            self.logger.debug('g: {}'.format(g))
-            self.logger.debug('lbg: {}'.format(lbg))
-            self.logger.debug('ubg: {}'.format(ubg))
-            self.logger.debug('j: {}'.format(j))
-
+            self.logger.debug(f'w: {w}')
+            self.logger.debug(f'lbw: {lbw}')
+            self.logger.debug(f'ubw: {ubw}')
+            self.logger.debug(f'g: {g}')
+            self.logger.debug(f'lbg: {lbg}')
+            self.logger.debug(f'ubg: {ubg}')
+            self.logger.debug(f'j: {j}')
+            self.logger.debug(f'p: {p}')
         # t_to_set_up = time.time() - t_start
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
-
-        self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+        self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
         # t_to_solve = time.time() - t_start
         # print('T to solve:', t_to_solve)
@@ -458,6 +480,62 @@ class Problem:
 if __name__ == '__main__':
     # MULTIPLE SHOOTING
 
+    # x = cs.SX.sym('x', 1)
+    # y = cs.SX.sym('y', 1)
+    # p = cs.SX.sym('z', 1)
+    # k = cs.SX.sym('k', 1)
+    #
+    # w = cs.vertcat(x, y)
+    # j = 0
+    # g = x*k + y*p
+    # prob = {'f': j, 'x': w, 'g': g, 'p': cs.vertcat(p, k)}
+    #
+    # solver = cs.nlpsol('solver', 'ipopt', prob)
+    #
+    # sol = solver(x0=[0, 0], lbx=[-1, -1], ubx=[1, 1], lbg=[2], ubg=[2], p=[])
+    #
+    # print(sol)
+    # exit()
+
+
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createStateVariable('x', 2)
+    y = prb.createStateVariable('v', 2)
+    p = prb.createParameter('p', 2)
+    k = prb.createParameter('k', 2)
+
+    diosporco = prb.createIntermediateConstraint('diosporcomaledetto', x+p)
+
+    prb.createProblem()
+
+    p.assign([5, 4])
+    k.assign([2, 2])
+
+    prb.solveProblem()
+
+    exit()
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createInputVariable('x', 2)
+    diosporco = prb.createIntermediateConstraint('diosporcomaledetto', x)
+
+    prb.createProblem()
+    prb.solveProblem()
+    exit()
+
+    nodes = 10
+    prb = Problem(nodes, logging_level=logging.DEBUG)
+    x = prb.createStateVariable('x', 2)
+    v = prb.createStateVariable('v', 2)
+    k = prb.createVariable('k', 2, range(2, 8))
+    u = prb.createInputVariable('u', 2)
+    t_tot = prb.createVariable('t', 2)
+    p = prb.createSingleVariable('p', 2)
+    t_tot.setBounds([100, 100], [100, 100])
+
+    prb.setNNodes(5)
+    exit()
     import horizon.utils.transcription_methods as tm
     import horizon.utils.integrators as integ
     nodes = 10
