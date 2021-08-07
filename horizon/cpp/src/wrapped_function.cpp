@@ -16,7 +16,6 @@ WrappedFunction::WrappedFunction(casadi::Function f):
     _iw.assign(_f.sz_iw(), 0);
     _dw.assign(_f.sz_w(), 0.);
 
-    f.sz_arg()
     // resize input buffers (note: sz_arg might be > n_in!!)
     _in_buf.assign(_f.n_in(), nullptr);
 
