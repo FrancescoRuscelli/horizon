@@ -1,0 +1,342 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>horizon.solvers package &mdash; horizon 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="horizon 0.0.1 documentation" href="index.html"/>
+        <link rel="up" title="horizon package" href="horizon.html"/>
+        <link rel="next" title="horizon.tests package" href="horizon.tests.html"/>
+        <link rel="prev" title="horizon.ros package" href="horizon.ros.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> horizon
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">horizon</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="horizon.html">horizon package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="horizon.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="horizon.ros.html">horizon.ros package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">horizon.solvers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="horizon.tests.html">horizon.tests package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="horizon.utils.html">horizon.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.function">horizon.function module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.misc_function">horizon.misc_function module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.nodes">horizon.nodes module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.problem">horizon.problem module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.state_variables">horizon.state_variables module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.type_doc">horizon.type_doc module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">horizon</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="modules.html">horizon</a> &raquo;</li>
+        
+          <li><a href="horizon.html">horizon package</a> &raquo;</li>
+        
+      <li>horizon.solvers package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/horizon.solvers.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="horizon-solvers-package">
+<h1>horizon.solvers package<a class="headerlink" href="#horizon-solvers-package" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="horizon-solvers-ilqr-module">
+<h2>horizon.solvers.ilqr module<a class="headerlink" href="#horizon-solvers-ilqr-module" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="module-horizon.solvers.sqp">
+<span id="horizon-solvers-sqp-module"></span><h2>horizon.solvers.sqp module<a class="headerlink" href="#module-horizon.solvers.sqp" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="horizon.solvers.sqp.osqpOptions">
+<code class="descclassname">horizon.solvers.sqp.</code><code class="descname">osqpOptions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.osqpOptions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="horizon.solvers.sqp.qpoasesMPCOptions">
+<code class="descclassname">horizon.solvers.sqp.</code><code class="descname">qpoasesMPCOptions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.qpoasesMPCOptions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="horizon.solvers.sqp.sqp">
+<em class="property">class </em><code class="descclassname">horizon.solvers.sqp.</code><code class="descname">sqp</code><span class="sig-paren">(</span><em>name</em>, <em>qp_solver</em>, <em>problem_dict</em>, <em>options_dict</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Implements a sqp solver using Gauss-Newton approximation of the Hessian</p>
+<dl class="method">
+<dt id="horizon.solvers.sqp.sqp.f">
+<code class="descname">f</code><span class="sig-paren">(</span><em>f</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqp.f" title="Permalink to this definition">¶</a></dt>
+<dd><p>Permits to update cost function
+:param f: new cost function</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="horizon.solvers.sqp.sqp.g">
+<code class="descname">g</code><span class="sig-paren">(</span><em>g</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqp.g" title="Permalink to this definition">¶</a></dt>
+<dd><p>permits to update constraints
+:param g: new constraints</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="horizon.solvers.sqp.sqp.get_hessian_computation_time">
+<code class="descname">get_hessian_computation_time</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqp.get_hessian_computation_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns: list of logged time to compute the hessian</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="horizon.solvers.sqp.sqp.get_qp_computation_time">
+<code class="descname">get_qp_computation_time</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqp.get_qp_computation_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns: list of logged time to setup and solve a QP</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="horizon.solvers.sqp.sqp.plot">
+<code class="descname">plot</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqp.plot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Shows plots of value of objective function and constraint violation</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="horizon.solvers.sqp.sqp.qpsolve">
+<code class="descname">qpsolve</code><span class="sig-paren">(</span><em>H</em>, <em>g</em>, <em>lbx</em>, <em>ubx</em>, <em>A</em>, <em>lba</em>, <em>uba</em>, <em>init=True</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqp.qpsolve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Internal qp solver to solve differential problem
+:param H: Hessian cos function
+:param g: gradient cost function
+:param lbx: lower bounds
+:param ubx: upper bounds
+:param A: Constraints
+:param lba: lower constraints
+:param uba: upper constraints</p>
+<p>Returns: solution of differential problem</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="horizon.solvers.sqp.sqp.qpsolver_option_parser">
+<code class="descname">qpsolver_option_parser</code><span class="sig-paren">(</span><em>qpsolver</em>, <em>options</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqp.qpsolver_option_parser" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.solvers.sqp.sqpsol">
+<code class="descclassname">horizon.solvers.sqp.</code><code class="descname">sqpsol</code><span class="sig-paren">(</span><em>name</em>, <em>qp_solver</em>, <em>problem_dict</em>, <em>options_dict</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.solvers.sqp.sqpsol" title="Permalink to this definition">¶</a></dt>
+<dd><p>sqpsol creates a sqp solver using Gauss-Newton approximation of the Hessian
+:param name: name of the solver (not used at the moment)
+:param qp_solver: internal qp solver name
+:param problem_dict: {‘f’: cost_function (residual!), ‘g’: constraints, ‘x’: variables}
+:param options_dict: {‘max_iter’: iterations}</p>
+<p>Returns: a sqp object</p>
+<p>NOTE: the cost function has to be passed in a residual form: [f1, f2, f3, …]
+where F = ||f1|| + ||f2|| + …</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-horizon.solvers">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-horizon.solvers" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="horizon.tests.html" class="btn btn-neutral float-right" title="horizon.tests package" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="horizon.ros.html" class="btn btn-neutral" title="horizon.ros package" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2021, Francesco Ruscelli.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> and ❤️  using a custom <a href="https://github.com/LinxiFan/Stanford-theme">theme</a> based on <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="_static/language_data.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

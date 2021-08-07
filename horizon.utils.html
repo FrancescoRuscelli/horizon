@@ -1,0 +1,661 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>horizon.utils package &mdash; horizon 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="horizon 0.0.1 documentation" href="index.html"/>
+        <link rel="up" title="horizon package" href="horizon.html"/>
+        <link rel="prev" title="horizon.tests package" href="horizon.tests.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> horizon
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">horizon</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="horizon.html">horizon package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="horizon.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="horizon.ros.html">horizon.ros package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="horizon.solvers.html">horizon.solvers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="horizon.tests.html">horizon.tests package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">horizon.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.function">horizon.function module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.misc_function">horizon.misc_function module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.nodes">horizon.nodes module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.problem">horizon.problem module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.state_variables">horizon.state_variables module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon.type_doc">horizon.type_doc module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="horizon.html#module-horizon">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">horizon</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="modules.html">horizon</a> &raquo;</li>
+        
+          <li><a href="horizon.html">horizon package</a> &raquo;</li>
+        
+      <li>horizon.utils package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/horizon.utils.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="horizon-utils-package">
+<h1>horizon.utils package<a class="headerlink" href="#horizon-utils-package" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="module-horizon.utils.casadi_kin_dyn">
+<span id="horizon-utils-casadi-kin-dyn-module"></span><h2>horizon.utils.casadi_kin_dyn module<a class="headerlink" href="#module-horizon.utils.casadi_kin_dyn" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="horizon.utils.casadi_kin_dyn.InverseDynamics">
+<em class="property">class </em><code class="descclassname">horizon.utils.casadi_kin_dyn.</code><code class="descname">InverseDynamics</code><span class="sig-paren">(</span><em>kindyn</em>, <em>contact_frames=[]</em>, <em>force_reference_frame=ReferenceFrame.LOCAL</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.casadi_kin_dyn.InverseDynamics" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class which computes inverse dynamics:
+given generalized position, velocities and accelerations returns generalized torques</p>
+<dl class="method">
+<dt id="horizon.utils.casadi_kin_dyn.InverseDynamics.call">
+<code class="descname">call</code><span class="sig-paren">(</span><em>q</em>, <em>qdot</em>, <em>qddot</em>, <em>frame_force_mapping={}</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.casadi_kin_dyn.InverseDynamics.call" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes generalized torques:
+:param q: joint positions
+:param qdot: joint velocities
+:param qddot: joint accelerations
+:param frame_force_mapping: dictionary containing a map between frames and force variables e.g. {‘lsole’: F1} representing the frame</p>
+<blockquote>
+<div>where the force is acting (the force is expressed in force_reference_frame!)</div></blockquote>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.casadi_kin_dyn.linearized_friciton_cone">
+<code class="descclassname">horizon.utils.casadi_kin_dyn.</code><code class="descname">linearized_friciton_cone</code><span class="sig-paren">(</span><em>f</em>, <em>mu</em>, <em>R</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.casadi_kin_dyn.linearized_friciton_cone" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>f</strong> – force (only linear components)</li>
+<li><strong>mu</strong> – friciton cone</li>
+<li><strong>R</strong> – rotation matrix between force reference frame and surface frame (ff_R_cf, ff: force frame, cf: contact frame)</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">constraint
+lb
+ub</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-horizon.utils.integrators">
+<span id="horizon-utils-integrators-module"></span><h2>horizon.utils.integrators module<a class="headerlink" href="#module-horizon.utils.integrators" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="horizon.utils.integrators.EULER">
+<code class="descclassname">horizon.utils.integrators.</code><code class="descname">EULER</code><span class="sig-paren">(</span><em>dae</em>, <em>opts=None</em>, <em>casadi_type=&lt;sphinx.ext.autodoc.importer._MockObject object&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.integrators.EULER" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>Implements an integration scheme based on Euler integration (<a class="reference external" href="http://www.cmth.ph.ic.ac.uk/people/a.mackinnon/Lectures/compphys/node4.html">http://www.cmth.ph.ic.ac.uk/people/a.mackinnon/Lectures/compphys/node4.html</a>):</dt>
+<dd>x = x + dt*xdot(x,u)</dd>
+</dl>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>dae</strong> – a dictionary containing
+‘x’: state
+‘p’: control
+‘ode’: a function of the state and control returning the derivative of the state
+‘quad’: quadrature term</li>
+<li><strong>opts</strong> – a dictionary containing ‘tf’: integration time</li>
+<li><strong>NOTE</strong> – this term can be used to take into account also a final time to optimize</li>
+<li><strong>casadi_type</strong> – ‘SX’ or ‘MX’</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="docutils">
+<dt>Returns: Function(‘F_RK’, [X0_RK, U_RK], [X_RK, Q_RK], [‘x0’, ‘p’], [‘xf’, ‘qf’]) or</dt>
+<dd><blockquote class="first">
+<div>Function(‘F_RK’, [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], [‘x0’, ‘p’, ‘time’], [‘xf’, ‘qf’])</div></blockquote>
+<p class="last">which given in input the actual state X0_RK and control U_RK returns the integrated state X_RK and quadrature term Q_RK</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.integrators.LEAPFROG">
+<code class="descclassname">horizon.utils.integrators.</code><code class="descname">LEAPFROG</code><span class="sig-paren">(</span><em>dae</em>, <em>opts=None</em>, <em>casadi_type=&lt;sphinx.ext.autodoc.importer._MockObject object&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.integrators.LEAPFROG" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.integrators.RK2">
+<code class="descclassname">horizon.utils.integrators.</code><code class="descname">RK2</code><span class="sig-paren">(</span><em>dae</em>, <em>opts=None</em>, <em>casadi_type=&lt;sphinx.ext.autodoc.importer._MockObject object&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.integrators.RK2" title="Permalink to this definition">¶</a></dt>
+<dd><p>Implements an integration scheme based on 2nd-order Runge-Kutta integration (<a class="reference external" href="http://www.cmth.ph.ic.ac.uk/people/a.mackinnon/Lectures/compphys/node11.html">http://www.cmth.ph.ic.ac.uk/people/a.mackinnon/Lectures/compphys/node11.html</a>):
+:param dae: a dictionary containing</p>
+<blockquote>
+<div>‘x’: state
+‘p’: control
+‘ode’: a function of the state and control returning the derivative of the state
+‘quad’: quadrature term</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>opts</strong> – a dictionary containing ‘tf’: integration time</li>
+<li><strong>NOTE</strong> – this term can be used to take into account also a final time to optimize</li>
+<li><strong>casadi_type</strong> – ‘SX’ or ‘MX’</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="docutils">
+<dt>Returns: Function(‘F_RK’, [X0_RK, U_RK], [X_RK, Q_RK], [‘x0’, ‘p’], [‘xf’, ‘qf’]) or</dt>
+<dd><blockquote class="first">
+<div>Function(‘F_RK’, [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], [‘x0’, ‘p’, ‘time’], [‘xf’, ‘qf’])</div></blockquote>
+<p class="last">which given in input the actual state X0_RK and control U_RK returns the integrated state X_RK and quadrature term Q_RK</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.integrators.RK4">
+<code class="descclassname">horizon.utils.integrators.</code><code class="descname">RK4</code><span class="sig-paren">(</span><em>dae</em>, <em>opts=None</em>, <em>casadi_type=&lt;sphinx.ext.autodoc.importer._MockObject object&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.integrators.RK4" title="Permalink to this definition">¶</a></dt>
+<dd><p>Implements an integration scheme based on 4th-order Runge-Kutta integration:
+:param dae: a dictionary containing</p>
+<blockquote>
+<div>‘x’: state
+‘p’: control
+‘ode’: a function of the state and control returning the derivative of the state
+‘quad’: quadrature term</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>opts</strong> – a dictionary containing ‘tf’: integration time</li>
+<li><strong>NOTE</strong> – this term can be used to take into account also a final time to optimize</li>
+<li><strong>casadi_type</strong> – ‘SX’ or ‘MX’</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="docutils">
+<dt>Returns: Function(‘F_RK’, [X0_RK, U_RK], [X_RK, Q_RK], [‘x0’, ‘p’], [‘xf’, ‘qf’]) or</dt>
+<dd><blockquote class="first">
+<div>Function(‘F_RK’, [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], [‘x0’, ‘p’, ‘time’], [‘xf’, ‘qf’])</div></blockquote>
+<p class="last">which given in input the actual state X0_RK and control U_RK returns the integrated state X_RK and quadrature term Q_RK</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.integrators.make_direct_collocation">
+<code class="descclassname">horizon.utils.integrators.</code><code class="descname">make_direct_collocation</code><span class="sig-paren">(</span><em>prob: horizon.problem.Problem</em>, <em>degree: int</em>, <em>dt: float</em><span class="sig-paren">)</span> &#x2192; None<a class="headerlink" href="#horizon.utils.integrators.make_direct_collocation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add auxiliary input variables and constraints that implement
+the Direct Collocation transcription scheme. This could also be
+seen as multiple shooting with a different integration strategy
+that is based on approximating polynomials.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>prob</strong> (<em>prb.Problem</em>) – the horizon problem</li>
+<li><strong>x</strong> (<em>cs.SX</em>) – the state variable</li>
+<li><strong>x_prev</strong> (<em>cs.SX</em>) – the state variable at the previous node</li>
+<li><strong>xdot</strong> (<em>cs.SX</em>) – the system dynamics</li>
+<li><strong>degree</strong> (<em>int</em>) – degree of approximating polynomial</li>
+<li><strong>dt</strong> (<em>float|StateVariable</em>) – discretization interval (cal be a control input)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-horizon.utils.plotter">
+<span id="horizon-utils-plotter-module"></span><h2>horizon.utils.plotter module<a class="headerlink" href="#module-horizon.utils.plotter" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="horizon.utils.plotter.PlotterHorizon">
+<em class="property">class </em><code class="descclassname">horizon.utils.plotter.</code><code class="descname">PlotterHorizon</code><span class="sig-paren">(</span><em>prb: horizon.problem.Problem</em>, <em>logger=None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.plotter.PlotterHorizon" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="horizon.utils.plotter.PlotterHorizon.plotFunctions">
+<code class="descname">plotFunctions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.plotter.PlotterHorizon.plotFunctions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="horizon.utils.plotter.PlotterHorizon.plotVariable">
+<code class="descname">plotVariable</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.plotter.PlotterHorizon.plotVariable" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="horizon.utils.plotter.PlotterHorizon.plotVariables">
+<code class="descname">plotVariables</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.plotter.PlotterHorizon.plotVariables" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-horizon.utils.resampler_trajectory">
+<span id="horizon-utils-resampler-trajectory-module"></span><h2>horizon.utils.resampler_trajectory module<a class="headerlink" href="#module-horizon.utils.resampler_trajectory" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="horizon.utils.resampler_trajectory.resample_torques">
+<code class="descclassname">horizon.utils.resampler_trajectory.</code><code class="descname">resample_torques</code><span class="sig-paren">(</span><em>p</em>, <em>v</em>, <em>a</em>, <em>node_time</em>, <em>dt</em>, <em>dae</em>, <em>frame_force_mapping</em>, <em>kindyn</em>, <em>force_reference_frame=ReferenceFrame.LOCAL</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.resampler_trajectory.resample_torques" title="Permalink to this definition">¶</a></dt>
+<dd><p>Resample solution to a different number of nodes, RK4 integrator is used for the resampling
+:param p: position
+:param v: velocity
+:param a: acceleration
+:param node_time: previous node time
+:param dt: resampled period
+:param dae: a dictionary containing</p>
+<blockquote>
+<div>‘x’: state
+‘p’: control
+‘ode’: a function of the state and control returning the derivative of the state
+‘quad’: quadrature term</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>frame_force_mapping</strong> – dictionary containing a map between frames and force variables e.g. {‘lsole’: F1}</li>
+<li><strong>kindyn</strong> – object of type casadi_kin_dyn</li>
+<li><strong>force_reference_frame</strong> – this is the frame which is used to compute the Jacobian during the ID computation:
+LOCAL (default)
+WORLD
+LOCAL_WORLD_ALIGNED</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">resampled p
+v_res: resampled v
+a_res: resampled a
+frame_res_force_mapping: resampled frame_force_mapping
+tau_res: resampled tau</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">p_res</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.resampler_trajectory.second_order_resample_integrator">
+<code class="descclassname">horizon.utils.resampler_trajectory.</code><code class="descname">second_order_resample_integrator</code><span class="sig-paren">(</span><em>p</em>, <em>v</em>, <em>a</em>, <em>node_time</em>, <em>dt</em>, <em>dae</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.resampler_trajectory.second_order_resample_integrator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Resample a solution with the given dt
+:param p: position
+:param v: velocity
+:param a: acceleration
+:param node_time: previous node time
+:param dt: resampling time
+:param dae: dynamic model</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">resampled position
+v_res: resampled velocity
+a_res: resampled acceleration</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">p_res</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-horizon.utils.transcription_methods">
+<span id="horizon-utils-transcription-methods-module"></span><h2>horizon.utils.transcription_methods module<a class="headerlink" href="#module-horizon.utils.transcription_methods" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="horizon.utils.transcription_methods.TranscriptionsHandler">
+<em class="property">class </em><code class="descclassname">horizon.utils.transcription_methods.</code><code class="descname">TranscriptionsHandler</code><span class="sig-paren">(</span><em>prb</em>, <em>dt</em>, <em>logger=None</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.transcription_methods.TranscriptionsHandler" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="horizon.utils.transcription_methods.TranscriptionsHandler.setDefaultIntegrator">
+<code class="descname">setDefaultIntegrator</code><span class="sig-paren">(</span><em>type='RK4'</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.transcription_methods.TranscriptionsHandler.setDefaultIntegrator" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="horizon.utils.transcription_methods.TranscriptionsHandler.setDirectCollocation">
+<code class="descname">setDirectCollocation</code><span class="sig-paren">(</span><em>degree=3</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.transcription_methods.TranscriptionsHandler.setDirectCollocation" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="horizon.utils.transcription_methods.TranscriptionsHandler.setIntegrator">
+<code class="descname">setIntegrator</code><span class="sig-paren">(</span><em>integrator</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.transcription_methods.TranscriptionsHandler.setIntegrator" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="horizon.utils.transcription_methods.TranscriptionsHandler.setMultipleShooting">
+<code class="descname">setMultipleShooting</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.transcription_methods.TranscriptionsHandler.setMultipleShooting" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-horizon.utils.utils">
+<span id="horizon-utils-utils-module"></span><h2>horizon.utils.utils module<a class="headerlink" href="#module-horizon.utils.utils" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="horizon.utils.utils.double_integrator">
+<code class="descclassname">horizon.utils.utils.</code><code class="descname">double_integrator</code><span class="sig-paren">(</span><em>q</em>, <em>qdot</em>, <em>qddot</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.utils.double_integrator" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.utils.double_integrator_with_floating_base">
+<code class="descclassname">horizon.utils.utils.</code><code class="descname">double_integrator_with_floating_base</code><span class="sig-paren">(</span><em>q</em>, <em>ndot</em>, <em>nddot</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.utils.double_integrator_with_floating_base" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>Construct the floating-base dynamic model:</dt>
+<dd>x = [q, ndot]
+xdot = [qdot, nddot]</dd>
+</dl>
+<p>using quaternion dynamics: quatdot = quat x [omega, 0]
+NOTE: this implementation consider floating-base position and orientation expressed in GLOBAL (world) coordinates while
+linear and angular velocities expressed in LOCAL (base_link) coordinates.
+:param q: joint space coordinates: q = [x y z px py pz pw qj], where p is a quaternion
+:param ndot: joint space velocities: ndot = [vx vy vz wx wy wz qdotj]
+:param nddot: joint space acceleration: nddot = [ax ay ax wdotx wdoty wdotz qddotj]</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">state x = [q, ndot]
+xdot: derivative of the state xdot = [qdot, nddot]</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">x</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.utils.jac">
+<code class="descclassname">horizon.utils.utils.</code><code class="descname">jac</code><span class="sig-paren">(</span><em>dict</em>, <em>var_string_list</em>, <em>function_string_list</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.utils.jac" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>dict</strong> – dictionary which maps variables and functions, eg. {‘x’: x, ‘u’: u, ‘f’: f}</li>
+<li><strong>var_string_list</strong> – list of variables in dict, eg. [‘x’, ‘u’]</li>
+<li><strong>function_string_list</strong> – list of functions in dict, eg. [‘f’]</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">casadi Function for evaluation
+jac: dictionary with expression of derivatives</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">F</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>NOTE: check /tests/jac_test.py for example of usage for Jacobian and Hessian computation</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.utils.quaterion_product">
+<code class="descclassname">horizon.utils.utils.</code><code class="descname">quaterion_product</code><span class="sig-paren">(</span><em>q</em>, <em>p</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.utils.quaterion_product" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes quaternion product between two quaternions q and p
+:param q: quaternion
+:param p: quaternion</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">quaternion product q x p</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.utils.skew">
+<code class="descclassname">horizon.utils.utils.</code><code class="descname">skew</code><span class="sig-paren">(</span><em>q</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.utils.skew" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create skew matrix from vector part of quaternion
+:param q: vector part of quaternion [qx, qy, qz]</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">S = skew symmetric matrix built using q</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="horizon.utils.utils.toRot">
+<code class="descclassname">horizon.utils.utils.</code><code class="descname">toRot</code><span class="sig-paren">(</span><em>q</em><span class="sig-paren">)</span><a class="headerlink" href="#horizon.utils.utils.toRot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute rotation matrix associated to given quaternion q
+:param q: quaternion</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">rotation matrix</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">R</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-horizon.utils">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-horizon.utils" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="horizon.tests.html" class="btn btn-neutral" title="horizon.tests package" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2021, Francesco Ruscelli.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> and ❤️  using a custom <a href="https://github.com/LinxiFan/Stanford-theme">theme</a> based on <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="_static/language_data.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
