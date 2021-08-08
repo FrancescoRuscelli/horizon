@@ -21,6 +21,16 @@ pip package is not supported yet, but until then:
  - clone the github repo `horizon <https://github.com/FrancescoRuscelli/horizon_gui>`_
  - run ``python setup.py install``
  
+Getting started
+=======
+If you want to get acquainted with Horizon, I prepared a brief tutorial for you:
+
+- install the jupyter notebook (``pip install notebook``)
+- open a web browser (e.g. chrome, firefox, …)
+- go to the horizon folder
+- ``jupyter notebook horizon-notebook.ipynb``
+- the notebook should display in a page of your browser
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
