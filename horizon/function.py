@@ -304,7 +304,7 @@ class Constraint(Function):
         bounds = misc.checkValueEntry(bounds)
 
         if bounds.shape[0] != self.getDim():
-            raise Exception('Wrong dimension of lower bounds inserted.')
+            raise Exception('Wrong dimension of upper bounds inserted.')
 
         for node in nodes:
             if node in self.nodes:

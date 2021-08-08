@@ -473,7 +473,6 @@ class Variable(AbstractVariable):
             nodes = misc.checkNodes(nodes, self.nodes)
 
         bounds = misc.checkValueEntry(bounds)
-
         if bounds.shape[0] != self.dim:
             raise Exception('Wrong dimension of lower bounds inserted.')
 
@@ -606,7 +605,7 @@ class Variable(AbstractVariable):
 
         self.var_impl = new_var_impl
 
-    def getImpl(self, node):
+    def getImpl(self, node=None):
         """
         Getter for the implemented variable.
 
@@ -621,7 +620,10 @@ class Variable(AbstractVariable):
         """
         # todo this is another option: reproject everytime one asks for .getImpl
         # var_impl = self._projectN(node)
-        var_impl = self.var_impl['n' + str(node)]['var']
+        if node is None:
+            var_impl = cs.vertcat(*[self.var_impl['n' + str(i)]['var'] for i in self.nodes])
+        else:
+            var_impl = self.var_impl['n' + str(node)]['var']
         return var_impl
 
     def _getVals(self, val_type, node):
@@ -1576,9 +1578,16 @@ class VariablesContainer:
 
 if __name__ == '__main__':
 
+    n_nodes = 10
+    sv = VariablesContainer(n_nodes)
+    x = sv.setStateVar('x', 2)
+
+    exit()
     x = StateVariable('x', 2, 4)
     u = InputVariable('u', 2, 4)
     print(isinstance(u, StateVariable))
+
+
     exit()
     # x._project()
     # print('before serialization:', x)
