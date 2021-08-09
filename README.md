@@ -9,5 +9,4 @@ Don't forget to check the [**documentation**](https://francescoruscelli.github.i
 
 ## Try it!
 
-.. image:: https://mybinder.org/badge_logo.svg 
-:target: https://mybinder.org/v2/gh/FrancescoRuscelli/horizon-live/HEAD
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/FrancescoRuscelli/horizon-live/HEAD)
