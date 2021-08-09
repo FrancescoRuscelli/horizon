@@ -8,7 +8,7 @@ setuptools.setup(
     version="0.0.1",
     author="Francesco Ruscelli",
     author_email="francesco.ruscelli@iit.it",
-    description="Library for Direct Multiple Shooting with CasADi",
+    description="Library for Trajectory Optimization based on CasADi",
     # long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/FrancescoRuscelli/horizon_gui",
@@ -21,6 +21,8 @@ setuptools.setup(
     # ],
     # package_dir={"": "horizon"},
     packages=['horizon', 'horizon_gui'],
+    install_requires=['casadi', 'numpy'],
     # packages=setuptools.find_packages(),
     python_requires=">=3.6"
+    
 )
