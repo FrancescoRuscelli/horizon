@@ -6,3 +6,4 @@ build/
 *.user
 dist
 venv
+*.so
