@@ -9,7 +9,7 @@ import sys
 import pickle
 import horizon.misc_function as misc
 from typing import Union, Dict
-from horizon.type_doc import BoundsDict
+# from horizon.type_doc import BoundsDict
 from collections.abc import Iterable
 
 class Problem:
@@ -252,7 +252,7 @@ class Problem:
     def createConstraint(self, name: str,
                          g,
                          nodes: Union[int, Iterable] = None,
-                         bounds: BoundsDict = None):
+                         bounds = None):
         """
         Create a Constraint Function of the optimization problem.
 
@@ -287,7 +287,7 @@ class Problem:
 
     def createFinalConstraint(self, name: str,
                               g,
-                              bounds: BoundsDict = None):
+                              bounds = None):
         """
         Create a Constraint Function only active on the last node of the optimization problem.
 
@@ -308,7 +308,7 @@ class Problem:
     def createIntermediateConstraint(self, name: str,
                                      g,
                                      nodes: Union[int, Iterable] = None,
-                                     bounds: BoundsDict = None):
+                                     bounds = None):
         """
         Create a Constraint Function that can be active on all the nodes except the last one
 
