@@ -5,7 +5,7 @@ import setuptools
 
 setuptools.setup(
     name="casadi_horizon",
-    version="0.0.1",
+    version="0.0.2",
     author="Francesco Ruscelli",
     author_email="francesco.ruscelli@iit.it",
     description="Library for Trajectory Optimization based on CasADi",
