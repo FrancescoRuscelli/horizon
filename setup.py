@@ -3,8 +3,6 @@ import subprocess
 # with open("README.md", "r", encoding="utf-8") as fh:
 #     long_description = fh.read()
 
-subprocess.call(args=['/bin/bash', 'setup_extensions.bash'])
-
 
 setuptools.setup(
     name="casadi_horizon",
