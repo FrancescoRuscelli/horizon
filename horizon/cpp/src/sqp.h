@@ -66,6 +66,16 @@ public:
         Eigen::VectorXd grad = Jf.transpose()*f;
 
 
+        /// COPY TO CASADI
+        casadi::DM x0_, lbx_, ubx_, lbg_, ubg_, grad_;
+
+        casadi_utils::toCasadiMatrix(x0, x0_);
+        casadi_utils::toCasadiMatrix(lbx, lbx_);
+        casadi_utils::toCasadiMatrix(ubx, ubx_);
+        casadi_utils::toCasadiMatrix(lbg, lbg_);
+        casadi_utils::toCasadiMatrix(ubg, ubg_);
+        casadi_utils::toCasadiMatrix(grad, grad_);
+
 
         //casadi::Function qp = casadi::conic("qp_solver", "osqp", );
 
