@@ -3,6 +3,7 @@
 #include <Eigen/Dense>
 #include <memory>
 
+
 #include "profiling.h"
 
 namespace horizon{
@@ -64,10 +65,17 @@ public:
 
         Eigen::VectorXd grad = Jf.transpose()*f;
 
+
+
+        //casadi::Function qp = casadi::conic("qp_solver", "osqp", );
+
+
     }
 
 
 private:
+
+
     CASADI_TYPE _x;
     std::string _name;
     std::string _qp_solver;
@@ -82,7 +90,9 @@ private:
     int _max_iter;
     bool _reinitialize_qp_solver;
 
-    //casadi::conic()
+
+
+
 
 };
 

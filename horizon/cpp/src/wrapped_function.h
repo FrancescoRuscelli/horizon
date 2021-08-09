@@ -8,6 +8,15 @@
 namespace casadi_utils
 {
 
+template <typename T, int r_size, int c_size>
+void toCasadiMatrix(const Eigen::Matrix<T, r_size, c_size>& E, casadi::Matrix<T>& C)
+{
+    C.resize(E.rows(), E.cols());
+    C = casadi::Matrix<T>::zeros(E.rows(), E.cols());
+    std::memcpy(C.ptr(), E.data(), sizeof(T)*E.rows()*E.cols());
+}
+
+
 class WrappedFunction
 {
 
