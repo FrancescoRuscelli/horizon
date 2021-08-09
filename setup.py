@@ -5,7 +5,7 @@ import setuptools
 
 setuptools.setup(
     name="casadi_horizon",
-    version="0.0.2",
+    version="0.0.3",
     author="Francesco Ruscelli",
     author_email="francesco.ruscelli@iit.it",
     description="Library for Trajectory Optimization based on CasADi",
@@ -20,7 +20,7 @@ setuptools.setup(
     #     "Operating System :: Ubuntu",
     # ],
     # package_dir={"": "horizon"},
-    packages=['horizon', 'horizon_gui'],
+    packages=['horizon', 'horizon.utils'],
     install_requires=['casadi', 'numpy'],
     # packages=setuptools.find_packages(),
     python_requires=">=3.6"
