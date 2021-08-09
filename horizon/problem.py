@@ -1,5 +1,4 @@
 import time
-from typing import Iterable
 
 import casadi as cs
 from horizon import function as fc
@@ -10,7 +9,7 @@ import sys
 import pickle
 import horizon.misc_function as misc
 from typing import Union, Dict
-from horizon.type_doc import BoundsDict
+# from horizon.type_doc import BoundsDict
 from collections.abc import Iterable
 
 class Problem:
@@ -26,7 +25,7 @@ class Problem:
     """
 
     # todo probably better to set logger, not logging_level
-    def __init__(self, N: str, crash_if_suboptimal: bool = False, logging_level=logging.INFO):
+    def __init__(self, N: int, crash_if_suboptimal: bool = False, logging_level=logging.INFO):
         """
         Initialize the optimization problem.
 
@@ -187,7 +186,7 @@ class Problem:
         """
         return self.input_aggr
 
-    def setDynamics(self, xdot: cs.SX):
+    def setDynamics(self, xdot):
         """
         Setter of the system Dynamics used in the optimization problem.
 
@@ -241,7 +240,7 @@ class Problem:
 
         return used_var
 
-    def _getUsedPar(self, f: cs.SX) -> Dict[str, list]:
+    def _getUsedPar(self, f) -> Dict[str, list]:
         """
         Finds all the parameters used by a given CASADI function
 
@@ -262,9 +261,9 @@ class Problem:
         return used_par
 
     def createConstraint(self, name: str,
-                         g: cs.SX,
+                         g,
                          nodes: Union[int, Iterable] = None,
-                         bounds: BoundsDict = None):
+                         bounds = None):
         """
         Create a Constraint Function of the optimization problem.
 
@@ -298,8 +297,8 @@ class Problem:
         return fun
 
     def createFinalConstraint(self, name: str,
-                              g: cs.SX,
-                              bounds: BoundsDict = None):
+                              g,
+                              bounds = None):
         """
         Create a Constraint Function only active on the last node of the optimization problem.
 
@@ -318,9 +317,9 @@ class Problem:
         return self.createConstraint(name, g, nodes=self.nodes - 1, bounds=bounds)
 
     def createIntermediateConstraint(self, name: str,
-                                     g: cs.SX,
+                                     g,
                                      nodes: Union[int, Iterable] = None,
-                                     bounds: BoundsDict = None):
+                                     bounds = None):
         """
         Create a Constraint Function that can be active on all the nodes except the last one
 
@@ -339,7 +338,7 @@ class Problem:
         return self.createConstraint(name, g, nodes=nodes, bounds=bounds)
 
     def createCostFunction(self, name: str,
-                           j: cs.SX,
+                           j,
                            nodes: Union[int, Iterable] = None):
         """
         Create a Cost Function of the optimization problem.
@@ -370,7 +369,7 @@ class Problem:
 
         return fun
 
-    def createFinalCost(self, name: str, j: cs.SX):
+    def createFinalCost(self, name: str, j):
         """
         Create a Cost Function only active on the last node of the optimization problem.
 
@@ -387,7 +386,10 @@ class Problem:
             raise RuntimeError(f'final cost "{name}" must not depend on the input')
         return self.createCostFunction(name, j, nodes=self.nodes - 1, )
 
-    def createIntermediateCost(self, name: str, j: cs.SX, nodes: Union[int, Iterable] = None):
+    def createIntermediateCost(self,
+                               name: str,
+                               j,
+                               nodes: Union[int, Iterable] = None):
         """
         Create a Cost Function that can be active on all the nodes except the last one.
 
@@ -801,5 +803,10 @@ class Problem:
 
 
 if __name__ == '__main__':
-    help(Problem)
+    nodes = 10
+
+    prb = Problem(nodes, crash_if_suboptimal=True)
+    x = prb.createStateVariable('x', 1)
+
+    print(x.getImpl())
     pass

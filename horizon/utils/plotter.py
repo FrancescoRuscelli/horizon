@@ -92,7 +92,7 @@ class PlotterHorizon:
             i = i+1
 
         fig.tight_layout()
-        plt.show()
+        plt.show(block=False)
 
 if __name__ == '__main__':
 

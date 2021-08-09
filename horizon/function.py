@@ -5,7 +5,7 @@ from collections import OrderedDict
 import pickle
 import time
 from typing import Union, Iterable
-from horizon.type_doc import BoundsDict
+# from horizon.type_doc import BoundsDict
 
 class Function:
 
@@ -212,7 +212,7 @@ class Constraint(Function):
     """
     Constraint Function of Horizon.
     """
-    def __init__(self, name: str, f: cs.SX, used_vars: dict, used_pars: dict, nodes: Union[int, Iterable], bounds: BoundsDict =None):
+    def __init__(self, name: str, f: cs.SX, used_vars: dict, used_pars: dict, nodes: Union[int, Iterable], bounds =None):
         """
         Initialize the Constraint Function.
 
@@ -304,7 +304,7 @@ class Constraint(Function):
         bounds = misc.checkValueEntry(bounds)
 
         if bounds.shape[0] != self.getDim():
-            raise Exception('Wrong dimension of lower bounds inserted.')
+            raise Exception('Wrong dimension of upper bounds inserted.')
 
         for node in nodes:
             if node in self.nodes:

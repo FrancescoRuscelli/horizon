@@ -1,6 +1,7 @@
 from horizon.problem import Problem
 import pprint
 import numpy as np
+import logging
 
 def test_singleParameter():
     nodes = 10
