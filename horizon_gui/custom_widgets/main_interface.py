@@ -123,6 +123,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             self.SolveButton.setEnabled(True)
             self.ledSolve.setEnabled(True)
             self.ledCreate.setReady(True)
+        else:
+            self.logger.warning('Failed to generate problem.')
             # with open(CSS_DIR + '/button_new.css', 'r') as f:
             #     self.SolveButton.setStyleSheet(f.read())
 

@@ -198,23 +198,26 @@ class HorizonLine(QScrollArea):
         self.updateMarginsMultiLine()
 
     def addFunctionToHorizon(self, name):
-        flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
 
-        dim = self.horizon_receiver.getFunction(name)['active'].getDim()[0]
-        initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
+        # getting used_vars from function not yet activated
+        # and compute all the available nodes based on the type of variable (if input, tha last node is not available, and so on...)
         used_vars = self.horizon_receiver.getFunction(name)['used_vars']
-
         available_nodes = set(range(self.n_nodes))
         for var in used_vars:
-            if not var.getNodes() == [-1]: # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
+            if not var.getNodes() == [-1]:  # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
                 available_nodes.intersection_update(var.getNodes())
 
         disabled_nodes = [node for node in range(self.n_nodes) if node not in available_nodes]
-
         disabled_nodes = ravelElements(disabled_nodes)
 
-        if flag:
+        # activate the function using only the available nodes
+        flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type, available_nodes)
 
+        # get dimension and bounds from the activated function to set them in gui
+        dim = self.horizon_receiver.getFunction(name)['active'].getDim()
+        initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
+
+        if flag:
             self.addFunctionToSingleLine(name, dim, disabled_nodes, initial_bounds)
             self.addFunctionToMultiLine(name, disabled_nodes)
             self.logger.info(signal)

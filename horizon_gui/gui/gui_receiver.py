@@ -72,14 +72,14 @@ class horizonImpl():
         else:
             return False, signal
 
-    def activateFunction(self, name, fun_type):
+    def activateFunction(self, name, fun_type, nodes):
 
         flag, signal = self.checkActiveFunction(name)
 
         if flag:
             if fun_type == 'constraint':
                 try:
-                    active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'])
+                    active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'], nodes=nodes)
                     # self.active_fun_list.append(active_fun)
                     self.fun_dict[name].update({'active': active_fun})
                 except Exception as e:
@@ -87,7 +87,7 @@ class horizonImpl():
 
             elif fun_type == 'costfunction':
                 try:
-                    active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
+                    active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'], nodes=nodes)
                     self.fun_dict[name].update({'active': active_fun})
                 except Exception as e:
                     return False, e
@@ -265,9 +265,11 @@ class horizonImpl():
 
     def generate(self):
         try:
+            self.casadi_prb.solver = None
             self.casadi_prb.createProblem()
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
+            return False
         return True
 
     def solve(self):
@@ -275,6 +277,7 @@ class horizonImpl():
             self.casadi_prb.solveProblem()
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
+            return False
         return True
 
     def getInfoAtNodes(self, node):
@@ -291,6 +294,7 @@ class horizonImpl():
 
     def plot(self):
         self.plt.plotVariables()
+        self.plt.plotFunctions()
 
     def serialize(self):
 

@@ -547,7 +547,8 @@ class QMultiSlider(QtWidgets.QWidget):
 
     def _emitRanges(self):
         # todo should emit ALL THE VALUES and not only .min .max?
-        all_ranges = [slice.getValues() for slice in self.slices]
+        all_ranges = [slice.getValues() for slice in self.slices if not isinstance(slice, AbstractSlice)]
+        print(all_ranges)
         self.on_slices_changed(all_ranges)
         # self.active_slice.emitRange()
 
