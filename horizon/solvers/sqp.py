@@ -143,7 +143,7 @@ class sqp(object):
         # Return the solution
         return r['x']
 
-    def __call__(self, x0, lbx, ubx, lbg=None, ubg=None, alpha=1.):
+    def __call__(self, x0, lbx, ubx, lbg=None, ubg=None, p=None, alpha=1.):
         """
         Compute solution of non linear problem
         Args:
@@ -152,6 +152,8 @@ class sqp(object):
             ubx: upper bounds
             lbg: lower constraints
             ubg: upper constraints
+            p: parameters NOTE USED AT THE MOMENT!
+            alpha: step
 
         Returns: solution dict {'x': nlp_solution, 'f': value_cost_function, 'g': value_constraints}
 
@@ -189,7 +191,7 @@ class sqp(object):
             if self.__g is not None:
                 Jac_g_fcn_value = self.__Jac_g_fcn(v=self.__v_opt)  # evaluate in v_opt
                 J_g_k = Jac_g_fcn_value['DgDv']
-                g_k = -self.__g_fcn(v=self.__v_opt)['g']
+                g_k = self.__g_fcn(v=self.__v_opt)['g']
 
             # Gauss-Newton Hessian
             t = time.time()
@@ -206,7 +208,7 @@ class sqp(object):
 
             # Solve the QP
             t = time.time()
-            dv = self.qpsolve(H_k, Grad_obj_k, dv_min, dv_max, J_g_k, g_k, g_k, init)
+            dv = self.qpsolve(H_k, Grad_obj_k, dv_min, dv_max, J_g_k, -g_k + self.__gmin, -g_k + self.__gmax, init)
             elapsed = time.time() - t
             self.__qp_computation_time.append(elapsed)
 
