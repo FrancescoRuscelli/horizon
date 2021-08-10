@@ -3,45 +3,31 @@
 
 int main()
 {
+    auto x = casadi::SX::sym("x", 1);
+    auto u = casadi::SX::sym("u", 1);
 
-    Eigen::VectorXd v(5);
-    v << 1., 2., 3., 4., 5.;
+    auto f = 3.*x*x + 2.*u;
+    auto g = casadi::SX::vertcat({x, u});
 
-    casadi::DM v_DM;
-    casadi_utils::toCasadiMatrix(v, v_DM);
+    casadi::Dict opts;
+    opts["max_iter"] = 5;
+    opts["printLevel"] = "none";
+    horizon::SQPGaussNewton<casadi::SX> sqp("sqp", "qpoases", f, g, casadi::SX::vertcat({x, u}), opts);
 
-    std::cout<<"v: "<<v.transpose()<<std::endl;
-    std::cout<<"v_DM: "<<v_DM<<std::endl;
+    casadi::DM x0(2,1);
+    x0(0) = 2.;
+    x0(1) = 3.;
 
-    Eigen::MatrixXd I; I.setIdentity(3,3);
+    casadi::DM lb(2,1), ub(2,1);
+    lb(0) = 0.;
+    lb(1) = -1.;
+    ub(0) = 0.;
+    ub(1) = 2.;
+    auto solution = sqp.solve(x0, lb, ub, lb, ub);
 
-    casadi::DM I_DM;
-    casadi_utils::toCasadiMatrix(I, I_DM);
+    std::cout<<"solution: "<<solution["x"]<<std::endl;
 
-    std::cout<<"I: \n"<<I<<std::endl;
-    std::cout<<"I_DM: "<<I_DM<<std::endl;
-
-    Eigen::MatrixXd M(2,3);
-    M<<1.,2.,3.,
-       4.,5.,6.;
-
-    casadi::DM M_DM;
-    casadi_utils::toCasadiMatrix(M, M_DM);
-
-    std::cout<<"M: \n"<<M<<std::endl;
-    std::cout<<"M_DM: "<<M_DM<<std::endl;
-
-
-
-//    auto x = casadi::SX::sym("x", 1);
-//    auto u = casadi::SX::sym("u", 1);
-
-//    auto f = 3.*x*x + 2.*u;
-//    auto g = casadi::SX::vertcat({x, u});
-
-//    horizon::SQPGaussNewton<casadi::SX> sqp("sqp", "stocazzo", f, g, casadi::SX::vertcat({x, u}));
-
-//    Eigen::VectorXd x0(2);
-//    x0 << 2., 3.;
-//    sqp.solve(x0, x0, x0, x0, x0);
+    casadi::DMVector var_trj = sqp.getVariableTrajectory();
+    for(unsigned int i = 0; i < var_trj.size(); ++i)
+        std::cout<<"iter "<<i<<": "<<var_trj[i]<<std::endl;
 }

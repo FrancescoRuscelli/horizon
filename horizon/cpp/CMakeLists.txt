@@ -12,7 +12,7 @@ find_package(Eigen3 REQUIRED)
 find_package(casadi 3.5.5 REQUIRED)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 
 
