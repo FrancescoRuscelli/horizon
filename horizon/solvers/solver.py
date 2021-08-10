@@ -1,6 +1,7 @@
 from horizon.problem import Problem
 from typing import Dict, Iterable
 from abc import ABC, abstractmethod
+import numpy as np
 
 class Solver(ABC):
 
@@ -35,6 +36,20 @@ class Solver(ABC):
         self.x = prb.getState().getVars()
         self.u = prb.getInput().getVars()
         self.xdot = prb.getDynamics()
+
+        # derived classes should at least provide the optimal state trajectory, 
+        # and input trajectory
+        self.nx = self.x.size1()
+        self.nu = self.u.size1()
+        self.x_opt = np.zeros(shape=(self.nx, prb.getNNodes()))
+        self.u_opt = np.zeros(shape=(self.nu, prb.getNNodes()-1))
+
+        # setup real-time iteration options
+        self.rti = opts.get('realtime_iteration', False)
+
+        if self.rti:
+            self.configure_rti()
+            del self.opts['realtime_iteration']
         
 
     @abstractmethod
@@ -46,3 +61,12 @@ class Solver(ABC):
             bool: success flag
         """
         pass 
+
+    def configure_rti(self) -> bool:
+        """
+        Take appropriate actions to make the solver suitable for
+        a RTI scheme
+
+        Returns:
+            bool: success flag
+        """

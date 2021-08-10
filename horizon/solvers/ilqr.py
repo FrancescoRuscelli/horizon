@@ -1,6 +1,10 @@
-from horizon.solvers import solver
-from pyilqr import IterativeLQR
-from solver import Solver
+try:
+    from .pyilqr import IterativeLQR
+except ImportError:
+    print('failed to import pyilqr extension; did you compile it?')
+    exit(1)
+
+from .solver import Solver
 from horizon.problem import Problem
 from horizon.function import Function, CostFunction, Constraint
 from typing import Dict, List
@@ -39,15 +43,25 @@ class SolverILQR(Solver):
             self._set_cost_k(k)
             self._set_constraint_k(k)
 
+    def configure_rti(self) -> bool:
+        self.opts['max_iter'] = 1
     
     def solve(self):
-        self.ilqr.setInitialState(prb.getInitialState())
+        x0 = self.prb.getInitialState().reshape((self.nx, 1))
+        self.x_opt = np.hstack(([x0]*(self.N+1)))
+        self.ilqr.setStateInitialGuess(self.x_opt)
         self.ilqr.setIterationCallback(self._iter_callback)
         self.ilqr.solve(self.max_iter)
+        self.x_opt = self.ilqr.getStateTrajectory()
+        self.u_opt = self.ilqr.getInputTrajectory()
+        
 
     def print_timings(self):
 
         prof_info = self.ilqr.getProfilingInfo()
+
+        if len(prof_info.timings) == 0:
+            return
         
         print('\ntimings (inner):')
         for k, v in prof_info.timings.items():
@@ -55,9 +69,7 @@ class SolverILQR(Solver):
                 continue
             print(f'{k[:-6]:30}{np.mean(v)} us')
 
-
         print('\ntimings (iter):')
-
         for k, v in prof_info.timings.items():
             if '_inner' in k:
                 continue
@@ -65,6 +77,7 @@ class SolverILQR(Solver):
     
     
     def _set_cost_k(self, k):
+        
         self._set_fun_k(k, 
                 container=self.prb.function_container.costfun_container, 
                 set_to_ilqr=self.ilqr.setIntermediateCost, 
@@ -162,43 +175,43 @@ class SolverILQR(Solver):
 
             
 
-
-
 ############# TESTING STUFF TO BE REMOVED #######################
-from matplotlib import pyplot as plt
+if __name__ == '__main__':
 
-# create problem
-N = 100
-dt = 0.03
-prb = Problem(N)
+    from matplotlib import pyplot as plt
 
-# create variables
-p = prb.createStateVariable('p', 2)
-theta = prb.createStateVariable('theta', 1)
-v = prb.createInputVariable('v', 1)
-omega = prb.createInputVariable('omega', 1)
+    # create problem
+    N = 100
+    dt = 0.03
+    prb = Problem(N)
 
-# define dynamics 
-x = prb.getState().getVars()
-u = prb.getInput().getVars()
-xdot = cs.vertcat(v*cs.cos(theta), 
-                  v*cs.sin(theta),
-                  omega)
-prb.setDynamics(xdot)
+    # create variables
+    p = prb.createStateVariable('p', 2)
+    theta = prb.createStateVariable('theta', 1)
+    v = prb.createInputVariable('v', 1)
+    omega = prb.createInputVariable('omega', 1)
 
-# Cost function
-x_tgt = np.array([1, 0, 0])
-prb.createIntermediateCost("reg", 1e-6*cs.sumsqr(u))
-prb.createFinalConstraint("gothere", x - x_tgt)
+    # define dynamics 
+    x = prb.getState().getVars()
+    u = prb.getInput().getVars()
+    xdot = cs.vertcat(v*cs.cos(theta), 
+                    v*cs.sin(theta),
+                    omega)
+    prb.setDynamics(xdot)
 
-# initial state
-x0 = np.array([0, 0, np.pi/2])
-prb.setInitialState(x0=x0)
+    # Cost function
+    x_tgt = np.array([1, 0, 0])
+    prb.createIntermediateCost("reg", 1e-6*cs.sumsqr(u))
+    prb.createFinalConstraint("gothere", x - x_tgt)
 
-# TEST ILQR
-sol = SolverILQR(prb, dt)
-sol.solve()
-sol.print_timings()
+    # initial state
+    x0 = np.array([0, 0, np.pi/2])
+    prb.setInitialState(x0=x0)
 
-plt.plot(sol.ilqr.getStateTrajectory().T, '-')
-plt.show()
+    # TEST ILQR
+    sol = SolverILQR(prb, dt)
+    sol.solve()
+    sol.print_timings()
+
+    plt.plot(sol.ilqr.getStateTrajectory().T, '-')
+    plt.show()
