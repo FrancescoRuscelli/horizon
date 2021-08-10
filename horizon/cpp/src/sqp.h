@@ -14,7 +14,7 @@ namespace horizon{
 typedef Eigen::Ref<const Eigen::VectorXd> VecConstRef;
 typedef Eigen::Ref<const Eigen::MatrixXd> MatConstRef;
 
-template <class CASADI_TYPE>
+template <class CASADI_TYPE> ///casadi::SX or casadi::MX
 class SQPGaussNewton
 {
 public:
@@ -23,7 +23,18 @@ public:
         casadi::DMDict output;
     };
 
-
+    /**
+     * @brief SQPGaussNewton SQP method with Gauss-Newton approximaiton (Hessian = J'J)
+     * @param name solver name
+     * @param qp_solver name internally used with casadi::conic (check casadi documetation for conic)
+     * @param f RESIDUAL of cost function
+     * @param g constraints
+     * @param x variables
+     * @param opts options for SQPGaussNewton and internal conic (check casadi documetation for conic).
+     * NOTE: options for SQPGaussNewton are:
+     *                                          "max_iter": iterations used to find solution
+     *                                          "reinitialize_qpsolver": if true the internal qp solver is initialized EVERY iteration
+     */
     SQPGaussNewton(const std::string& name, const std::string& qp_solver,
                    const CASADI_TYPE& f, const CASADI_TYPE& g, const CASADI_TYPE& x, const casadi::Dict& opts = casadi::Dict()):
         _name(name), _qp_solver(qp_solver),
@@ -62,6 +73,17 @@ public:
             _conic->print_options(stream);
     }
 
+    /**
+     * @brief solve NLP for given max iteration. Internal qp solver is reinitialized if "reinitialize_qpsolver" option was passed
+     * as true in constructor options
+     * @param initial_guess_x initial guess
+     * @param lbx lower variables bound
+     * @param ubx upper variables bound
+     * @param lbg lower constraints bound
+     * @param ubg upper constraints bound
+     * @param alpha Newton's method step
+     * @return solution dictionary containing: "x" solution, "f" 0.5*norm2 cost function, "g" norm2 constraints vector
+     */
     const casadi::DMDict& solve(const casadi::DM& initial_guess_x, const casadi::DM& lbx, const casadi::DM& ubx,
                                 const casadi::DM& lbg, const casadi::DM& ubg, const double alpha=1.)
     {
