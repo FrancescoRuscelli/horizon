@@ -22,7 +22,7 @@ class Solver(ABC):
                     type: str,
                     prb: Problem, 
                     dt: float, 
-                    opts: Dict = None):
+                    opts: Dict = None) -> 'Solver':
         """
         Construct a solver from its type name
 

@@ -46,6 +46,12 @@ public:
                  int N);
 
     /**
+     * @brief setStepLength
+     * @param alpha
+     */
+    void setStepLength(double alpha);
+
+    /**
      * @brief set an intermediate cost term for each intermediate state
      * @param inter_cost: a vector of N entries, each of which is a function with
      * required signature (x, u) -> (l)
@@ -124,9 +130,11 @@ private:
     void forward_pass_iter(int i, double alpha);
     void set_default_cost();
 
-    int _nx;
-    int _nu;
-    int _N;
+    const int _nx;
+    const int _nu;
+    const int _N;
+
+    double _step_length;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;

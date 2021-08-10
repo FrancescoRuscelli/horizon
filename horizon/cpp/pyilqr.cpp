@@ -13,6 +13,7 @@ PYBIND11_MODULE(pyilqr, m) {
             .def("setIntermediateConstraint", set_inter_constraint_wrapper_single)
             .def("setFinalCost", set_final_cost_wrapper)
             .def("setFinalConstraint", set_final_constraint_wrapper)
+            .def("setStepLength", &IterativeLQR::setStepLength)
             .def("solve", &IterativeLQR::solve)
             .def("getProfilingInfo", &IterativeLQR::getProfilingInfo)
             .def("setIterationCallback", &IterativeLQR::setIterationCallback)

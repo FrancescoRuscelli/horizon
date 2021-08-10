@@ -4,7 +4,7 @@ from casadi_kin_dyn import pycasadi_kin_dyn
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.solvers import ilqr, blocksqp
+from horizon.solvers import Solver
 from horizon.utils.transcription_methods import TranscriptionsHandler
 from horizon.utils import plotter
 from horizon.ros.replay_trajectory import replay_trajectory
@@ -22,11 +22,11 @@ nq = kindyn.nq()
 nv = kindyn.nv()
 
 # OPTIMIZATION PARAMETERS
-ns = 40  # number of shooting nodes
-tf = 1.0  # [s]
+ns = 20  # number of shooting nodes
+tf = 3.0  # [s]
 dt = tf/ns
 use_ms = True
-use_ilqr = True
+solver_type = 'ilqr'
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -46,9 +46,9 @@ xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
 prb.setDynamics(xdot)
 
 # Limits
-q_min = [-0.5, -2.*np.pi]
-q_max = [0.5, 2.*np.pi]
-q_init = [0.5, np.pi-0.01]
+q_min = [-1, -2.*np.pi]
+q_max = [1, 2.*np.pi]
+q_init = [0.0, np.pi-0.1]
 
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
@@ -64,11 +64,12 @@ qdot.setBounds(qdot_init, qdot_init, nodes=0)
 u.setBounds(-tau_lims, tau_lims)
 
 # Cost function
-qtgt = np.array([1.0, np.pi])
-prb.createIntermediateCost("tau", 1e-4*cs.sumsqr(tau))
-prb.createIntermediateCost("qdot", 1e-3*cs.sumsqr(qdot))
+qtgt = np.array([0.5, np.pi])
+prb.createIntermediateCost("err", cs.sumsqr(q - qtgt))
+prb.createIntermediateCost("tau", 1e-6*cs.sumsqr(tau))
+# prb.createIntermediateCost("qdot", cs.sumsqr(qdot))
 
-if not use_ilqr:
+if solver_type != 'ilqr':
     # Dynamics
     th = TranscriptionsHandler(prb, dt)
     if use_ms:
@@ -83,15 +84,11 @@ prb.createFinalConstraint("center", q[0] - qtgt[0])
 prb.createFinalConstraint("final_qdot", qdot)
 
 # Creates problem
-if not use_ilqr:
-    prb.createProblem()
-    solution = prb.solveProblem()
-    q_hist = solution["q"]
-else:
-    solver = ilqr.SolverILQR(prb, dt, opts={'max_iter': 10})
-    solver.solve()
-    q_hist = solver.x_opt[:2, :]
-    qdot_hist = solver.x_opt[2:4, :]
+solver = Solver.make_solver(solver_type, prb, dt)  #, opts={'max_iter': 10})
+solver.ilqr.setStepLength(1)
+solver.solve()
+q_hist = solver.x_opt[:2, :]
+qdot_hist = solver.x_opt[2:4, :]
 
 time = np.arange(0.0, tf+1e-6, tf/ns)
 plt.figure()
@@ -99,11 +96,18 @@ plt.plot(time, solver.x_opt[:2,:].T)
 plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[m]}$', size = 20)
+
 plt.figure()
 plt.plot(time, solver.x_opt[2:,:].T)
 plt.suptitle('$\mathrm{Base \ Velocity}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
-plt.ylabel('$\mathrm{[m]}$', size = 20)
+plt.ylabel('$\mathrm{[ms^-1]}$', size = 20)
+
+plt.figure()
+plt.plot(time[:-1], solver.u_opt.T)
+plt.suptitle('$\mathrm{Force}$', size = 20)
+plt.xlabel('$\mathrm{[sec]}$', size = 20)
+plt.ylabel('$\mathrm{[N]}$', size = 20)
 plt.show()
 
 # plot_all = True
