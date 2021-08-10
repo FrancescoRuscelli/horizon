@@ -40,7 +40,13 @@ find_package(pybind11 REQUIRED)
 pybind11_add_module(pyilqr pyilqr.cpp)
 target_link_libraries(pyilqr PUBLIC ilqr)
 
+pybind11_add_module(pysqp pysqp.cpp)
+target_link_libraries(pysqp PUBLIC ilqr)
+
 install(TARGETS pyilqr
+    DESTINATION horizon/solvers)
+
+install(TARGETS pysqp
     DESTINATION horizon/solvers)
 
 

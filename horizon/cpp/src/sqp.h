@@ -1,3 +1,6 @@
+#ifndef __HORIZON__SQP__H__
+#define __HORIZON__SQP__H__
+
 #include <casadi/casadi.hpp>
 #include "wrapped_function.h"
 #include <Eigen/Dense>
@@ -53,7 +56,7 @@ public:
 
     }
 
-    void print_options_conic(std::ostream &stream=casadi::uout()) const
+    void printConicOptions(std::ostream &stream=casadi::uout()) const
     {
         if(_conic)
             _conic->print_options(stream);
@@ -63,83 +66,122 @@ public:
                                 const casadi::DM& lbg, const casadi::DM& ubg, const double alpha=1.)
     {
         bool sparse = true;
-        casadi::DM x0 = initial_guess_x;
-        Eigen::VectorXd sol;
-        casadi_utils::toEigen(x0, sol);
-        _variable_trj[0] = x0;
+        x0_ = initial_guess_x;
+        casadi_utils::toEigen(x0_, _sol);
+        _variable_trj[0] = x0_;
         for(unsigned int k = 0; k < _max_iter; ++k)
         {
             //1. Cost function is linearized around actual x0
-            _f.setInput(0, sol); // cost function
+            _f.setInput(0, _sol); // cost function
             _f.call();
-            Eigen::VectorXd f = _f.getOutput(0);
 
-            _df.setInput(0, sol); // cost function Jacobian
+            _df.setInput(0, _sol); // cost function Jacobian
             _df.call(sparse);
-            Eigen::SparseMatrix<double> J = _df.getSparseOutput(0);
+            _J = _df.getSparseOutput(0);
 
             //2. Constraints are linearized around actual x0
-            IODMDict g_dict;
-            g_dict.input["x"] = x0;
-            _g.call(g_dict.input, g_dict.output);
+            _g_dict.input["x"] = x0_;
+            _g.call(_g_dict.input, _g_dict.output);
 
-            IODMDict A_dict;
-            A_dict.input["x"] = x0;
-            _dg.call(A_dict.input, A_dict.output);
+            _A_dict.input["x"] = x0_;
+            _dg.call(_A_dict.input, _A_dict.output);
 
-            casadi::DM g = g_dict.output["g"];
-            casadi::DM A = A_dict.output["jac_g_x"];
+            g_ = _g_dict.output["g"];
+            A_ = _A_dict.output["jac_g_x"];
 
             //2. We compute Gauss-Newton Hessian approximation and gradient function
-            Eigen::SparseMatrix<double> H(J.cols(), J.cols());
-            H = J.transpose()*J; //<-- to optimize
+            _H.resize(_J.cols(), _J.cols());
+            _H = _J.transpose()*_J; ///TODO: to optimize
 
-            Eigen::VectorXd grad = J.transpose()*f;
+            _grad = _J.transpose()*_f.getOutput(0);
 
             //3. Setup QP
-            casadi::DM grad_;
-            casadi_utils::toCasadiMatrix(grad, grad_);
+            casadi_utils::toCasadiMatrix(_grad, grad_);
 
             ///TODO: Optimize using directly sparsity
-            casadi::DM H_;
-            casadi_utils::toCasadiMatrix(H.toDense(), H_);
+            casadi_utils::toCasadiMatrix(_H.toDense(), H_);
 
             if(!_conic || _reinitialize_qp_solver)
             {
-                std::cout<<"init QP"<<std::endl;
                 _conic_init_input["h"] = H_.sparsity();
-                _conic_init_input["a"] = A.sparsity();
+                _conic_init_input["a"] = A_.sparsity();
                 _conic = std::make_unique<casadi::Function>(casadi::conic("qp_solver", _qp_solver, _conic_init_input, _qp_opts));
             }
 
             _conic_dict.input["h"] = H_;
             _conic_dict.input["g"] = grad_;
-            _conic_dict.input["a"] = A;
-            _conic_dict.input["lba"] = lbg - g;
-            _conic_dict.input["uba"] = ubg - g;
-            _conic_dict.input["lbx"] = lbx - x0;
-            _conic_dict.input["ubx"] = ubx - x0;
-            _conic_dict.input["x0"] = x0;
+            _conic_dict.input["a"] = A_;
+            _conic_dict.input["lba"] = lbg - g_;
+            _conic_dict.input["uba"] = ubg - g_;
+            _conic_dict.input["lbx"] = lbx - x0_;
+            _conic_dict.input["ubx"] = ubx - x0_;
+            _conic_dict.input["x0"] = x0_;
 
             _conic->call(_conic_dict.input, _conic_dict.output);
 
             //4. Take full step
-            x0 = x0 + alpha*_conic_dict.output["x"];
-            casadi_utils::toEigen(x0, sol);
+            x0_ = x0_ + alpha*_conic_dict.output["x"];
+            casadi_utils::toEigen(x0_, _sol);
 
 
             // store trajectory
-            _variable_trj[k+1] = x0;
+            _variable_trj[k+1] = x0_;
         }
 
-        _solution["x"] = x0;
+        _solution["x"] = x0_;
+        double norm_f = _f.getOutput(0).norm();
+        _solution["f"] = 0.5*norm_f*norm_f;
+        _solution["g"] = casadi::norm_2(_g_dict.output["g"].get_elements());
         return _solution;
     }
 
+    /**
+     * @brief getVariableTrajectory
+     * @return vector of variable solutions (one per iteration)
+     */
     const casadi::DMVector& getVariableTrajectory() const
     {
         return _variable_trj;
     }
+
+    /**
+     * @brief getObjectiveIterations
+     * @return 0.5*norm2 of objective (one per iteration)
+     */
+    const std::vector<double>& getObjectiveIterations()
+    {
+        Eigen::VectorXd tmp;
+        _objective.clear();
+        _objective.reserve(_variable_trj.size());
+        for(unsigned int k = 0; k < _variable_trj.size(); ++k)
+        {
+            casadi_utils::toEigen(_variable_trj[k], tmp);
+            _f.setInput(0, tmp); // cost function
+            _f.call();
+            double norm = _f.getOutput(0).norm();
+            _objective.push_back(0.5*norm*norm);
+        }
+        return _objective;
+    }
+
+    /**
+     * @brief getConstraintNormIterations
+     * @return norm2 of the constraint vector (one per iteration)
+     */
+    const std::vector<double>& getConstraintNormIterations()
+    {
+        _constraints_norm.clear();
+        _constraints_norm.reserve(_variable_trj.size());
+        for(auto sol : _variable_trj)
+        {
+            _g_dict.input["x"] = sol;
+            _g.call(_g_dict.input, _g_dict.output);
+            _constraints_norm.push_back(casadi::norm_2(_g_dict.output["g"].get_elements()));
+        }
+        return _constraints_norm;
+    }
+
+
 
 private:
 
@@ -168,8 +210,24 @@ private:
     casadi::Dict _qp_opts;
 
     casadi::DMVector _variable_trj;
+    std::vector<double> _objective, _constraints_norm;
+
+    Eigen::SparseMatrix<double> _J;
+    Eigen::SparseMatrix<double> _H;
+    Eigen::VectorXd _grad;
+    casadi::DM grad_;
+    casadi::DM g_;
+    casadi::DM A_;
+    casadi::DM H_;
+    casadi::DM x0_;
+    Eigen::VectorXd _sol;
+
+    IODMDict _g_dict;
+    IODMDict _A_dict;
 
 
 };
 
 }
+
+#endif

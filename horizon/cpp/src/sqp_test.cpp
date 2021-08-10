@@ -19,15 +19,17 @@ int main()
     x0(1) = 3.;
 
     casadi::DM lb(2,1), ub(2,1);
-    lb(0) = 0.;
+    lb(0) = 1.5;
     lb(1) = -1.;
-    ub(0) = 0.;
+    ub(0) = 1.5;
     ub(1) = 2.;
     auto solution = sqp.solve(x0, lb, ub, lb, ub);
 
-    std::cout<<"solution: "<<solution["x"]<<std::endl;
+    std::cout<<"solution: "<<solution["x"]<<"   f: "<<solution["f"]<<"  g: "<<solution["g"]<<std::endl;
 
     casadi::DMVector var_trj = sqp.getVariableTrajectory();
+    std::vector<double> objs = sqp.getObjectiveIterations();
+    std::vector<double> cons = sqp.getConstraintNormIterations();
     for(unsigned int i = 0; i < var_trj.size(); ++i)
-        std::cout<<"iter "<<i<<": "<<var_trj[i]<<std::endl;
+        std::cout<<"iter "<<i<<"-> sol: "<<var_trj[i]<<"    obj: "<<objs[i]<<"  cons: "<<cons[i]<<std::endl;
 }
