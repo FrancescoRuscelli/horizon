@@ -207,9 +207,20 @@ class Problem:
             instance of the derivative of the state
 
         """
+        if self.state_der is None:
+            raise ValueError('dynamics not defined, have you called setDynamics?')
         return self.state_der
 
-    def _getUsedVar(self, f) -> Dict[str, list]:
+    def setInitialState(self, x0: Iterable):
+        self.getState().setBounds(lb=x0, ub=x0, nodes=0)
+
+    def getInitialState(self) -> np.array:
+        lb, ub = self.getState().getBounds(node=0)
+        if np.any(lb != ub):
+            return None
+        return lb
+
+    def _getUsedVar(self, f: cs.SX) -> Dict[str, list]:
         """
         Finds all the variable used by a given CASADI function
 
@@ -527,17 +538,18 @@ class Problem:
         """
         return self.solver
 
-    def solveProblem(self) -> Union[bool, dict]:
+    def updateProblem(self):
         """
-        Solves the problem after updating the bounds, the initial guesses and the parameters of the problem.
+        Compute updated initial guess and bounds
 
         Returns:
-            the solution of the problem
+            tuple containing the nlp's initial guess, bounds for the optimization
+            variables and constraint function
         """
-        # t_start = time.time()
+
         if self.prob is None:
             self.logger.warning('Problem is not created. Nothing to solve!')
-            return False
+            return None
 
         self.var_container.updateBounds()
         self.var_container.updateInitialGuess()
@@ -555,6 +567,24 @@ class Problem:
         ubg = self.function_container.getUpperBoundsList()
 
         p = self.var_container.getParameterValues()
+
+        return w0, lbw, ubw, lbg, ubg, p
+
+
+
+    def solveProblem(self) -> Union[bool, dict]:
+        """
+        Solves the problem after updating the bounds, the initial guesses and the parameters of the problem.
+
+        Returns:
+            the solution of the problem
+        """
+        
+        if self.prob is None:
+            self.logger.warning('Problem is not created. Nothing to solve!')
+            return None
+
+        w0, lbw, ubw, lbg, ubg, p = self.updateProblem()
 
         if self.debug_mode:
             j = self.function_container.getCostFImplSum()
@@ -584,10 +614,14 @@ class Problem:
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
 
+        if self.solver is None:
+            return None
+
         if 'p' in inspect.getfullargspec(self.solver)[0]:
             self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
         else:
             self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+
 
         # t_to_solve = time.time() - t_start
         # print('T to solve:', t_to_solve)
