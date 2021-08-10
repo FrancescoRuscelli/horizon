@@ -317,6 +317,21 @@ void IterativeLQR::setInitialState(const Eigen::VectorXd &x0)
     _xtrj.col(0) = x0;
 }
 
+void IterativeLQR::setStateInitialGuess(const Eigen::MatrixXd& x0)
+{
+    if(x0.rows() != _xtrj.rows())
+    {
+        throw std::invalid_argument("wrong initial guess rows");
+    }
+
+    if(x0.cols() != _xtrj.cols())
+    {
+        throw std::invalid_argument("wrong initial guess cols");
+    }
+
+    _xtrj = x0;
+}
+
 void IterativeLQR::setIterationCallback(const CallbackType &cb)
 {
     _iter_cb = cb;

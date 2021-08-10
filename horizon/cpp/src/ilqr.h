@@ -80,6 +80,8 @@ public:
 
     void setInitialState(const Eigen::VectorXd& x0);
 
+    void setStateInitialGuess(const Eigen::MatrixXd& x0);
+
     void setIterationCallback(const CallbackType& cb);
 
     bool solve(int max_iter);
