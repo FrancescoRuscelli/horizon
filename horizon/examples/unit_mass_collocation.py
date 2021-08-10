@@ -6,6 +6,7 @@ import casadi as cs
 import numpy as np
 from horizon.utils.integrators import make_direct_collocation
 import horizon.utils.transcription_methods as transmet
+import matplotlib.pyplot as plt
 
 def make_integrator(x, xdot, u, l, dt):
     """A trivial Euler integrator"""
@@ -79,3 +80,4 @@ if plot_all:
     hplt = plotter.PlotterHorizon(prob)
     hplt.plotVariables()
     hplt.plotFunctions()
+    plt.show()
