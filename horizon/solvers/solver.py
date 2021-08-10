@@ -1,3 +1,4 @@
+import typing
 from horizon.problem import Problem
 from typing import Dict, Iterable
 from abc import ABC, abstractmethod
@@ -10,6 +11,21 @@ class Solver(ABC):
     that aims to find a solution of an instance of
     horizon.problem.Problem.
     """
+
+    @classmethod
+    def make_solver(cls, 
+                    type: str,
+                    prb: Problem, 
+                    dt: float, 
+                    opts: Dict = None):
+        if type == 'blocksqp':
+            from . import blocksqp
+            return blocksqp.BlockSqpSolver(prb, dt, opts)
+        elif type == 'ilqr':
+            from . import ilqr
+            return ilqr.SolverILQR(prb, dt, opts)
+        else:
+            raise KeyError(f'unsupperted solver type "{type}"')
 
     def __init__(self, 
                  prb: Problem, 

@@ -10,10 +10,10 @@ class BlockSqpSolver(Solver):
         super().__init__(prb, dt, opts=opts)
         
         # generate problem to be solver
-        prb.createProblem()
+        problem_dict = prb.createProblem()
 
         # create solver from prob
-        self.solver = cs.nlpsol('blocksqp_solver', 'blocksqp', prb.prob, opts)
+        self.solver = cs.nlpsol('solver', 'blocksqp', problem_dict, self.opts)
 
     def configure_rti(self) -> bool:
         rti_opts = {
