@@ -237,19 +237,20 @@ class Constraint(Function):
 
             if 'nodes' not in bounds:
                 bounds['nodes'] = None
-            # if only one constraint is set, we assume:
-            if 'lb' not in bounds:  # -inf <= x <= ub
-                bounds['lb'] = np.full(f.shape[0], -np.inf)
-            else:
-                # todo what if bounds does not have shape!
+
+            if 'lb' in bounds:
+                bounds['lb'] = misc.checkValueEntry(bounds['lb'])
                 if bounds['lb'].shape[0] != self.getDim():
                     raise Exception('Wrong dimension of lower bounds inserted.')
+                if 'ub' not in bounds:
+                    bounds['ub'] = np.full(f.shape[0], np.inf)
 
-            if 'ub' not in bounds:  # lb <= x <= inf
-                bounds['ub'] = np.full(f.shape[0], np.inf)
-            else:
+            if 'ub' in bounds:
+                bounds['ub'] = misc.checkValueEntry(bounds['ub'])
                 if bounds['ub'].shape[0] != self.getDim():
                     raise Exception('Wrong dimension of upper bounds inserted.')
+                if 'lb' not in bounds:
+                    bounds['lb'] = np.full(f.shape[0], -np.inf)
 
             self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
 
