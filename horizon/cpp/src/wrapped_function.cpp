@@ -77,6 +77,11 @@ const Eigen::MatrixXd& WrappedFunction::getOutput(int i) const
     return _out_matrix[i];
 }
 
+Eigen::MatrixXd& WrappedFunction::out(int i)
+{
+    return _out_matrix[i];
+}
+
 casadi::Function& WrappedFunction::function()
 {
     return _f;

@@ -18,6 +18,7 @@ public:
     void setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi);
     void call();
     const Eigen::MatrixXd& getOutput(int i) const;
+    Eigen::MatrixXd& out(int i);
     casadi::Function& function();
 
     bool is_valid() const;
