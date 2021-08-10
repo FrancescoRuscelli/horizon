@@ -472,9 +472,15 @@ class FunctionsContainer:
             fun: a Function (can be Constraint or Cost Function) o add
         """
         if fun.getType() == 'constraint':
-            self.cnstr_container[fun.getName()] = fun
+            if fun.getName() not in self.cnstr_container:
+                self.cnstr_container[fun.getName()] = fun
+            else:
+                raise Exception(f'Function name "{fun.getName()}" already inserted.')
         elif fun.getType() == 'costfunction':
-            self.costfun_container[fun.getName()] = fun
+            if fun.getName() not in self.costfun_container:
+                self.costfun_container[fun.getName()] = fun
+            else:
+                raise Exception(f'Function name "{fun.getName()}" already inserted.')
         elif fun.getType() == 'generic':
             print('function.py: generic not implemented')
 
