@@ -54,8 +54,11 @@ struct IterativeLQR::Constraint
     // dh/du
     const Eigen::MatrixXd& D() const;
 
-    // constraint value
+    // constraint violation f(x, u) - hd
     VecConstRef h() const;
+
+    // desired value
+    Eigen::VectorXd hd;
 
     // valid flag
     bool is_valid() const;
@@ -1020,12 +1023,16 @@ void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
     f.setInput(0, x);
     f.setInput(1, u);
     f.call();
+
+    // subtract desired value
+    f.out(0).col(0) -= hd;
 }
 
 void IterativeLQR::Constraint::setConstraint(casadi::Function h)
 {
     f = h;
     df = h.factory("dh", {"x", "u"}, {"jac:h:x", "jac:h:u"});
+    hd.setZero(h.size1_out(0));
 }
 
 IterativeLQR::~IterativeLQR() = default;
