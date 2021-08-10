@@ -1,3 +1,4 @@
+from typing import List
 import casadi as cs
 from collections import OrderedDict
 import logging
@@ -779,7 +780,7 @@ class AbstractAggregate():
         Args:
             *args: abstract variables of the same nature
         """
-        self.var_list = [item for item in args]
+        self.var_list : List[AbstractVariable] = [item for item in args]
 
     def getVars(self) -> cs.SX:
         """
@@ -828,6 +829,22 @@ class Aggregate(AbstractAggregate):
             var_list.append(var.getVarOffset(offset))
 
         return AbstractAggregate(*var_list)
+
+    def getVarIndex(self, name):
+        """
+        Return offset and dimension for the variable with given name, 
+        that must belong to this aggregate. The resulting pair is such
+        that the following code returns the variable's SX value
+            off, dim = self.getVarIndex(name='myvar')
+            v = self.getVars()[off:off+dim]
+
+        Args:
+            name ([type]): [description]
+        """
+        names = [v.tag for v in self.var_list]
+        i = names.index(name)
+        offset = sum(v.dim for v in self.var_list[:i])
+        return offset, self.var_list[i].dim
 
     def addVariable(self, var):
         """
