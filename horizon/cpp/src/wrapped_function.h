@@ -16,6 +16,13 @@ void toCasadiMatrix(const Eigen::Matrix<T, r_size, c_size>& E, casadi::Matrix<T>
     std::memcpy(C.ptr(), E.data(), sizeof(T)*E.rows()*E.cols());
 }
 
+template <typename T, int r_size, int c_size>
+void toEigen(const casadi::Matrix<T>& C, Eigen::Matrix<T, r_size, c_size>& E)
+{
+    E.setZero(C.rows(), C.columns());
+    std::memcpy(E.data(), C.ptr(), sizeof(T)*C.rows()*C.columns());
+}
+
 
 class WrappedFunction
 {

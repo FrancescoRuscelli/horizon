@@ -107,12 +107,11 @@ void WrappedFunction::csc_to_sparse_matrix(const casadi::Sparsity& sp,
     sp.get_triplet(output_row, output_col);
 
     std::vector<Eigen::Triplet<double>> triplet_list;
+    triplet_list.reserve(data.size());
     for(unsigned int i = 0; i < data.size(); ++i)
-        triplet_list[i] = Eigen::Triplet<double>(output_row[i], output_col[i], data[i]);
+        triplet_list.push_back(Eigen::Triplet<double>(output_row[i], output_col[i], data[i]));
 
     matrix.setFromTriplets(triplet_list.begin(), triplet_list.end());
-
-
 }
 
 void WrappedFunction::csc_to_matrix(const casadi::Sparsity& sp,

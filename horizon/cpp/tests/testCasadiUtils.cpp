@@ -41,7 +41,22 @@ TEST_F(testCasadiUtils, testToCasadiMatrix)
             EXPECT_DOUBLE_EQ(E(i,j), double(C(i,j)));
     }
 
+    Eigen::MatrixXd EE;
+    casadi_utils::toEigen(C, EE);
+
+    EXPECT_EQ(EE.rows(), C.rows());
+    EXPECT_EQ(EE.cols(), C.columns());
+
+    for(unsigned int i = 0; i < EE.rows(); ++i)
+    {
+        for(unsigned int j = 0; j < EE.cols(); ++j)
+            EXPECT_DOUBLE_EQ(EE(i,j), double(C(i,j)));
+    }
+
     std::cout<<"E: \n"<<E<<std::endl;
+    std::cout<<"EE: \n"<<EE<<std::endl;
+    std::cout<<"C: "<<C<<std::endl;
+
     std::cout<<"C: "<<C<<std::endl;
 
     Eigen::VectorXd e;
@@ -56,7 +71,18 @@ TEST_F(testCasadiUtils, testToCasadiMatrix)
     for(unsigned int i = 0; i < e.size(); ++i)
         EXPECT_DOUBLE_EQ(e[i], double(c(i)));
 
+    Eigen::VectorXd ee;
+    casadi_utils::toEigen(c, ee);
+
+    EXPECT_EQ(ee.rows(), c.rows());
+    EXPECT_EQ(ee.cols(), c.columns());
+
+    for(unsigned int i = 0; i < ee.size(); ++i)
+        EXPECT_DOUBLE_EQ(ee[i], double(c(i)));
+
+
     std::cout<<"e: "<<e.transpose()<<std::endl;
+    std::cout<<"ee: "<<ee.transpose()<<std::endl;
     std::cout<<"c: "<<c<<std::endl;
 
 }
