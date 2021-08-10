@@ -658,6 +658,15 @@ bool IterativeLQR::forward_pass(double alpha)
         forward_pass_iter(i, alpha);
     }
 
+    // compute final constraint violation
+    if(_constraint[_N].is_valid())
+    {
+        // note: u not used
+        // todo: enforce this!
+        _constraint[_N].evaluate(_fp_res->xtrj.col(_N), _fp_res->utrj.col(_N-1));
+        _fp_res->constraint_violation += _constraint[_N].h().cwiseAbs().sum();
+    }
+
     // todo: add line search
     // for now, we always accept the step
     _xtrj = _fp_res->xtrj;
