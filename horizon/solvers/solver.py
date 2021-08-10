@@ -9,7 +9,12 @@ class Solver(ABC):
     """
     Solver is an abstract interface for a generic solver
     that aims to find a solution of an instance of
-    horizon.problem.Problem.
+    horizon.Problem.
+
+    The typical usage requires to (i) given an horizon.Problem,
+    call the factory make_solver() to retrieve a solver concrete instance, 
+    (ii) to call solve() on it, and (iii) to retrieve the solution as
+    solver.x_opt, and solver.u_opt.
     """
 
     @classmethod
@@ -18,6 +23,16 @@ class Solver(ABC):
                     prb: Problem, 
                     dt: float, 
                     opts: Dict = None):
+        """
+        Construct a solver from its type name
+
+        Args:
+            type (str): a string indicating the solver type (e.g., blocksqp, ipopt, ilqr)
+            prb (Problem): the horizon's problem instance to be solved
+            dt (float): the discretization step
+            opts (Dict, optional): A solver-dependent Dict of options. Defaults to None.
+        """
+
         if type == 'blocksqp':
             from . import blocksqp
             return blocksqp.BlockSqpSolver(prb, dt, opts)
