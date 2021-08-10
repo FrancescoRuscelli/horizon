@@ -32,7 +32,15 @@ WrappedFunction::WrappedFunction(casadi::Function f):
 
         // allocate a zero dense matrix to store the output
         _out_matrix.emplace_back(Eigen::MatrixXd::Zero(sp.size1(), sp.size2()));
+
+        // save sparsity pattern for i-th output
+        std::vector<casadi_int> rows, cols;
+        sp.get_triplet(rows, cols);
+        _rows.push_back(rows);
+        _cols.push_back(cols);
     }
+
+
 }
 
 void WrappedFunction::setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi)
@@ -55,6 +63,7 @@ void WrappedFunction::call()
     for(int i = 0; i < _f.n_out(); i++)
     {
         csc_to_matrix(_f.sparsity_out(i),
+                      _rows[i], _cols[i],
                       _out_data[i],
                       _out_matrix[i]);
     }
@@ -79,6 +88,8 @@ bool WrappedFunction::is_valid() const
 }
 
 void WrappedFunction::csc_to_matrix(const casadi::Sparsity& sp,
+                                    const std::vector<casadi_int>&  sp_rows,
+                                    const std::vector<casadi_int>&  sp_cols,
                                     const std::vector<double>& data,
                                     Eigen::MatrixXd& matrix)
 {
@@ -92,17 +103,12 @@ void WrappedFunction::csc_to_matrix(const casadi::Sparsity& sp,
         return;
     }
 
-    int col_j = 0;
+
     for(int k = 0; k < sp.nnz(); k++)
     {
         // current elem row index
-        int row_i = sp.row(k);
-
-        // update current elem col index
-        if(k == sp.colind(col_j + 1))
-        {
-            col_j++;
-        }
+        int row_i = sp_rows[k];
+        int col_j = sp_cols[k];
 
         // copy data
         matrix(row_i, col_j) =  data[k];

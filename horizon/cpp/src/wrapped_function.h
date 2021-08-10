@@ -25,6 +25,8 @@ public:
 private:
 
     void csc_to_matrix(const casadi::Sparsity& sp,
+                       const std::vector<casadi_int>&  sp_rows,
+                       const std::vector<casadi_int>&  sp_cols,
                        const std::vector<double>& data,
                        Eigen::MatrixXd& matrix);
 
@@ -34,6 +36,8 @@ private:
     std::vector<double *> _out_buf;
     std::vector<casadi_int> _iw;
     std::vector<double> _dw;
+    std::vector<std::vector<casadi_int>> _rows;
+    std::vector<std::vector<casadi_int>> _cols;
 
     casadi::Function _f;
 };
