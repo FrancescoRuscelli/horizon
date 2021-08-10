@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import logging
 
+import os
 import casadi as cs
 import numpy as np
 from horizon import problem
@@ -8,7 +9,8 @@ from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajecto
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
-urdf = rospy.get_param('robot_description')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')
+urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 FKRope = cs.Function.deserialize(kindyn.fk('rope_anchor2'))
 

@@ -70,11 +70,26 @@ def test_singleVariable():
 
     sol = prb.solveProblem()
 
+def test_constraintBounds():
+    #  check if bounds are correct when setting them AFTER building the problem
+    nodes = 10
+
+    prb = Problem(nodes, crash_if_suboptimal=True)
+    x = prb.createStateVariable('x', 2)
+    u = prb.createSingleVariable('u', 2)
+
+    constr1 = prb.createIntermediateConstraint('constr1', x+u, bounds=dict(lb=[0, 0]))
+    constr2 = prb.createIntermediateConstraint('constr2', x + u, bounds=dict(ub=[0, 0]))
+    constr3 = prb.createIntermediateConstraint('constr3', x + u, bounds=dict(lb=[0, 0], ub=[0, 0]))
+
+    prb.createProblem()
+    sol = prb.solveProblem()
 
 if __name__ == '__main__':
     # test_singleParameter()
     # test_parameters()
-    test_singleVariable()
+    # test_singleVariable()
+    test_constraintBounds()
     exit()
 nodes = 10
 prb = Problem(nodes, logging_level=logging.DEBUG)

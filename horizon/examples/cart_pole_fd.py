@@ -93,6 +93,7 @@ if plot_all:
     hplt = plotter.PlotterHorizon(prb)
     hplt.plotVariables()
     hplt.plotFunctions()
+    plt.show()
 
 joint_list=["cart_joint", "pole_joint"]
 replay_trajectory(tf/ns, joint_list, q_hist).replay(is_floating_base=False)
