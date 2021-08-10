@@ -21,6 +21,9 @@ class Solver(ABC):
         if type == 'blocksqp':
             from . import blocksqp
             return blocksqp.BlockSqpSolver(prb, dt, opts)
+        elif type == 'ipopt':
+            from . import ipopt
+            return ipopt.IpoptSolver(prb, dt, opts)
         elif type == 'ilqr':
             from . import ilqr
             return ilqr.SolverILQR(prb, dt, opts)
