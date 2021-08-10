@@ -11,6 +11,7 @@ import horizon.misc_function as misc
 from typing import Union, Dict
 # from horizon.type_doc import BoundsDict
 from collections.abc import Iterable
+import inspect
 
 class Problem:
     """
@@ -583,7 +584,10 @@ class Problem:
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
 
-        self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
+        if 'p' in inspect.getfullargspec(self.solver)[0]:
+            self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
+        else:
+            self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
 
         # t_to_solve = time.time() - t_start
         # print('T to solve:', t_to_solve)
@@ -792,10 +796,4 @@ class Problem:
 
 
 if __name__ == '__main__':
-    nodes = 10
-
-    prb = Problem(nodes, crash_if_suboptimal=True)
-    x = prb.createStateVariable('x', 1)
-
-    print(x.getImpl())
-    pass
+   pass
