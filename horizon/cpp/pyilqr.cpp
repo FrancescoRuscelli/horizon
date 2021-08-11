@@ -2,6 +2,17 @@
 
 PYBIND11_MODULE(pyilqr, m) {
 
+    py::class_<IterativeLQR::ForwardPassResult>(m, "ForwardPassResult")
+            .def_readonly("xtrj", &IterativeLQR::ForwardPassResult::xtrj)
+            .def_readonly("utrj", &IterativeLQR::ForwardPassResult::utrj)
+            .def_readonly("accepted", &IterativeLQR::ForwardPassResult::accepted)
+            .def_readonly("alpha", &IterativeLQR::ForwardPassResult::alpha)
+            .def_readonly("constraint_violation", &IterativeLQR::ForwardPassResult::constraint_violation)
+            .def_readonly("cost", &IterativeLQR::ForwardPassResult::cost)
+            .def_readonly("defect_norm", &IterativeLQR::ForwardPassResult::defect_norm)
+            .def_readonly("merit", &IterativeLQR::ForwardPassResult::merit)
+            .def_readonly("step_length", &IterativeLQR::ForwardPassResult::step_length);
+
     py::class_<utils::ProfilingInfo>(m, "ProfilingInfo")
             .def_readonly("timings", &utils::ProfilingInfo::timings);
 
@@ -20,6 +31,7 @@ PYBIND11_MODULE(pyilqr, m) {
             .def("getStateTrajectory", &IterativeLQR::getStateTrajectory)
             .def("getInputTrajectory", &IterativeLQR::getInputTrajectory)
             .def("setInitialState", &IterativeLQR::setInitialState)
+            .def("setInputInitialGuess", &IterativeLQR::setInputInitialGuess)
             .def("setStateInitialGuess", &IterativeLQR::setStateInitialGuess)
             ;
 

@@ -10,12 +10,6 @@ namespace horizon
 typedef Eigen::Ref<const Eigen::VectorXd> VecConstRef;
 typedef Eigen::Ref<const Eigen::MatrixXd> MatConstRef;
 
-typedef std::function<bool(const Eigen::MatrixXd& xtrj,
-                           const Eigen::MatrixXd& utrj,
-                           double step_length,
-                           double total_cost,
-                           double defect_norm,
-                           double constraint_violation)> CallbackType;
 
 /**
  * @brief IterativeLQR implements a multiple-shooting variant of the
@@ -35,8 +29,18 @@ class IterativeLQR
 
 public:
 
+    /**
+     *
+     */
+    struct ForwardPassResult;
 
-     /**
+    /**
+     * @brief CallbackType
+     */
+    typedef std::function<bool(const ForwardPassResult& res)> CallbackType;
+
+
+    /**
      * @brief Class constructor
      * @param fdyn is a function mapping state and control to the integrated state;
      * required signature is (x, u) -> (f)
@@ -88,6 +92,8 @@ public:
 
     void setStateInitialGuess(const Eigen::MatrixXd& x0);
 
+    void setInputInitialGuess(const Eigen::MatrixXd& u0);
+
     void setIterationCallback(const CallbackType& cb);
 
     bool solve(int max_iter);
@@ -104,6 +110,23 @@ public:
 
     ~IterativeLQR();
 
+    struct ForwardPassResult
+    {
+        Eigen::MatrixXd xtrj;
+        Eigen::MatrixXd utrj;
+        double alpha;
+        double cost;
+        double merit;
+        double step_length;
+        double constraint_violation;
+        double defect_norm;
+        bool accepted;
+
+        ForwardPassResult(int nx, int nu, int N);
+    };
+
+
+
 protected:
 
 private:
@@ -116,18 +139,18 @@ private:
     struct Temporaries;
     struct ConstraintToGo;
     struct BackwardPassResult;
-    struct ForwardPassResult;
     struct ValueFunction;
 
     typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost> HandleConstraintsRetType;
 
     void linearize_quadratize();
-    void report_result();
+    void report_result(const ForwardPassResult& fpres);
     void backward_pass();
     void backward_pass_iter(int i);
     HandleConstraintsRetType handle_constraints(int i);
     bool forward_pass(double alpha);
     void forward_pass_iter(int i, double alpha);
+    void line_search();
     void set_default_cost();
 
     const int _nx;
