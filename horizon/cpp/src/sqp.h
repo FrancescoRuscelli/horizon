@@ -41,7 +41,8 @@ public:
         _x(x),
         _max_iter(1000),
         _reinitialize_qp_solver(false),
-        _opts(opts), _qp_opts(opts)
+        _opts(opts), _qp_opts(opts),
+        _alpha(1.)
     {
         _f = casadi::Function("f", {_x}, {f}, {"x"}, {"f"});
         _df = _f.function().factory("df", {"x"}, {"jac:f:x"});
@@ -74,6 +75,20 @@ public:
     }
 
     /**
+     * @brief setAlpha
+     * @param alpha Newton's method step
+     */
+    void setAlpha(const double alpha)
+    {
+        _alpha = alpha;
+    }
+
+    const double& getAlpha() const
+    {
+        return _alpha;
+    }
+
+    /**
      * @brief solve NLP for given max iteration. Internal qp solver is reinitialized if "reinitialize_qpsolver" option was passed
      * as true in constructor options
      * @param initial_guess_x initial guess
@@ -81,11 +96,10 @@ public:
      * @param ubx upper variables bound
      * @param lbg lower constraints bound
      * @param ubg upper constraints bound
-     * @param alpha Newton's method step
      * @return solution dictionary containing: "x" solution, "f" 0.5*norm2 cost function, "g" norm2 constraints vector
      */
     const casadi::DMDict& solve(const casadi::DM& initial_guess_x, const casadi::DM& lbx, const casadi::DM& ubx,
-                                const casadi::DM& lbg, const casadi::DM& ubg, const double alpha=1.)
+                                const casadi::DM& lbg, const casadi::DM& ubg)
     {
         bool sparse = true;
         x0_ = initial_guess_x;
@@ -142,7 +156,7 @@ public:
             _conic->call(_conic_dict.input, _conic_dict.output);
 
             //4. Take full step
-            x0_ = x0_ + alpha*_conic_dict.output["x"];
+            x0_ = x0_ + _alpha*_conic_dict.output["x"];
             casadi_utils::toEigen(x0_, _sol);
 
 
@@ -247,6 +261,7 @@ private:
     IODMDict _g_dict;
     IODMDict _A_dict;
 
+    double _alpha;
 
 };
 

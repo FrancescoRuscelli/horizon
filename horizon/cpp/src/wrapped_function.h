@@ -49,6 +49,8 @@ private:
                        const std::vector<double>& data,
                        Eigen::MatrixXd& matrix);
     void csc_to_sparse_matrix(const casadi::Sparsity& sp,
+                              const std::vector<casadi_int>&  sp_rows,
+                              const std::vector<casadi_int>&  sp_cols,
                               const std::vector<double>& data,
                               Eigen::SparseMatrix<double>& matrix);
 
