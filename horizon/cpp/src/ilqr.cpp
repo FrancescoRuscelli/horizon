@@ -54,8 +54,11 @@ struct IterativeLQR::Constraint
     // dh/du
     const Eigen::MatrixXd& D() const;
 
-    // constraint value
+    // constraint violation f(x, u) - hd
     VecConstRef h() const;
+
+    // desired value
+    Eigen::VectorXd hd;
 
     // valid flag
     bool is_valid() const;
@@ -98,10 +101,15 @@ struct IterativeLQR::IntermediateCost
 
 struct IterativeLQR::Temporaries
 {
-    // backward pass
+    /* Backward pass */
+
+    // temporary for s + S*d
     Eigen::MatrixXd s_plus_S_d;
+
+    // temporary for S*A
     Eigen::MatrixXd S_A;
 
+    // quadratized value function
     Eigen::MatrixXd Huu;
     Eigen::MatrixXd Hux;
     Eigen::MatrixXd Hxx;
@@ -109,20 +117,29 @@ struct IterativeLQR::Temporaries
     Eigen::VectorXd hx;
     Eigen::VectorXd hu;
 
+    // temporary for [hu Hux]
+    // note: it is used to store gains as well, take care!
     Eigen::MatrixXd huHux;
 
+    // cholesky for Huu
     Eigen::LLT<Eigen::MatrixXd> llt;
 
-    // constraints
+    // linearized constraint to go (C*x + D*u + h = 0)
     Eigen::MatrixXd C;
     Eigen::MatrixXd D;
     Eigen::VectorXd h;
+
+    // svd of D
+    Eigen::BDCSVD<Eigen::MatrixXd> svd;
+
+    // rotated constraint according to left singular vectors of D
     Eigen::MatrixXd rotC;
     Eigen::VectorXd roth;
-    Eigen::BDCSVD<Eigen::MatrixXd> svd;
+
+    // input component due to constraint (u = lc + Lc*x + Bz*z)
     Eigen::MatrixXd Lc;
-    Eigen::MatrixXd Lz;
     Eigen::VectorXd lc;
+    Eigen::MatrixXd Bz;
 
     // modified dynamics and cost due to
     // constraints
@@ -135,7 +152,8 @@ struct IterativeLQR::Temporaries
     Eigen::VectorXd qc;
     Eigen::VectorXd rc;
 
-    // forward pass
+
+    /* Forward pass */
     Eigen::VectorXd dx;
 
 };
@@ -180,8 +198,15 @@ struct IterativeLQR::ValueFunction
 
 struct IterativeLQR::BackwardPassResult
 {
-    Eigen::MatrixXd Lfb;
-    Eigen::VectorXd du_ff;
+    // real input as function of state
+    // (u = Lu*x + lu)
+    Eigen::MatrixXd Lu;
+    Eigen::VectorXd lu;
+
+    // auxiliary input as function of state
+    // (z = Lz*x + lz, where u = lc + Lc*x + Bz*z)
+    Eigen::MatrixXd Lz;
+    Eigen::VectorXd lz;
 
     BackwardPassResult(int nx, int nu);
 };
@@ -221,6 +246,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _nx(fdyn.size1_in(0)),
     _nu(fdyn.size1_in(1)),
     _N(N),
+    _step_length(1.0),
     _cost(N+1, IntermediateCost(_nx, _nu)),
     _constraint(N+1),
     _value(N+1, ValueFunction(_nx)),
@@ -248,6 +274,11 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
 
     // a default cost so that it works out of the box
     set_default_cost();
+}
+
+void IterativeLQR::setStepLength(double alpha)
+{
+    _step_length = alpha;
 }
 
 
@@ -317,6 +348,21 @@ void IterativeLQR::setInitialState(const Eigen::VectorXd &x0)
     _xtrj.col(0) = x0;
 }
 
+void IterativeLQR::setStateInitialGuess(const Eigen::MatrixXd& x0)
+{
+    if(x0.rows() != _xtrj.rows())
+    {
+        throw std::invalid_argument("wrong initial guess rows");
+    }
+
+    if(x0.cols() != _xtrj.cols())
+    {
+        throw std::invalid_argument("wrong initial guess cols");
+    }
+
+    _xtrj = x0;
+}
+
 void IterativeLQR::setIterationCallback(const CallbackType &cb)
 {
     _iter_cb = cb;
@@ -347,7 +393,7 @@ bool IterativeLQR::solve(int max_iter)
 
         linearize_quadratize();
         backward_pass();
-        forward_pass(1.0);
+        forward_pass(_step_length);
 
         TOC(solve)
 
@@ -452,7 +498,7 @@ void IterativeLQR::backward_pass_iter(int i)
     // mapping to original input u
     const auto& lc = tmp.lc;
     const auto& Lc = tmp.Lc;
-    const auto& Lz = tmp.Lz;
+    const auto& Bz = tmp.Bz;
 
     // components of next node's value function (as a function of
     // current state and control via the dynamics)
@@ -470,10 +516,10 @@ void IterativeLQR::backward_pass_iter(int i)
     {
         // save solution
         auto& res = _bp_res[i];
-        auto& L = res.Lfb;
-        auto& l = res.du_ff;
-        L = Lc;
-        l = lc;
+        res.Lu = Lc;
+        res.lu = lc;
+        res.Lz.setZero(0, _nx);
+        res.lz.setZero(0);
 
         // save optimal value function
         auto& value = _value[i];
@@ -506,24 +552,29 @@ void IterativeLQR::backward_pass_iter(int i)
 
     // save solution
     auto& res = _bp_res[i];
-    auto& L = res.Lfb;
-    auto& l = res.du_ff;
-    L = -tmp.huHux.rightCols(_nx);
-    l = -tmp.huHux.col(0);
+    auto& Lz = res.Lz;
+    auto& lz = res.lz;
+    Lz = -tmp.huHux.rightCols(_nx);
+    lz = -tmp.huHux.col(0);
 
     // save optimal value function
     auto& value = _value[i];
     auto& S = value.S;
     auto& s = value.s;
 
-    S.noalias() = tmp.Hxx - L.transpose()*tmp.Huu*L;
-    s.noalias() = tmp.hx + tmp.Hux.transpose()*l + L.transpose()*(tmp.hu + tmp.Huu*l);
+    S.noalias() = tmp.Hxx - Lz.transpose()*tmp.Huu*Lz;
+    s.noalias() = tmp.hx + tmp.Hux.transpose()*lz + Lz.transpose()*(tmp.hu + tmp.Huu*lz);
 
     // map to original input u
     if(has_constraints)
     {
-        l = lc + Lz*l;
-        L = Lc + Lz*L;
+        res.lu.noalias() = lc + Bz*lz;
+        res.Lu.noalias() = Lc + Bz*Lz;
+    }
+    else
+    {
+        res.lu = lz;
+        res.Lu = Lz;
     }
 
 }
@@ -555,7 +606,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     auto& roth = tmp.roth;
     auto& lc = tmp.lc;
     auto& Lc = tmp.Lc;
-    auto& Lz = tmp.Lz;
+    auto& Bz = tmp.Bz;
 
     // no constraint to handle, do nothing
     if(_constraint_to_go->dim() == 0 &&
@@ -599,7 +650,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     //  *) Lc = -V[:, 0:r]*sigma^-1*rot_C
     lc.noalias() = -V.leftCols(rank) * roth.head(rank).cwiseQuotient(sv.head(rank));
     Lc.noalias() = -V.leftCols(rank) * sv.head(rank).cwiseInverse().asDiagonal() * rotC.topRows(rank);
-    Lz.noalias() = V.rightCols(ns_dim);
+    Bz.noalias() = V.rightCols(ns_dim);
 
     // remove satisfied constraints from constraint to go
     _constraint_to_go->set(rotC.bottomRows(nc - rank),
@@ -608,14 +659,14 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     // modified cost and dynamics due to uc = uc(x, z)
     // note: our new control input will be z!
     tmp.Ac.noalias() = A + B*Lc;
-    tmp.Bc.noalias() = B*Lz;
+    tmp.Bc.noalias() = B*Bz;
     tmp.dc.noalias() = d + B*lc;
 
     tmp.qc.noalias() = q + Lc.transpose()*(r + R*lc) + P.transpose()*lc;
-    tmp.rc.noalias() = Lz.transpose()*(r + R*lc);
+    tmp.rc.noalias() = Bz.transpose()*(r + R*lc);
     tmp.Qc.noalias() = Q + Lc.transpose()*R*Lc + Lc.transpose()*P + P.transpose()*Lc;
-    tmp.Rc.noalias() = Lz.transpose()*R*Lz;
-    tmp.Pc.noalias() = Lz.transpose()*(P + R*Lc);
+    tmp.Rc.noalias() = Bz.transpose()*R*Bz;
+    tmp.Pc.noalias() = Bz.transpose()*(P + R*Lc);
 
     // return
     ConstrainedDynamics cd = {tmp.Ac, tmp.Bc, tmp.dc};
@@ -641,6 +692,15 @@ bool IterativeLQR::forward_pass(double alpha)
     for(int i = 0; i < _N; i++)
     {
         forward_pass_iter(i, alpha);
+    }
+
+    // compute final constraint violation
+    if(_constraint[_N].is_valid())
+    {
+        // note: u not used
+        // todo: enforce this!
+        _constraint[_N].evaluate(_fp_res->xtrj.col(_N), _fp_res->utrj.col(_N-1));
+        _fp_res->constraint_violation += _constraint[_N].h().cwiseAbs().sum();
     }
 
     // todo: add line search
@@ -675,8 +735,8 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
 
     // backward pass solution
     const auto& res = _bp_res[i];
-    const auto& L = res.Lfb;
-    auto l = alpha * res.du_ff;
+    const auto& L = res.Lu;
+    auto l = alpha * res.lu;
 
     // update control
     auto ui_upd = ui + l + L*tmp.dx;
@@ -849,8 +909,8 @@ IterativeLQR::ValueFunction::ValueFunction(int nx)
 
 IterativeLQR::BackwardPassResult::BackwardPassResult(int nx, int nu)
 {
-    Lfb.setZero(nu, nx);
-    du_ff.setZero(nu);
+    Lu.setZero(nu, nx);
+    lu.setZero(nu);
 }
 
 IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N)
@@ -996,12 +1056,16 @@ void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
     f.setInput(0, x);
     f.setInput(1, u);
     f.call();
+
+    // subtract desired value
+    f.out(0).col(0) -= hd;
 }
 
 void IterativeLQR::Constraint::setConstraint(casadi::Function h)
 {
     f = h;
     df = h.factory("dh", {"x", "u"}, {"jac:h:x", "jac:h:u"});
+    hd.setZero(h.size1_out(0));
 }
 
 IterativeLQR::~IterativeLQR() = default;

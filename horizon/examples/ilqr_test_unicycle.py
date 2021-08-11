@@ -11,10 +11,6 @@ import matplotlib.pyplot as plt
 
 np.set_printoptions(suppress=True, precision=3)
 
-# pyilqr_build_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'build')
-# sys.path.append(pyilqr_build_folder)
-# import pyilqr
-
 from horizon.solvers import pyilqr
 
 from matplotlib import pyplot as plt

@@ -37,12 +37,15 @@ public:
     const Eigen::MatrixXd& getOutput(int i) const;
     const Eigen::SparseMatrix<double>& getSparseOutput(int i) const;
     casadi::Function& function();
+    Eigen::MatrixXd& out(int i);
 
     bool is_valid() const;
 
 private:
 
     void csc_to_matrix(const casadi::Sparsity& sp,
+                       const std::vector<casadi_int>&  sp_rows,
+                       const std::vector<casadi_int>&  sp_cols,
                        const std::vector<double>& data,
                        Eigen::MatrixXd& matrix);
     void csc_to_sparse_matrix(const casadi::Sparsity& sp,
@@ -56,6 +59,8 @@ private:
     std::vector<double *> _out_buf;
     std::vector<casadi_int> _iw;
     std::vector<double> _dw;
+    std::vector<std::vector<casadi_int>> _rows;
+    std::vector<std::vector<casadi_int>> _cols;
 
     casadi::Function _f;
 };
