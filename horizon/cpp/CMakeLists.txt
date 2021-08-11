@@ -41,7 +41,7 @@ pybind11_add_module(pyilqr pyilqr.cpp)
 target_link_libraries(pyilqr PUBLIC ilqr)
 
 pybind11_add_module(pysqp pysqp.cpp)
-target_link_libraries(pysqp PUBLIC ilqr)
+target_link_libraries(pysqp PUBLIC sqp Eigen3::Eigen casadi)
 
 install(TARGETS pyilqr
     DESTINATION horizon/solvers)

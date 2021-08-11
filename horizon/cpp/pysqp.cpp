@@ -1,31 +1,31 @@
 #include "pysqp_helpers.h"
+#include <casadi/casadi.hpp>
 
-using namespace casadi;
 
 PYBIND11_MODULE(pysqp, m) {
 
-    py::class_<SQPGaussNewton<SX>>(m, "SQPGaussNewton")
+    py::class_<SQPGaussNewton<casadi::SX>>(m, "SQPGaussNewtonSX")
             .def(py::init(&constructSX))
-            .def("solve", &SQPGaussNewton<SX>::solve,
+            .def("solve", callSX,
                  py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"))
-            .def("setAlpha", &SQPGaussNewton<SX>::setAlpha)
-            .def("getAlpha", &SQPGaussNewton<SX>::getAlpha)
-            .def("getVariableTrajectory", &SQPGaussNewton<SX>::getVariableTrajectory)
-            .def("getObjectiveIterations", &SQPGaussNewton<SX>::getObjectiveIterations)
-            .def("getConstraintNormIterations", &SQPGaussNewton<SX>::getConstraintNormIterations)
-            .def("printConicOptions", &SQPGaussNewton<SX>::printConicOptions)
+            .def("setAlpha", &SQPGaussNewton<casadi::SX>::setAlpha)
+            .def("getAlpha", &SQPGaussNewton<casadi::SX>::getAlpha)
+            .def("getVariableTrajectory", &SQPGaussNewton<casadi::SX>::getVariableTrajectory)
+            .def("getObjectiveIterations", &SQPGaussNewton<casadi::SX>::getObjectiveIterations)
+            .def("getConstraintNormIterations", &SQPGaussNewton<casadi::SX>::getConstraintNormIterations)
+            .def("printConicOptions", &SQPGaussNewton<casadi::SX>::printConicOptions)
             ;
 
-    py::class_<SQPGaussNewton<MX>>(m, "SQPGaussNewton")
-            .def(py::init(&constructMX))
-            .def("solve", &SQPGaussNewton<MX>::solve,
-                 py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"))
-            .def("setAlpha", &SQPGaussNewton<MX>::setAlpha)
-            .def("getAlpha", &SQPGaussNewton<MX>::getAlpha)
-            .def("getVariableTrajectory", &SQPGaussNewton<MX>::getVariableTrajectory)
-            .def("getObjectiveIterations", &SQPGaussNewton<MX>::getObjectiveIterations)
-            .def("getConstraintNormIterations", &SQPGaussNewton<MX>::getConstraintNormIterations)
-            .def("printConicOptions", &SQPGaussNewton<MX>::printConicOptions)
-            ;
+//    py::class_<SQPGaussNewton<casadi::MX>>(m, "SQPGaussNewtonMX")
+//            .def(py::init(&constructMX))
+//            .def("solve", &SQPGaussNewton<casadi::MX>::solve,
+//                 py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"))
+//            .def("setAlpha", &SQPGaussNewton<casadi::MX>::setAlpha)
+//            .def("getAlpha", &SQPGaussNewton<casadi::MX>::getAlpha)
+//            .def("getVariableTrajectory", &SQPGaussNewton<casadi::MX>::getVariableTrajectory)
+//            .def("getObjectiveIterations", &SQPGaussNewton<casadi::MX>::getObjectiveIterations)
+//            .def("getConstraintNormIterations", &SQPGaussNewton<casadi::MX>::getConstraintNormIterations)
+//            .def("printConicOptions", &SQPGaussNewton<casadi::MX>::printConicOptions)
+//            ;
 
 }

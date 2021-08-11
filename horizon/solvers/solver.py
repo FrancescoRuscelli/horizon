@@ -42,6 +42,9 @@ class Solver(ABC):
         elif type == 'ilqr':
             from . import ilqr
             return ilqr.SolverILQR(prb, dt, opts)
+        elif type == 'gnsqp':
+            from . import sqp
+            return sqp.GNSQPSolver(prb, dt, opts, 'qpoases')
         else:
             raise KeyError(f'unsupperted solver type "{type}"')
 
