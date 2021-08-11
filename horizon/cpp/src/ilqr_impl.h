@@ -112,13 +112,19 @@ struct IterativeLQR::Temporaries
     // temporary for S*A
     Eigen::MatrixXd S_A;
 
-    // quadratized value function
+    // quadratized value function (after constraints, if any)
+    // note: 'u' is actually 'z' in this context!
     Eigen::MatrixXd Huu;
     Eigen::MatrixXd Hux;
     Eigen::MatrixXd Hxx;
 
     Eigen::VectorXd hx;
     Eigen::VectorXd hu;
+
+    // quadratized value function (free)
+    Eigen::MatrixXd Huuf;
+    Eigen::MatrixXd Huxf;
+    Eigen::VectorXd huf;
 
     // temporary for [hu Hux]
     // note: it is used to store gains as well, take care!
@@ -138,6 +144,9 @@ struct IterativeLQR::Temporaries
     // rotated constraint according to left singular vectors of D
     Eigen::MatrixXd rotC;
     Eigen::VectorXd roth;
+
+    // temporary that is used to compute lagrange multipliers
+    Eigen::MatrixXd UrSinvVrT;
 
     // input component due to constraint (u = lc + Lc*x + Bz*z)
     Eigen::MatrixXd Lc;
@@ -211,6 +220,11 @@ struct IterativeLQR::BackwardPassResult
     // (z = Lz*x + lz, where u = lc + Lc*x + Bz*z)
     Eigen::MatrixXd Lz;
     Eigen::VectorXd lz;
+
+    // lagrange multipliers
+    Eigen::MatrixXd Gu;
+    Eigen::MatrixXd Gx;
+    Eigen::VectorXd glam;
 
     BackwardPassResult(int nx, int nu);
 };

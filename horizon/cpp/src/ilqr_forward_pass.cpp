@@ -103,14 +103,29 @@ void IterativeLQR::line_search()
 {
     TIC(line_search);
 
-    // fake line search for now
-    forward_pass(_step_length);
-    _fp_res->accepted = true;
-    report_result(*_fp_res);
+    const double step_reduction_factor = 0.5 ;
+    const double alpha_min = 0.001;
+    double alpha = 1.0;
 
-    _xtrj = _fp_res->xtrj;
-    _utrj = _fp_res->utrj;
+    ForwardPassResult best_res(_nx, _nu, _N);
+    best_res.merit = std::numeric_limits<double>::max();
 
-    return;
+    while(alpha >= alpha_min)
+    {
+        forward_pass(alpha);
 
+        if(_fp_res->merit < best_res.merit)
+        {
+            best_res = *_fp_res;
+        }
+
+        report_result(*_fp_res);
+        alpha *= step_reduction_factor;
+    }
+
+    best_res.accepted = true;
+    report_result(best_res);
+
+    _xtrj = best_res.xtrj;
+    _utrj = best_res.utrj;
 }

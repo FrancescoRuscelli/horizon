@@ -20,22 +20,33 @@ void IterativeLQR::backward_pass()
 
 void IterativeLQR::backward_pass_iter(int i)
 {
-    TIC(backward_pass_inner)
+    TIC(backward_pass_inner);
+
+    // some shorthands..
+
+    // ..value function
+    const auto& value_next = _value[i+1];
+    const auto& Snext = value_next.S;
+    const auto& snext = value_next.s;
+
+    // ..defect
+    const auto& d = _dyn[i].d;
+
+    // ..workspace
+    auto& tmp = _tmp[i];
+
+    // note: compute s + S*d here since handle_constraints needs it
+    tmp.s_plus_S_d.noalias() = snext + Snext*d;
 
     // constraint handling
     auto [nz, cdyn, ccost] = handle_constraints(i);
 
-    const bool has_constraints = nz != _nu;
+    const bool has_constraints = (nz != _nu);
 
     // note: after handling constraints, we're actually optimizing an
     // auxiliary input z, where the original input u = lc + Lc*x + Lz*z
 
-    // some shorthands
 
-    // value function
-    const auto& value_next = _value[i+1];
-    const auto& Snext = value_next.S;
-    const auto& snext = value_next.s;
 
     // intermediate cost
     const auto r = ccost.r;
@@ -47,10 +58,8 @@ void IterativeLQR::backward_pass_iter(int i)
     // dynamics
     const auto A = cdyn.A;
     const auto B = cdyn.B;
-    const auto d = cdyn.d;
 
-    // workspace
-    auto& tmp = _tmp[i];
+
 
     // mapping to original input u
     const auto& lc = tmp.lc;
@@ -61,7 +70,6 @@ void IterativeLQR::backward_pass_iter(int i)
     // current state and control via the dynamics)
     // note: first compute state-only components, since after constraints
     // there might be no input dof to optimize at all!
-    tmp.s_plus_S_d.noalias() = snext + Snext*d;
     tmp.S_A.noalias() = Snext*A;
 
     tmp.hx.noalias() = q + A.transpose()*tmp.s_plus_S_d;
@@ -77,6 +85,9 @@ void IterativeLQR::backward_pass_iter(int i)
         res.lu = lc;
         res.Lz.setZero(0, _nx);
         res.lz.setZero(0);
+
+        // save multipliers
+
 
         // save optimal value function
         auto& value = _value[i];
@@ -138,9 +149,13 @@ void IterativeLQR::backward_pass_iter(int i)
 
 IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 {
-    TIC(handle_constraints_inner)
+    TIC(handle_constraints_inner);
 
     // some shorthands for..
+
+    // ..value function
+    const auto& value_next = _value[i+1];
+    const auto& Snext = value_next.S;
 
     // ..intermediate cost
     const auto& cost = _cost[i];
@@ -164,6 +179,9 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     auto& lc = tmp.lc;
     auto& Lc = tmp.Lc;
     auto& Bz = tmp.Bz;
+
+    // ..backward pass result
+    auto& res = _bp_res[i];
 
     // no constraint to handle, do nothing
     if(_constraint_to_go->dim() == 0 &&
@@ -208,6 +226,22 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     lc.noalias() = -V.leftCols(rank) * roth.head(rank).cwiseQuotient(sv.head(rank));
     Lc.noalias() = -V.leftCols(rank) * sv.head(rank).cwiseInverse().asDiagonal() * rotC.topRows(rank);
     Bz.noalias() = V.rightCols(ns_dim);
+
+    // compute quadritized free value function (before constraints)
+    tmp.huf.noalias() = r + B.transpose()*tmp.s_plus_S_d;
+    tmp.Huuf.noalias() = R + B.transpose()*Snext*B;
+    tmp.Huxf.noalias() = P + B.transpose()*tmp.S_A;
+
+    // compute lagrangian multipliers corresponding to the
+    // satisfied component of the constraints, i.e.
+    // lam = Gu*u + Gx*x + g, where:
+    //  *) Gu = -U[:, :r]*sigma^-1*V[:, :r]'*Huu
+    //  *) Gx = -U[:, :r]*sigma^-1*V[:, :r]'*Hux
+    //  *) g = -U[:, :r]*sigma^-1*V[:, :r]'*hu
+    tmp.UrSinvVrT.noalias() = U.leftCols(rank)*sv.head(rank).cwiseInverse().asDiagonal()*V.leftCols(rank).transpose();
+    res.Gu = -tmp.UrSinvVrT*tmp.Huuf;
+    res.Gx = -tmp.UrSinvVrT*tmp.Huxf;
+    res.glam = -tmp.UrSinvVrT*tmp.huf;
 
     // remove satisfied constraints from constraint to go
     _constraint_to_go->set(rotC.bottomRows(nc - rank),
