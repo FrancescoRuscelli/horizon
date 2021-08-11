@@ -898,6 +898,20 @@ class Aggregate(AbstractAggregate):
             var.setUpperBounds(ub[idx:idx+nv], nodes)
             idx += nv
 
+    def setInitialGuess(self, v0, nodes=None):
+        """
+        
+
+        Args:
+            v0 ([type]): [description]
+            nodes ([type], optional): [description]. Defaults to None.
+        """
+        idx = 0
+        for var in self:
+            nv = var.shape[0]
+            var.setInitialGuess(v0[idx:idx+nv], nodes)
+            idx += nv    
+    
     def getBounds(self, node):
         """
         Getter for the bounds of the variables in the aggregate.
@@ -945,6 +959,18 @@ class Aggregate(AbstractAggregate):
             test this!
         """
         return np.hstack([var.getUpperBounds(node) for var in self])
+
+    def getInitialGuess(self, node=None) -> np.array:
+        """
+        [summary]
+
+        Args:
+            node ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        return np.hstack([var.getInitialGuess(node) for var in self])
 
 class StateAggregate(Aggregate):
     """

@@ -43,15 +43,28 @@ class SolverILQR(Solver):
             self._set_cost_k(k)
             self._set_constraint_k(k)
 
+        # set a default iteration callback
+        self.ilqr.setIterationCallback(self._iter_callback)
+
+
     def configure_rti(self) -> bool:
         self.opts['max_iter'] = 1
     
+
     def solve(self):
-        x0 = self.prb.getInitialState().reshape((self.nx, 1))
-        self.x_opt = np.hstack(([x0]*(self.N+1)))
-        self.ilqr.setStateInitialGuess(self.x_opt)
-        self.ilqr.setIterationCallback(self._iter_callback)
+        # get initial guess
+        x0 = self.prb.getState().getInitialGuess().reshape((self.nx, self.N+1))
+        u0 = self.prb.getInput().getInitialGuess().reshape((self.nu, self.N))
+
+        # set initial condition
+        x0[:, 0] = self.prb.getInitialState()
+
+        # set it to solver and solve
+        self.ilqr.setStateInitialGuess(x0)
+        self.ilqr.setInputInitialGuess(u0)
         self.ilqr.solve(self.max_iter)
+
+        # get solution
         self.x_opt = self.ilqr.getStateTrajectory()
         self.u_opt = self.ilqr.getInputTrajectory()
         
@@ -129,7 +142,7 @@ class SolverILQR(Solver):
             # get input variables for this function
             input_vars = f.getVariables()
 
-            # make input list dor this function
+            # make input list for this function
             input_list = list()
             for vname, vlist in input_vars.items():
                 var: cs.SX = vlist[0]
@@ -163,9 +176,10 @@ class SolverILQR(Solver):
 
 
     
-    def _iter_callback(self, xtrj, utrj, du, cost, defect, constr):
+    def _iter_callback(self, fpres):
         fmt = ' <#010.3f'
-        print(f'delta_u={du:{fmt}}  cost={cost:{fmt}}  constr={constr:{fmt}}  gap={defect:{fmt}}')
+        star = '*' if fpres.accepted else ' '
+        print(f'{star}alpha={fpres.alpha:{fmt}}  delta_u={fpres.step_length:{fmt}}  cost={fpres.cost:{fmt}}  constr={fpres.constraint_violation:{fmt}}  gap={fpres.defect_norm:{fmt}}')
 
 
                     
