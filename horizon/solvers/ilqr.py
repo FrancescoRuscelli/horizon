@@ -6,7 +6,7 @@ except ImportError:
 
 from .solver import Solver
 from horizon.problem import Problem
-from horizon.function import Function, CostFunction, Constraint
+from horizon.functions import Function, CostFunction, Constraint
 from typing import Dict, List
 from horizon.utils import integrators
 import casadi as cs

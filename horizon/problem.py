@@ -1,8 +1,8 @@
 import time
 
 import casadi as cs
-from horizon import function as fc
-from horizon import state_variables as sv
+from horizon import functions as fc
+from horizon import variables as sv
 import numpy as np
 import logging
 import sys
@@ -292,6 +292,21 @@ class Problem:
 
         # create internal representation of a constraint
         fun = fc.Constraint(name, g, used_var, used_par, nodes, bounds)
+
+        # as soon as it is created, the function is projected along the nodes
+        used_var_impl = list()
+        for var_name in used_var.keys():
+            var_impl = self.var_container.vars[var_name].getImpl(fun.getNodes())
+            # reshape them for all-in-one evaluation of function
+            var_impl_matrix = cs.reshape(var_impl, (fun.getDim(), len(fun.getNodes())))
+            # generic input --> row: dim // column: nodes
+            # [[x_0_0, x_1_0, ... x_N_0],
+            #  [x_0_1, x_1_1, ... x_N_1]]
+            used_var_impl.append(var_impl_matrix)
+
+        # compute function with all used variables on all active nodes
+        fun._project(used_var_impl)
+
 
         self.function_container.addFunction(fun)
 

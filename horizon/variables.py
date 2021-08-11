@@ -107,9 +107,9 @@ class SingleParameter(AbstractVariable):
         # todo what if I return all the nodes?
         return [-1]
 
-    def getValue(self, dummy_node):
+    def getValue(self, dummy_node=None):
         """
-        Getter for the value assigned to the parameter. It is the same troughout all the nodes, since this parameter is node-independent.
+        Getter for the value assigned to the parameter. It is the same throughout all the nodes, since this parameter is node-independent.
 
         Args:
             dummy_node: useless input, used to simplify the framework mechanics
@@ -193,7 +193,7 @@ class Parameter(AbstractVariable):
         for node in nodes:
             self.par_impl['n' + str(node)]['val'] = vals
 
-    def getImpl(self, node=None):
+    def getImpl(self, nodes=None):
         """
         Getter for the implemented parameter.
 
@@ -203,12 +203,16 @@ class Parameter(AbstractVariable):
         Returns:
             implemented instances of the abstract parameter
         """
-        if node is None:
-            vals = cs.vertcat([self.par_impl['n' + str(i)]['par'] for i in self.nodes])
-        else:
-            vals = self.par_impl['n' + str(node)]['par']
 
-        return vals
+        if nodes is None:
+            nodes = self.nodes
+
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        par_impl = cs.vertcat(*[self.par_impl['n' + str(i)]['par'] for i in nodes])
+
+        return par_impl
+
 
     def getValue(self, node=None):
         """
@@ -221,9 +225,7 @@ class Parameter(AbstractVariable):
             value/s of the parameter
         """
         if node is None:
-            vals = np.zeros([self.dim, len(self.nodes)])
-            for dim in range(self.dim):
-                vals[dim, :] = np.hstack([self.par_impl['n' + str(i)]['val'][dim] for i in self.nodes])
+            vals = np.hstack([self.par_impl['n' + str(i)]['val']for i in self.nodes])
         else:
             vals = self.par_impl['n' + str(node)]['val']
 
@@ -318,7 +320,7 @@ class SingleVariable(AbstractVariable):
 
         self.var_impl['w0'] = val
 
-    def getImpl(self, dummy_node):
+    def getImpl(self, dummy_node=None):
         """
         Getter for the implemented variable. Node is useless, since this variable is node-independent.
 
@@ -606,28 +608,28 @@ class Variable(AbstractVariable):
 
         self.var_impl = new_var_impl
 
-    def getImpl(self, node=None):
+    def getImpl(self, nodes=None):
         """
         Getter for the implemented variable.
 
         Args:
             node: node at which the variable is retrieved
 
-        TODO:
-            If not specified, this function should return an SX array with all the implemented variables along the nodes.
-
         Returns:
             implemented instances of the abstract variable
         """
-        # todo this is another option: reproject everytime one asks for .getImpl
-        # var_impl = self._projectN(node)
-        if node is None:
-            var_impl = cs.vertcat(*[self.var_impl['n' + str(i)]['var'] for i in self.nodes])
-        else:
-            var_impl = self.var_impl['n' + str(node)]['var']
+
+        # embed this in getVals? difference between cs.vertcat and np.hstack
+        if nodes is None:
+            nodes = self.nodes
+
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        var_impl = cs.vertcat(*[self.var_impl['n' + str(i)]['var'] for i in nodes])
+
         return var_impl
 
-    def _getVals(self, val_type, node):
+    def _getVals(self, val_type, nodes):
         """
         wrapper function to get the desired argument from the variable.
 
@@ -638,12 +640,13 @@ class Variable(AbstractVariable):
         Returns:
             value/s of the desired argument
         """
-        if node is None:
-            vals = np.zeros([self.shape[0], len(self.nodes)])
-            for dim in range(self.shape[0]):
-                vals[dim, :] = np.hstack([self.var_impl['n' + str(i)][val_type][dim] for i in self.nodes])
-        else:
-            vals = self.var_impl['n' + str(node)][val_type]
+        if nodes is None:
+            nodes = self.nodes
+
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        vals = np.hstack([self.var_impl['n' + str(i)][val_type] for i in nodes])
+
         return vals
 
     def getLowerBounds(self, node=None):
@@ -1124,6 +1127,31 @@ class VariablesContainer:
 
         return par
 
+    def getVarImplList(self, node=None):
+        """
+        Get all the variables implemented at desired node
+        Args:
+            node: desired node from which retrieve the variables. If not specified, function return a list with all the nodes
+
+        Returns:
+            a vector of all the variables in a node
+        """
+        if node is None:
+            var_impl_list = list()
+            for n in range(self.nodes):
+                for var in self.vars.values():
+                    var_impl = var.getImpl(n)
+                    if var_impl is not None:
+                        var_impl_list.append(var_impl)
+        else:
+            var_impl_list = list()
+            for var in self.vars.values():
+                var_impl = var.getImpl(node)
+                if var_impl is not None:
+                    var_impl_list.append(var.getImpl(node))
+
+        return cs.vertcat(*var_impl_list)
+
     def getParameterList(self):
         """
         Getter for the Parameters in the Variable Container. Ordered following the nodes order.
@@ -1321,26 +1349,26 @@ class VariablesContainer:
         """
         return self.vars_impl
 
-    def getVarImplList(self):
-        """
-        Getter for the list of all implemented variables. Used by Horizon Problem in buildProblem to retrieve the final vector of optimization variables.
-
-        todo:
-            should be embedded in getVarImpl or vice-versa
-
-        Returns:
-            SX vector (vertcat) of all the implemented variables at each node
-
-        """
-
-        state_var_impl_list = list()
-        for val in self.vars_impl.values():
-            for var_abstract in val.keys():
-                # get from state_var_impl the relative var
-
-                state_var_impl_list.append(val[var_abstract]['var'])
-
-        return cs.vertcat(*state_var_impl_list)
+    # def getVarImplList(self):
+    #     """
+    #     Getter for the list of all implemented variables. Used by Horizon Problem in buildProblem to retrieve the final vector of optimization variables.
+    #
+    #     todo:
+    #         should be embedded in getVarImpl or vice-versa
+    #
+    #     Returns:
+    #         SX vector (vertcat) of all the implemented variables at each node
+    #
+    #     """
+    #
+    #     state_var_impl_list = list()
+    #     for vars_in_node in self.vars_impl.values():
+    #         for var_abstract in vars_in_node.keys():
+    #             # get from var_impl the relative var
+    #
+    #             state_var_impl_list.append(vars_in_node[var_abstract]['var'])
+    #
+    #     return cs.vertcat(*state_var_impl_list)
 
     def _getVarInfoList(self, var_type):
         """
@@ -1440,7 +1468,7 @@ class VariablesContainer:
 
     def build(self):
         """
-        fill the dictionary "state_var_impl"
+        fill the dictionary "var_impl"
             - key: nodes (nNone, n0, n1, ...) nNone contains single variables that are not projected in nodes
             - val: dict with name and value of implemented variable
         """

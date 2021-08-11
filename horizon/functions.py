@@ -82,7 +82,7 @@ class Function:
         """
         return self.fun
 
-    def getFunctionImpl(self, node):
+    def getImpl(self, nodes = None):
         """
         Getter for the CASADI function implemented at the desired node
         Args:
@@ -91,26 +91,33 @@ class Function:
         Returns:
             instance of the CASADI function at the desired node
         """
-        if 'n' + str(node) in self.fun_impl:
-            return self.fun_impl['n' + str(node)]
-        else:
-            return None
+        if nodes is None:
+            nodes = self.nodes
 
-    def _project(self, node: int, used_vars: list):
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        fun_impl = cs.vertcat(*[self.fun_impl['n' + str(i)] for i in nodes])
+
+        return fun_impl
+
+    def _project(self, used_vars):
         """
         Implements the function at the desired node using the desired variables.
 
         Args:
-            node: the desired node at which the function is implemented
             used_vars: the variable used at the desired node
 
         Returns:
             the implemented function
         """
-        # print('projected fun "{}" with vars {}:'.format(self.fun, used_vars))
-        # todo are we 100% sure the order of the input variables is right?
-        self.fun_impl['n' + str(node)] = self.fun(*used_vars)
-        return self.fun_impl['n' + str(node)]
+        fun_eval = self.fun(*used_vars)
+
+        for i in range(len(self.nodes)):
+            self.fun_impl['n' + str(self.nodes[i])] = fun_eval[:, i]
+
+        # reshape it as a vector for solver
+        # fun_eval_vector = cs.reshape(fun_eval, (self.getDim() * len(self.getNodes()), 1))
+
 
     def getNodes(self) -> list:
         """
@@ -287,8 +294,6 @@ class Constraint(Function):
             if node in self.nodes:
                 self.bounds['n' + str(node)].update({'lb': bounds})
 
-        # print('function lower bounds: {}'.format(nodes))
-
     def setUpperBounds(self, bounds, nodes=None):
         """
         Setter for the upper bounds of the function.
@@ -325,7 +330,7 @@ class Constraint(Function):
         self.setLowerBounds(lb, nodes)
         self.setUpperBounds(ub, nodes)
 
-    def _getVals(self, val_type: str, node: int):
+    def _getVals(self, val_type: str, nodes=None):
         """
         wrapper function to get the desired argument from the constraint.
 
@@ -336,13 +341,15 @@ class Constraint(Function):
         Returns:
             value/s of the desired argument
         """
-        if node is None:
-            vals = np.zeros([self.f.shape[0], len(self.nodes)])
-            for dim in range(self.f.shape[0]):
-                vals[dim, :] = np.hstack([self.bounds['n' + str(i)][val_type][dim] for i in self.nodes])
-        else:
-            vals = self.bounds['n' + str(node)][val_type]
+        if nodes is None:
+            nodes = self.nodes
+
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        vals = np.hstack([self.bounds['n' + str(i)][val_type] for i in nodes])
+
         return vals
+
 
     def getLowerBounds(self, node: int =None):
         """
@@ -482,7 +489,7 @@ class FunctionsContainer:
             else:
                 raise Exception(f'Function name "{fun.getName()}" already inserted.')
         elif fun.getType() == 'generic':
-            print('function.py: generic not implemented')
+            print('functions.py: generic not implemented')
 
     def removeFunction(self, fun_name: str):
         """

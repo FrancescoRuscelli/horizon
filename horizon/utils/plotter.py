@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib import gridspec
 from horizon.problem import Problem
-from horizon.state_variables import InputVariable
+from horizon.variables import InputVariable
 import math
 import numpy as np
 import casadi as cs
