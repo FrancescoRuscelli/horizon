@@ -23,9 +23,9 @@ class GNSQPSolver(Solver):
         problem_dict = prb.createProblem()
 
         # create solver from prob
-        self.solver = SQPGaussNewtonSX('gnsqp', qp_solver_plugin,
-                                       problem_dict['f'], problem_dict['g'], problem_dict['x'],
-                                       self.opts)
+        F = cs.Function('f', [problem_dict['x']], [problem_dict['f']], ['x'], ['f'])
+        G = cs.Function('g', [problem_dict['x']], [problem_dict['g']], ['x'], ['g'])
+        self.solver = SQPGaussNewtonSX('gnsqp', qp_solver_plugin, F, G, self.opts)
 
     def solve(self) -> bool:
         # update bounds and initial guess
@@ -60,7 +60,7 @@ class GNSQPSolver(Solver):
                 var_nodes = self.prb.var_container.getVarAbstrDict(offset=False)[name].getNodes()
                 if node_number in var_nodes:
                     dim = var['var'].shape[0]
-                    self.x_opt[off:off + dim, node_number - var_nodes[0]] = sol['x'][pos:pos + dim].full().flatten()
+                    self.x_opt[off:off + dim, node_number - var_nodes[0]] = sol['x'][pos:pos + dim].flatten()
                     pos += dim
 
             # for loop handling input vars (pretty ugly: todo refactor)
@@ -71,7 +71,7 @@ class GNSQPSolver(Solver):
                 var_nodes = self.prb.var_container.getVarAbstrDict(offset=False)[name].getNodes()
                 if node_number in var_nodes:
                     dim = var['var'].shape[0]
-                    self.u_opt[off:off + dim, node_number - var_nodes[0]] = sol['x'][pos:pos + dim].full().flatten()
+                    self.u_opt[off:off + dim, node_number - var_nodes[0]] = sol['x'][pos:pos + dim].flatten()
                     pos += dim
 
         return True

@@ -28,7 +28,7 @@ class SolverConsistency(unittest.TestCase):
     #     self.assertLess(np.abs(uerr).max(), 1e-6)
     #
     def test_gnsqp(self):
-        gnsqp = make_problem('gnsqp', *self.matrices)
+        gnsqp = make_problem("gnsqp", *self.matrices)
         gnsqp.solve()
 
     #
@@ -46,10 +46,20 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
 
     # a random linear dynamics
     x1 = prob.createStateVariable('x1', dim=2)
+    x1.setBounds([-100, -100], [100, 100])
+
     x2 = prob.createStateVariable('x2', dim=2)
+    x2.setBounds([-100, -100], [100, 100])
+
     x3 = prob.createStateVariable('x3', dim=2)
+    x3.setBounds([-100, -100], [100, 100])
+
     u1 = prob.createInputVariable('u1', dim=2)
+    u1.setBounds([-100, -100], [100, 100])
+
     u2 = prob.createInputVariable('u2', dim=2)
+    u2.setBounds([-100, -100], [100, 100])
+
     x = prob.getState().getVars()
 
     xdot = cs.vertcat(
@@ -82,7 +92,10 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     # blocksqp needs exact hessian to be accurate
     opts = None
 
-    bsqpsol = Solver.make_solver("gnsqp", prob, dt, opts)
+    #if solver_type == "gnsqp":
+    #    opts = dict([("max_iter", 10)])
+
+    bsqpsol = Solver.make_solver(solver_type, prob, dt, opts)
     return bsqpsol
 
 
