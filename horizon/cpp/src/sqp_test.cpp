@@ -4,15 +4,12 @@
 int main()
 {
     auto x = casadi::SX::sym("x", 2);
+    std::cout<<"x: "<<x<<std::endl;
     auto u = casadi::SX::sym("u", 1);
+    std::cout<<"u: "<<u<<std::endl;
 
     auto f = 3.*x(0)*x(1)+ 2.*u;
     auto g = casadi::SX::vertcat({x, u});
-
-    casadi::Dict opts;
-    opts["max_iter"] = 5;
-    opts["printLevel"] = "none";
-    horizon::SQPGaussNewton<casadi::SX> sqp("sqp", "qpoases", f, g, casadi::SX::vertcat({x, u}), opts);
 
     casadi::DM x0(3,1);
     x0(0) = 2.;
@@ -26,6 +23,16 @@ int main()
     ub(0) = 1.5;
     ub(1) = 2.;
     ub(1) = 2.;
+
+
+    casadi::Dict opts;
+    opts["max_iter"] = 5;
+    opts["printLevel"] = "none";
+
+    /// CONSTRUCTOR 1
+    std::cout<<"USE MAIN CONSTRUCTOR"<<std::endl;
+    horizon::SQPGaussNewton<casadi::SX> sqp("sqp", "qpoases", f, g, casadi::SX::vertcat({x, u}), opts);
+
     auto solution = sqp.solve(x0, lb, ub, lb, ub);
 
     std::cout<<"solution: "<<solution["x"]<<"   f: "<<solution["f"]<<"  g: "<<solution["g"]<<std::endl;
@@ -35,4 +42,23 @@ int main()
     std::vector<double> cons = sqp.getConstraintNormIterations();
     for(unsigned int i = 0; i < var_trj.size(); ++i)
         std::cout<<"iter "<<i<<"-> sol: "<<var_trj[i]<<"    obj: "<<objs[i]<<"  cons: "<<cons[i]<<std::endl;
+
+    /// CONSTRUCTOR 2
+    std::cout<<"USE SECOND CONSTRUCTOR"<<std::endl;
+    auto F = casadi::Function("f", {casadi::SX::vertcat({x,u})}, {f}, {"x"}, {"f"});
+    auto G = casadi::Function("g", {casadi::SX::vertcat({x,u})}, {g}, {"x"}, {"g"});
+
+    horizon::SQPGaussNewton<casadi::SX> sqp2("sqp2", "qpoases", F, G, opts);
+
+    auto solution2 = sqp2.solve(x0, lb, ub, lb, ub);
+
+    std::cout<<"solution2: "<<solution2["x"]<<"   f: "<<solution2["f"]<<"  g: "<<solution2["g"]<<std::endl;
+
+    casadi::DMVector var_trj2 = sqp2.getVariableTrajectory();
+    std::vector<double> objs2 = sqp2.getObjectiveIterations();
+    std::vector<double> cons2 = sqp2.getConstraintNormIterations();
+    for(unsigned int i = 0; i < var_trj2.size(); ++i)
+        std::cout<<"iter "<<i<<"-> sol2: "<<var_trj2[i]<<"    obj2: "<<objs2[i]<<"  cons: "<<cons2[i]<<std::endl;
+
+
 }

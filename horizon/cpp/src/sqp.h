@@ -27,6 +27,58 @@ public:
      * @brief SQPGaussNewton SQP method with Gauss-Newton approximaiton (Hessian = J'J)
      * @param name solver name
      * @param qp_solver name internally used with casadi::conic (check casadi documetation for conic)
+     * @param f cost function as casadi::Function({x}, {f}, {"x"}, {"f"})
+     * @param g constraints as casadi::Function({x}, {g}, {"x"}, {"g"})
+     * @param opts options for SQPGaussNewton and internal conic (check casadi documetation for conic).
+     * NOTE: options for SQPGaussNewton are:
+     *                                          "max_iter": iterations used to find solution
+     *                                          "reinitialize_qpsolver": if true the internal qp solver is initialized EVERY iteration
+     */
+    SQPGaussNewton(const std::string& name, const std::string& qp_solver,
+                   const casadi::Function& f, const casadi::Function& g, const casadi::Dict& opts = casadi::Dict()):
+        _name(name), _qp_solver(qp_solver),
+        _max_iter(1000),
+        _reinitialize_qp_solver(false),
+        _opts(opts), _qp_opts(opts),
+        _alpha(1.)
+    {
+
+        if(f.n_in() != 1)
+            throw std::runtime_error("Expected inputs for f is 1");
+        if(f.n_out() != 1)
+            throw std::runtime_error("Expected outputs for f is 1");
+        if(g.n_in() != 1)
+            throw std::runtime_error("Expected inputs for g is 1");
+        if(g.n_out() != 1)
+            throw std::runtime_error("Expected ouptuts for g is 1");
+
+
+        _f = f;
+        _df = f.factory("df", {"x"}, {"jac:f:x"});
+
+        _g = g;
+        _dg = _g.factory("dg", {"x"}, {"jac:g:x"});
+
+        if(opts.contains("max_iter"))
+        {
+            _max_iter = opts.at("max_iter");
+            _qp_opts.erase("max_iter");
+        }
+
+        if(opts.contains("reinitialize_qpsolver"))
+        {
+            _reinitialize_qp_solver = opts.at("reinitialize_qpsolver");
+            _qp_opts.erase("reinitialize_qpsolver");
+        }
+
+
+        _variable_trj.resize(_max_iter+1, casadi::DM(f.size1_in(0), f.size2_in(0)));
+    }
+
+    /**
+     * @brief SQPGaussNewton SQP method with Gauss-Newton approximaiton (Hessian = J'J)
+     * @param name solver name
+     * @param qp_solver name internally used with casadi::conic (check casadi documetation for conic)
      * @param f RESIDUAL of cost function
      * @param g constraints
      * @param x variables
@@ -38,17 +90,16 @@ public:
     SQPGaussNewton(const std::string& name, const std::string& qp_solver,
                    const CASADI_TYPE& f, const CASADI_TYPE& g, const CASADI_TYPE& x, const casadi::Dict& opts = casadi::Dict()):
         _name(name), _qp_solver(qp_solver),
-        _x(x),
         _max_iter(1000),
         _reinitialize_qp_solver(false),
         _opts(opts), _qp_opts(opts),
         _alpha(1.)
     {
-        _f = casadi::Function("f", {_x}, {f}, {"x"}, {"f"});
+        _f = casadi::Function("f", {x}, {f}, {"x"}, {"f"});
         _df = _f.function().factory("df", {"x"}, {"jac:f:x"});
 
 
-        _g = casadi::Function("g",{_x}, {g}, {"x"}, {"g"});
+        _g = casadi::Function("g",{x}, {g}, {"x"}, {"g"});
         _dg = _g.factory("dg", {"x"}, {"jac:g:x"});
 
         if(opts.contains("max_iter"))
@@ -222,7 +273,6 @@ public:
 private:
 
 
-    CASADI_TYPE _x;
     std::string _name;
     std::string _qp_solver;
 
