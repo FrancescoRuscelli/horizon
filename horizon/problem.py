@@ -13,6 +13,7 @@ from typing import Union, Dict
 from collections.abc import Iterable
 import inspect
 
+
 class Problem:
     """
     Main class of Horizon, a tool for dynamic optimization using the symbolic framework CASADI. It is a useful tool
@@ -132,7 +133,7 @@ class Problem:
         Args:
             name: name of the parameter
             dim: dimension of the parameter
-            nodes: nodes the parameter is defined on. If not specified, the variable created is a Single Parameter.
+            nodes: nodes the parameter is defined on. If not specified, the variable is created on all the nodes.
 
         Returns:
             instance of Parameter
@@ -220,7 +221,7 @@ class Problem:
             return None
         return lb
 
-    def _getUsedVar(self, f: cs.SX) -> Dict[str, list]:
+    def _getUsedVar(self, f: cs.SX) -> list:
         """
         Finds all the variable used by a given CASADI function
 
@@ -228,20 +229,17 @@ class Problem:
             f: function to be checked
 
         Returns:
-            dictionary of used variable {name, list of variables}
+            list of used variable
 
         """
-        used_var = dict()
-        for name_var, value_var in self.var_container.getVarAbstrDict().items():
-            for var in value_var:
-                if cs.depends_on(f, var):
-                    if name_var not in used_var:
-                        used_var[name_var] = list()
-                    used_var[name_var].append(var)
+        used_var = list()
+        for var in self.var_container.getVarList(offset=True):
+            if cs.depends_on(f, var):
+                used_var.append(var)
 
         return used_var
 
-    def _getUsedPar(self, f) -> Dict[str, list]:
+    def _getUsedPar(self, f) -> list:
         """
         Finds all the parameters used by a given CASADI function
 
@@ -249,22 +247,57 @@ class Problem:
             f: function to be checked
 
         Returns:
-            dictionary of used parameters {name, list of parameters}
+            list of used parameters
 
         """
-        used_par = dict()
-        for name_par, value_par in self.var_container.getParAbstrDict().items():
-            if cs.depends_on(f, value_par):
-                if name_par not in used_par:
-                    used_par[name_par] = list()
-                used_par[name_par].append(value_par)
+        used_par = list()
+        for var in self.var_container.getParList():
+            if cs.depends_on(f, var):
+                used_par.append(var)
 
         return used_par
+
+        # used_par = dict()
+        # for name_par, value_par in self.var_container.getParAbstrDict().items():
+        #     if cs.depends_on(f, value_par):
+        #         if name_par not in used_par:
+        #             used_par[name_par] = list()
+        #         used_par[name_par].append(value_par)
+        #
+        # return used_par
+
+    def _getUsedVarImpl(self, fun, used_var_abstract):
+
+        used_var_impl = list()
+        for var in used_var_abstract:
+            var_impl = var.getImpl(fun.getNodes())
+            var_dim = var.getDim()
+            # reshape them for all-in-one evaluation of function
+            # this is getting all the generic variable x, even if the function has a slice of it x[0:2].
+            # It will work. The casadi function takes from x only the right slices afterwards.
+            var_impl_matrix = cs.reshape(var_impl, (var_dim, len(fun.getNodes())))
+            # generic input --> row: dim // column: nodes
+            # [[x_0_0, x_1_0, ... x_N_0],
+            #  [x_0_1, x_1_1, ... x_N_1]]
+            used_var_impl.append(var_impl_matrix)
+
+        return used_var_impl
+
+    def _getUsedParImpl(self, fun, used_par_abstract):
+
+        used_par_impl = list()
+        for par in used_par_abstract:
+            par_impl = par.getImpl(fun.getNodes())
+            par_dim = par.getDim()
+            par_impl_matrix = cs.reshape(par_impl, (par_dim, len(fun.getNodes())))
+            used_par_impl.append(par_impl_matrix)
+
+        return used_par_impl
 
     def createConstraint(self, name: str,
                          g,
                          nodes: Union[int, Iterable] = None,
-                         bounds = None):
+                         bounds=None):
         """
         Create a Constraint Function of the optimization problem.
 
@@ -284,7 +317,7 @@ class Problem:
             nodes = misc.checkNodes(nodes, range(self.nodes))
 
         # get vars that constraint depends upon
-        used_var = self._getUsedVar(g)
+        used_var = self._getUsedVar(g) # these now are fucking list!
         used_par = self._getUsedPar(g)
 
         if self.debug_mode:
@@ -293,20 +326,10 @@ class Problem:
         # create internal representation of a constraint
         fun = fc.Constraint(name, g, used_var, used_par, nodes, bounds)
 
-        # as soon as it is created, the function is projected along the nodes
-        used_var_impl = list()
-        for var_name in used_var.keys():
-            var_impl = self.var_container.vars[var_name].getImpl(fun.getNodes())
-            # reshape them for all-in-one evaluation of function
-            var_impl_matrix = cs.reshape(var_impl, (fun.getDim(), len(fun.getNodes())))
-            # generic input --> row: dim // column: nodes
-            # [[x_0_0, x_1_0, ... x_N_0],
-            #  [x_0_1, x_1_1, ... x_N_1]]
-            used_var_impl.append(var_impl_matrix)
+        used_var_impl = self._getUsedVarImpl(fun, used_var)
+        used_par_impl = self._getUsedParImpl(fun, used_par)
 
-        # compute function with all used variables on all active nodes
-        fun._project(used_var_impl)
-
+        fun._project(used_var_impl + used_par_impl)
 
         self.function_container.addFunction(fun)
 
@@ -314,7 +337,7 @@ class Problem:
 
     def createFinalConstraint(self, name: str,
                               g,
-                              bounds = None):
+                              bounds=None):
         """
         Create a Constraint Function only active on the last node of the optimization problem.
 
@@ -335,7 +358,7 @@ class Problem:
     def createIntermediateConstraint(self, name: str,
                                      g,
                                      nodes: Union[int, Iterable] = None,
-                                     bounds = None):
+                                     bounds=None):
         """
         Create a Constraint Function that can be active on all the nodes except the last one
 
@@ -380,6 +403,11 @@ class Problem:
             self.logger.debug(f'Creating Cost Function "{name}": active in nodes: {nodes}')
 
         fun = fc.CostFunction(name, j, used_var, used_par, nodes)
+
+        used_var_impl = self._getUsedVarImpl(fun, used_var)
+        used_par_impl = self._getUsedParImpl(fun, used_par)
+
+        fun._project(used_var_impl + used_par_impl)
 
         self.function_container.addFunction(fun)
 
@@ -473,219 +501,216 @@ class Problem:
         """
         return self.nodes
 
-    def createProblem(self, solver_type=None, solver_plugin: str = None, opts=None):
-        """
-        Generates the optimization problem, projecting all the variable and the function along the nodes, and initialize the solver.
-        For more information on the solver, check https://web.casadi.org/python-api/#nlp
-        If a solver is already set (using setSolver), that solver will be used.
+    # def createProblem(self, solver_type=None, solver_plugin: str = None, opts=None):
+    #     """
+    #     Generates the optimization problem, projecting all the variable and the function along the nodes, and initialize the solver.
+    #     For more information on the solver, check https://web.casadi.org/python-api/#nlp
+    #     If a solver is already set (using setSolver), that solver will be used.
+    #
+    #     Args:
+    #         solver_type: the desired solved. If not specified, 'nlpsol' is used
+    #         solver_plugin: the desired solver plugin. if not specified, 'ipopt' is used
+    #         opts: options used by the solver
+    #
+    #     Returns:
+    #         the created problem in the CASADI form: {'f': --, 'x': --, 'g': --, 'p': --}
+    #     """
+    #     # this is to reset both the constraints and the cost functions everytime I create a problem
+    #     self.var_container.clear()
+    #     self.function_container.clear()
+    #
+    #     # implement the abstract state variable with the current node
+    #     self.var_container.build()
+    #
+    #     # implement the constraints and the cost functions with the current node
+    #     self.function_container.build()
+    #
+    #     # get j, w, g
+    #     j = self.function_container.getCostFImplSum()
+    #     w = self.var_container.getVarImplList()
+    #     g = self.function_container.getCnstrFList()
+    #     p = self.var_container.getParameterList()
+    #
+    #     # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
+    #     # self.logger.debug('constraints unraveled:', cs.vertcat(*self. ...))
+    #     # self.logger.debug('cost functions unraveled:', cs.vertcat(*self. ...))
+    #     # self.logger.debug('cost function summed:', self.j)
+    #     # self.logger.debug('----------------------------------------------------')
+    #
+    #     # if self.debug_mode:
+    #     #     self.logger.debug('cost fun: {}'.format(j))
+    #     #     self.logger.debug('state variables: {}'.format(w))
+    #     #     self.logger.debug('constraints: {}'.format(g))
+    #
+    #     self.prob = {'f': j, 'x': w, 'g': g, 'p': p}
+    #
+    #     if self.solver is None:
+    #         if solver_type is None:
+    #             solver_type = self.default_solver
+    #         if solver_plugin is None:
+    #             solver_plugin = self.default_solver_plugin
+    #         if opts is None:
+    #             opts = dict()
+    #
+    #         self.solver = solver_type('solver', solver_plugin, self.prob, opts)
+    #
+    #     return self.prob
 
-        Args:
-            solver_type: the desired solved. If not specified, 'nlpsol' is used
-            solver_plugin: the desired solver plugin. if not specified, 'ipopt' is used
-            opts: options used by the solver
+    # def getProblem(self):
+    #     """
+    #     Getter of the created problem.
+    #     Returns:
+    #         the created problem in the CASADI form: {'f': --, 'x': --, 'g': --, 'p': --}
+    #     """
+    #     return self.prob
 
-        Returns:
-            the created problem in the CASADI form: {'f': --, 'x': --, 'g': --, 'p': --}
-        """
-        # this is to reset both the constraints and the cost functions everytime I create a problem
-        self.var_container.clear()
-        self.function_container.clear()
+    # def setSolver(self, solver):
+    #     """
+    #     Set a custom solver for the optimization problem.
+    #     Args:
+    #         solver: the desired solver to be used.
+    #     """
+    #     self.solver = solver
 
-        # implement the abstract state variable with the current node
-        self.var_container.build()
+    # def getSolver(self):
+    #     """
+    #     Get the solver used in the optimization problem.
+    #
+    #     Returns:
+    #         instance of the solver
+    #     """
+    #     return self.solver
 
-        # implement the constraints and the cost functions with the current node
-        self.function_container.build()
+    # def updateProblem(self):
+    #     """
+    #     Compute updated initial guess and bounds
+    #
+    #     Returns:
+    #         tuple containing the nlp's initial guess, bounds for the optimization
+    #         variables and constraint function
+    #     """
+    #
+    #     if self.prob is None:
+    #         self.logger.warning('Problem is not created. Nothing to solve!')
+    #         return None
+    #
+    #     self.var_container.updateBounds()
+    #     self.var_container.updateInitialGuess()
+    #     self.var_container.updateParameters()
+    #
+    #     w0 = self.var_container.getInitialGuessList()
+    #
+    #     if self.debug_mode:
+    #         self.logger.debug('Initial guess vector for variables: {}'.format(self.var_container.getInitialGuessList()))
+    #
+    #     lbw = self.var_container.getLowerBoundsList()
+    #     ubw = self.var_container.getUpperBoundsList()
+    #
+    #     lbg = self.function_container.getLowerBoundsList()
+    #     ubg = self.function_container.getUpperBoundsList()
+    #
+    #     p = self.var_container.getParameterValues()
+    #
+    #     return w0, lbw, ubw, lbg, ubg, p
 
-        # get j, w, g
-        j = self.function_container.getCostFImplSum()
-        w = self.var_container.getVarImplList()
-        g = self.function_container.getCnstrFList()
-        p = self.var_container.getParameterList()
+    # def solveProblem(self) -> Union[bool, dict]:
+    #     """
+    #     Solves the problem after updating the bounds, the initial guesses and the parameters of the problem.
+    #
+    #     Returns:
+    #         the solution of the problem
+    #     """
+    #
+    #     if self.prob is None:
+    #         self.logger.warning('Problem is not created. Nothing to solve!')
+    #         return None
+    #
+    #     w0, lbw, ubw, lbg, ubg, p = self.updateProblem()
+    #
+    #     if self.debug_mode:
+    #         j = self.function_container.getCostFImplSum()
+    #         w = self.var_container.getVarImplList()
+    #         g = self.function_container.getCnstrFList()
+    #
+    #         self.logger.debug('================')
+    #         self.logger.debug(f'len w: {w.shape}')
+    #         self.logger.debug(f'len lbw: {len(lbw)}')
+    #         self.logger.debug(f'len ubw: {len(ubw)}')
+    #         self.logger.debug(f'len w0: {len(w0)}')
+    #         self.logger.debug(f'len g: {g.shape}')
+    #         self.logger.debug(f'len lbg: {len(lbg)}')
+    #         self.logger.debug(f'len ubg: {len(ubg)}')
+    #         self.logger.debug(f'len p: {p.shape}')
+    #
+    #         # self.logger.debug('================')
+    #         self.logger.debug(f'w: {w}')
+    #         self.logger.debug(f'lbw: {lbw}')
+    #         self.logger.debug(f'ubw: {ubw}')
+    #         self.logger.debug(f'g: {g}')
+    #         self.logger.debug(f'lbg: {lbg}')
+    #         self.logger.debug(f'ubg: {ubg}')
+    #         self.logger.debug(f'j: {j}')
+    #         self.logger.debug(f'p: {p}')
+    #     # t_to_set_up = time.time() - t_start
+    #     # print('T to set up:', t_to_set_up)
+    #     # t_start = time.time()
+    #
+    #     if self.solver is None:
+    #         return None
+    #
+    #     if 'p' in inspect.getfullargspec(self.solver)[0]:
+    #         self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
+    #     else:
+    #         self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+    #
+    #     # t_to_solve = time.time() - t_start
+    #     # print('T to solve:', t_to_solve)
+    #     # t_start = time.time()
+    #
+    #     if self.crash_if_suboptimal:
+    #         if not self.solver.stats()['success']:
+    #             raise Exception('Optimal solution NOT found.')
+    #
+    #     w_opt = self.sol['x'].full().flatten()
+    #
+    #     # split solution for each variable
+    #     solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in
+    #                      self.var_container.getVarAbstrDict(offset=False).items()}
+    #
+    #     pos = 0
+    #     for node, val in self.var_container.getVarImplDict().items():
+    #         if node == 'nNone':
+    #             for name, var in val.items():
+    #                 dim = var['var'].shape[0]
+    #                 solution_dict[name][:, 0] = w_opt[pos:pos + dim]
+    #                 pos = pos + dim
+    #         else:
+    #             for name, var in val.items():
+    #                 node_number = int(node[node.index('n') + 1:])
+    #                 var_nodes = self.var_container.getVarAbstrDict(offset=False)[name].getNodes()
+    #                 if node_number in var_nodes:
+    #                     dim = var['var'].shape[0]
+    #                     solution_dict[name][:, node_number - var_nodes[0]] = w_opt[pos:pos + dim]
+    #                     pos = pos + dim
+    #
+    #     # t_to_finish = time.time() - t_start
+    #     # print('T to finish:', t_to_finish)
+    #     self.__solution = solution_dict
+    #     return self.__solution
 
-        # self.logger.debug('state var unraveled:', self.state_var_container.getVarImplList())
-        # self.logger.debug('constraints unraveled:', cs.vertcat(*self. ...))
-        # self.logger.debug('cost functions unraveled:', cs.vertcat(*self. ...))
-        # self.logger.debug('cost function summed:', self.j)
-        # self.logger.debug('----------------------------------------------------')
-
-        # if self.debug_mode:
-        #     self.logger.debug('cost fun: {}'.format(j))
-        #     self.logger.debug('state variables: {}'.format(w))
-        #     self.logger.debug('constraints: {}'.format(g))
-
-        self.prob = {'f': j, 'x': w, 'g': g, 'p': p}
-
-        if self.solver is None:
-            if solver_type is None:
-                solver_type = self.default_solver
-            if solver_plugin is None:
-                solver_plugin = self.default_solver_plugin
-            if opts is None:
-                opts = dict()
-
-            self.solver = solver_type('solver', solver_plugin, self.prob, opts)
-
-        return self.prob
-
-    def getProblem(self):
-        """
-        Getter of the created problem.
-        Returns:
-            the created problem in the CASADI form: {'f': --, 'x': --, 'g': --, 'p': --}
-        """
-        return self.prob
-
-    def setSolver(self, solver):
-        """
-        Set a custom solver for the optimization problem.
-        Args:
-            solver: the desired solver to be used.
-        """
-        self.solver = solver
-
-    def getSolver(self):
-        """
-        Get the solver used in the optimization problem.
-
-        Returns:
-            instance of the solver
-        """
-        return self.solver
-
-    def updateProblem(self):
-        """
-        Compute updated initial guess and bounds
-
-        Returns:
-            tuple containing the nlp's initial guess, bounds for the optimization
-            variables and constraint function
-        """
-
-        if self.prob is None:
-            self.logger.warning('Problem is not created. Nothing to solve!')
-            return None
-
-        self.var_container.updateBounds()
-        self.var_container.updateInitialGuess()
-        self.var_container.updateParameters()
-
-        w0 = self.var_container.getInitialGuessList()
-
-        if self.debug_mode:
-            self.logger.debug('Initial guess vector for variables: {}'.format(self.var_container.getInitialGuessList()))
-
-        lbw = self.var_container.getLowerBoundsList()
-        ubw = self.var_container.getUpperBoundsList()
-
-        lbg = self.function_container.getLowerBoundsList()
-        ubg = self.function_container.getUpperBoundsList()
-
-        p = self.var_container.getParameterValues()
-
-        return w0, lbw, ubw, lbg, ubg, p
-
-
-
-    def solveProblem(self) -> Union[bool, dict]:
-        """
-        Solves the problem after updating the bounds, the initial guesses and the parameters of the problem.
-
-        Returns:
-            the solution of the problem
-        """
-        
-        if self.prob is None:
-            self.logger.warning('Problem is not created. Nothing to solve!')
-            return None
-
-        w0, lbw, ubw, lbg, ubg, p = self.updateProblem()
-
-        if self.debug_mode:
-            j = self.function_container.getCostFImplSum()
-            w = self.var_container.getVarImplList()
-            g = self.function_container.getCnstrFList()
-
-            self.logger.debug('================')
-            self.logger.debug(f'len w: {w.shape}')
-            self.logger.debug(f'len lbw: {len(lbw)}')
-            self.logger.debug(f'len ubw: {len(ubw)}')
-            self.logger.debug(f'len w0: {len(w0)}')
-            self.logger.debug(f'len g: {g.shape}')
-            self.logger.debug(f'len lbg: {len(lbg)}')
-            self.logger.debug(f'len ubg: {len(ubg)}')
-            self.logger.debug(f'len p: {p.shape}')
-
-            # self.logger.debug('================')
-            self.logger.debug(f'w: {w}')
-            self.logger.debug(f'lbw: {lbw}')
-            self.logger.debug(f'ubw: {ubw}')
-            self.logger.debug(f'g: {g}')
-            self.logger.debug(f'lbg: {lbg}')
-            self.logger.debug(f'ubg: {ubg}')
-            self.logger.debug(f'j: {j}')
-            self.logger.debug(f'p: {p}')
-        # t_to_set_up = time.time() - t_start
-        # print('T to set up:', t_to_set_up)
-        # t_start = time.time()
-
-        if self.solver is None:
-            return None
-
-        if 'p' in inspect.getfullargspec(self.solver)[0]:
-            self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
-        else:
-            self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
-
-
-        # t_to_solve = time.time() - t_start
-        # print('T to solve:', t_to_solve)
-        # t_start = time.time()
-
-        if self.crash_if_suboptimal:
-            if not self.solver.stats()['success']:
-                raise Exception('Optimal solution NOT found.')
-
-        w_opt = self.sol['x'].full().flatten()
-
-        # split solution for each variable
-        solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in
-                         self.var_container.getVarAbstrDict(offset=False).items()}
-
-        pos = 0
-        for node, val in self.var_container.getVarImplDict().items():
-            if node == 'nNone':
-                for name, var in val.items():
-                    dim = var['var'].shape[0]
-                    solution_dict[name][:, 0] = w_opt[pos:pos + dim]
-                    pos = pos + dim
-            else:
-                for name, var in val.items():
-                    node_number = int(node[node.index('n') + 1:])
-                    var_nodes = self.var_container.getVarAbstrDict(offset=False)[name].getNodes()
-                    if node_number in var_nodes:
-                        dim = var['var'].shape[0]
-                        solution_dict[name][:, node_number - var_nodes[0]] = w_opt[pos:pos + dim]
-                        pos = pos + dim
-
-        # t_to_finish = time.time() - t_start
-        # print('T to finish:', t_to_finish)
-        self.__solution = solution_dict
-        return self.__solution
-
-    def getSolution(self) -> dict:
-        """
-        Getter for the ordered solution of the problem.
-                * keys -> the name of the decision variables
-                * values -> the values of the decision variables over the nodes
-
-        Returns:
-            the solution of the problem as a dict
-
-
-
-        """
-        return self.__solution
+    # def getSolution(self) -> dict:
+    #     """
+    #     Getter for the ordered solution of the problem.
+    #             * keys -> the name of the decision variables
+    #             * values -> the values of the decision variables over the nodes
+    #
+    #     Returns:
+    #         the solution of the problem as a dict
+    #
+    #
+    #
+    #     """
+    #     return self.__solution
 
     def getVariables(self, name: str = None):
         """
@@ -698,9 +723,9 @@ class Problem:
             the desired variable/s
         """
         if name is None:
-            var = self.var_container.getVarAbstrDict(offset=False)
+            var = self.var_container.getVarDict(offset=False)
         else:
-            var = self.var_container.getVarAbstrDict(offset=False)[name]
+            var = self.var_container.getVarDict(offset=False)[name]
 
         return var
 
@@ -845,4 +870,4 @@ class Problem:
 
 
 if __name__ == '__main__':
-   pass
+    pass

@@ -20,10 +20,8 @@ class NlpsolSolver(Solver):
         self.pars_impl = dict()
 
         # dictionary of implemented variables
-        self.var_container.clear()
-        self.fun_container.clear()
 
-        self.build()
+        j, w, g, p = self.build()
         # implement the abstract state variable with the current node
         # self.prb.var_container.build()
         # implement the constraints and the cost functions with the current node
@@ -36,10 +34,10 @@ class NlpsolSolver(Solver):
         # p = self.var_container.getParameterList()
 
 
-        # self.prob_dict = {'f': j, 'x': w, 'g': g, 'p': p}
+        self.prob_dict = {'f': j, 'x': w, 'g': g, 'p': p}
 
         # create solver from prob
-        # self.solver = cs.nlpsol('solver', solver_plugin, self.prob_dict, self.opts)
+        self.solver = cs.nlpsol('solver', solver_plugin, self.prob_dict, self.opts)
 
     def build(self):
         """
@@ -50,7 +48,7 @@ class NlpsolSolver(Solver):
 
         # todo it seems tht i only need self.vars in var_container.
         # ORDERED AS VARIABLES
-        # variables
+        # build variables
         var_list = list()
         for var in self.var_container.vars.values():
             var_list.append(var.getImpl())
@@ -58,7 +56,7 @@ class NlpsolSolver(Solver):
         w = cs.vertcat(*var_list) #
 
 
-        # parameters
+        # build parameters
         par_list = list()
         for par in self.var_container.pars.values():
             par_list.append(par.getImpl())
@@ -144,65 +142,71 @@ class NlpsolSolver(Solver):
         # ===================================================================================
         # ===================================================================================
         # or ...
+
+        # build constraint functions list
         fun_list = list()
         for fun in self.fun_container.cnstr_container.values():
             fun_list.append(fun.getImpl())
         g = cs.vertcat(*fun_list)
 
-
+        # build cost functions list
         fun_list = list()
         for fun in self.fun_container.costfun_container.values():
             fun_list.append(fun.getImpl())
-        j = cs.vertcat(*fun_list)
+        j = cs.sum1(cs.vertcat(*fun_list))
 
         print(f'g ({g.shape[0]}): {g}')
         print(f'j ({j.shape[0]}): {j}')
 
 
+        return j, w, g, p
+
 
     def solve(self) -> bool:
-        # update bounds and initial guess
+        # update lower bounds of variables
         lb_list = list()
         for var in self.var_container.vars.values():
             lb_list.append(var.getLowerBounds())
         lbw = cs.vertcat(*lb_list)
 
+        # update upper bounds of variables
         ub_list = list()
         for var in self.var_container.vars.values():
             ub_list.append(var.getUpperBounds())
         ubw = cs.vertcat(*ub_list)
 
+        # update initial guess of variables
         w0_list = list()
         for var in self.var_container.vars.values():
             w0_list.append(var.getInitialGuess())
         w0 = cs.vertcat(*w0_list)
         # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
 
+        # update parameters
         p_list = list()
         for par in self.var_container.pars.values():
             p_list.append(par.getValue())
         p = cs.vertcat(*p_list)
 
-        print(f'lbw ({lbw.shape[0]}): {lbw}')
-        print(f'ubw ({ubw.shape[0]}): {ubw}')
-        print(f'w0 ({w0.shape[0]}): {w0}')
-        print(f'p ({p.shape[0]}): {p}')
-
-
+        # update lower bounds of constraints
         lbg_list = list()
         for fun in self.fun_container.cnstr_container.values():
             lbg_list.append(fun.getLowerBounds())
         lbg = cs.vertcat(*lbg_list)
 
+        # update upper bounds of constraints
         ubg_list = list()
         for fun in self.fun_container.cnstr_container.values():
             ubg_list.append(fun.getUpperBounds())
         ubg = cs.vertcat(*ubg_list)
 
+        print(f'lbw ({lbw.shape[0]}): {lbw}')
+        print(f'ubw ({ubw.shape[0]}): {ubw}')
+        print(f'w0 ({w0.shape[0]}): {w0}')
+        print(f'p ({p.shape[0]}): {p}')
         print(f'lbg ({lbg.shape[0]}): {lbg}')
         print(f'ubg ({ubg.shape[0]}): {ubg}')
 
-        exit()
         # getlowerboundList(node):  to be defined in variables.py....
         #     ublist = list()
         #     for var in self.vars.values():
@@ -210,8 +214,6 @@ class NlpsolSolver(Solver):
         #     return ublist
         # todo careful about ordering!
         #   this list should be ordered as the var_impl_list. Both comes from the same vars?
-
-        w0, lbw, ubw, lbg, ubg, p = self.prb.updateProblem()
 
         # solve
         sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
@@ -266,34 +268,62 @@ if __name__ == '__main__':
     dt = 0.01
     prob = Problem(10)
     x = prob.createStateVariable('x', 2)
-    y = prob.createInputVariable('y', 2)
-    z = prob.createSingleVariable('z', 2)
+    # y = prob.createStateVariable('y', 4)
+    u = prob.createInputVariable('u', 2)
+    # z = prob.createSingleVariable('z', 4)
+    # j = prob.createSingleParameter('j', 1)
+    # p = prob.createParameter('p', 2)
+    #
+    x_next = x.getVarOffset(1)
+    x_prev = x.getVarOffset(-1)
+    # f = prob.createSingleParameter('f', 4)
+    #
+    # a = prob.createVariable('a', 2, nodes=range(0, 5))
+    #
+    # x.setInitialGuess([1, 1], nodes=0)
+    # x.setInitialGuess([10, 10], nodes=10)
+    # a.setBounds([0, 0], [5, 5])
+    #
+    # p.assign([7, 7], nodes=range(0, 4))
+    # p.assign([2, 2], nodes=4)
+    #
+    # j.assign([44])
+    #
+    # print(z.getUpperBounds(range(3, 5)))
 
-    p = prob.createParameter('p', 2)
-    f = prob.createSingleParameter('f', 4)
-
-    a = prob.createVariable('a', 2, nodes=range(0, 5))
-
-    x.setInitialGuess([1,1], nodes=0)
-    x.setInitialGuess([10,10], nodes=10)
-    a.setBounds([0,0], [5, 5])
-    cnsrt1 = prob.createIntermediateConstraint('cnsrt1', x + y)
-
+    # cnsrt0 = prob.createIntermediateConstraint('cnsrt0', y[2:4] + u)
+    # =========
+    # cnsrt1 = prob.createIntermediateConstraint('cnsrt1', x + u)
+    # cnsrt1.setLowerBounds([-np.inf, -np.inf])
     # this is new, bitches!
-    print(cnsrt1.getImpl(2)) # the constraints get implemented as soon as it get created muahahah
-    cnsrt2 = prob.createConstraint('cnsrt2', x * y, nodes=[3, 8])
+    # print(cnsrt1.getImpl(2)) # the constraints get implemented as soon as it get created muahahah
+    # =========
+    # cnsrt2 = prob.createConstraint('cnsrt2', x * y[0:2], nodes=[3, 8])
+    # =========
+    # cnsrt3 = prob.createConstraint('cnsrt3', x + p)
+    # =========
+    # cnsrt4 = prob.createConstraint('cnsrt4', x + f[0:2])
+    # =========
+    # cnsrt5 = prob.createConstraint('cnsrt5', p + f[0:2] + z[2:4])
+    # =========
+    # cnsrt6 = prob.createConstraint('cnsrt6', x + z[0:2])
+    # =========
+    # this should be the same
+    cnsrt7 = prob.createIntermediateConstraint('cnsrt7', x_next - x)
+    cnsrt8 = prob.createConstraint('cnsrt8', x - x_prev, nodes=range(1, N+1))
 
-    cost1 = prob.createCostFunction('cost1', x+p)
 
-    cnsrt1.setLowerBounds([-np.inf, -np.inf])
+    # cost1 = prob.createCostFunction('cost1', x+p)
+    # =========
 
-
+    # todo check if everything is allright!
     for i in range(N):
         x.setLowerBounds(np.array(range(i, i+2)), nodes=i)
 
-    p.assign([20, 20], nodes=4)
-    f.assign([121, 122, 120, 119])
-    xdot = y
+    # p.assign([20, 20], nodes=4)
+    # f.assign([121, 122, 120, 119])
+    # xdot = cs.vertcat(y, u)
+    xdot = cs.vertcat(u)
     prob.setDynamics(xdot)
     sol = NlpsolSolver(prb=prob, dt=dt, opts=dict(), solver_plugin='ipopt')
     sol.solve()

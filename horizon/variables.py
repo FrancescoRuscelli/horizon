@@ -1,3 +1,4 @@
+import copy
 from typing import List
 import casadi as cs
 from collections import OrderedDict
@@ -46,6 +47,44 @@ class AbstractVariable(cs.SX):
         """
         return self.dim
 
+class OffsetVariable(AbstractVariable):
+    def __init__(self, tag, dim, nodes, offset, var_impl):
+        """
+        Initialize the Offset Variable.
+
+        Args:
+            tag: name of the variable
+            dim: dimension of the variable
+            nodes: nodes the variable is defined on
+            offset: offset of the variable (which (previous/next) node it refers to
+            var_impl: implemented variables it refers to (of base class Variable)
+        """
+        super(OffsetVariable, self).__init__(tag, dim)
+
+        self.nodes = nodes
+        self.offset = offset
+        self.var_impl = var_impl
+
+    def getImpl(self, nodes=None):
+        """
+        Getter for the implemented offset variable.
+
+        Args:
+            node: node at which the variable is retrieved
+
+        Returns:
+            implemented instances of the abstract offsetted variable
+        """
+
+        if nodes is None:
+            nodes = self.nodes
+
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        var_impl = cs.vertcat(*[self.var_impl['n' + str(i + self.offset)]['var'] for i in nodes])
+
+        return var_impl
+
 class SingleParameter(AbstractVariable):
     """
     Single Parameter of Horizon Problem.
@@ -85,7 +124,7 @@ class SingleParameter(AbstractVariable):
 
         self.par_impl['val'] = vals
 
-    def getImpl(self, node=None):
+    def getImpl(self, nodes=None):
         """
         Getter for the implemented parameter. Node is useless, since this parameter is node-independent.
 
@@ -95,7 +134,12 @@ class SingleParameter(AbstractVariable):
         Returns:
             instance of the implemented parameter
         """
-        return self.par_impl['par']
+        if nodes is None:
+            par_impl = self.par_impl['par']
+        else:
+            nodes = misc.checkNodes(nodes)
+            par_impl = cs.vertcat(*[self.par_impl['par'] for i in nodes])
+        return par_impl
 
     def getNodes(self):
         """
@@ -107,7 +151,7 @@ class SingleParameter(AbstractVariable):
         # todo what if I return all the nodes?
         return [-1]
 
-    def getValue(self, dummy_node=None):
+    def getValue(self, nodes=None):
         """
         Getter for the value assigned to the parameter. It is the same throughout all the nodes, since this parameter is node-independent.
 
@@ -117,8 +161,12 @@ class SingleParameter(AbstractVariable):
         Returns:
             value assigned to the parameter.
         """
-        return self.par_impl['val']
-
+        if nodes is None:
+            par_impl = self.par_impl['val']
+        else:
+            nodes = misc.checkNodes(nodes)
+            par_impl = cs.vertcat(*[self.par_impl['val'] for i in nodes])
+        return par_impl
 
 class Parameter(AbstractVariable):
     """
@@ -171,7 +219,7 @@ class Parameter(AbstractVariable):
         """
         return self.nodes
 
-    def assign(self, vals, nodes):
+    def assign(self, vals, nodes=None):
         """
        Assign a value to the parameter at a desired node. Can be assigned also after the problem is built, before solving the problem.
        If not assigned, its default value is zero.
@@ -214,7 +262,7 @@ class Parameter(AbstractVariable):
         return par_impl
 
 
-    def getValue(self, node=None):
+    def getValue(self, nodes=None):
         """
         Getter for the value of the parameter.
 
@@ -224,12 +272,14 @@ class Parameter(AbstractVariable):
         Returns:
             value/s of the parameter
         """
-        if node is None:
-            vals = np.hstack([self.par_impl['n' + str(i)]['val']for i in self.nodes])
-        else:
-            vals = self.par_impl['n' + str(node)]['val']
+        if nodes is None:
+            nodes = self.nodes
 
-        return vals
+        nodes = misc.checkNodes(nodes, self.nodes)
+
+        par_impl = cs.vertcat(*[self.par_impl['n' + str(i)]['val'] for i in nodes])
+
+        return par_impl
 
     def __reduce__(self):
         """
@@ -239,8 +289,6 @@ class Parameter(AbstractVariable):
             instance of this element serialized
         """
         return (self.__class__, (self.tag, self.dim, self.nodes,))
-
-
 
 class SingleVariable(AbstractVariable):
     """
@@ -320,7 +368,7 @@ class SingleVariable(AbstractVariable):
 
         self.var_impl['w0'] = val
 
-    def getImpl(self, dummy_node=None):
+    def getImpl(self, nodes=None):
         """
         Getter for the implemented variable. Node is useless, since this variable is node-independent.
 
@@ -330,10 +378,15 @@ class SingleVariable(AbstractVariable):
         Returns:
             implemented instances of the abstract variable
         """
-        var_impl = self.var_impl['var']
+        if nodes is None:
+            var_impl = self.var_impl['var']
+        else:
+            nodes = misc.checkNodes(nodes)
+            var_impl = cs.vertcat(*[self.var_impl['var'] for i in nodes])
         return var_impl
 
-    def _getVals(self, val_type, dummy_node):
+
+    def _getVals(self, val_type, nodes):
         """
         wrapper function to get the desired argument from the variable.
 
@@ -344,13 +397,12 @@ class SingleVariable(AbstractVariable):
         Returns:
             value/s of the desired argument
         """
-        if dummy_node is None:
-            # returns the value in the form of an array
-            vals = np.array([self.var_impl[val_type]]).T
+        if nodes is None:
+            var_impl = self.var_impl[val_type]
         else:
-            vals = self.var_impl[val_type]
-
-        return vals
+            nodes = misc.checkNodes(nodes)
+            var_impl = cs.vertcat(*[self.var_impl[val_type] for i in nodes])
+        return var_impl
 
     def getLowerBounds(self, dummy_node=None):
         """
@@ -455,7 +507,6 @@ class Variable(AbstractVariable):
 
         self.nodes = nodes
 
-        # self.var = cs.SX.sym(tag, dim)
         self.var_offset = dict()
         self.var_impl = dict()
 
@@ -561,8 +612,7 @@ class Variable(AbstractVariable):
             createTag = lambda name, node: name + str(node) if node is not None else name
 
             new_tag = createTag(self.tag, node)
-            var = AbstractVariable(new_tag, self.dim)
-            var.offset = int(node)
+            var = OffsetVariable(new_tag, self.dim, self.nodes, int(node), self.var_impl)
 
             self.var_offset[node] = var
         return var
@@ -727,7 +777,6 @@ class Variable(AbstractVariable):
             instance of this element serialized
         """
         return (self.__class__, (self.tag, self.dim, self.nodes, ))
-
 
 class InputVariable(Variable):
     """
@@ -1127,85 +1176,85 @@ class VariablesContainer:
 
         return par
 
-    def getVarImplList(self, node=None):
-        """
-        Get all the variables implemented at desired node
-        Args:
-            node: desired node from which retrieve the variables. If not specified, function return a list with all the nodes
+    # def getVarImplList(self, node=None):
+    #     """
+    #     Get all the variables implemented at desired node
+    #     Args:
+    #         node: desired node from which retrieve the variables. If not specified, function return a list with all the nodes
+    #
+    #     Returns:
+    #         a vector of all the variables in a node
+    #     """
+    #     if node is None:
+    #         var_impl_list = list()
+    #         for n in range(self.nodes):
+    #             for var in self.vars.values():
+    #                 var_impl = var.getImpl(n)
+    #                 if var_impl is not None:
+    #                     var_impl_list.append(var_impl)
+    #     else:
+    #         var_impl_list = list()
+    #         for var in self.vars.values():
+    #             var_impl = var.getImpl(node)
+    #             if var_impl is not None:
+    #                 var_impl_list.append(var.getImpl(node))
+    #
+    #     return cs.vertcat(*var_impl_list)
 
-        Returns:
-            a vector of all the variables in a node
-        """
-        if node is None:
-            var_impl_list = list()
-            for n in range(self.nodes):
-                for var in self.vars.values():
-                    var_impl = var.getImpl(n)
-                    if var_impl is not None:
-                        var_impl_list.append(var_impl)
-        else:
-            var_impl_list = list()
-            for var in self.vars.values():
-                var_impl = var.getImpl(node)
-                if var_impl is not None:
-                    var_impl_list.append(var.getImpl(node))
+    # def getParameterList(self):
+    #     """
+    #     Getter for the Parameters in the Variable Container. Ordered following the nodes order.
+    #
+    #     Returns:
+    #         a list of all the abstract parameters
+    #     """
+    #     # self.pars_impl --> {node: {parameter_name: par, val}}
+    #     par_impl_list = list()
+    #     # for each node
+    #     for node in self.pars_impl.values():
+    #         # for each parameter in node
+    #         for parameter in node.keys():
+    #             # get from state_var_impl the relative var
+    #             par_impl_list.append(node[parameter]['par'])
+    #
+    #     return cs.vertcat(*par_impl_list)
 
-        return cs.vertcat(*var_impl_list)
+    # def getParameterValues(self, name=None):
+    #     """
+    #     Getter for the assigned values to the desired Parameter in the Variable Container. Ordered following the nodes order.
+    #
+    #     Args:
+    #         name: name of the desired parameter. If not specified, returns the values of the parameter along all the nodes
+    #
+    #     Returns:
+    #         values of the parameters
+    #     """
+    #     # self.pars_impl --> {node: {parameter_name: par, val}}
+    #     par_impl_list = list()
+    #     if name is None:
+    #         # for each node
+    #         for node in self.pars_impl.values():
+    #             for parameter in node.keys():
+    #                 # get from state_var_impl the relative var
+    #                 par_impl_list.append(node[parameter]['val'])
+    #
+    #         return cs.vertcat(*par_impl_list)
+    #
+    #     else:
+    #         # todo can I do this elsewhere in getPar and getVar? it's nice!
+    #         return self.pars[name].getValue()
 
-    def getParameterList(self):
-        """
-        Getter for the Parameters in the Variable Container. Ordered following the nodes order.
-
-        Returns:
-            a list of all the abstract parameters
-        """
-        # self.pars_impl --> {node: {parameter_name: par, val}}
-        par_impl_list = list()
-        # for each node
-        for node in self.pars_impl.values():
-            # for each parameter in node
-            for parameter in node.keys():
-                # get from state_var_impl the relative var
-                par_impl_list.append(node[parameter]['par'])
-
-        return cs.vertcat(*par_impl_list)
-
-    def getParameterValues(self, name=None):
-        """
-        Getter for the assigned values to the desired Parameter in the Variable Container. Ordered following the nodes order.
-
-        Args:
-            name: name of the desired parameter. If not specified, returns the values of the parameter along all the nodes
-
-        Returns:
-            values of the parameters
-        """
-        # self.pars_impl --> {node: {parameter_name: par, val}}
-        par_impl_list = list()
-        if name is None:
-            # for each node
-            for node in self.pars_impl.values():
-                for parameter in node.keys():
-                    # get from state_var_impl the relative var
-                    par_impl_list.append(node[parameter]['val'])
-
-            return cs.vertcat(*par_impl_list)
-
-        else:
-            # todo can I do this elsewhere in getPar and getVar? it's nice!
-            return self.pars[name].getValue()
-
-    def getVarsDim(self):
-        """
-        Getter for the total dimension of the variables in the Variable Container (dim * number of nodes).
-
-        Returns:
-            total dimension of the variables
-        """
-        var_dim_tot = 0
-        for var in self.vars.values():
-            var_dim_tot += var.getImplDim()
-        return var_dim_tot
+    # def getVarsDim(self):
+    #     """
+    #     Getter for the total dimension of the variables in the Variable Container (dim * number of nodes).
+    #
+    #     Returns:
+    #         total dimension of the variables
+    #     """
+    #     var_dim_tot = 0
+    #     for var in self.vars.values():
+    #         var_dim_tot += var.getImplDim()
+    #     return var_dim_tot
 
     def getStateVars(self):
         """
@@ -1235,7 +1284,7 @@ class VariablesContainer:
 
         return input_vars
 
-    def getVarAbstrDict(self, offset=True):
+    def getVarList(self, offset=True):
         """
         Getter for the abstract variables in the Variable Container. Used by the Horizon Problem.
 
@@ -1243,111 +1292,160 @@ class VariablesContainer:
             offset: if True, get also the offset_variable
 
         Returns:
-            a dict with all the abstract variables
+            a list with all the abstract variables
         """
-        if offset:
-            var_abstr_dict = dict()
-            for name, var in self.vars.items():
-                var_abstr_dict[name] = list()
-                var_abstr_dict[name].append(var)
+        var_abstr_list = list()
+        for name, var in self.vars.items():
+            var_abstr_list.append(var)
+            if offset:
                 for var_offset in var.getVarOffsetDict().values():
-                    var_abstr_dict[name].append(var_offset)
-        else:
-            # todo beware of deep copy
-            var_abstr_dict = self.vars
+                    var_abstr_list.append(var_offset)
 
-        return var_abstr_dict
+        return var_abstr_list
 
-    def getParAbstrDict(self):
+    def getParList(self):
         """
         Getter for the abstract parameters in the Variable Container. Used by the Horizon Problem.
 
         Returns:
-           a dict with all the abstract parameters
+            a list with all the abstract parameters
         """
-        # todo beware of deep copy
-        return self.pars
+        par_abstr_list = list()
+        for name, var in self.pars.items():
+            par_abstr_list.append(var)
 
-    def getParImpl(self, name, k):
+        return par_abstr_list
+
+    def getVarDict(self):
         """
-         Getter for the desired implemented parameter at the desired node in the Variable Container. Used by the Horizon Problem.
-
-        todo:
-            this should be a variation of getParameterList or getParameterValues
-
-        Args:
-            name: name of the desired parameter
-            k: node the parameter is implemented at
+        Getter for the abstract variables in the Variable Container.
 
         Returns:
-            instance of the implemented parameter
+            a dict with all the abstract variables
         """
+        return copy.deepcopy(self.vars)
 
-        if isinstance(self.pars[name], SingleParameter):
-            k = None
-
-        node_name = 'n' + str(k)
-
-        if node_name in self.pars_impl:
-            par = self.pars_impl[node_name][name]['par']
-        else:
-            par = None
-
-        return par
-
-    def getVarImpl(self, name, k):
+    def getParDict(self):
         """
-        Getter for the desired implemented variable at the desired node in the Variable Container. Used by the Horizon Problem.
-
-        todo:
-            this should be a variation of getVarDict or getVarList
-
-        Args:
-            name: name of the desired variable
-            k: node the variable is implemented at
+        Getter for the abstract parameters in the Variable Container.
 
         Returns:
-            instance of the implemented variable
+            a dict with all the abstract parameters
         """
-        if isinstance(self.vars[name], SingleVariable):
-            k = None
+        return copy.deepcopy(self.pars)
+    # def getVarAbstrDict(self, offset=True):
+    #     """
+    #     Getter for the abstract variables in the Variable Container. Used by the Horizon Problem.
+    #
+    #     Args:
+    #         offset: if True, get also the offset_variable
+    #
+    #     Returns:
+    #         a dict with all the abstract variables
+    #     """
+    #     if offset:
+    #         var_abstr_dict = dict()
+    #         for name, var in self.vars.items():
+    #             var_abstr_dict[name] = list()
+    #             var_abstr_dict[name].append(var)
+    #             for var_offset in var.getVarOffsetDict().values():
+    #                 var_abstr_dict[name].append(var_offset)
+    #     else:
+    #         # todo beware of deep copy
+    #         var_abstr_dict = self.vars
+    #
+    #     return var_abstr_dict
+    #
+    # def getParAbstrDict(self):
+    #     """
+    #     Getter for the abstract parameters in the Variable Container. Used by the Horizon Problem.
+    #
+    #     Returns:
+    #        a dict with all the abstract parameters
+    #     """
+    #     # todo beware of deep copy
+    #     return self.pars
 
-        node_name = 'n' + str(k)
+    # def getParImpl(self, name, k):
+    #     """
+    #      Getter for the desired implemented parameter at the desired node in the Variable Container. Used by the Horizon Problem.
+    #
+    #     todo:
+    #         this should be a variation of getParameterList or getParameterValues
+    #
+    #     Args:
+    #         name: name of the desired parameter
+    #         k: node the parameter is implemented at
+    #
+    #     Returns:
+    #         instance of the implemented parameter
+    #     """
+    #
+    #     if isinstance(self.pars[name], SingleParameter):
+    #         k = None
+    #
+    #     node_name = 'n' + str(k)
+    #
+    #     if node_name in self.pars_impl:
+    #         par = self.pars_impl[node_name][name]['par']
+    #     else:
+    #         par = None
+    #
+    #     return par
 
-        if node_name in self.vars_impl:
-            var = self.vars_impl[node_name][name]['var']
-        else:
-            var = None
+    # def getVarImpl(self, name, k):
+    #     """
+    #     Getter for the desired implemented variable at the desired node in the Variable Container. Used by the Horizon Problem.
+    #
+    #     todo:
+    #         this should be a variation of getVarDict or getVarList
+    #
+    #     Args:
+    #         name: name of the desired variable
+    #         k: node the variable is implemented at
+    #
+    #     Returns:
+    #         instance of the implemented variable
+    #     """
+    #     if isinstance(self.vars[name], SingleVariable):
+    #         k = None
+    #
+    #     node_name = 'n' + str(k)
+    #
+    #     if node_name in self.vars_impl:
+    #         var = self.vars_impl[node_name][name]['var']
+    #     else:
+    #         var = None
+    #
+    #     return var
 
-        return var
+    # def getVarImplAtNode(self, k):
+    #     """
+    #     Getter for all the implemented variables at a desired node.
+    #
+    #     todo:
+    #         should be embedded in getVarImpl
+    #     Args:
+    #         k: desired node to scope
+    #
+    #     Returns:
+    #         dict of all the variable at desired node
+    #     """
+    #     if 'n' + str(k) in self.vars_impl:
+    #         return self.vars_impl['n' + str(k)]
+    #     else:
+    #         return None
 
-    def getVarImplAtNode(self, k):
-        """
-        Getter for all the implemented variables at a desired node.
-
-        todo:
-            should be embedded in getVarImpl
-        Args:
-            k: desired node to scope
-
-        Returns:
-            dict of all the variable at desired node
-        """
-        if 'n' + str(k) in self.vars_impl:
-            return self.vars_impl['n' + str(k)]
-        else:
-            return None
-
-    def getVarImplDict(self):
-        """
-        Getter for all the implemented variables.
-
-        todo:
-            should be embedded in getVarImpl or vice-versa
-        Returns:
-            dict with all nodes and relative implemented variables
-        """
-        return self.vars_impl
+    # def getVarImplDict(self):
+    #     """
+    #     Getter for all the implemented variables.
+    #
+    #     todo:
+    #         should be embedded in getVarImpl or vice-versa
+    #     Returns:
+    #         dict with all nodes and relative implemented variables
+    #     """
+    #     return self.vars_impl
 
     # def getVarImplList(self):
     #     """
@@ -1370,177 +1468,177 @@ class VariablesContainer:
     #
     #     return cs.vertcat(*state_var_impl_list)
 
-    def _getVarInfoList(self, var_type):
-        """
-        Getter for the desired information of a variable.
+    # def _getVarInfoList(self, var_type):
+    #     """
+    #     Getter for the desired information of a variable.
+    #
+    #     Args:
+    #         var_type: type of argument to be retrieved
+    #
+    #     Returns:
+    #         array of the desired propery along the horizon nodes
+    #     """
+    #     state_var_bound_list = np.zeros(self.getVarsDim())
+    #
+    #     j = 0
+    #     for node, val in self.vars_impl.items():
+    #         for var_abstract in val.keys():
+    #             var = val[var_abstract][var_type]
+    #             dim = val[var_abstract][var_type].shape[0]
+    #             state_var_bound_list[j:j + dim] = var
+    #             j = j + dim
+    #
+    #     return state_var_bound_list
 
-        Args:
-            var_type: type of argument to be retrieved
+    # def getLowerBoundsList(self):
+    #     """
+    #     Getter for all the lower bounds of all the variables.
+    #     Used by Horizon Problem in solveProblem to retrieve the final vector of lower bounds.
+    #
+    #     Returns:
+    #         an array containing all the lower bound values
+    #     """
+    #     return self._getVarInfoList('lb')
 
-        Returns:
-            array of the desired propery along the horizon nodes
-        """
-        state_var_bound_list = np.zeros(self.getVarsDim())
+    # def getUpperBoundsList(self):
+    #     """
+    #     Getter for all the upper bounds of all the variables.
+    #     Used by Horizon Problem in solveProblem to retrieve the final vector of upper bounds.
+    #
+    #     Returns:
+    #         an array containing all the upper bound values
+    #     """
+    #     return self._getVarInfoList('ub')
 
-        j = 0
-        for node, val in self.vars_impl.items():
-            for var_abstract in val.keys():
-                var = val[var_abstract][var_type]
-                dim = val[var_abstract][var_type].shape[0]
-                state_var_bound_list[j:j + dim] = var
-                j = j + dim
+    # def getInitialGuessList(self):
+    #     """
+    #     Getter for all the initial bounds of all the variables.
+    #     Used by Horizon Problem in solveProblem to retrieve the final vector of upper bounds.
+    #
+    #     Returns:
+    #         an array containing all the initial values
+    #     """
+    #     return self._getVarInfoList('w0')
 
-        return state_var_bound_list
+    # def _fillVar(self, name, node, val):
+    #     """
+    #     Fills a dict with the implemented variable and its properties (lb, ub, w0) at a given node.
+    #     self.vars_impl is a dict {node: {name: var, lb, ub, w0}}
+    #
+    #     Args:
+    #         name: name of the abstract variable
+    #         node: desired node
+    #         val: value of the variable (only required for logging)
+    #     """
+    #     # todo bounds are not necessary here
+    #     # node can be None ---> nNone contains all the single variables
+    #     node_name = 'n' + str(node)
+    #     var_impl = self.vars[name].getImpl(node)
+    #     var_bound_min = self.vars[name].getLowerBounds(node)
+    #     var_bound_max = self.vars[name].getUpperBounds(node)
+    #     initial_guess = self.vars[name].getInitialGuess(node)
+    #     var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
+    #     self.vars_impl[node_name].update({name: var_dict})
+    #
+    #     if self.logger:
+    #         if self.logger.isEnabledFor(logging.DEBUG):
+    #             self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
 
-    def getLowerBoundsList(self):
-        """
-        Getter for all the lower bounds of all the variables.
-        Used by Horizon Problem in solveProblem to retrieve the final vector of lower bounds.
+    # def _fillPar(self, name, node, val):
+    #     """
+    #     Fills a dict with the implemented parameters and its properties (par, val) at a given node.
+    #     self.pars_impl is a dict {node: {name: par, val}}
+    #     Args:
+    #         name: name of the abstract parameter
+    #         node: desired node
+    #         val: value of the parameter (only required for logging)
+    #     """
+    #     # node can be None ---> nNone contains all the single parameters
+    #     node_name = 'n' + str(node)
+    #     par_impl = self.pars[name].getImpl(node)
+    #     par_value = self.pars[name].getValue(node)
+    #     par_dict = dict(par=par_impl, val=par_value)
+    #     self.pars_impl[node_name].update({name: par_dict})
+    #
+    #     if self.logger:
+    #         if self.logger.isEnabledFor(logging.DEBUG):
+    #             self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), par_impl))
 
-        Returns:
-            an array containing all the lower bound values
-        """
-        return self._getVarInfoList('lb')
+    # def build(self):
+    #     """
+    #     fill the dictionary "var_impl"
+    #         - key: nodes (nNone, n0, n1, ...) nNone contains single variables that are not projected in nodes
+    #         - val: dict with name and value of implemented variable
+    #     """
+    #
+    #     # todo I'm tired now but I believe I can use directly the values from the Variables: maybe it is not necessary
+    #     #  to create a self.vars_impl? VariableContainer may become just a mirror searching for the values that all the abstract variables holds
+    #
+    #     # todo not sure about the timings, but here a dictionary with potentially MANY empty value is created.
+    #     # contains single vars that do not need to be projected
+    #     self.vars_impl['nNone'] = dict()
+    #     self.pars_impl['nNone'] = dict()
+    #
+    #     # for each node, instantiate a dict() ..
+    #     for node in range(self.nodes):
+    #         # which contains variables that are projected along the nodes
+    #         self.vars_impl['n' + str(node)] = dict()
+    #
+    #         for name, val in self.vars.items():
+    #
+    #             # if it is a single variable, search at nNode (key of the self.vars_impl and self.vars[name])
+    #             if isinstance(val, SingleVariable):
+    #                 self._fillVar(name, None, val)
+    #                 continue
+    #
+    #             if node in self.vars[name].getNodes():
+    #                 self._fillVar(name, node, val)
+    #
+    #     # same thing for parameters
+    #     for node in range(self.nodes):
+    #         self.pars_impl['n' + str(node)] = dict()
+    #         for name, val in self.pars.items():
+    #
+    #             if isinstance(val, SingleParameter):
+    #                 self._fillPar(name, None, val)
+    #                 continue
+    #
+    #             if node in self.pars[name].getNodes():
+    #                 self._fillPar(name, node, val)
 
-    def getUpperBoundsList(self):
-        """
-        Getter for all the upper bounds of all the variables.
-        Used by Horizon Problem in solveProblem to retrieve the final vector of upper bounds.
+    # def updateBounds(self):
+    #     """
+    #     Updates the bounds of each variable in Variable Container.
+    #     Used by Horizon Problem in solveProblem to get the final vector of all bounds.
+    #     It asks each abstract variables (in self.vars) for its bounds and set them to self.vars_impl
+    #     """
+    #     for node in self.vars_impl.keys():
+    #         for name, state_var in self.vars_impl[node].items():
+    #             k = node[node.index('n') + 1:]
+    #             state_var['lb'] = self.vars[name].getLowerBounds(k)
+    #             state_var['ub'] = self.vars[name].getUpperBounds(k)
 
-        Returns:
-            an array containing all the upper bound values
-        """
-        return self._getVarInfoList('ub')
+    # def updateInitialGuess(self):
+    #     """
+    #     Updates the initial guess of each variable in Variable Container.
+    #     Used by Horizon Problem in solveProblem to get the final vector of all intial guesses.
+    #     It asks each abstract variables (in self.vars) for its initial guess and set them to self.vars_impl
+    #     """
+    #     for node in self.vars_impl.keys():
+    #         for name, state_var in self.vars_impl[node].items():
+    #             k = node[node.index('n') + 1:]
+    #             state_var['w0'] = self.vars[name].getInitialGuess(k)
 
-    def getInitialGuessList(self):
-        """
-        Getter for all the initial bounds of all the variables.
-        Used by Horizon Problem in solveProblem to retrieve the final vector of upper bounds.
-
-        Returns:
-            an array containing all the initial values
-        """
-        return self._getVarInfoList('w0')
-
-    def _fillVar(self, name, node, val):
-        """
-        Fills a dict with the implemented variable and its properties (lb, ub, w0) at a given node.
-        self.vars_impl is a dict {node: {name: var, lb, ub, w0}}
-
-        Args:
-            name: name of the abstract variable
-            node: desired node
-            val: value of the variable (only required for logging)
-        """
-        # todo bounds are not necessary here
-        # node can be None ---> nNone contains all the single variables
-        node_name = 'n' + str(node)
-        var_impl = self.vars[name].getImpl(node)
-        var_bound_min = self.vars[name].getLowerBounds(node)
-        var_bound_max = self.vars[name].getUpperBounds(node)
-        initial_guess = self.vars[name].getInitialGuess(node)
-        var_dict = dict(var=var_impl, lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
-        self.vars_impl[node_name].update({name: var_dict})
-
-        if self.logger:
-            if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), var_impl))
-
-    def _fillPar(self, name, node, val):
-        """
-        Fills a dict with the implemented parameters and its properties (par, val) at a given node.
-        self.pars_impl is a dict {node: {name: par, val}}
-        Args:
-            name: name of the abstract parameter
-            node: desired node
-            val: value of the parameter (only required for logging)
-        """
-        # node can be None ---> nNone contains all the single parameters
-        node_name = 'n' + str(node)
-        par_impl = self.pars[name].getImpl(node)
-        par_value = self.pars[name].getValue(node)
-        par_dict = dict(par=par_impl, val=par_value)
-        self.pars_impl[node_name].update({name: par_dict})
-
-        if self.logger:
-            if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('Implemented {} of type {}: {}'.format(name, type(val), par_impl))
-
-    def build(self):
-        """
-        fill the dictionary "var_impl"
-            - key: nodes (nNone, n0, n1, ...) nNone contains single variables that are not projected in nodes
-            - val: dict with name and value of implemented variable
-        """
-
-        # todo I'm tired now but I believe I can use directly the values from the Variables: maybe it is not necessary
-        #  to create a self.vars_impl? VariableContainer may become just a mirror searching for the values that all the abstract variables holds
-
-        # todo not sure about the timings, but here a dictionary with potentially MANY empty value is created.
-        # contains single vars that do not need to be projected
-        self.vars_impl['nNone'] = dict()
-        self.pars_impl['nNone'] = dict()
-
-        # for each node, instantiate a dict() ..
-        for node in range(self.nodes):
-            # which contains variables that are projected along the nodes
-            self.vars_impl['n' + str(node)] = dict()
-
-            for name, val in self.vars.items():
-
-                # if it is a single variable, search at nNode (key of the self.vars_impl and self.vars[name])
-                if isinstance(val, SingleVariable):
-                    self._fillVar(name, None, val)
-                    continue
-
-                if node in self.vars[name].getNodes():
-                    self._fillVar(name, node, val)
-
-        # same thing for parameters
-        for node in range(self.nodes):
-            self.pars_impl['n' + str(node)] = dict()
-            for name, val in self.pars.items():
-
-                if isinstance(val, SingleParameter):
-                    self._fillPar(name, None, val)
-                    continue
-
-                if node in self.pars[name].getNodes():
-                    self._fillPar(name, node, val)
-
-    def updateBounds(self):
-        """
-        Updates the bounds of each variable in Variable Container.
-        Used by Horizon Problem in solveProblem to get the final vector of all bounds.
-        It asks each abstract variables (in self.vars) for its bounds and set them to self.vars_impl
-        """
-        for node in self.vars_impl.keys():
-            for name, state_var in self.vars_impl[node].items():
-                k = node[node.index('n') + 1:]
-                state_var['lb'] = self.vars[name].getLowerBounds(k)
-                state_var['ub'] = self.vars[name].getUpperBounds(k)
-
-    def updateInitialGuess(self):
-        """
-        Updates the initial guess of each variable in Variable Container.
-        Used by Horizon Problem in solveProblem to get the final vector of all intial guesses.
-        It asks each abstract variables (in self.vars) for its initial guess and set them to self.vars_impl
-        """
-        for node in self.vars_impl.keys():
-            for name, state_var in self.vars_impl[node].items():
-                k = node[node.index('n') + 1:]
-                state_var['w0'] = self.vars[name].getInitialGuess(k)
-
-    def updateParameters(self):
-        """
-        Updates the assigned value of each parameters in Variable Container.
-        Used by Horizon Problem in solveProblem to get the final vector of all assigned parameter values.
-        It asks each abstract variables (in self.pars) for its initial guess and set them to self.pars_impl
-        """
-        for node in self.pars_impl.keys():
-            for name, parameter in self.pars_impl[node].items():
-                k = node[node.index('n') + 1:]
-                parameter['val'] = self.pars[name].getValue(k)
+    # def updateParameters(self):
+    #     """
+    #     Updates the assigned value of each parameters in Variable Container.
+    #     Used by Horizon Problem in solveProblem to get the final vector of all assigned parameter values.
+    #     It asks each abstract variables (in self.pars) for its initial guess and set them to self.pars_impl
+    #     """
+    #     for node in self.pars_impl.keys():
+    #         for name, parameter in self.pars_impl[node].items():
+    #             k = node[node.index('n') + 1:]
+    #             parameter['val'] = self.pars[name].getValue(k)
 
     def setNNodes(self, n_nodes):
         """
