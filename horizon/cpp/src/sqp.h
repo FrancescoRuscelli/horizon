@@ -27,8 +27,8 @@ public:
      * @brief SQPGaussNewton SQP method with Gauss-Newton approximaiton (Hessian = J'J)
      * @param name solver name
      * @param qp_solver name internally used with casadi::conic (check casadi documetation for conic)
-     * @param f cost function as casadi::Function({x}, {f}, {"x"}, {"f"})
-     * @param g constraints as casadi::Function({x}, {g}, {"x"}, {"g"})
+     * @param f cost function as casadi::Function with single input and single output (otherwise throw)
+     * @param g constraints as casadi::Function with single input and single output (otherwise throw)
      * @param opts options for SQPGaussNewton and internal conic (check casadi documetation for conic).
      * NOTE: options for SQPGaussNewton are:
      *                                          "max_iter": iterations used to find solution
@@ -54,10 +54,10 @@ public:
 
 
         _f = f;
-        _df = f.factory("df", {"x"}, {"jac:f:x"});
+        _df = f.factory("df", {f.name_in(0)}, {"jac:" + f.name_out(0) +":" + f.name_in(0)});
 
         _g = g;
-        _dg = _g.factory("dg", {"x"}, {"jac:g:x"});
+        _dg = _g.factory("dg", {g.name_in(0)}, {"jac:" + g.name_out(0) + ":" + g.name_in(0)});
 
         if(opts.contains("max_iter"))
         {
@@ -167,14 +167,14 @@ public:
             _J = _df.getSparseOutput(0);
 
             //2. Constraints are linearized around actual x0
-            _g_dict.input["x"] = x0_;
+            _g_dict.input[_g.name_in(0)] = x0_;
             _g.call(_g_dict.input, _g_dict.output);
 
-            _A_dict.input["x"] = x0_;
+            _A_dict.input[_g.name_in(0)] = x0_;
             _dg.call(_A_dict.input, _A_dict.output);
 
-            g_ = _g_dict.output["g"];
-            A_ = _A_dict.output["jac_g_x"];
+            g_ = _g_dict.output[_g.name_out(0)];
+            A_ = _A_dict.output[_dg.name_out(0)];
 
             //2. We compute Gauss-Newton Hessian approximation and gradient function
             _H.resize(_J.cols(), _J.cols());
@@ -218,7 +218,7 @@ public:
         _solution["x"] = x0_;
         double norm_f = _f.getOutput(0).norm();
         _solution["f"] = 0.5*norm_f*norm_f;
-        _solution["g"] = casadi::norm_2(_g_dict.output["g"].get_elements());
+        _solution["g"] = casadi::norm_2(_g_dict.output[_g.name_out(0)].get_elements());
         return _solution;
     }
 
@@ -261,9 +261,9 @@ public:
         _constraints_norm.reserve(_variable_trj.size());
         for(auto sol : _variable_trj)
         {
-            _g_dict.input["x"] = sol;
+            _g_dict.input[_g.name_in(0)] = sol;
             _g.call(_g_dict.input, _g_dict.output);
-            _constraints_norm.push_back(casadi::norm_2(_g_dict.output["g"].get_elements()));
+            _constraints_norm.push_back(casadi::norm_2(_g_dict.output[_g.name_out(0)].get_elements()));
         }
         return _constraints_norm;
     }
