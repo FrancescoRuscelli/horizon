@@ -51,7 +51,7 @@ class NlpsolSolver(Solver):
         # ORDERED AS VARIABLES
         # build variables
         var_list = list()
-        for var in self.var_container.vars.values():
+        for var in self.var_container.getVarList(offset=False):
             var_list.append(var.getImpl())
 
         w = cs.vertcat(*var_list) #
@@ -59,7 +59,7 @@ class NlpsolSolver(Solver):
 
         # build parameters
         par_list = list()
-        for par in self.var_container.pars.values():
+        for par in self.var_container.getParList():
             par_list.append(par.getImpl())
 
         p = cs.vertcat(*par_list)
@@ -146,13 +146,13 @@ class NlpsolSolver(Solver):
 
         # build constraint functions list
         fun_list = list()
-        for fun in self.fun_container.cnstr_container.values():
+        for fun in self.fun_container.getCnstr().values():
             fun_list.append(fun.getImpl())
         g = cs.vertcat(*fun_list)
 
         # build cost functions list
         fun_list = list()
-        for fun in self.fun_container.costfun_container.values():
+        for fun in self.fun_container.getCost().values():
             fun_list.append(fun.getImpl())
         j = cs.sum1(cs.vertcat(*fun_list))
 
@@ -166,38 +166,38 @@ class NlpsolSolver(Solver):
     def solve(self) -> bool:
         # update lower bounds of variables
         lb_list = list()
-        for var in self.var_container.vars.values():
+        for var in self.var_container.getVarList(offset=False):
             lb_list.append(var.getLowerBounds())
         lbw = cs.vertcat(*lb_list)
 
         # update upper bounds of variables
         ub_list = list()
-        for var in self.var_container.vars.values():
+        for var in self.var_container.getVarList(offset=False):
             ub_list.append(var.getUpperBounds())
         ubw = cs.vertcat(*ub_list)
 
         # update initial guess of variables
         w0_list = list()
-        for var in self.var_container.vars.values():
+        for var in self.var_container.getVarList(offset=False):
             w0_list.append(var.getInitialGuess())
         w0 = cs.vertcat(*w0_list)
         # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
 
         # update parameters
         p_list = list()
-        for par in self.var_container.pars.values():
+        for par in self.var_container.getParList():
             p_list.append(par.getValues())
         p = cs.vertcat(*p_list)
 
         # update lower bounds of constraints
         lbg_list = list()
-        for fun in self.fun_container.cnstr_container.values():
+        for fun in self.fun_container.getCnstr().values():
             lbg_list.append(fun.getLowerBounds())
         lbg = cs.vertcat(*lbg_list)
 
         # update upper bounds of constraints
         ubg_list = list()
-        for fun in self.fun_container.cnstr_container.values():
+        for fun in self.fun_container.getCnstr().values():
             ubg_list.append(fun.getUpperBounds())
         ubg = cs.vertcat(*ubg_list)
 
@@ -220,24 +220,24 @@ class NlpsolSolver(Solver):
         sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
         # retrieve state and input trajector
-        input_vars = [v.tag for v in self.prb.getInput().var_list]
-        state_vars = [v.tag for v in self.prb.getState().var_list]
+        input_vars = [v.getName() for v in self.prb.getInput().var_list]
+        state_vars = [v.getName() for v in self.prb.getState().var_list]
 
         # get solution dict
         pos = 0
         solution_dict = dict()
-        for name, var in self.var_container.vars.items():
+        for var in self.var_container.getVarList(offset=False):
             val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
             # this is to divide in rows the each dim of the var
             val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
-            solution_dict[name] = val_sol_matrix
+            solution_dict[var.getName()] = val_sol_matrix
             pos = pos + var.shape[0] * len(var.getNodes())
 
         self.solution = solution_dict
 
         # get solution as state/input
         pos = 0
-        for name, var in self.var_container.vars.items():
+        for name, var in self.var_container.getVar().items():
             val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
             val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
             if name in state_vars:

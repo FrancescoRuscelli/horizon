@@ -1,10 +1,10 @@
 try:
-    from .pyilqr import IterativeLQR
+    from horizon.solvers.pyilqr import IterativeLQR
 except ImportError:
     print('failed to import pyilqr extension; did you compile it?')
     exit(1)
 
-from .solver import Solver
+from horizon.solvers import Solver
 from horizon.problem import Problem
 from horizon.functions import Function, CostFunction, Constraint
 from typing import Dict, List
@@ -127,13 +127,7 @@ class SolverILQR(Solver):
                 continue
                 
             # get input variables for this function
-            input_vars = f.getVariables()
-
-            # make input list dor this function
-            input_list = list()
-            for vname, vlist in input_vars.items():
-                var: cs.SX = vlist[0]
-                input_list.append(var)
+            input_list = f.getVariables()
 
             # save function value to list
             value = f.fun(*input_list)
