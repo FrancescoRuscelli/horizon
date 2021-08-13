@@ -519,21 +519,36 @@ class FunctionsContainer:
         else:
             return None
 
-    # def getCnstrFDict(self) -> OrderedDict:
-    #     """
-    #     Getter for the dictionary of all the abstract constraint functions.
-    #     Returns:
-    #         ordered dict of the functions {name: fun}
-    #     """
-    #     return self.cnstr_container
+    def getCnstr(self, name=None) -> OrderedDict:
+        """
+        Getter for the dictionary of all the abstract constraint functions.
 
-    # def getCostFDict(self) -> OrderedDict:
-    #     """
-    #     Getter for the dictionary of all the abstract cost functions.
-    #     Returns:
-    #         ordered dict of the functions {name: fun}
-    #     """
-    #     return self.costfun_container
+        Args:
+            name of constraint. If not specified, returns all of them
+        Returns:
+            ordered dict of the functions {name: fun}
+        """
+        if name is None:
+            cnsrt_dict = self.cnstr_container
+        else:
+            cnsrt_dict = self.cnstr_container[name]
+        return cnsrt_dict
+
+    def getCost(self, name=None) -> OrderedDict:
+        """
+        Getter for the dictionary of all the abstract cost functions.
+
+        Args:
+            name of constraint. If not specified, returns all of them
+
+        Returns:
+            ordered dict of the functions {name: fun}
+        """
+        if name is None:
+            cost_dict = self.costfun_container
+        else:
+            cost_dict = self.costfun_container[name]
+        return cost_dict
 
     # def build(self):
     #     """

@@ -40,7 +40,7 @@ class TranscriptionsHandler:
         dae['x'] = self.state
         dae['p'] = self.input
         dae['ode'] = self.state_dot
-        dae['quad'] = 0  # note: we don't use the quadratue fn here
+        dae['quad'] = 0  # note: we don't use the quadrature fn here
 
         self.integrator = integ.__dict__[type](dae=dae, opts=opts, casadi_type=cs.SX)
 

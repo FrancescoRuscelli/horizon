@@ -10,8 +10,9 @@ import numpy as np
 import casadi as cs
 
 class PlotterHorizon:
-    def __init__(self, prb: Problem, logger=None):
+    def __init__(self, prb: Problem, solution, logger=None):
 
+        self.solution = solution
         self.prb = prb
         self.logger = logger
 
@@ -32,30 +33,30 @@ class PlotterHorizon:
             for dim in range(val.shape[0]):
                 for i in range(val.shape[1]-1):
                     if baseline:
-                        baseline, = ax.plot(range(val.shape[1])[i:i+2], [val[dim, i]] * 2, color=baseline.get_color())
+                        baseline, = ax.plot(range(val.shape[1])[i:i + 2], [val[dim, i]] * 2, color=baseline.get_color())
                     else:
                         baseline, = ax.plot(range(val.shape[1])[i:i + 2], [val[dim, i]] * 2)
 
                     lb, ub = abstract_var.getBounds()
-                    ax.plot(range(val.shape[1]), lb[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
-                    ax.plot(range(val.shape[1]), ub[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
+                    lb_mat = np.reshape(lb, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
+                    ub_mat = np.reshape(ub, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
+                    ax.plot(range(val.shape[1]), lb_mat[dim, :], marker="x", markersize=3, linestyle='dotted',linewidth=1, color=baseline.get_color())
+                    ax.plot(range(val.shape[1]), ub_mat[dim, :], marker="x", markersize=3, linestyle='dotted',linewidth=1, color=baseline.get_color())
         else:
             for dim in range(val.shape[0]):
                 baseline, = ax.plot(range(val.shape[1]), val[dim, :], marker="o", markersize=2)
-                lb, ub = abstract_var.getBounds()
-                ax.plot(range(val.shape[1]), lb[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
-                ax.plot(range(val.shape[1]), ub[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
 
+                lb, ub = abstract_var.getBounds()
+                lb_mat = np.reshape(lb, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
+                ub_mat = np.reshape(ub, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
+                ax.plot(range(val.shape[1]), lb_mat[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
+                ax.plot(range(val.shape[1]), ub_mat[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
 
     def plotVariables(self, grid=False):
 
-        sol = self.prb.getSolution()
-        if sol is None:
-            raise Exception('Problem must contain a solution.')
-
-        fig, gs = self._createPlotGrid(3, len(sol), 'Variables')
+        fig, gs = self._createPlotGrid(3, len(self.solution), 'Variables')
         i = 0
-        for key, val in sol.items():
+        for key, val in self.solution.items():
             ax = fig.add_subplot(gs[i])
             if grid:
                 ax.grid(axis='x')
@@ -74,11 +75,7 @@ class PlotterHorizon:
 
     def plotVariable(self, name, grid=False):
 
-        sol = self.prb.getSolution()
-        if sol is None:
-            raise Exception('Problem must contain a solution.')
-
-        val = sol[name]
+        val = self.solution[name]
 
         fig, ax = plt.subplots()
         if grid:
@@ -91,10 +88,6 @@ class PlotterHorizon:
 
     def plotFunctions(self, grid=False):
 
-        sol = self.prb.getSolution()
-        if sol is None:
-            raise Exception('Problem must contain a solution.')
-
         fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
 
         i = 0
@@ -102,7 +95,7 @@ class PlotterHorizon:
             ax = fig.add_subplot(gs[i])
             if grid:
                 ax.grid(axis='x')
-            fun_evaluated = self.prb.evalFun(fun)
+            fun_evaluated = self.prb.evalFun(fun, self.solution)
             self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name))
 
             ax.set_title('{}'.format(name))

@@ -3,6 +3,7 @@ from horizon.problem import Problem
 from typing import Dict
 import casadi as cs
 import numpy as np
+import pprint
 
 class NlpsolSolver(Solver):
     
@@ -64,8 +65,8 @@ class NlpsolSolver(Solver):
         p = cs.vertcat(*par_list)
 
 
-        print(f'w {w.shape[0]}: {w}')
-        print(f'p {p.shape[0]}: {p}')
+        # print(f'w {w.shape[0]}: {w}')
+        # print(f'p {p.shape[0]}: {p}')
 
         # this is good but the problem is that, without some tampering, i get the variables repeated
         # ORDERED AS NODES
@@ -155,8 +156,8 @@ class NlpsolSolver(Solver):
             fun_list.append(fun.getImpl())
         j = cs.sum1(cs.vertcat(*fun_list))
 
-        print(f'g ({g.shape[0]}): {g}')
-        print(f'j ({j.shape[0]}): {j}')
+        # print(f'g ({g.shape[0]}): {g}')
+        # print(f'j ({j.shape[0]}): {j}')
 
 
         return j, w, g, p
@@ -185,7 +186,7 @@ class NlpsolSolver(Solver):
         # update parameters
         p_list = list()
         for par in self.var_container.pars.values():
-            p_list.append(par.getValue())
+            p_list.append(par.getValues())
         p = cs.vertcat(*p_list)
 
         # update lower bounds of constraints
@@ -200,12 +201,12 @@ class NlpsolSolver(Solver):
             ubg_list.append(fun.getUpperBounds())
         ubg = cs.vertcat(*ubg_list)
 
-        print(f'lbw ({lbw.shape[0]}): {lbw}')
-        print(f'ubw ({ubw.shape[0]}): {ubw}')
-        print(f'w0 ({w0.shape[0]}): {w0}')
-        print(f'p ({p.shape[0]}): {p}')
-        print(f'lbg ({lbg.shape[0]}): {lbg}')
-        print(f'ubg ({ubg.shape[0]}): {ubg}')
+        # print(f'lbw ({lbw.shape[0]}): {lbw}')
+        # print(f'ubw ({ubw.shape[0]}): {ubw}')
+        # print(f'w0 ({w0.shape[0]}): {w0}')
+        # print(f'p ({p.shape[0]}): {p}')
+        # print(f'lbg ({lbg.shape[0]}): {lbg}')
+        # print(f'ubg ({ubg.shape[0]}): {ubg}')
 
         # getlowerboundList(node):  to be defined in variables.py....
         #     ublist = list()
@@ -221,66 +222,103 @@ class NlpsolSolver(Solver):
         # retrieve state and input trajector
         input_vars = [v.tag for v in self.prb.getInput().var_list]
         state_vars = [v.tag for v in self.prb.getState().var_list]
+
+        # get solution dict
         pos = 0
+        solution_dict = dict()
+        for name, var in self.var_container.vars.items():
+            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
+            # this is to divide in rows the each dim of the var
+            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
+            solution_dict[name] = val_sol_matrix
+            pos = pos + var.shape[0] * len(var.getNodes())
 
-        # loop over nodes
-        for node, val in self.prb.var_container.getVarImplDict().items():
+        self.solution = solution_dict
 
-            
-            # variables which don't depend on the node (ignore for now)
-            if node == 'nNone':
-                # note: for now, we only focus on state and input!!
-                for name, var in val.items():
-                    dim = var['var'].shape[0]
-                    pos += dim  
-                continue
-            
-            node_number = int(node[node.index('n') + 1:])
-
-            # for loop handling state vars
-            for name, var in val.items():
-                if name not in state_vars:
-                    continue
+        # get solution as state/input
+        pos = 0
+        for name, var in self.var_container.vars.items():
+            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
+            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
+            if name in state_vars:
                 off, _ = self.prb.getState().getVarIndex(name)
-                var_nodes = self.prb.var_container.getVarAbstrDict(offset=False)[name].getNodes()
-                if node_number in var_nodes:
-                    dim = var['var'].shape[0]
-                    self.x_opt[off:off+dim, node_number - var_nodes[0]] = sol['x'][pos:pos + dim].full().flatten()
-                    pos += dim
-
-            # for loop handling input vars (pretty ugly: todo refactor)
-            for name, var in val.items():
-                if name not in input_vars:
-                    continue
+                self.x_opt[off:off+var.shape[0], :] = val_sol_matrix
+            elif name in input_vars:
                 off, _ = self.prb.getInput().getVarIndex(name)
-                var_nodes = self.prb.var_container.getVarAbstrDict(offset=False)[name].getNodes()
-                if node_number in var_nodes:
-                    dim = var['var'].shape[0]
-                    self.u_opt[off:off+dim, node_number - var_nodes[0]] = sol['x'][pos:pos + dim].full().flatten()
-                    pos += dim
-            
+                self.u_opt[off:off+var.shape[0], :] = val_sol_matrix
+            else:
+                pass
+            pos = pos + var.shape[0] * len(var.getNodes())
+
+
+        # print(f'{self.x_opt.shape}:, {self.x_opt}')
+        # print(f'{self.u_opt.shape}:, {self.u_opt}')
+
         return True
 
+    def getSolutionDict(self):
+        return self.solution
 
 if __name__ == '__main__':
+
+    # from matplotlib import pyplot as plt
+    #
+    # # create problem
+    # N = 100
+    # dt = 0.03
+    # prb = Problem(N)
+    #
+    # # create variables
+    # p = prb.createStateVariable('p', 2)
+    # theta = prb.createStateVariable('theta', 1)
+    # v = prb.createInputVariable('v', 1)
+    # omega = prb.createInputVariable('omega', 1)
+    #
+    # p.setBounds([99, 99], [99, 99], nodes=50)
+    # # define dynamics
+    # x = prb.getState().getVars()
+    # u = prb.getInput().getVars()
+    # xdot = cs.vertcat(v * cs.cos(theta),
+    #                   v * cs.sin(theta),
+    #                   omega)
+    # prb.setDynamics(xdot)
+    #
+    # # Cost function
+    # x_tgt = np.array([1, 0, 0])
+    # prb.createIntermediateCost("reg", 1e-6 * cs.sumsqr(u))
+    # prb.createFinalConstraint("gothere", x - x_tgt)
+    #
+    # # initial state
+    # x0 = np.array([0, 0, np.pi / 2])
+    # prb.setInitialState(x0=x0)
+    #
+    # # TEST ILQR
+    # sol = NlpsolSolver(prb, dt, {}, 'ipopt')
+    # sol.solve()
+    # print(sol.x_opt.shape)
+    # print(sol.x_opt)
+    # # print(sol.u_opt)
+
+    # exit()
 
     N = 10
     dt = 0.01
     prob = Problem(10)
     x = prob.createStateVariable('x', 2)
-    # y = prob.createStateVariable('y', 4)
+    y = prob.createStateVariable('y', 4)
     u = prob.createInputVariable('u', 2)
-    # z = prob.createSingleVariable('z', 4)
-    # j = prob.createSingleParameter('j', 1)
-    # p = prob.createParameter('p', 2)
-    #
+    z = prob.createSingleVariable('z', 4)
+    j = prob.createSingleParameter('j', 1)
+    p = prob.createParameter('p', 2)
+
+    z.setBounds([77, 77, 77, 77], [77, 77, 77, 77])
     x_next = x.getVarOffset(1)
     x_prev = x.getVarOffset(-1)
-    # f = prob.createSingleParameter('f', 4)
+    f = prob.createSingleParameter('f', 4)
     #
-    # a = prob.createVariable('a', 2, nodes=range(0, 5))
-    #
-    # x.setInitialGuess([1, 1], nodes=0)
+    a = prob.createVariable('a', 2, nodes=range(0, 5))
+
+    x.setInitialGuess([1, 1], nodes=0)
     # x.setInitialGuess([10, 10], nodes=10)
     # a.setBounds([0, 0], [5, 5])
     #
@@ -309,8 +347,9 @@ if __name__ == '__main__':
     # cnsrt6 = prob.createConstraint('cnsrt6', x + z[0:2])
     # =========
     # this should be the same
-    cnsrt7 = prob.createIntermediateConstraint('cnsrt7', x_next - x)
-    cnsrt8 = prob.createConstraint('cnsrt8', x - x_prev, nodes=range(1, N+1))
+    # cnsrt7 = prob.createIntermediateConstraint('cnsrt7', x_next - x)
+    # cnsrt8 = prob.createConstraint('cnsrt8', x - x_prev, nodes=range(1, N+1))
+    cnsrt9 = prob.createConstraint('cnsrt9', y, nodes=N)
 
 
     # cost1 = prob.createCostFunction('cost1', x+p)
@@ -320,10 +359,12 @@ if __name__ == '__main__':
     for i in range(N):
         x.setLowerBounds(np.array(range(i, i+2)), nodes=i)
 
-    # p.assign([20, 20], nodes=4)
+    p.assign([20, 20], nodes=4)
     # f.assign([121, 122, 120, 119])
-    # xdot = cs.vertcat(y, u)
-    xdot = cs.vertcat(u)
+    xdot = cs.vertcat(y, u)
+    # xdot = cs.vertcat(u)
     prob.setDynamics(xdot)
     sol = NlpsolSolver(prb=prob, dt=dt, opts=dict(), solver_plugin='ipopt')
     sol.solve()
+
+

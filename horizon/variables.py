@@ -47,8 +47,11 @@ class AbstractVariable(cs.SX):
         """
         return self.dim
 
+    def getName(self):
+        return self.tag
+
 class OffsetVariable(AbstractVariable):
-    def __init__(self, tag, dim, nodes, offset, var_impl):
+    def __init__(self, parent_name, tag, dim, nodes, offset, var_impl):
         """
         Initialize the Offset Variable.
 
@@ -61,6 +64,7 @@ class OffsetVariable(AbstractVariable):
         """
         super(OffsetVariable, self).__init__(tag, dim)
 
+        self.parent_name = parent_name
         self.nodes = nodes
         self.offset = offset
         self.var_impl = var_impl
@@ -75,15 +79,26 @@ class OffsetVariable(AbstractVariable):
         Returns:
             implemented instances of the abstract offsetted variable
         """
-
         if nodes is None:
             nodes = self.nodes
 
-        nodes = misc.checkNodes(nodes, self.nodes)
+        # offset the node of self.offset
+        offset_nodes = [node + self.offset for node in nodes]
+        offset_nodes = misc.checkNodes(offset_nodes, self.nodes)
 
-        var_impl = cs.vertcat(*[self.var_impl['n' + str(i + self.offset)]['var'] for i in nodes])
+        var_impl = cs.vertcat(*[self.var_impl['n' + str(i)]['var'] for i in offset_nodes])
 
         return var_impl
+
+    def getName(self):
+        """
+        Get name of the variable. Warning: not always same as the tag
+
+        Returns:
+            name of the variable
+
+        """
+        return self.parent_name
 
 class SingleParameter(AbstractVariable):
     """
@@ -151,7 +166,7 @@ class SingleParameter(AbstractVariable):
         # todo what if I return all the nodes?
         return [-1]
 
-    def getValue(self, nodes=None):
+    def getValues(self, nodes=None):
         """
         Getter for the value assigned to the parameter. It is the same throughout all the nodes, since this parameter is node-independent.
 
@@ -262,7 +277,7 @@ class Parameter(AbstractVariable):
         return par_impl
 
 
-    def getValue(self, nodes=None):
+    def getValues(self, nodes=None):
         """
         Getter for the value of the parameter.
 
@@ -612,7 +627,7 @@ class Variable(AbstractVariable):
             createTag = lambda name, node: name + str(node) if node is not None else name
 
             new_tag = createTag(self.tag, node)
-            var = OffsetVariable(new_tag, self.dim, self.nodes, int(node), self.var_impl)
+            var = OffsetVariable(self.tag, new_tag, self.dim, self.nodes, int(node), self.var_impl)
 
             self.var_offset[node] = var
         return var
@@ -1316,23 +1331,35 @@ class VariablesContainer:
 
         return par_abstr_list
 
-    def getVarDict(self):
+    def getVar(self, name=None):
         """
         Getter for the abstract variables in the Variable Container.
+
+        Args:
+            name: name of the variable to be retrieve
 
         Returns:
             a dict with all the abstract variables
         """
-        return copy.deepcopy(self.vars)
+        if name is None:
+            var_dict = self.vars
+        else:
+            var_dict = self.vars[name]
+        return var_dict
 
-    def getParDict(self):
+    def getPar(self, name=None):
         """
         Getter for the abstract parameters in the Variable Container.
 
         Returns:
             a dict with all the abstract parameters
         """
-        return copy.deepcopy(self.pars)
+        if name is None:
+            par_dict = self.pars
+        else:
+            par_dict = self.pars[name]
+        return par_dict
+
     # def getVarAbstrDict(self, offset=True):
     #     """
     #     Getter for the abstract variables in the Variable Container. Used by the Horizon Problem.
@@ -1668,9 +1695,7 @@ class VariablesContainer:
             if isinstance(par, SingleParameter):
                 pass
             elif isinstance(par, Parameter):
-                par._setNNodes([node for node in var.getNodes() if node in list(range(self.nodes))])
-
-
+                par._setNNodes([node for node in par.getNodes() if node in list(range(self.nodes))])
 
     def clear(self):
         """

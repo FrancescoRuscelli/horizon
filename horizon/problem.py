@@ -267,7 +267,6 @@ class Problem:
         # return used_par
 
     def _getUsedVarImpl(self, fun, used_var_abstract):
-
         used_var_impl = list()
         for var in used_var_abstract:
             var_impl = var.getImpl(fun.getNodes())
@@ -275,6 +274,7 @@ class Problem:
             # reshape them for all-in-one evaluation of function
             # this is getting all the generic variable x, even if the function has a slice of it x[0:2].
             # It will work. The casadi function takes from x only the right slices afterwards.
+            # print(var_impl)
             var_impl_matrix = cs.reshape(var_impl, (var_dim, len(fun.getNodes())))
             # generic input --> row: dim // column: nodes
             # [[x_0_0, x_1_0, ... x_N_0],
@@ -722,10 +722,7 @@ class Problem:
         Returns:
             the desired variable/s
         """
-        if name is None:
-            var = self.var_container.getVarDict(offset=False)
-        else:
-            var = self.var_container.getVarDict(offset=False)[name]
+        var = self.var_container.getVar(name)
 
         return var
 
@@ -739,14 +736,12 @@ class Problem:
         Returns:
             the desired constraint/s
         """
-        if name is None:
-            fun = self.function_container.getCnstrFDict()
-        else:
-            fun = self.function_container.getCnstrFDict()[name]
+        fun = self.function_container.getCnstr(name)
+
 
         return fun
 
-    def evalFun(self, fun: fc.Function):
+    def evalFun(self, fun: fc.Function, solution):
         """
         Evaluates a given function over the solution found.
 
@@ -756,29 +751,27 @@ class Problem:
         Returns:
             fun evaluated at all nodes using the solution of horizon problem
         """
-        if self.__solution is None:
-            raise Exception('The solution of the horizon problem is not computed yet. Cannot evaluate function.')
-
         fun_to_evaluate = fun.getFunction()
         all_vars = list()
-        for var_name, var_list in fun.getVariables().items():
-            for var in var_list:
-                # careful about ordering
-                # todo this is very ugly, but what can I do (wanted to do it without the if)
-                if isinstance(var, sv.SingleVariable):
-                    all_vars.append(self.__solution[var_name])
-                else:
-                    all_vars.append(self.__solution[var_name][:, np.array(fun.getNodes()) + var.offset])
+
+        for var in fun.getVariables():
+            var_name = var.getName()
+            # careful about ordering
+            # todo this is very ugly, but what can I do (wanted to do it without the if)
+            if isinstance(var, sv.SingleVariable):
+                all_vars.append(solution[var_name])
+            else:
+                all_vars.append(solution[var_name][:, np.array(fun.getNodes()) + var.offset])
 
         all_pars = list()
-        for par_name, par_list in fun.getParameters().items():
-            for par in par_list:
+        for par in fun.getParameters():
                 # careful about ordering
                 # todo this is very ugly, but what can I do (wanted to do it without the if)
-                if isinstance(par, sv.SingleParameter):
-                    all_pars.append(self.var_container.getParameterValues(par_name))
-                else:
-                    all_pars.append(self.var_container.getParameterValues(par_name)[:, fun.getNodes()])
+            if isinstance(par, sv.SingleParameter):
+                all_pars.append(par.getValues())
+            else:
+                par_matrix = np.reshape(par.getValues(), (par.getDim(), len(par.getNodes())), order='F')
+                all_pars.append(par_matrix[:, fun.getNodes()])
 
         fun_evaluated = fun_to_evaluate(*(all_vars + all_pars)).toarray()
         return fun_evaluated
@@ -870,4 +863,12 @@ class Problem:
 
 
 if __name__ == '__main__':
+    N = 10
+    dt = 0.01
+    prob = Problem(10)
+    x = prob.createStateVariable('x', 2)
+    y = prob.createStateVariable('y', 4)
+    u = prob.createInputVariable('u', 2)
+
+    prob.getVariables()['x']
     pass
