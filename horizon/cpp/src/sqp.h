@@ -178,7 +178,6 @@ public:
         bool sparse = true;
         x0_ = initial_guess_x;
         casadi_utils::toEigen(x0_, _sol);
-        _previous_sol = _sol;
         _variable_trj[0] = x0_;
         _iteration_to_solve = 0;
         for(unsigned int k = 0; k < _max_iter; ++k)
@@ -237,6 +236,14 @@ public:
             toc = std::chrono::high_resolution_clock::now();
             _qp_computation_time.push_back((toc-tic).count()*1E-9);
 
+
+            casadi_utils::toEigen(_conic_dict.output["x"], _dx);
+
+            /// BREAK CRITERIA
+            if(_dx.norm() <= _solution_convergence)
+                break;
+
+
             //4. Take full step
             x0_ = x0_ + _alpha*_conic_dict.output["x"];
             casadi_utils::toEigen(x0_, _sol);
@@ -247,12 +254,6 @@ public:
 
             _iteration_to_solve++;
 
-
-            /// BREAK CRITERIA
-            if((_sol - _previous_sol).norm() <= _solution_convergence)
-                break;
-            else
-                _previous_sol = _sol;
         }
 
         _solution["x"] = x0_;
@@ -385,7 +386,7 @@ private:
     casadi::DM A_;
     casadi::DM H_;
     casadi::DM x0_;
-    Eigen::VectorXd _sol, _previous_sol;
+    Eigen::VectorXd _sol, _dx;
 
     IODMDict _g_dict;
     IODMDict _A_dict;
