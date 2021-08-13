@@ -6,6 +6,7 @@ import numpy as np
 from horizon import problem
 from horizon.utils.transcription_methods import TranscriptionsHandler
 from horizon.utils import plotter
+from horizon.solvers import Solver
 from horizon.ros.replay_trajectory import replay_trajectory
 
 import matplotlib.pyplot as plt
@@ -76,8 +77,10 @@ prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
 
 # Creates problem
-prb.createProblem()
-solution = prb.solveProblem()
+solver = Solver.make_solver('ipopt', prb, dt)  #, opts={'max_iter': 10})
+# solver = solver.NlpsolSolver(prb=prb, dt=dt, opts={}, solver_plugin='ipopt')
+solver.solve()
+solution = solver.getSolutionDict()
 q_hist = solution["q"]
 
 time = np.arange(0.0, tf+1e-6, tf/ns)
@@ -90,7 +93,7 @@ plt.ylabel('$\mathrm{[m]}$', size = 20)
 
 plot_all = True
 if plot_all:
-    hplt = plotter.PlotterHorizon(prb)
+    hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
     plt.show()

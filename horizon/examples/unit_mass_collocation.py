@@ -6,6 +6,7 @@ import casadi as cs
 import numpy as np
 from horizon.utils.integrators import make_direct_collocation
 import horizon.utils.transcription_methods as transmet
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
 
 def make_integrator(x, xdot, u, l, dt):
@@ -33,6 +34,7 @@ if use_transcription_methods:
 
 
     xdot = cs.vertcat(v, F)
+    prob.setDynamics(xdot)
     l = cs.sumsqr(F)  # useless
 
     th = transmet.TranscriptionsHandler(prob, dt)
@@ -50,6 +52,7 @@ else:
     x = cs.vertcat(p, v)
     x_prev = cs.vertcat(p_prev, v_prev)
     xdot = cs.vertcat(v, F)
+    prob.setDynamics(xdot)
     l = cs.sumsqr(F)  # useless
 
     use_ms = False
@@ -71,13 +74,16 @@ v.setBounds(lb=0, ub=0, nodes=N)
 prob.createCostFunction('cost', cs.sumsqr(F), nodes=range(N))  # TODO: intermediate vs final cost
 
 # solve
-prob.createProblem(opts={'ipopt.max_iter': 10})
-solution = prob.solveProblem()
+opts={'ipopt.max_iter': 10}
+solver = solver.Solver.make_solver('ipopt', prob, dt, opts)
+solver.solve()
+
+solution = solver.getSolutionDict()
 
 # plot
 plot_all = True
 if plot_all:
-    hplt = plotter.PlotterHorizon(prob)
+    hplt = plotter.PlotterHorizon(prob, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
     plt.show()

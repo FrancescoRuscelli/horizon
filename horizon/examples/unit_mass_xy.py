@@ -6,6 +6,7 @@ import casadi as cs
 import numpy as np
 from horizon.utils.integrators import make_direct_collocation
 import horizon.utils.transcription_methods as transmet
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
 
 n_nodes = 50
@@ -50,14 +51,15 @@ obs_cnsrt.setUpperBounds(np.inf)
 prob.createIntermediateCost('cost', cs.sumsqr(F))
 
 # solve
-prob.createProblem()
-solution = prob.solveProblem()
+solver = solver.Solver.make_solver('ipopt', prob, dt)
+solver.solve()
+solution = solver.getSolutionDict()
 
 # plot
 plot_all = True
 
 if plot_all:
-    hplt = plotter.PlotterHorizon(prob)
+    hplt = plotter.PlotterHorizon(prob, solution)
     hplt.plotVariables(grid=True)
     hplt.plotFunctions(grid=True)
 

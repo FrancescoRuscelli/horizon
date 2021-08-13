@@ -7,6 +7,7 @@ import time
 from horizon import problem
 from horizon.utils import integrators
 from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 
@@ -88,7 +89,8 @@ blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact
     }
 
 # Creates problem
-prb.createProblem(solver_plugin='blocksqp', opts=blocksqp_opts)
+solver = solver.Solver.make_solver('blocksqp', prb, dt, opts=blocksqp_opts)
+# prb.createProblem(solver_plugin='blocksqp', opts=blocksqp_opts)
 
 
 class RealTimeIteration:
@@ -110,7 +112,7 @@ class RealTimeIteration:
         self.state.setBounds(lb=stateread, ub=stateread, nodes=0)
         
         # solve
-        self.solution = prb.solveProblem()
+        self.solution = solver.solve()
 
         # get control input to apply
         u_opt = self.solution['u'][:, 0]

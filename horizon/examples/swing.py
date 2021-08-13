@@ -6,6 +6,7 @@ import casadi as cs
 import numpy as np
 from horizon import problem
 from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 
@@ -37,6 +38,7 @@ frope = prb.createInputVariable("frope", nf)
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
+prb.setDynamics(xdot)
 # Formulate discrete time dynamics
 tf = 2.0  # [s]
 L = 0.5 * cs.dot(qdot, qdot)  # Objective term
@@ -138,19 +140,15 @@ p_rope_init = FKRope(q=q_init)['ee_pos']
 p_rope = FKRope(q=q)['ee_pos']
 prb.createConstraint("rope_anchor_point", p_rope - p_rope_init)
 
-prb.createProblem()
-
 # SETUP SOLVER
 opts = {
     'ipopt.tol': 1e-3
     , 'ipopt.constr_viol_tol': 1e-3
-    , 'ipopt.max_iter': 4000
-    , 'ipopt.linear_solver': 'ma57'}
+    , 'ipopt.max_iter': 4000}
 
-solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
-prb.setSolver(solver)
-
-solution = prb.solveProblem()
+solver = solver.Solver.make_solver('ipopt', prb,  tf / ns, opts)
+solver.solve()
+solution = solver.getSolutionDict()
 
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]
@@ -230,11 +228,12 @@ if PRINT:
 
     plt.show()
 
-inbuild_plot = False
+inbuild_plot = True
 if inbuild_plot:
-    hplt = plotter.PlotterHorizon(prb)
+    hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
+    plt.show()
 
 # REPLAY TRAJECTORY
 # resampling
