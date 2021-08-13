@@ -10,11 +10,14 @@ import numpy as np
 import casadi as cs
 
 class PlotterHorizon:
-    def __init__(self, prb: Problem, solution, logger=None):
+    def __init__(self, prb: Problem, solution=None, logger=None):
 
         self.solution = solution
         self.prb = prb
         self.logger = logger
+
+    def setSolution(self, solution):
+        self.solution = solution
 
     def _createPlotGrid(self, n_rows_max, n_plots, title):
 
@@ -54,6 +57,9 @@ class PlotterHorizon:
 
     def plotVariables(self, grid=False):
 
+        if self.solution is None:
+            raise Exception('Solution not set. Cannot plot variables.')
+
         fig, gs = self._createPlotGrid(3, len(self.solution), 'Variables')
         i = 0
         for key, val in self.solution.items():
@@ -75,6 +81,9 @@ class PlotterHorizon:
 
     def plotVariable(self, name, grid=False):
 
+        if self.solution is None:
+            raise Exception('Solution not set. Cannot plot variable.')
+
         val = self.solution[name]
 
         fig, ax = plt.subplots()
@@ -87,6 +96,9 @@ class PlotterHorizon:
         ax.set(xlabel='nodes', ylabel='vals')
 
     def plotFunctions(self, grid=False):
+
+        if self.solution is None:
+            raise Exception('Solution not set. Cannot plot functions.')
 
         fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
 

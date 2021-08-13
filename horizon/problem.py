@@ -53,8 +53,8 @@ class Problem:
 
         self.nodes = N + 1
         # state variable to optimize
-        self.var_container = sv.VariablesContainer(self.nodes)
-        self.function_container = fc.FunctionsContainer(self.var_container, self.nodes, self.logger)
+        self.var_container = sv.VariablesContainer(self.logger)
+        self.function_container = fc.FunctionsContainer(self.logger)
         self.prob = None
 
         self.state_aggr = sv.StateAggregate()
@@ -75,7 +75,7 @@ class Problem:
         """
         if self.state_der is not None:
             raise RuntimeError('createStateVariable must be called *before* setDynamics')
-        var = self.var_container.setStateVar(name, dim)
+        var = self.var_container.setStateVar(name, dim, range(self.nodes))
         self.state_aggr.addVariable(var)
         return var
 
@@ -90,7 +90,7 @@ class Problem:
         Returns:
             instance of Input Variable
         """
-        var = self.var_container.setInputVar(name, dim)
+        var = self.var_container.setInputVar(name, dim, range(self.nodes-1))
         self.input_aggr.addVariable(var)
         return var
 
@@ -121,6 +121,9 @@ class Problem:
             instance of Variable
 
         """
+        if nodes is not None:
+            nodes = misc.checkNodes(nodes, range(self.nodes))
+
         var = self.var_container.setVar(name, dim, nodes)
         return var
 
@@ -139,6 +142,9 @@ class Problem:
             instance of Parameter
 
         """
+        if nodes is None:
+            nodes = range(self.nodes)
+
         par = self.var_container.setParameter(name, dim, nodes)
         return par
 

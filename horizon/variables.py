@@ -680,7 +680,6 @@ class Variable(AbstractVariable):
         Args:
             n_nodes: the desired number of nodes to be set
         """
-        # todo this is because I must manage Variable, InputVariable, StateVariable in different ways.
         self._nodes = n_nodes
         self._project()
 
@@ -1136,7 +1135,7 @@ class VariablesContainer:
     Container of all the variables of Horizon.
     It is used internally by the Problem to get the abstract and implemented variables.
     """
-    def __init__(self, nodes, logger=None):
+    def __init__(self, logger=None):
         """
         Initialize the Variable Container.
 
@@ -1145,7 +1144,6 @@ class VariablesContainer:
            logger: a logger reference to log data
         """
         self._logger = logger
-        self._nodes = nodes
 
         self._vars = OrderedDict()
         self._pars = OrderedDict()
@@ -1160,9 +1158,6 @@ class VariablesContainer:
             dim: dimension of variable
             active_nodes: nodes the variable is defined on
         """
-        if active_nodes is not None:
-            active_nodes = misc.checkNodes(active_nodes, range(self._nodes))
-
         var = var_type(name, dim, active_nodes)
         self._vars[name] = var
 
@@ -1189,7 +1184,7 @@ class VariablesContainer:
         var = self.createVar(var_type, name, dim, active_nodes)
         return var
 
-    def setStateVar(self, name, dim):
+    def setStateVar(self, name, dim, nodes):
         """
         Creates a State variable.
 
@@ -1197,10 +1192,10 @@ class VariablesContainer:
             name: name of the variable
             dim: dimension of the variable
         """
-        var = self.createVar(StateVariable, name, dim, range(self._nodes))
+        var = self.createVar(StateVariable, name, dim, nodes)
         return var
 
-    def setInputVar(self, name, dim):
+    def setInputVar(self, name, dim, nodes):
         """
         Creates a Input (Control) variable.
 
@@ -1208,7 +1203,7 @@ class VariablesContainer:
             name: name of the variable
             dim: dimension of the variable
         """
-        var = self.createVar(InputVariable, name, dim, range(self._nodes-1))
+        var = self.createVar(InputVariable, name, dim, nodes)
         return var
 
     def setSingleVar(self, name, dim):
@@ -1231,9 +1226,6 @@ class VariablesContainer:
             dim: dimension of the variable
             nodes: nodes the parameter is defined on. If not specified, all the horizon nodes are considered
         """
-        if nodes is None:
-            nodes = range(self._nodes)
-
         par = Parameter(name, dim, nodes)
         self._pars[name] = par
 
@@ -1357,19 +1349,13 @@ class VariablesContainer:
         Args:
             n_nodes: the desired number of nodes to be set
         """
-        raise Exception('setNNodes yet to be re-implemented')
-        # this is required to update the self.state_var_impl EACH time a new number of node is set
-        # removed_nodes = [node for node in range(self.nodes) if node not in range(n_nodes)]
-        # for node in removed_nodes:
-        #     if 'n' + str(node) in self.state_var_impl:
-        #         del self.state_var_impl['n' + str(node)]
-
         self._nodes = n_nodes
+
         for var in self._vars.values():
             if isinstance(var, SingleVariable):
                 pass
             elif isinstance(var, InputVariable):
-                var._setNNodes(list(range(self._nodes-1)))
+                var._setNNodes(list(range(self._nodes-1))) # todo is this right?
             elif isinstance(var, StateVariable):
                 var._setNNodes(list(range(self._nodes)))
             elif isinstance(var, Variable):

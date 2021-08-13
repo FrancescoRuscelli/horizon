@@ -432,19 +432,14 @@ class FunctionsContainer:
     Methods:
         build: builds the container with the updated functions.
     """
-    def __init__(self, state_vars, nodes, logger=None):
+    def __init__(self, logger=None):
         """
         Initialize the Function Container.
 
         Args:
-            state_vars: all the decision variable used in the problem
-            nodes: the number of nodes of the problem
             logger: a logger reference to log data
         """
         self._logger = logger
-
-        # the number of nodes
-        self._nodes = nodes
 
         # containers for the constraints
         self._cnstr_container = OrderedDict()
@@ -543,6 +538,19 @@ class FunctionsContainer:
             total_dim += cnstr.getDim() * len(cnstr.getNodes())
 
         return total_dim
+
+    def setNNodes(self, n_nodes):
+        """
+        set a desired number of nodes to Function Container.
+        Args:
+            n_nodes: the desired number of nodes to be set
+        """
+        # this is required to update the function_container EACH time a new number of node is set
+        for cnstr in self._cnstr_container.values():
+            cnstr.setNodes([i for i in cnstr.getNodes() if i in range(n_nodes)], erasing=True)
+
+        for costfun in self._costfun_container.values():
+            costfun.setNodes([i for i in costfun.getNodes() if i in range(n_nodes)], erasing=True)
 
     def serialize(self):
         """
