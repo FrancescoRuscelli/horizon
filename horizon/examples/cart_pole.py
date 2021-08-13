@@ -7,6 +7,7 @@ from horizon import problem
 from horizon.utils import utils, casadi_kin_dyn
 from horizon.utils.transcription_methods import TranscriptionsHandler
 from horizon.utils.plotter import PlotterHorizon
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 
@@ -29,7 +30,7 @@ print("nv: ", nv)
 
 # OPTIMIZATION PARAMETERS
 tf = 5.0  # [s]
-ns = 100  # number of shooting nodes
+ns = 30  # number of shooting nodes
 dt = tf/ns
 use_ms = True
 
@@ -88,8 +89,9 @@ tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
-prb.createProblem(opts = {'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
-solution = prb.solveProblem()
+solver = solver.Solver.make_solver('ipopt', prb, dt, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
+solver.solve()
+solution = solver.getSolutionDict()
 q_hist = solution["q"]
 
 time = np.arange(0.0, tf+1e-6, tf/ns)
@@ -99,11 +101,10 @@ plt.plot(time, q_hist[1,:])
 plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[m]}$', size = 20)
-plt.show()
 
 plot_all = True
 if plot_all:
-    hplt = PlotterHorizon(prb)
+    hplt = PlotterHorizon(prb, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
     plt.show()
