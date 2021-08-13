@@ -92,8 +92,8 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     # blocksqp needs exact hessian to be accurate
     opts = None
 
-    #if solver_type == "gnsqp":
-    #    opts = dict([("max_iter", 10)])
+    if solver_type == "gnsqp":
+        opts = {"max_iter": 10, "printLevel": "none"}
 
     bsqpsol = Solver.make_solver(solver_type, prob, dt, opts)
     return bsqpsol
