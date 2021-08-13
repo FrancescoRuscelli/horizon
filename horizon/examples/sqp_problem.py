@@ -55,7 +55,7 @@ problem_dict['f'] = prb.function_container.getCostFList()
 opts = {#SQP
         'max_iter': 100, "solution_convergence": 1e-9,
         #QPOASES
-        'sparse': True, 'hessian_type': 'posdef', 'printLevel': 'none'}
+        'sparse': True, 'hessian_type': 'posdef', 'printLevel': 'none', 'linsol_plugin': 'ma57'}
 
 t = time.time()
 
