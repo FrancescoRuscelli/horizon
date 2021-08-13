@@ -4,7 +4,7 @@ import logging
 import casadi as cs
 from horizon import problem
 from horizon.utils import integrators
-from horizon.solvers import sqp
+from horizon.solvers import pysqp
 import matplotlib.pyplot as plt
 import numpy as np
 import time
@@ -52,25 +52,30 @@ problem_dict = prb.getProblem()
 problem_dict['f'] = prb.function_container.getCostFList()
 
 
-d = {'verbose': False}
-opts = {'max_iter': 10,
-        'osqp.osqp': d}
+opts = {#SQP
+        'max_iter': 100, "solution_convergence": 1e-9,
+        #QPOASES
+        'sparse': True, 'hessian_type': 'posdef', 'printLevel': 'none'}
 
 t = time.time()
-solver = sqp.sqp('solver', 'qpoases', problem_dict, opts)
+
+F = cs.Function('f', [problem_dict['x']], [problem_dict['f']], ['x'], ['f'])
+G = cs.Function('g', [problem_dict['x']], [problem_dict['g']], ['x'], ['g'])
+solver = pysqp.SQPGaussNewtonSX('gnsqp', 'qpoases', F, G, opts)
+
 prb.setSolver(solver)
 
 solution = prb.solveProblem()
 print ("first solve: ", time.time() - t)
 
-print ("compute Hessian time: ", solver.get_hessian_computation_time())
-print ("compute QP time: ", solver.get_qp_computation_time())
+print ("compute Hessian time: ", solver.getHessianComputationTime())
+print ("compute QP time: ", solver.getQPComputationTime())
 
 dx_hist = solution['dx']
 du_hist = solution['du']
 
-obj_history = prb.sol['f']
-con_history = prb.sol['g']
+obj_history = solver.getObjectiveIterations()
+con_history = solver.getConstraintNormIterations()
 
 # Retrieve the solution
 x0_opt = dx_hist[0, :]
@@ -107,19 +112,20 @@ prb.createCostFunction('min_dx_prev', 10.*dx_prev, nodes=list(range(N, N+1)))
 
 prb.createProblem()
 
-prb.solver.f(prb.function_container.getCostFList())
+F = cs.Function('f', [problem_dict['x']], [prb.function_container.getCostFList()], ['x'], ['f'])
+prb.solver.f(F, True)
 
 solution = prb.solveProblem()
-print ("first solve: ", time.time() - t)
+print ("second solve: ", time.time() - t)
 
-print ("compute Hessian time: ", solver.get_hessian_computation_time())
-print ("compute QP time: ", solver.get_qp_computation_time())
+print ("compute Hessian time: ", solver.getHessianComputationTime())
+print ("compute QP time: ", solver.getQPComputationTime())
 
-dx_hist = solution['dx']
-du_hist = solution['du']
+dx_hist = np.concatenate((dx_hist, solution['dx']), axis=1)
+du_hist = np.concatenate((du_hist, solution['du']), axis=None)
 
-obj_history = prb.sol['f']
-con_history = prb.sol['g']
+obj_history += solver.getObjectiveIterations()
+con_history += solver.getConstraintNormIterations()
 
 # Retrieve the solution
 x0_opt = dx_hist[0, :]
@@ -130,9 +136,9 @@ u_opt = du_hist.T
 plt.figure(1)
 plt.clf()
 plt.subplot(121)
-plt.plot(np.linspace(0, T, N+1), x0_opt, '--')
-plt.plot(np.linspace(0, T, N+1), x1_opt, '-')
-plt.step(np.linspace(0, T, N), u_opt, '-.')
+plt.plot(np.linspace(0, T, 2*(N+1)), x0_opt, '--')
+plt.plot(np.linspace(0, T, 2*(N+1)), x1_opt, '-')
+plt.step(np.linspace(0, T, 2*N), u_opt, '-.')
 plt.title("Solution: Gauss-Newton SQP")
 plt.xlabel('time')
 plt.legend(['x0 trajectory', 'x1 trajectory', 'u trajectory'])

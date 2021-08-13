@@ -626,7 +626,10 @@ class Problem:
             if not self.solver.stats()['success']:
                 raise Exception('Optimal solution NOT found.')
 
-        w_opt = self.sol['x'].full().flatten()
+        if hasattr(self.sol['x'], 'full'):
+            w_opt = self.sol['x'].full().flatten()
+        else:
+            w_opt = self.sol['x'].flatten()
 
         # split solution for each variable
         solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in

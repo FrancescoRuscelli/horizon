@@ -32,7 +32,7 @@ class GNSQPSolver(Solver):
         w0, lbw, ubw, lbg, ubg, p = self.prb.updateProblem()
 
         # solve
-        sol = self.solver.solve(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg) #, p=p)
+        sol = self.solver.solve(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
         # retrieve state and input trajector
         input_vars = [v.tag for v in self.prb.getInput().var_list]
