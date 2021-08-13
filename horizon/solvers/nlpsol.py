@@ -319,40 +319,40 @@ if __name__ == '__main__':
     a = prob.createVariable('a', 2, nodes=range(0, 5))
 
     x.setInitialGuess([1, 1], nodes=0)
-    # x.setInitialGuess([10, 10], nodes=10)
-    # a.setBounds([0, 0], [5, 5])
-    #
-    # p.assign([7, 7], nodes=range(0, 4))
-    # p.assign([2, 2], nodes=4)
-    #
-    # j.assign([44])
-    #
-    # print(z.getUpperBounds(range(3, 5)))
+    x.setInitialGuess([10, 10], nodes=10)
+    a.setBounds([0, 0], [5, 5])
 
-    # cnsrt0 = prob.createIntermediateConstraint('cnsrt0', y[2:4] + u)
-    # =========
-    # cnsrt1 = prob.createIntermediateConstraint('cnsrt1', x + u)
-    # cnsrt1.setLowerBounds([-np.inf, -np.inf])
-    # this is new, bitches!
-    # print(cnsrt1.getImpl(2)) # the constraints get implemented as soon as it get created muahahah
-    # =========
+    p.assign([7, 7], nodes=range(0, 4))
+    p.assign([2, 2], nodes=4)
+
+    j.assign([44])
+
+    print(z.getUpperBounds(range(3, 5)))
+    #
+    cnsrt0 = prob.createIntermediateConstraint('cnsrt0', y[2:4] + u)
+    ## =========
+    cnsrt1 = prob.createIntermediateConstraint('cnsrt1', x + u)
+    cnsrt1.setLowerBounds([-np.inf, -np.inf])
+    ## this is new, bitches!
+    print(cnsrt1.getImpl(2)) # the constraints get implemented as soon as it get created muahahah
+    ## =========
     # cnsrt2 = prob.createConstraint('cnsrt2', x * y[0:2], nodes=[3, 8])
-    # =========
+    ## =========
     # cnsrt3 = prob.createConstraint('cnsrt3', x + p)
-    # =========
+    ## =========
     # cnsrt4 = prob.createConstraint('cnsrt4', x + f[0:2])
-    # =========
+    ## =========
     # cnsrt5 = prob.createConstraint('cnsrt5', p + f[0:2] + z[2:4])
-    # =========
+    ## =========
     # cnsrt6 = prob.createConstraint('cnsrt6', x + z[0:2])
-    # =========
+    ## =========
     # this should be the same
     # cnsrt7 = prob.createIntermediateConstraint('cnsrt7', x_next - x)
     # cnsrt8 = prob.createConstraint('cnsrt8', x - x_prev, nodes=range(1, N+1))
-    cnsrt9 = prob.createConstraint('cnsrt9', y, nodes=N)
+    # cnsrt9 = prob.createConstraint('cnsrt9', y, nodes=N)
+    #
 
-
-    # cost1 = prob.createCostFunction('cost1', x+p)
+    cost1 = prob.createCostFunction('cost1', x+p)
     # =========
 
     # todo check if everything is allright!
