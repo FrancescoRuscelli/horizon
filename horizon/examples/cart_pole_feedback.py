@@ -112,7 +112,8 @@ class RealTimeIteration:
         self.state.setBounds(lb=stateread, ub=stateread, nodes=0)
         
         # solve
-        self.solution = solver.solve()
+        solver.solve()
+        self.solution = solver.getSolutionDict()
 
         # get control input to apply
         u_opt = self.solution['u'][:, 0]
