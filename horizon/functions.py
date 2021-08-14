@@ -35,12 +35,14 @@ class Function:
         # todo isn't there another way to get the variables from the function g?
         self.vars = used_vars
         self.pars = used_pars
-
+        # todo since i have the variables, I can reproject here!!!!!!!!!!
         # create function of CASADI, dependent on (in order) [all_vars, all_pars]
         self._fun = cs.Function(name, self.vars + self.pars, [self._f])
         self._fun_impl = dict()
 
         self.setNodes(nodes)
+
+        self._project()
 
     def getName(self) -> str:
         """
@@ -86,7 +88,36 @@ class Function:
 
         return fun_impl
 
-    def _project(self, used_vars):
+
+    def _getUsedVarImpl(self):
+        used_var_impl = list()
+        for var in self.vars:
+            var_impl = var.getImpl(self.getNodes())
+            var_dim = var.getDim()
+            # reshape them for all-in-one evaluation of function
+            # this is getting all the generic variable x, even if the function has a slice of it x[0:2].
+            # It will work. The casadi function takes from x only the right slices afterwards.
+            # print(var_impl)
+            var_impl_matrix = cs.reshape(var_impl, (var_dim, len(self.getNodes())))
+            # generic input --> row: dim // column: nodes
+            # [[x_0_0, x_1_0, ... x_N_0],
+            #  [x_0_1, x_1_1, ... x_N_1]]
+            used_var_impl.append(var_impl_matrix)
+
+        return used_var_impl
+
+    def _getUsedParImpl(self):
+
+        used_par_impl = list()
+        for par in self.pars:
+            par_impl = par.getImpl(self.getNodes())
+            par_dim = par.getDim()
+            par_impl_matrix = cs.reshape(par_impl, (par_dim, len(self.getNodes())))
+            used_par_impl.append(par_impl_matrix)
+
+        return used_par_impl
+
+    def _project(self):
         """
         Implements the function at the desired node using the desired variables.
 
@@ -96,7 +127,10 @@ class Function:
         Returns:
             the implemented function
         """
-        fun_eval = self._fun(*used_vars)
+        used_var_impl = self._getUsedVarImpl()
+        used_par_impl = self._getUsedParImpl()
+        all_vars = used_var_impl+used_par_impl
+        fun_eval = self._fun(*all_vars)
 
         for i in range(len(self._nodes)):
             self._fun_impl['n' + str(self._nodes[i])] = fun_eval[:, i]
@@ -549,8 +583,8 @@ class FunctionsContainer:
         for cnstr in self._cnstr_container.values():
             cnstr.setNodes([i for i in cnstr.getNodes() if i in range(n_nodes)], erasing=True)
 
-        for costfun in self._costfun_container.values():
-            costfun.setNodes([i for i in costfun.getNodes() if i in range(n_nodes)], erasing=True)
+        for cost in self._costfun_container.values():
+            cost.setNodes([i for i in cost.getNodes() if i in range(n_nodes)], erasing=True)
 
     def serialize(self):
         """

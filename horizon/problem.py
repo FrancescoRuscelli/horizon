@@ -263,34 +263,6 @@ class Problem:
 
         return used_par
 
-    def _getUsedVarImpl(self, fun, used_var_abstract):
-        used_var_impl = list()
-        for var in used_var_abstract:
-            var_impl = var.getImpl(fun.getNodes())
-            var_dim = var.getDim()
-            # reshape them for all-in-one evaluation of function
-            # this is getting all the generic variable x, even if the function has a slice of it x[0:2].
-            # It will work. The casadi function takes from x only the right slices afterwards.
-            # print(var_impl)
-            var_impl_matrix = cs.reshape(var_impl, (var_dim, len(fun.getNodes())))
-            # generic input --> row: dim // column: nodes
-            # [[x_0_0, x_1_0, ... x_N_0],
-            #  [x_0_1, x_1_1, ... x_N_1]]
-            used_var_impl.append(var_impl_matrix)
-
-        return used_var_impl
-
-    def _getUsedParImpl(self, fun, used_par_abstract):
-
-        used_par_impl = list()
-        for par in used_par_abstract:
-            par_impl = par.getImpl(fun.getNodes())
-            par_dim = par.getDim()
-            par_impl_matrix = cs.reshape(par_impl, (par_dim, len(fun.getNodes())))
-            used_par_impl.append(par_impl_matrix)
-
-        return used_par_impl
-
     def createConstraint(self, name: str,
                          g,
                          nodes: Union[int, Iterable] = None,
@@ -322,11 +294,6 @@ class Problem:
 
         # create internal representation of a constraint
         fun = fc.Constraint(name, g, used_var, used_par, nodes, bounds)
-
-        used_var_impl = self._getUsedVarImpl(fun, used_var)
-        used_par_impl = self._getUsedParImpl(fun, used_par)
-
-        fun._project(used_var_impl + used_par_impl)
 
         self.function_container.addFunction(fun)
 
@@ -400,11 +367,6 @@ class Problem:
             self.logger.debug(f'Creating Cost Function "{name}": active in nodes: {nodes}')
 
         fun = fc.CostFunction(name, j, used_var, used_par, nodes)
-
-        used_var_impl = self._getUsedVarImpl(fun, used_var)
-        used_par_impl = self._getUsedParImpl(fun, used_par)
-
-        fun._project(used_var_impl + used_par_impl)
 
         self.function_container.addFunction(fun)
 
@@ -539,7 +501,6 @@ class Problem:
         """
         fun_to_evaluate = fun.getFunction()
         all_vars = list()
-
         for var in fun.getVariables():
             var_name = var.getName()
             # careful about ordering
@@ -547,7 +508,15 @@ class Problem:
             if isinstance(var, sv.SingleVariable):
                 all_vars.append(solution[var_name])
             else:
-                all_vars.append(solution[var_name][:, np.array(fun.getNodes()) + var.getOffset()])
+                # this is required because:
+                # I retrieve from the solution values only the nodes that the function is active on.
+                # suppose a function is active on nodes [3, 4, 5, 6].
+                # suppose a variable is defined on nodes [0, 1, 2, 3, 4, 5, 6].
+                #   its solution will be [a, b, c, d, e, f, g]. I'm interested in the values at position [3, 4, 5, 6]
+                # suppose a variable is defined only on nodes [3, 4, 5, 6].
+                #   its solution will be [a, b, c, d]. I'm interested in the values at position [0, 1, 2, 3], which corresponds to nodes [3, 4, 5, 6]
+                node_index = [i for i in range(len(var.getNodes())) if var.getNodes()[i] in np.array(fun.getNodes()) + var.getOffset()]
+                all_vars.append(solution[var_name][:, node_index])
 
         all_pars = list()
         for par in fun.getParameters():
@@ -654,20 +623,51 @@ class Problem:
 
 
 if __name__ == '__main__':
+    from horizon.solvers import Solver
+    from horizon.utils import plotter
+    import matplotlib.pyplot as plt
     N = 10
     dt = 0.01
     prob = Problem(10)
-    x = prob.createStateVariable('x', 2)
-    y = prob.createStateVariable('y', 4)
-    u = prob.createInputVariable('u', 2)
+    x = prob.createStateVariable('x', 1)
+    y = prob.createInputVariable('y', 1)
+    # z = prob.createVariable('z', 1, nodes=[0, 1, 2, 3, 4, 5])
 
-    state = prob.getState()
+    cnsrt = prob.createIntermediateConstraint('cnsrt', x+y)
+    # cnsrt = prob.createIntermediateConstraint('cnsrt', x + z, nodes=[0, 1, 2, 3, 4, 5])
+    xdot = cs.vertcat(x)
+    prob.setDynamics(xdot)
 
-    print(state)
-    print(state.getVarIndex('x'))
-    print(state.getVars())
-    state_prev = state.getVarOffset(-1)
-    print(state_prev.getVars())
-    print(state_prev.getVarIndex('y'))
+    prob.setNNodes(1)
+    prob.setNNodes(12)
 
-    pass
+    cnsrt.setNodes(range(1, 10))
+    sol = Solver.make_solver('ipopt', prob, dt)
+    sol.solve()
+    solution = sol.getSolutionDict()
+
+
+    exit()
+
+    N = 10
+    dt = 0.01
+    prob = Problem(10)
+    x = prob.createStateVariable('x', 1)
+    y = prob.createVariable('y', 1, nodes=range(5, 11))
+
+    cnsrt = prob.createConstraint('cnsrt', x+y, nodes=range(5, 11))
+
+    xdot = cs.vertcat(x)
+    prob.setDynamics(xdot)
+
+    sol = Solver.make_solver('ipopt', prob, dt)
+    sol.solve()
+    solution = sol.getSolutionDict()
+
+    print(solution)
+    hplt = plotter.PlotterHorizon(prob, solution)
+    hplt.plotVariables()
+    hplt.plotFunctions()
+
+    plt.show()
+

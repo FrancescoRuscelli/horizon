@@ -183,20 +183,38 @@ def test_bounds_2():
     x = prb.createStateVariable('x', 2)
     y = prb.createStateVariable('y', 2)
     cnsrt = prb.createConstraint('cnsrt', x+y)
-
+    prb.setDynamics(cs.vertcat(x,y))
     cnsrt.setBounds([12, 12],[12, 12], 4)
     solver = Solver.make_solver('ipopt', prb, dt)
     solver.solve()
 
+def test_boundsarray():
+    nodes = 8
+    dt = 0.01
+    prb = Problem(nodes)
+    x = prb.createStateVariable('x', 1)
+    y = prb.createStateVariable('y', 1)
+    prb.setDynamics(cs.vertcat(x, y))
+    cnsrt = prb.createConstraint('cnsrt', x + y)
+
+    bounds = cnsrt.getBounds()
+    print(bounds[0].shape, bounds[0])
+    print(bounds[0].shape, bounds[1])
+
+    lb = cnsrt.getLowerBounds()
+    print(lb.shape)
+
 if __name__ == '__main__':
-    test_singleParameter()
-    test_parameters()
-    test_singleVariable()
-    test_constraintBounds()
-    test_intermediateConstraint()
-    test_variables()
-    test_prev()
-    test_bounds_input()
+    # test_singleParameter()
+    # test_parameters()
+    # test_singleVariable()
+    # test_constraintBounds()
+    # test_intermediateConstraint()
+    # test_variables()
+    # test_prev()
+    # test_bounds_input()
+    # test_bounds_2()
+    test_boundsarray()
 
 
 #
