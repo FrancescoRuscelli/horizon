@@ -44,5 +44,9 @@ class FunctionLine(QWidget):
     def updateSlices(self, slices):
         self.slider.updateSlices(slices)
 
+    def setDisabledNodes(self, slices, erasing=True):
+        for slice in slices:
+            self.slider.disableValues(slice[0], slice[1], erasing)
+
     def getName(self):
         return self.name

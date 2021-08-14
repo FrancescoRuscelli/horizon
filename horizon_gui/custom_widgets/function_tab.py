@@ -75,6 +75,10 @@ class FunctionTabWidget(QTabWidget):
     def on_fun_ub_changed(self, fun_name, node, lims):
         self.funUbChanged.emit(fun_name, node, lims)
 
+    def setFunctionDisabledNodes(self, fun_name, ranges, erasing):
+        for widget_fl in self.findChildren(FunctionLine):
+            if widget_fl.getName() == fun_name:
+                widget_fl.setDisabledNodes(ranges, erasing)
 
     def setFunctionNodes(self, fun_name, ranges):
         for widget_fl in self.findChildren(FunctionLine):

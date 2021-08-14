@@ -1,3 +1,4 @@
+import numpy as np
 from PyQt5.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QScrollArea, QTableWidget, \
     QLabel, QTableWidgetItem, QGridLayout, QAbstractScrollArea, QSizePolicy, QHeaderView, QLayout
 
@@ -143,6 +144,21 @@ class HorizonLine(QScrollArea):
 
         # update nodes in second widget (function line) + set margins
         self.function_tab.setHorizonNodes(nodes)
+
+        # mechanics to update disabled nodes when nodes of problem are changed.
+        # for example, for a function with an input variable, always and only the last node is disabled.
+        for i in range(self.function_tab.count()):
+            fun_name = self.function_tab.tabText(i)
+            used_vars = self.horizon_receiver.getFunction(fun_name)['used_vars']
+            available_nodes = set(range(self.n_nodes))
+            for var in used_vars:
+                if not var.getNodes() == [-1]:  # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
+                    available_nodes.intersection_update(var.getNodes())
+
+            disabled_nodes = [node for node in range(self.n_nodes) if node not in available_nodes]
+            disabled_nodes = ravelElements(disabled_nodes)
+            self.function_tab.setFunctionDisabledNodes(fun_name, disabled_nodes, erasing=True)
+
         if self.function_tab.count():
             self.updateMarginsSingleLine()
 
@@ -161,7 +177,6 @@ class HorizonLine(QScrollArea):
         margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
         self.multi_function_box.updateMargins(margins)
 
-    #
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
         # items = source_Widget.selectedItems()
@@ -210,6 +225,7 @@ class HorizonLine(QScrollArea):
         disabled_nodes = [node for node in range(self.n_nodes) if node not in available_nodes]
         disabled_nodes = ravelElements(disabled_nodes)
 
+
         # activate the function using only the available nodes
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type, available_nodes)
 
@@ -217,14 +233,16 @@ class HorizonLine(QScrollArea):
         dim = self.horizon_receiver.getFunction(name)['active'].getDim()
         initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
 
+        lb_matrix = np.reshape(initial_bounds[0], (dim, len(available_nodes)), order='F')
+        ub_matrix = np.reshape(initial_bounds[1], (dim, len(available_nodes)), order='F')
+
         if flag:
-            self.addFunctionToSingleLine(name, dim, disabled_nodes, initial_bounds)
+            self.addFunctionToSingleLine(name, dim, disabled_nodes, [lb_matrix, ub_matrix])
             self.addFunctionToMultiLine(name, disabled_nodes)
             self.logger.info(signal)
         else:
             self.logger.warning(signal)
 
-    #
     # def removeFunctionFromHorizon(self, name):
     #     flag, signal = self.horizon_receiver.removeActiveFunction(name)
 

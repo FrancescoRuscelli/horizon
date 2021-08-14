@@ -59,19 +59,22 @@ def checkValueEntry(val):
 
 def ravelElements(list_values):
     list_ranges = list()
-    first = list_values[0]
-    if len(list_values) == 1:
-        list_ranges.append([first, list_values[0]])
-    else:
-        for i in range(1, len(list_values)):
-            if list_values[i] - list_values[i - 1] > 1:
-                last = list_values[i-1]
-                list_ranges.append([first, last])
-                first = list_values[i]
+    if list_values:
+        first = list_values[0]
+        if len(list_values) == 1:
+            list_ranges.append([first, list_values[0]])
+        else:
+            for i in range(1, len(list_values)):
+                if list_values[i] - list_values[i - 1] > 1:
+                    last = list_values[i-1]
+                    list_ranges.append([first, last])
+                    first = list_values[i]
 
-            if i ==len(list_values)-1:
-                last = list_values[i]
-                list_ranges.append([first, last])
+                if i ==len(list_values)-1:
+                    last = list_values[i]
+                    list_ranges.append([first, last])
+    else:
+        list_ranges = list_values
 
     return list_ranges
 

@@ -132,7 +132,7 @@ class Function:
                 self._nodes.append(i)
                 self._nodes.sort()
 
-    def getVariables(self) -> dict:
+    def getVariables(self) -> list:
         """
         Getter for the variables used in the function.
 
@@ -141,7 +141,7 @@ class Function:
         """
         return self.vars
 
-    def getParameters(self) -> dict:
+    def getParameters(self) -> list:
         """
         Getter for the parameters used in the function.
 
@@ -547,9 +547,22 @@ class FunctionsContainer:
         """
         # this is required to update the function_container EACH time a new number of node is set
         for cnstr in self._cnstr_container.values():
-            cnstr.setNodes([i for i in cnstr.getNodes() if i in range(n_nodes)], erasing=True)
+            # this is required to update the nodes consistently.
+            # For instance, the horizon problem is specified on [0, 1, 2, 3, 4].
+            # Consider a function containing an input variable. it is active on [0, 1, 2, 3].
+            # I change the nodes to [0, 1, 2, 3]. The function must be updated accordingly: [0, 1, 2]
+            # I change the nodes to [0, 1, 2, 3, 4, 5]. The function must be updated accordingly: [0, 1, 2, 4]
+            available_nodes = set(range(n_nodes))
+            for var in cnstr.getVariables():
+                if not var.getNodes() == [-1]:  # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
+                    available_nodes.intersection_update(var.getNodes())
+            cnstr.setNodes([i for i in cnstr.getNodes() if i in available_nodes], erasing=True)
 
         for costfun in self._costfun_container.values():
+            available_nodes = set(range(n_nodes))
+            for var in costfun.getVariables():
+                if not var.getNodes() == [-1]:  # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
+                    available_nodes.intersection_update(var.getNodes())
             costfun.setNodes([i for i in costfun.getNodes() if i in range(n_nodes)], erasing=True)
 
     def serialize(self):

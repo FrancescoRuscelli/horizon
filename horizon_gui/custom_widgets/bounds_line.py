@@ -107,8 +107,8 @@ class BoundsLine(QWidget):
                 layout.itemAt(i).widget().deleteLater()
                 layout.removeItem(layout.itemAt(i))
 
-        temp_lb = np.matrix(np.ones((self.dim, self.n_nodes)) * -np.inf)
-        temp_ub = np.matrix(np.ones((self.dim, self.n_nodes)) * np.inf)
+        temp_lb = np.matrix(np.zeros((self.dim, self.n_nodes)))
+        temp_ub = np.matrix(np.zeros((self.dim, self.n_nodes)))
 
         temp_lb[:self.lb.shape[0], :self.lb.shape[1]] = self.lb[:temp_lb.shape[0], :temp_lb.shape[1]]
         temp_ub[:self.ub.shape[0], :self.ub.shape[1]] = self.ub[:temp_ub.shape[0], :temp_ub.shape[1]]

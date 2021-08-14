@@ -6,6 +6,7 @@ import math
 import pickle
 from logging import INFO, DEBUG
 from horizon.utils import plotter as plt
+from horizon.solvers import Solver
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -21,6 +22,7 @@ class horizonImpl():
 
         self.plt = plt.PlotterHorizon(self.casadi_prb)
         # self.active_fun_list = list()
+        self.solver = None
 
     def _setVarGenerator(self, var_type):
         if var_type == 'state_var':
@@ -265,8 +267,14 @@ class horizonImpl():
 
     def generate(self):
         try:
-            self.casadi_prb.solver = None
-            self.casadi_prb.createProblem()
+            dt = 0.1
+            # if self.solver is None:
+            #     self.logger.warning('Solver not set. Please select a valid solver before building Horizon problem.')
+            # else:
+            # todo tapullo:
+            self.casadi_prb.setDynamics(self.casadi_prb.getState().getVars())
+            self.solver = Solver.make_solver('ipopt', self.casadi_prb, dt)
+            self.logger.info('Problem created succesfully!')
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
             return False
@@ -274,13 +282,18 @@ class horizonImpl():
 
     def solve(self):
         try:
-            self.casadi_prb.solveProblem()
+            if self.solver is None:
+                self.logger.warning('Solver not set. Cannot solve.')
+            else:
+                self.solver.solve()
+                self.logger.info('Problem solved succesfully!')
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
             return False
         return True
 
     def getInfoAtNodes(self, node):
+        raise Exception('getInfoAtNodes yet to be done')
         vars = list()
         vars_dict = self.casadi_prb.scopeNodeVars(node) #lb, ub, w0
         if vars_dict is not None:
@@ -293,6 +306,7 @@ class horizonImpl():
         return vars, cnstrs, costfuns
 
     def plot(self):
+        self.plt.setSolution(self.solver.getSolutionDict())
         self.plt.plotVariables()
         self.plt.plotFunctions()
 
