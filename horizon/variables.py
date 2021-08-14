@@ -105,6 +105,15 @@ class OffsetVariable(AbstractVariable):
         """
         return self.parent_name
 
+    def getNodes(self):
+        """
+        Getter for the active nodes.
+
+        Returns:
+            list of active nodes
+        """
+        return self._nodes
+
 class SingleParameter(AbstractVariable):
     """
     Single Parameter of Horizon Problem.

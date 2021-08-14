@@ -22,6 +22,7 @@ class PlotterHorizon:
     def _createPlotGrid(self, n_rows_max, n_plots, title):
 
         cols = n_plots if n_plots < n_rows_max else n_rows_max
+
         rows = int(math.ceil(n_plots / cols))
 
         gs = gridspec.GridSpec(rows, cols)
@@ -100,24 +101,25 @@ class PlotterHorizon:
         if self.solution is None:
             raise Exception('Solution not set. Cannot plot functions.')
 
-        fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
+        if self.prb.getConstraints():
+            fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
 
-        i = 0
-        for name, fun in self.prb.getConstraints().items():
-            ax = fig.add_subplot(gs[i])
-            if grid:
-                ax.grid(axis='x')
-            fun_evaluated = self.prb.evalFun(fun, self.solution)
-            self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name))
+            i = 0
+            for name, fun in self.prb.getConstraints().items():
+                ax = fig.add_subplot(gs[i])
+                if grid:
+                    ax.grid(axis='x')
+                fun_evaluated = self.prb.evalFun(fun, self.solution)
+                self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name))
 
-            ax.set_title('{}'.format(name))
-            plt.xticks(list(range(fun_evaluated.shape[1])))
-            ax.ticklabel_format(useOffset=False, style='plain')
-            ax.yaxis.set_major_formatter(FormatStrFormatter('%g'))
-            i = i+1
+                ax.set_title('{}'.format(name))
+                plt.xticks(list(range(fun_evaluated.shape[1])))
+                ax.ticklabel_format(useOffset=False, style='plain')
+                ax.yaxis.set_major_formatter(FormatStrFormatter('%g'))
+                i = i+1
 
-        fig.tight_layout()
-        plt.show(block=False)
+            fig.tight_layout()
+            plt.show(block=False)
 
 if __name__ == '__main__':
 
