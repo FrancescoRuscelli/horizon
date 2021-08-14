@@ -35,14 +35,13 @@ class Function:
         # todo isn't there another way to get the variables from the function g?
         self.vars = used_vars
         self.pars = used_pars
+
         # todo since i have the variables, I can reproject here!!!!!!!!!!
         # create function of CASADI, dependent on (in order) [all_vars, all_pars]
         self._fun = cs.Function(name, self.vars + self.pars, [self._f])
         self._fun_impl = dict()
 
         self.setNodes(nodes)
-
-        self._project()
 
     def getName(self) -> str:
         """
@@ -166,7 +165,13 @@ class Function:
                 self._nodes.append(i)
                 self._nodes.sort()
 
-    def getVariables(self) -> dict:
+        # todo this is redundant. If the implemented variables do not change, this is not required, right?
+        #   How do I understand when the var impl changed?
+        # usually the number of nodes stays the same, while the active nodes of a function may change.
+        # If the number of nodes changes, also the variables change. That is when this reprojection is required.
+        self._project()
+
+    def getVariables(self) -> list:
         """
         Getter for the variables used in the function.
 
@@ -175,7 +180,7 @@ class Function:
         """
         return self.vars
 
-    def getParameters(self) -> dict:
+    def getParameters(self) -> list:
         """
         Getter for the parameters used in the function.
 
@@ -432,6 +437,8 @@ class Constraint(Function):
                     self.bounds['n' + str(i)] = dict(lb=np.full(self._f.shape[0], 0.),
                                                      ub=np.full(self._f.shape[0], 0.))
 
+        self._project()
+
 class CostFunction(Function):
     """
     Cost Function of Horizon.
@@ -581,9 +588,22 @@ class FunctionsContainer:
         """
         # this is required to update the function_container EACH time a new number of node is set
         for cnstr in self._cnstr_container.values():
-            cnstr.setNodes([i for i in cnstr.getNodes() if i in range(n_nodes)], erasing=True)
+            # this is required to update the nodes consistently.
+            # For instance, the horizon problem is specified on [0, 1, 2, 3, 4].
+            # Consider a function containing an input variable. it is active on [0, 1, 2, 3].
+            # I change the nodes to [0, 1, 2, 3]. The function must be updated accordingly: [0, 1, 2]
+            # I change the nodes to [0, 1, 2, 3, 4, 5]. The function must be updated accordingly: [0, 1, 2, 4]
+            available_nodes = set(range(n_nodes))
+            for var in cnstr.getVariables():
+                if not var.getNodes() == [-1]:  # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
+                    available_nodes.intersection_update(var.getNodes())
+            cnstr.setNodes([i for i in cnstr.getNodes() if i in available_nodes], erasing=True)
 
         for cost in self._costfun_container.values():
+            available_nodes = set(range(n_nodes))
+            for var in cost.getVariables():
+                if not var.getNodes() == [-1]:
+                    available_nodes.intersection_update(var.getNodes())
             cost.setNodes([i for i in cost.getNodes() if i in range(n_nodes)], erasing=True)
 
     def serialize(self):

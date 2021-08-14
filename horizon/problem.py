@@ -638,7 +638,9 @@ if __name__ == '__main__':
     xdot = cs.vertcat(x)
     prob.setDynamics(xdot)
 
+    print('changing nodes to 1!')
     prob.setNNodes(1)
+    print('changing nodes to 12!')
     prob.setNNodes(12)
 
     cnsrt.setNodes(range(1, 10))
