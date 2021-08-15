@@ -73,7 +73,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.inputVarAddButton.clicked.connect(partial(self.generateVariable, 'Input'))
         self.singleVarAddButton.clicked.connect(partial(self.generateVariable, 'Single'))
         self.customVarAddButton.clicked.connect(self.openCustomVarOptions)
-        self.funButton.clicked.connect(self.generateFunction)
+        self.funCustomButton.clicked.connect(self.generateCustomFunction)
+        self.funDefaultButton.clicked.connect(self.generateDefaultFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
         self.varTable.itemDoubleClicked.connect(self.openVar)
         self.switchPageButton.clicked.connect(self.switchPage)
@@ -102,6 +103,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.constraintLine.function_nodes_changed.connect(partial(self.ledSolve.setReady, False))
         self.ledSolve.setEnabled(False)
 
+
         # when opening horizon, fill the GUI
         for name, data in horizon_receiver.getVarDict().items():
             self.addStateVariableToGUI(name)
@@ -118,6 +120,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
                     line = self.costfunctionLine
                     line.addFunctionToSingleLine(name, data['active'].getDim()[0])
                     line.addFunctionToMultiLine(name)
+
+        # fill function combo box
+        self._fillFunComboBox()
 
     def createButtonPushed(self):
         if self.horizon_receiver.generate():
@@ -161,6 +166,12 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             self.switchPageButton.setText('Switch to Cost Functions')
 
         self.ProblemMain.setCurrentIndex(abs(index-1))
+
+    def _fillFunComboBox(self):
+        self.funComboBox.addItem('multiple shooting')
+        self.funComboBox.addItem('direct collocation')
+        self.funComboBox.setCurrentIndex(-1)
+
 
     def openFunction(self, item):
 
@@ -436,7 +447,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.funTable.setItem(row_pos, 1, str_table)
 
 
-    def generateFunction(self):
+    def generateCustomFunction(self):
 
         name = self.funNameInput.text()
         str_fun = self.funInput.toPlainText()
@@ -461,6 +472,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             self.logger.warning('main_inteface.py: {}'.format(signal))
             self.on_generic_sig(signal)
 
+    def generateDefaultFunction(self):
+
+        print(self.funComboBox.currentText())
     # GUI
     def setFunEditor(self, parent):
         font = QFont()

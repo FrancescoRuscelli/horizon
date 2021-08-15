@@ -1,4 +1,6 @@
 from horizon import problem as horizon
+from horizon.solvers import Solver
+from horizon.utils.transcription_methods import TranscriptionsHandler
 import parser
 import re
 import casadi as cs
@@ -6,7 +8,6 @@ import math
 import pickle
 from logging import INFO, DEBUG
 from horizon.utils import plotter as plt
-from horizon.solvers import Solver
 
 class horizonImpl():
     def __init__(self, nodes, logger=None):
@@ -23,6 +24,12 @@ class horizonImpl():
         self.plt = plt.PlotterHorizon(self.casadi_prb)
         # self.active_fun_list = list()
         self.solver = None
+
+        # todo hack!
+        # self.dt = 0.01
+        # todo add to transctiptionHandler a class method to construct a method?
+        # th = TranscriptionsHandler(self.casadi_prb, self.dt)
+
 
     def _setVarGenerator(self, var_type):
         if var_type == 'State':
@@ -220,6 +227,9 @@ class horizonImpl():
             signal = 'Failed editing of function "{}".'.format(name)
             return False, signal
 
+    # def addTranscriptionMethod(self):
+
+
     def updateFunctionNodes(self, name, nodes):
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
@@ -266,13 +276,12 @@ class horizonImpl():
 
     def generate(self):
         try:
-            dt = 0.1
             # if self.solver is None:
             #     self.logger.warning('Solver not set. Please select a valid solver before building Horizon problem.')
             # else:
             # todo tapullo:
             self.casadi_prb.setDynamics(self.casadi_prb.getState().getVars())
-            self.solver = Solver.make_solver('ipopt', self.casadi_prb, dt)
+            self.solver = Solver.make_solver('ipopt', self.casadi_prb, self.dt)
             self.logger.info('Problem created succesfully!')
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
