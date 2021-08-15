@@ -20,6 +20,7 @@ class FunctionLine(QWidget):
         self.hlayout = QHBoxLayout(self)
         self.hlayout.setAlignment(Qt.AlignTop)
         self.slider = QMultiSlider(slider_range=[0, self.n_nodes - 1, 1], options=options)
+
         if disabled_nodes is not None:
             for node_slice in disabled_nodes:
                 self.slider.disableValues(node_slice[0], node_slice[1])
@@ -44,7 +45,8 @@ class FunctionLine(QWidget):
     def updateSlices(self, slices):
         self.slider.updateSlices(slices)
 
-    def setDisabledNodes(self, slices, erasing=True):
+    def setDisabledNodes(self, slices, erasing=False):
+        self.slider._resetDisabled()
         for slice in slices:
             self.slider.disableValues(slice[0], slice[1], erasing)
 

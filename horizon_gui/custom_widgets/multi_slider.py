@@ -236,10 +236,15 @@ class QMultiSlider(QtWidgets.QWidget):
                     self.removeSliceAction.triggered.connect(partial(self._removeSlice, slice))
                     menu.addAction(self.removeSliceAction)
 
-        menu.exec_(event.globalPos())
+            menu.exec_(event.globalPos())
+
+    def _resetDisabled(self):
+        self.slices = [slice for slice in self.slices if isinstance(slice, Slice)]
+        self.update()
 
     def _reset(self):
-        self.slices.clear()
+        self.slices = [slice for slice in self.slices if isinstance(slice, DisabledSlice)]
+        # self.slices.clear()
         self.update()
 
     def _addSlice(self, slice=None):
@@ -582,12 +587,27 @@ class QMultiSlider(QtWidgets.QWidget):
         self.scale = slider_range[1] - slider_range[0]
 
         self._checkScale(slider_range + [self.single_step])
-
+        to_be_removed = list()
         for slice in self.slices:
             if slice.getValues()[1] > slider_range[1]:
-                slice.setMax(slider_range[1])
+                # if new maximum would become smaller that current minimum, remove slice
+                if slider_range[1] < slice.getValues()[0]:
+                    to_be_removed.append(slice)
+                else:
+                    # set new maximum
+                    slice.setMax(slider_range[1])
+
             if slice.getValues()[0] < slider_range[0]:
-                slice.setMin(slider_range[0])
+                # if new minimum would become bigger that current maximum, remove slice
+                if slider_range[0] > slice.getValues()[1]:
+                    to_be_removed.append(slice)
+                else:
+                    # set new minimum
+                    slice.setMin(slider_range[0])
+
+        # this is because you don't want to remove items from a list while it is iterated
+        for slice in to_be_removed:
+            self._removeSlice(slice)
 
         self.update()
 
@@ -663,11 +683,11 @@ if (__name__ == "__main__"):
     # mywidget = MyWidget()
     # mywidget.show()
     hslider = QMultiSlider([0, 6, 1], number_bar=True)
-    hslider.disableValues(6, 6)
-    # hslider.disableValues(0, 8)
+    # hslider.disableValues(6, 6)
+    hslider.disableValues(0, 2)
     # hslider.disableValues(2, 6)
     # hslider.enableValues(4, 6)
-    # hslider.disableValues(15, 18)
+    hslider.disableValues(4, 6)
 
     # hslider.disableValues(20, 25)
     # hslider.disableValues(26, 30)

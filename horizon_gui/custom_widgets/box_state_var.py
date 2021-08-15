@@ -11,7 +11,7 @@ class BoxStateVar(QTableWidget):
         self.setShowGrid(False)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         # tableWidget.setStyleSheet('QTableView::item {border-right: 1px solid #d6d9dc;}')
-        self.setColumnCount(2)
+        self.setColumnCount(3)
         self.setRowCount(0)
 
         self.verticalHeader().setVisible(False)
@@ -19,7 +19,7 @@ class BoxStateVar(QTableWidget):
         header = self.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
         # row_pos = self.rowCount()
         # self.insertRow(row_pos)
         # self.setItem(row_pos, 0, QTableWidgetItem('penis'))

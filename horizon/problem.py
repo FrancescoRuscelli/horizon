@@ -449,18 +449,8 @@ class Problem:
         """
         self.nodes = n_nodes + 1  # todo because I decided so
 
-
-
         self.var_container.setNNodes(self.nodes)
         self.function_container.setNNodes(self.nodes)
-
-
-        for cnsrt in self.function_container.getCnstr().values():
-
-            used_var_impl = self._getUsedVarImpl(cnsrt, cnsrt.getVariables())
-            used_par_impl = self._getUsedParImpl(cnsrt, cnsrt.getParameters())
-
-            cnsrt._project(used_var_impl + used_par_impl)
 
     def getNNodes(self) -> int:
         """

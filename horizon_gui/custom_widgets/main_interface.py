@@ -69,14 +69,15 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         #
         # with open(CSS_DIR + '/button_old.css', 'r') as f:
         #     self.PlotButton.setStyleSheet(f.read())
-        self.stateVarAddButton.clicked.connect(partial(self.generateVariable, 'state_var'))
-        self.inputVarAddButton.clicked.connect(partial(self.generateVariable, 'input_var'))
-        self.singleVarAddButton.clicked.connect(partial(self.generateVariable,'single_var'))
+        self.stateVarAddButton.clicked.connect(partial(self.generateVariable, 'State'))
+        self.inputVarAddButton.clicked.connect(partial(self.generateVariable, 'Input'))
+        self.singleVarAddButton.clicked.connect(partial(self.generateVariable, 'Single'))
         self.customVarAddButton.clicked.connect(self.openCustomVarOptions)
         self.funButton.clicked.connect(self.generateFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
         self.varTable.itemDoubleClicked.connect(self.openVar)
         self.switchPageButton.clicked.connect(self.switchPage)
+        # self.NodesSpinBox.editingFinished.connect(self.setBoxNodes)
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
         self.SingleLineButton.toggled.connect(partial(self.constraintLine.switchPage, self.constraintLine.Single))
         self.SingleLineButton.toggled.connect(partial(self.costfunctionLine.switchPage, self.constraintLine.Single))
@@ -143,11 +144,12 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     def on_generic_sig(self, str):
         self.generic_sig.emit(str)
 
-    def setBoxNodes(self, n_nodes):
+    def setBoxNodes(self):
+        n_nodes = self.NodesSpinBox.value()
         self.nodes = n_nodes
-        self.horizon_receiver.setHorizonNodes(n_nodes) # setting to casadi the new number of nodes
-        self.constraintLine.setHorizonNodes(n_nodes+1) # n_nodes+1 to account for the final node
-        self.costfunctionLine.setHorizonNodes(n_nodes+1) # n_nodes+1 to account for the final node
+        self.horizon_receiver.setHorizonNodes(n_nodes)  # setting to casadi the new number of nodes
+        self.constraintLine.setHorizonNodes(n_nodes+1)  # n_nodes+1 to account for the final node
+        self.costfunctionLine.setHorizonNodes(n_nodes+1)  # n_nodes+1 to account for the final node
         # self.ledCreate.setReady(False)
         # self.ledSolve.setReady(False)
 
@@ -163,8 +165,6 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     def openFunction(self, item):
 
         # todo ADD USAGES: if active and where is active!!
-
-
         # regardless of where I click, get the first item of the table
         item = self.funTable.item(self.funTable.row(item), 0)
 
@@ -277,6 +277,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         # regardless of where I click, get the first item of the table
         item = self.varTable.item(self.varTable.row(item), 0)
+        n_row = 0
         # create window that emit a signal when closed
         self.temp_win = on_destroy_signal_window.DestroySignalWindow()
 
@@ -286,7 +287,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         # populate it
         self.label_name = QLabel("name:")
-        self.sv_window_layout.addWidget(self.label_name, 0, 0, 1, 1)
+        self.sv_window_layout.addWidget(self.label_name, n_row, 0, 1, 1)
 
         palette = QPalette()
         palette.setColor(QPalette.Text, Qt.black)
@@ -297,25 +298,25 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.display_name.setDisabled(True)
         self.display_name.setPalette(palette)
 
-
-        self.display_name.setPalette(palette)
-
-        self.sv_window_layout.addWidget(self.display_name, 0, 1, 1, 1)
+        self.sv_window_layout.addWidget(self.display_name, n_row, 1, 1, 1)
 
         self.label_dim = QLabel("dimension:")
-        self.sv_window_layout.addWidget(self.label_dim, 0, 2, 1, 1)
+        self.sv_window_layout.addWidget(self.label_dim, n_row, 2, 1, 1)
 
         self.display_dim = QLineEdit()
         self.display_dim.setFixedWidth(20)
         self.display_dim.setText(str(self.horizon_receiver.getVar(item.text())['dim']))
         self.display_dim.setDisabled(True)
         self.display_dim.setPalette(palette)
-        self.sv_window_layout.addWidget(self.display_dim, 0, 3, 1, 1)
+        self.sv_window_layout.addWidget(self.display_dim, n_row, 3, 1, 1)
 
+        # next row
+        n_row = n_row+1
         self.label_fun = QLabel("var:")
-        self.sv_window_layout.addWidget(self.label_fun, 1, 0, 1, 1)
+        self.sv_window_layout.addWidget(self.label_fun, n_row, 0, 1, 1)
 
         self.display_fun = QLineEdit()
+        # as width as the vari text
         width = self.display_fun.fontMetrics().width(str(self.horizon_receiver.getVar(item.text())['var']))
         self.display_fun.setText(str(self.horizon_receiver.getVar(item.text())['var']))
         self.display_fun.setDisabled(True)
@@ -323,10 +324,41 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.display_fun.setMinimumWidth(width+5)
         self.display_fun.setAlignment(Qt.AlignCenter)
         self.display_fun.setPalette(palette)
-        self.sv_window_layout.addWidget(self.display_fun, 1, 1, 1, 3)
+        self.sv_window_layout.addWidget(self.display_fun, n_row, 1, 1, 3)
 
+        # next row
+        n_row = n_row+1
+        self.label_type = QLabel("type:")
+        self.sv_window_layout.addWidget(self.label_type, n_row, 0, 1, 1)
+
+        self.type_var = QLineEdit()
+        self.type_var.setText(str(self.horizon_receiver.getVar(item.text())['type']))
+        self.type_var.setDisabled(True)
+        self.type_var.setAlignment(Qt.AlignCenter)
+        self.type_var.setPalette(palette)
+        self.sv_window_layout.addWidget(self.type_var, n_row, 1, 1, 3)
+
+
+        if self.horizon_receiver.getVar(item.text())['type'] == 'Custom':
+            # next row
+            n_row = n_row + 1
+            self.label_nodes = QLabel("active nodes:")
+            self.sv_window_layout.addWidget(self.label_nodes, n_row, 0, 1, 1)
+
+            node_list = str(self.horizon_receiver.getVar(item.text())['var'].getNodes())
+            self.nodes_var = QLineEdit("active nodes:")
+            width = self.display_fun.fontMetrics().width(node_list)
+            self.nodes_var.setMinimumWidth(width + 5)
+            self.nodes_var.setText(node_list)
+            self.nodes_var.setDisabled(True)
+            self.nodes_var.setAlignment(Qt.AlignCenter)
+            self.nodes_var.setPalette(palette)
+            self.sv_window_layout.addWidget(self.nodes_var, n_row, 1, 1, 3)
+
+        # next row
+        n_row = n_row + 1
         self.label_usages = QLabel("usages:")
-        self.sv_window_layout.addWidget(self.label_usages, 2, 0, 1, 4)
+        self.sv_window_layout.addWidget(self.label_usages, n_row, 0, 1, 4)
 
         self.usages_table = QTableWidget()
         self.usages_table.setColumnCount(3)
@@ -340,7 +372,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
 
-        self.sv_window_layout.addWidget(self.usages_table, 3, 0, 1, 4)
+        # next row
+        n_row = n_row + 1
+        self.sv_window_layout.addWidget(self.usages_table, n_row, 0, 1, 4)
         # # todo add usages (add constraint logic and check if constraint depends on variable)
         # TODO REMOVE CT ADD FUNCTION
         # get only active function
@@ -509,13 +543,13 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         no_button.clicked.connect(self.box.close)
         yes_button.clicked.connect(partial(self.assembleCustomVar, node_selector))
-
+        yes_button.clicked.connect(self.box.close)
         self.box.show()
 
     def assembleCustomVar(self, node_selector):
 
         nodes = node_selector.getRanges()
-        self.generateVariable('custom_var', nodes)
+        self.generateVariable('Custom', nodes)
 
     # GUI
     def _connectActions(self):
@@ -531,6 +565,11 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         self.varTable.setItem(row_pos, 0, QTableWidgetItem(name))
         self.varTable.setItem(row_pos, 1, QTableWidgetItem(str(self.horizon_receiver.getVar(name)['dim'])))
+
+        item_type = QTableWidgetItem(str(self.horizon_receiver.getVar(name)['type']))
+        item_type.setTextAlignment(Qt.AlignCenter)
+        self.varTable.setItem(row_pos, 2, item_type)
+
 
         # self.SVTable.setCellWidget(row_pos, 2, scroll)
 

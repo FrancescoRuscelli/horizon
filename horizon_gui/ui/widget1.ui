@@ -224,6 +224,11 @@
               <string>Dim</string>
              </property>
             </column>
+            <column>
+             <property name="text">
+              <string>Type</string>
+             </property>
+            </column>
            </widget>
           </item>
           <item row="5" column="2">

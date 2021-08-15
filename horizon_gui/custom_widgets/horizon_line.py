@@ -150,22 +150,32 @@ class HorizonLine(QScrollArea):
         for i in range(self.function_tab.count()):
             fun_name = self.function_tab.tabText(i)
             used_vars = self.horizon_receiver.getFunction(fun_name)['used_vars']
-            available_nodes = set(range(self.n_nodes))
-            for var in used_vars:
-                if not var.getNodes() == [-1]:  # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
-                    available_nodes.intersection_update(var.getNodes())
-
-            disabled_nodes = [node for node in range(self.n_nodes) if node not in available_nodes]
-            disabled_nodes = ravelElements(disabled_nodes)
-            self.function_tab.setFunctionDisabledNodes(fun_name, disabled_nodes, erasing=True)
+            disabled_nodes = self._getDisableNodes(used_vars)
+            self.function_tab.setFunctionDisabledNodes(fun_name, disabled_nodes)
 
         if self.function_tab.count():
             self.updateMarginsSingleLine()
 
         # update nodes in multi_function window widget
         self.multi_function_box.setHorizonNodes(nodes)
+
+        for fun_name in self.multi_function_box.getFunctionNames():
+            used_vars = self.horizon_receiver.getFunction(fun_name)['used_vars']
+            disabled_nodes = self._getDisableNodes(used_vars)
+            self.multi_function_box.setFunctionDisabledNodes(fun_name, disabled_nodes)
+
         if self.multi_function_box.getNFunctions():
             self.updateMarginsMultiLine()
+
+    def _getDisableNodes(self, used_vars):
+        available_nodes = set(range(self.n_nodes))
+        for var in used_vars:
+            if not var.getNodes() == [-1]:
+                available_nodes.intersection_update(var.getNodes())
+
+        disabled_nodes = [node for node in range(self.n_nodes) if node not in available_nodes]
+        disabled_nodes = ravelElements(disabled_nodes)
+        return disabled_nodes
 
     def updateMarginsSingleLine(self):
         node_box_width = self.nodes_line.getBoxWidth()

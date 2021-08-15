@@ -25,13 +25,13 @@ class horizonImpl():
         self.solver = None
 
     def _setVarGenerator(self, var_type):
-        if var_type == 'state_var':
+        if var_type == 'State':
             return self.casadi_prb.createStateVariable
-        if var_type == 'input_var':
+        if var_type == 'Input':
             return self.casadi_prb.createInputVariable
-        if var_type == 'single_var':
+        if var_type == 'Single':
             return self.casadi_prb.createSingleVariable
-        if var_type == 'custom_var':
+        if var_type == 'Custom':
             return self.casadi_prb.createVariable
 
     def createVariable(self, var_type, name, dim, offset, nodes=None):
@@ -41,18 +41,18 @@ class horizonImpl():
         if flag:
 
             if offset == 0:
-                if var_type == 'state_var':
+                if var_type == 'State':
                     var = self.casadi_prb.createStateVariable(name, dim)
-                if var_type == 'input_var':
+                if var_type == 'Input':
                     var = self.casadi_prb.createInputVariable(name, dim)
-                if var_type == 'single_var':
+                if var_type == 'Single':
                     var = self.casadi_prb.createSingleVariable(name, dim)
-                if var_type == 'custom_var':
+                if var_type == 'Custom':
                     var = self.casadi_prb.createVariable(name, dim, nodes)
             else:
                 raise Exception('TBD prev/next state variables')
 
-            self.sv_dict[name] = dict(var=var, dim=dim)
+            self.sv_dict[name] = dict(var=var, dim=dim, type=var_type)
 
             return True, signal + f'. Type: {type(var)}'
         else:
@@ -244,7 +244,6 @@ class horizonImpl():
         return self.sv_dict
 
     def getVar(self, elem):
-
         return self.sv_dict[elem]
 
     def getNodes(self):

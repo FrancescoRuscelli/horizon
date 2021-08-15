@@ -111,6 +111,14 @@ class MultiFunctionBox(QScrollArea):
         for i in range(self.main_layout.count()):
             self.main_layout.setContentsMargins(margins)
 
+    def getFunctionNames(self):
+        return [name for name in self.fun_list.keys()]
+
+    def setFunctionDisabledNodes(self, fun_name, ranges):
+        for widget_fl in self.findChildren(FunctionLine):
+            if widget_fl.getName() == fun_name:
+                widget_fl.setDisabledNodes(ranges)
+
     # def get_index(self, pos):
     #     for i in range(self.main_layout.count()):
     #         if self.main_layout.itemAt(i).geometry().contains(pos) and i != self.target:
