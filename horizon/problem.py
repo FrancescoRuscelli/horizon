@@ -209,6 +209,15 @@ class Problem:
         """
         return self.state_der
 
+    def setInitialState(self, x0: Iterable):
+        self.getState().setBounds(lb=x0, ub=x0, nodes=0)
+
+    def getInitialState(self) -> np.array:
+        lb, ub = self.getState().getBounds(node=0)
+        if np.any(lb != ub):
+            return None
+        return lb
+
     def _getUsedVar(self, f) -> Dict[str, list]:
         """
         Finds all the variable used by a given CASADI function
