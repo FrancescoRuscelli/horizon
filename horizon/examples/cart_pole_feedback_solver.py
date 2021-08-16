@@ -69,7 +69,7 @@ prb.createFinalConstraint("qfinal", q - q_tgt)
 prb.createFinalConstraint("qdotfinal", qdot)
 
 # Create solver
-use_ilqr = False
+use_ilqr = True
 if use_ilqr:
     solver = ilqr.SolverILQR(prb, dt, opts={'realtime_iteration': True})
 else:

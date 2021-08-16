@@ -7,7 +7,7 @@ import time
 from horizon import problem
 from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.ros.replay_trajectory import replay_trajectory
-from horizon.solvers import sqp
+from horizon.solvers import pysqp
 
 import matplotlib.pyplot as plt
 import os
@@ -86,17 +86,25 @@ if use_ms:
     x_int = F_integrator(x0=x_prev, p=u_prev)
     prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns + 1))
 else:
-    integrators.make_direct_collocation(prob=prb, x=x, x_prev=x_prev, xdot=xdot, degree=3, dt=tf / ns)
+    prb.setDynamics(xdot)
+    integrators.make_direct_collocation(prob=prb, degree=3, dt=tf / ns)
 
 # Creates problem
 prb.createProblem()
 
 problem_dict = prb.getProblem()
 problem_dict['f'] = prb.function_container.getCostFList()
-d = {'verbose': False}
-opts = {'max_iter': 1,
-        'osqp.osqp': d}
-solver = sqp.sqp('solver', 'osqp', problem_dict, opts)
+
+opts = pysqp.SQPGaussNewtonSX.getQPOasesOptionsMPC()
+opts['max_iter'] = 1
+opts['sparse'] = True
+opts['hessian_type'] = 'posdef'
+opts['printLevel'] = 'none'
+
+
+F = cs.Function('f', [problem_dict['x']], [problem_dict['f']], ['x'], ['f'])
+G = cs.Function('g', [problem_dict['x']], [problem_dict['g']], ['x'], ['g'])
+solver = pysqp.SQPGaussNewtonSX('gnsqp', 'qpoases', F, G, opts)
 prb.setSolver(solver)
 
 class RealTimeIteration:
