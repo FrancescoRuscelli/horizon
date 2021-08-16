@@ -9,6 +9,7 @@ PYBIND11_MODULE(pysqp, m) {
             .def("solve", callSX,
                  py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"), py::arg("p"))
             .def("f", fSX)
+            .def("g", gSX)
             .def("__call__", callSX,
                  py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"), py::arg("p"))
             .def("setAlpha", &SQPGaussNewton<casadi::SX>::setAlpha)
@@ -28,6 +29,7 @@ PYBIND11_MODULE(pysqp, m) {
             .def("solve", callSX,
                 py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"), py::arg("p"))
             .def("f", fMX)
+            .def("g", gMX)
             .def("__call__", callSX,
                 py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"), py::arg("p"))
             .def("setAlpha", &SQPGaussNewton<casadi::MX>::setAlpha)

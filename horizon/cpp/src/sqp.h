@@ -298,6 +298,14 @@ public:
         _df = _f.function().factory("df", {"x"}, {"jac:f:x"});
     }
 
+    void g(const CASADI_TYPE& g, const CASADI_TYPE& x, bool reinitialize_qp_solver = true)
+    {
+        _reinitialize_qp_solver = reinitialize_qp_solver;
+
+        _g = casadi::Function("g",{x}, {g}, {"x"}, {"g"});
+        _dg = _g.factory("dg", {"x"}, {"jac:g:x"});
+    }
+
     bool f(const casadi::Function& f, bool reinitialize_qp_solver = true)
     {
         _reinitialize_qp_solver = reinitialize_qp_solver;
@@ -309,6 +317,21 @@ public:
 
         _f = f;
         _df = f.factory("df", {f.name_in(0)}, {"jac:" + f.name_out(0) +":" + f.name_in(0)});
+
+        return true;
+    }
+
+    bool g(const casadi::Function& g, bool reinitialize_qp_solver = true)
+    {
+        _reinitialize_qp_solver = reinitialize_qp_solver;
+
+        if(g.n_in() != 1)
+            return false;
+        if(g.n_out() != 1)
+            return false;
+
+        _g = g;
+        _dg = _g.factory("dg", {g.name_in(0)}, {"jac:" + g.name_out(0) + ":" + g.name_in(0)});
 
         return true;
     }

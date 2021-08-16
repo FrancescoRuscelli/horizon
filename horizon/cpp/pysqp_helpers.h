@@ -151,6 +151,16 @@ bool fSX(SQPGaussNewton<casadi::SX>& self, py::object f, bool reinitialize_qp_so
     return self.f(to_cpp(f), reinitialize_qp_solver);
 }
 
+bool gMX(SQPGaussNewton<casadi::MX>& self, py::object g, bool reinitialize_qp_solver = true)
+{
+    return self.f(to_cpp(g), reinitialize_qp_solver);
+}
+
+bool gSX(SQPGaussNewton<casadi::SX>& self, py::object g, bool reinitialize_qp_solver = true)
+{
+    return self.f(to_cpp(g), reinitialize_qp_solver);
+}
+
 auto callMX(SQPGaussNewton<casadi::MX>& self, const Eigen::VectorXd& x0,
                             const Eigen::VectorXd& lbx, const Eigen::VectorXd& ubx,
                             const Eigen::VectorXd& lbg, const Eigen::VectorXd& ubg,
