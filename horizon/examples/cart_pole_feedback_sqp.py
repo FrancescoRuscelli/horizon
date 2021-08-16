@@ -56,9 +56,9 @@ opts = {'tf': dt}
 F_integrator = integrators.EULER(dae, opts)
 
 # Limits
-q_min = np.array([-0.5, -2. * np.pi])
-q_max = np.array([0.5, 2. * np.pi])
-q_init = np.array([0., np.pi - 0.01])
+q_min = np.array([-1, -2.*np.pi])
+q_max = -q_min
+q_init = np.array([0., np.pi])
 
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
@@ -73,13 +73,13 @@ qdot.setBounds(qdot_init, qdot_init, nodes=0)
 u.setBounds(-tau_lims, tau_lims)
 
 # Cost function
-prb.createCostFunction("track", 10.*(q - q_init), nodes=range(ns + 1))
-prb.createCostFunction("damp", 10. * qdot, nodes=range(ns + 1))
-prb.createCostFunction("reg", 0.02 * u, nodes=range(ns))
+prb.createCostFunction("damp", 0.1 * qdot)
+prb.createCostFunction("reg", 0.001 * u, nodes=range(ns))
 
 # Final constraint
-prb.createConstraint("qfinal", q - q_init, nodes=ns)
-prb.createConstraint("qdotfinal", qdot, nodes=ns)
+q_tgt = np.array([0.5, np.pi])  # forward 0.5m, and stay up!
+prb.createConstraint("qfinal", q - q_tgt, nodes=ns+1)
+prb.createConstraint("qdotfinal", qdot, nodes=ns+1)
 
 # Dynamics
 if use_ms:
@@ -107,7 +107,8 @@ if qp_solver == "qpoases":
 
 if qp_solver == "osqp":
     opts['warm_start_primal'] = True
-    opts['osqp.max_iter'] = 35
+    opts['warm_start_dual'] = True
+    opts['osqp.polish'] = False
     opts['osqp.verbose'] = False
 
 opts['max_iter'] = 1
@@ -144,10 +145,12 @@ class RealTimeIteration:
 
 # the rti loop
 rti = RealTimeIteration(dt=0.01)
-stateread = np.array([0, np.pi - 0.30, 0.0, 0.0])
+stateread = np.array([0.5, np.pi-0.01, 0.0, 0.0])
 states = []
 inputs = []
 times = []
+time_qp = []
+time_hessian = []
 for i in range(300):
     states.append(stateread.copy())
     tic = time.time()
@@ -155,6 +158,8 @@ for i in range(300):
     toc = time.time()
     inputs.append(input)
     times.append(toc - tic)
+    time_qp.append(solver.getQPComputationTime())
+    time_hessian.append(solver.getHessianComputationTime())
 
 plt.figure()
 plt.title('state trajectory')
@@ -167,5 +172,11 @@ plt.plot(inputs)
 plt.figure()
 plt.title('cpu time')
 plt.plot(times)
+
+plt.figure()
+plt.title('qp vs Hessian time')
+plt.plot(time_qp, label='QP')
+plt.plot(time_hessian, label='Hessian')
+plt.legend()
 
 plt.show()
