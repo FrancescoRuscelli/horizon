@@ -241,15 +241,22 @@ class Constraint(Function):
             if 'lb' not in bounds:  # -inf <= x <= ub
                 bounds['lb'] = np.full(f.shape[0], -np.inf)
             else:
-                # todo what if bounds does not have shape!
-                if bounds['lb'].shape[0] != self.getDim():
-                    raise Exception('Wrong dimension of lower bounds inserted.')
+                if type(bounds['lb']) is list:
+                    if len(bounds['lb']) != self.getDim():
+                        raise Exception('Wrong dimension of lower bounds inserted.')
+                else: # we assume np.array input
+                    if bounds['lb'].shape[0] != self.getDim():
+                        raise Exception('Wrong dimension of lower bounds inserted.')
 
             if 'ub' not in bounds:  # lb <= x <= inf
                 bounds['ub'] = np.full(f.shape[0], np.inf)
             else:
-                if bounds['ub'].shape[0] != self.getDim():
-                    raise Exception('Wrong dimension of upper bounds inserted.')
+                if type(bounds['ub']) is list:
+                    if len(bounds['ub']) != self.getDim():
+                        raise Exception('Wrong dimension of upper bounds inserted.')
+                else: # we assume np.array input
+                    if bounds['ub'].shape[0] != self.getDim():
+                        raise Exception('Wrong dimension of upper bounds inserted.')
 
             self.setBounds(lb=bounds['lb'], ub=bounds['ub'], nodes=bounds['nodes'])
 
