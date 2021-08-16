@@ -19,6 +19,33 @@ template <class CASADI_TYPE> ///casadi::SX or casadi::MX
 class SQPGaussNewton
 {
 public:
+
+    static void setQPOasesOptionsMPC(casadi::Dict& opts)
+    {
+        opts["enableEqualities"] = true;
+        opts["initialStatusBounds"] = "inactive";
+        opts["numRefinementSteps"] = 0;
+        opts["enableDriftCorrection"] = 0;
+        opts["terminationTolerance"] = 10e9 * std::numeric_limits<double>::epsilon();
+        opts["enableFlippingBounds"] = false;
+        opts["enableNZCTests"] = false;
+        opts["enableRamping"] = false;
+        opts["enableRegularisation"] = true;
+        opts["numRegularisationSteps"] = 2;
+        opts["epsRegularisation"] = 5. * 10e3 * std::numeric_limits<double>::epsilon();
+    }
+
+    static void setQPOasesOptionsReliable(casadi::Dict& opts)
+    {
+        opts["enableEqualities"] = false;
+        opts["numRefinementSteps"] = 2;
+        opts["enableFullLITest"] = true;
+        opts["epsLITests"] = 10e5 * std::numeric_limits<double>::epsilon();
+        opts["maxDualJump"] = 10e8;
+        opts["enableCholeskyRefactorisation"] = 1;
+    }
+
+
     struct IODMDict{
         casadi::DMDict input;
         casadi::DMDict output;
@@ -351,6 +378,8 @@ public:
     }
 
 private:
+
+
 
 
     std::string _name;
