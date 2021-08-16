@@ -10,7 +10,7 @@ if __name__ == '__main__':
 
     x = prb.createStateVariable('x', 6)
     # x_prev = prb.createStateVariable('x', 6, prev_nodes=-1) # how to do for previous nodes?
-    x_prev = prb.createStateVariable('x', 6, prev_nodes=-1) # how to do for previous nodes?
+    x_prev = x.getVarOffset(-1)
     u = prb.createInputVariable('u', 2)
     z = prb.createStateVariable('z', 2)
 

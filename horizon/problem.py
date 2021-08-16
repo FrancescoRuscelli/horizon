@@ -593,10 +593,12 @@ class Problem:
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
 
-        if 'p' in inspect.getfullargspec(self.solver)[0]:
+
+        try:
             self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
-        else:
+        except:
             self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+
 
         # t_to_solve = time.time() - t_start
         # print('T to solve:', t_to_solve)
@@ -606,7 +608,10 @@ class Problem:
             if not self.solver.stats()['success']:
                 raise Exception('Optimal solution NOT found.')
 
-        w_opt = self.sol['x'].full().flatten()
+        if hasattr(self.sol['x'], 'full'):
+            w_opt = self.sol['x'].full().flatten()
+        else:
+            w_opt = self.sol['x'].flatten()
 
         # split solution for each variable
         solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in
