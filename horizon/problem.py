@@ -11,6 +11,7 @@ import horizon.misc_function as misc
 from typing import Union, Dict
 # from horizon.type_doc import BoundsDict
 from collections.abc import Iterable
+import inspect
 
 class Problem:
     """
@@ -206,20 +207,9 @@ class Problem:
             instance of the derivative of the state
 
         """
-        if self.state_der is None:
-            raise ValueError('dynamics not defined, have you called setDynamics?')
         return self.state_der
 
-    def setInitialState(self, x0: Iterable):
-        self.getState().setBounds(lb=x0, ub=x0, nodes=0)
-
-    def getInitialState(self) -> np.array:
-        lb, ub = self.getState().getBounds(node=0)
-        if np.any(lb != ub):
-            return None
-        return lb
-
-    def _getUsedVar(self, f: cs.SX) -> Dict[str, list]:
+    def _getUsedVar(self, f) -> Dict[str, list]:
         """
         Finds all the variable used by a given CASADI function
 
@@ -537,18 +527,17 @@ class Problem:
         """
         return self.solver
 
-    def updateProblem(self):
+    def solveProblem(self) -> Union[bool, dict]:
         """
-        Compute updated initial guess and bounds
+        Solves the problem after updating the bounds, the initial guesses and the parameters of the problem.
 
         Returns:
-            tuple containing the nlp's initial guess, bounds for the optimization
-            variables and constraint function
+            the solution of the problem
         """
-
+        # t_start = time.time()
         if self.prob is None:
             self.logger.warning('Problem is not created. Nothing to solve!')
-            return None
+            return False
 
         self.var_container.updateBounds()
         self.var_container.updateInitialGuess()
@@ -566,24 +555,6 @@ class Problem:
         ubg = self.function_container.getUpperBoundsList()
 
         p = self.var_container.getParameterValues()
-
-        return w0, lbw, ubw, lbg, ubg, p
-
-
-
-    def solveProblem(self) -> Union[bool, dict]:
-        """
-        Solves the problem after updating the bounds, the initial guesses and the parameters of the problem.
-
-        Returns:
-            the solution of the problem
-        """
-        
-        if self.prob is None:
-            self.logger.warning('Problem is not created. Nothing to solve!')
-            return None
-
-        w0, lbw, ubw, lbg, ubg, p = self.updateProblem()
 
         if self.debug_mode:
             j = self.function_container.getCostFImplSum()
@@ -613,10 +584,10 @@ class Problem:
         # print('T to set up:', t_to_set_up)
         # t_start = time.time()
 
-        if self.solver is None:
-            return None
-
-        self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
+        if 'p' in inspect.getfullargspec(self.solver)[0]:
+            self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
+        else:
+            self.sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
 
         # t_to_solve = time.time() - t_start
         # print('T to solve:', t_to_solve)
@@ -626,10 +597,7 @@ class Problem:
             if not self.solver.stats()['success']:
                 raise Exception('Optimal solution NOT found.')
 
-        if hasattr(self.sol['x'], 'full'):
-            w_opt = self.sol['x'].full().flatten()
-        else:
-            w_opt = self.sol['x'].flatten()
+        w_opt = self.sol['x'].full().flatten()
 
         # split solution for each variable
         solution_dict = {name: np.zeros([var.shape[0], len(var.getNodes())]) for name, var in
@@ -828,10 +796,4 @@ class Problem:
 
 
 if __name__ == '__main__':
-    nodes = 10
-
-    prb = Problem(nodes, crash_if_suboptimal=True)
-    x = prb.createStateVariable('x', 1)
-
-    print(x.getImpl())
-    pass
+   pass

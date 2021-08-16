@@ -112,6 +112,7 @@ if plot_all:
     hplt = PlotterHorizon(prb)
     hplt.plotVariables()
     hplt.plotFunctions()
+    plt.show()
 
 if do_replay:
     joint_list=["cart_joint", "pole_joint"]

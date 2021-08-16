@@ -16,7 +16,7 @@ horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
 time.sleep(3.)
 
 # Switch between suspended and free fall
-FREE_FALL = False
+FREE_FALL = True
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')

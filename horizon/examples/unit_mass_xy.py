@@ -58,8 +58,8 @@ plot_all = True
 
 if plot_all:
     hplt = plotter.PlotterHorizon(prob)
-    hplt.plotVariables()
-    hplt.plotFunctions()
+    hplt.plotVariables(grid=True)
+    hplt.plotFunctions(grid=True)
 
 
 plt.figure()
