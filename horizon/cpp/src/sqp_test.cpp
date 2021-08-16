@@ -27,11 +27,11 @@ int main()
 
     casadi::Dict opts;
     opts["max_iter"] = 5;
-    opts["printLevel"] = "none";
+    //opts["printLevel"] = "none";
 
     /// CONSTRUCTOR 1
     std::cout<<"USE MAIN CONSTRUCTOR"<<std::endl;
-    horizon::SQPGaussNewton<casadi::SX> sqp("sqp", "qpoases", f, g, casadi::SX::vertcat({x, u}), opts);
+    horizon::SQPGaussNewton<casadi::SX> sqp("sqp", "osqp", f, g, casadi::SX::vertcat({x, u}), opts);
 
     auto solution = sqp.solve(x0, lb, ub, lb, ub);
 

@@ -95,16 +95,28 @@ prb.createProblem()
 problem_dict = prb.getProblem()
 problem_dict['f'] = prb.function_container.getCostFList()
 
-opts = pysqp.SQPGaussNewtonSX.getQPOasesOptionsMPC()
+
+opts = dict()
+qp_solver = "osqp"
+
+if qp_solver == "qpoases":
+    opts = pysqp.SQPGaussNewtonSX.getQPOasesOptionsMPC()
+    opts['sparse'] = True
+    opts['hessian_type'] = 'posdef'
+    opts['printLevel'] = 'none'
+
+if qp_solver == "osqp":
+    opts['warm_start_primal'] = True
+    opts['osqp.max_iter'] = 35
+    opts['osqp.verbose'] = False
+
 opts['max_iter'] = 1
-opts['sparse'] = True
-opts['hessian_type'] = 'posdef'
-opts['printLevel'] = 'none'
+
 
 
 F = cs.Function('f', [problem_dict['x']], [problem_dict['f']], ['x'], ['f'])
 G = cs.Function('g', [problem_dict['x']], [problem_dict['g']], ['x'], ['g'])
-solver = pysqp.SQPGaussNewtonSX('gnsqp', 'qpoases', F, G, opts)
+solver = pysqp.SQPGaussNewtonSX('gnsqp', qp_solver, F, G, opts)
 prb.setSolver(solver)
 
 class RealTimeIteration:

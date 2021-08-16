@@ -102,10 +102,30 @@ bool checkOptions(const std::string& key, py::handle& value, casadi::Dict& dict)
     if(setOption    <double>        (key,   "epsLITests",                       value, dict)) return true;
     if(setOption    <double>        (key,   "epsNZCTests",                      value, dict)) return true;
     if(setOption    <bool>          (key,   "enableInertiaCorrection",          value, dict)) return true;
+    // -- osqp options --//
+    if(setOption    <bool>          (key,   "warm_start_primal",                value, dict)) return true;
+    if(setOption    <bool>          (key,   "warm_start_dual",                  value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.rho",                         value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.sigma",                       value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.scaling",                     value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.adaptive_rho",                value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.adaptive_rho_interval",       value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.adaptive_rho_tolerance",      value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.max_iter",                    value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.eps_abs",                     value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.eps_rel",                     value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.eps_prim_inf",                value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.eps_dual_inf",                value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.alpha",                       value, dict)) return true;
+    if(setOption    <double>        (key,   "osqp.delta",                       value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.polish",                      value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.polish_refine_iter",          value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.verbose",                     value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.scaled_termination",          value, dict)) return true;
+    if(setOption    <int>           (key,   "osqp.check_termination",           value, dict)) return true;
+
 
     return false;
-
-
 }
 
 
