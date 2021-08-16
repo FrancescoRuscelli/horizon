@@ -536,6 +536,37 @@ class Problem:
         """
         return self.solver
 
+    def updateProblem(self):
+        """
+        Compute updated initial guess and bounds
+        Returns:
+            tuple containing the nlp's initial guess, bounds for the optimization
+            variables and constraint function
+        """
+
+        if self.prob is None:
+            self.logger.warning('Problem is not created. Nothing to solve!')
+            return None
+
+        self.var_container.updateBounds()
+        self.var_container.updateInitialGuess()
+        self.var_container.updateParameters()
+
+        w0 = self.var_container.getInitialGuessList()
+
+        if self.debug_mode:
+            self.logger.debug('Initial guess vector for variables: {}'.format(self.var_container.getInitialGuessList()))
+
+        lbw = self.var_container.getLowerBoundsList()
+        ubw = self.var_container.getUpperBoundsList()
+
+        lbg = self.function_container.getLowerBoundsList()
+        ubg = self.function_container.getUpperBoundsList()
+
+        p = self.var_container.getParameterValues()
+
+        return w0, lbw, ubw, lbg, ubg, p
+
     def solveProblem(self) -> Union[bool, dict]:
         """
         Solves the problem after updating the bounds, the initial guesses and the parameters of the problem.
