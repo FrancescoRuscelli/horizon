@@ -236,7 +236,8 @@ public:
             //2. We compute Gauss-Newton Hessian approximation and gradient function
             auto tic = std::chrono::high_resolution_clock::now();
             _H.resize(_J.cols(), _J.cols());
-            _H.selfadjointView<Eigen::Lower>().rankUpdate(_J.transpose());
+            //_H.selfadjointView<Eigen::Lower>().rankUpdate(_J.transpose());
+            _H = _J.transpose() * _J;
             auto toc = std::chrono::high_resolution_clock::now();
             _hessian_computation_time.push_back((toc-tic).count()*1E-9);
 
