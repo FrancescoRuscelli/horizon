@@ -177,9 +177,10 @@ class SolverILQR(Solver):
 
     
     def _iter_callback(self, fpres):
-        fmt = ' <#010.3f'
+        fmt = ' <#010.3e'
+        fmtf = ' <#06.3f'
         star = '*' if fpres.accepted else ' '
-        print(f'{star}alpha={fpres.alpha:{fmt}}  delta_u={fpres.step_length:{fmt}}  cost={fpres.cost:{fmt}}  constr={fpres.constraint_violation:{fmt}}  gap={fpres.defect_norm:{fmt}}')
+        print(f'{star}alpha={fpres.alpha:{fmtf}} merit={fpres.merit:{fmt}} cost={fpres.cost:{fmt}} delta_u={fpres.step_length:{fmt}} constr={fpres.constraint_violation:{fmt}} gap={fpres.defect_norm:{fmt}}')
 
 
                     

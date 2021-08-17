@@ -168,6 +168,8 @@ struct IterativeLQR::Temporaries
     /* Forward pass */
     Eigen::VectorXd dx;
     Eigen::VectorXd defect;
+    Eigen::VectorXd lam_x;
+    Eigen::VectorXd lam_g;
 
 };
 
@@ -220,6 +222,9 @@ struct IterativeLQR::BackwardPassResult
     // (z = Lz*x + lz, where u = lc + Lc*x + Bz*z)
     Eigen::MatrixXd Lz;
     Eigen::VectorXd lz;
+
+    // constraint-to-go size
+    int nc;
 
     // lagrange multipliers
     Eigen::MatrixXd Gu;

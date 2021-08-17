@@ -15,6 +15,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _bp_res(N, BackwardPassResult(_nx, _nu)),
     _constraint_to_go(std::make_unique<ConstraintToGo>(_nx, _nu)),
     _fp_res(std::make_unique<ForwardPassResult>(_nx, _nu, _N)),
+    _fp_best(std::make_unique<ForwardPassResult>(_nx, _nu, _N)),
+    _lam_g(_N+1),
     _tmp(_N)
 {
     // set timer callback
@@ -32,8 +34,11 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     // initialize trajectories
     _xtrj.setZero(_nx, _N+1);
     _utrj.setZero(_nu, _N);
+    _lam_x.setZero(_nx, _N+1);
 
     // a default cost so that it works out of the box
+    //  *) default intermediate cost -> l(x, u) = eps*|u|^2
+    //  *) default final cost        -> lf(x)   = eps*|xf|^2
     set_default_cost();
 }
 
@@ -161,18 +166,27 @@ const utils::ProfilingInfo& IterativeLQR::getProfilingInfo() const
 
 bool IterativeLQR::solve(int max_iter)
 {
-    // tbd implement convergence check
+    // set cost value and constraint violation *before* the forward pass
+    _fp_res->cost = compute_cost(_xtrj, _utrj);
+    _fp_res->constraint_violation = compute_constr(_xtrj, _utrj);
+    _fp_res->defect_norm = compute_defect(_xtrj, _utrj);
 
+    // solve
     for(int i = 0; i < max_iter; i++)
     {
         TIC(solve)
 
         linearize_quadratize();
         backward_pass();
-        line_search();
+        line_search(i);
+
+        if(should_stop())
+        {
+            return true;
+        }
     }
 
-    return true;
+    return should_stop();
 }
 
 void IterativeLQR::linearize_quadratize()
@@ -212,12 +226,13 @@ void IterativeLQR::report_result(const IterativeLQR::ForwardPassResult& fpres)
 
 void IterativeLQR::set_default_cost()
 {
+    const double dfl_cost_weight = 1e-6;
     auto x = cs::SX::sym("x", _nx);
     auto u = cs::SX::sym("u", _nu);
     auto l = cs::Function("dfl_cost", {x, u},
-                          {0.5*cs::SX::sumsqr(u)},
+                          {dfl_cost_weight*cs::SX::sumsqr(u)},
                           {"x", "u"}, {"l"});
-    auto lf = cs::Function("dfl_cost_final", {x, u}, {0.5*cs::SX::sumsqr(x)},
+    auto lf = cs::Function("dfl_cost_final", {x, u}, {dfl_cost_weight*cs::SX::sumsqr(x)},
                            {"x", "u"}, {"l"});
     setIntermediateCost(std::vector<cs::Function>(_N, l));
     setFinalCost(lf);
@@ -366,6 +381,8 @@ IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N):
 {
     xtrj.setZero(nx, N+1);
     utrj.setZero(nu, N);
+    merit = 0.0;
+    step_length = 0.0;
 }
 
 IterativeLQR::ConstraintToGo::ConstraintToGo(int nx, int nu):

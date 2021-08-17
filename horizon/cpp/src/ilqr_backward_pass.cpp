@@ -22,22 +22,6 @@ void IterativeLQR::backward_pass_iter(int i)
 {
     TIC(backward_pass_inner);
 
-    // some shorthands..
-
-    // ..value function
-    const auto& value_next = _value[i+1];
-    const auto& Snext = value_next.S;
-    const auto& snext = value_next.s;
-
-    // ..defect
-    const auto& d = _dyn[i].d;
-
-    // ..workspace
-    auto& tmp = _tmp[i];
-
-    // note: compute s + S*d here since handle_constraints needs it
-    tmp.s_plus_S_d.noalias() = snext + Snext*d;
-
     // constraint handling
     auto [nz, cdyn, ccost] = handle_constraints(i);
 
@@ -58,8 +42,15 @@ void IterativeLQR::backward_pass_iter(int i)
     // dynamics
     const auto A = cdyn.A;
     const auto B = cdyn.B;
+    const auto d = cdyn.d;
 
+    // ..value function
+    const auto& value_next = _value[i+1];
+    const auto& Snext = value_next.S;
+    const auto& snext = value_next.s;
 
+    // ..workspace
+    auto& tmp = _tmp[i];
 
     // mapping to original input u
     const auto& lc = tmp.lc;
@@ -70,6 +61,7 @@ void IterativeLQR::backward_pass_iter(int i)
     // current state and control via the dynamics)
     // note: first compute state-only components, since after constraints
     // there might be no input dof to optimize at all!
+    tmp.s_plus_S_d.noalias() = snext + Snext*d;
     tmp.S_A.noalias() = Snext*A;
 
     tmp.hx.noalias() = q + A.transpose()*tmp.s_plus_S_d;
@@ -156,6 +148,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     // ..value function
     const auto& value_next = _value[i+1];
     const auto& Snext = value_next.S;
+    const auto& snext = value_next.s;
 
     // ..intermediate cost
     const auto& cost = _cost[i];
@@ -189,6 +182,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     {
         ConstrainedDynamics cd = {A, B, d};
         ConstrainedCost cc = {Q, R, P, q, r};
+        res.nc = 0;
         return std::make_tuple(_nu, cd, cc);
     }
 
@@ -203,6 +197,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 
     // number of constraints
     int nc = _constraint_to_go->dim();
+    res.nc = nc;
 
     // svd of input matrix
     const double sv_ratio_thr = 1e-3;
@@ -228,9 +223,9 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     Bz.noalias() = V.rightCols(ns_dim);
 
     // compute quadritized free value function (before constraints)
-    tmp.huf.noalias() = r + B.transpose()*tmp.s_plus_S_d;
+    tmp.huf.noalias() = r + B.transpose()*(snext + Snext*d);
     tmp.Huuf.noalias() = R + B.transpose()*Snext*B;
-    tmp.Huxf.noalias() = P + B.transpose()*tmp.S_A;
+    tmp.Huxf.noalias() = P + B.transpose()*Snext*A;
 
     // compute lagrangian multipliers corresponding to the
     // satisfied component of the constraints, i.e.
@@ -265,3 +260,6 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     return std::make_tuple(ns_dim, cd, cc);
 
 }
+
+
+

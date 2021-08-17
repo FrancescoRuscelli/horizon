@@ -148,9 +148,17 @@ private:
     void backward_pass();
     void backward_pass_iter(int i);
     HandleConstraintsRetType handle_constraints(int i);
+    double compute_merit_value(double mu_f, double mu_c, double cost, double defect_norm, double constr_viol);
+    double compute_merit_slope(double mu_f, double mu_c, double defect_norm, double constr_viol);
+    std::pair<double, double> compute_merit_weights();
+    double compute_cost(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj);
+    double compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj);
+    double compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj);
     bool forward_pass(double alpha);
     void forward_pass_iter(int i, double alpha);
-    void line_search();
+    void line_search(int iter);
+    bool should_stop();
+
     void set_default_cost();
 
     const int _nx;
@@ -167,9 +175,13 @@ private:
     std::vector<BackwardPassResult> _bp_res;
     std::unique_ptr<ConstraintToGo> _constraint_to_go;
     std::unique_ptr<ForwardPassResult> _fp_res;
+    std::unique_ptr<ForwardPassResult> _fp_best;
 
     Eigen::MatrixXd _xtrj;
     Eigen::MatrixXd _utrj;
+    std::vector<Eigen::VectorXd> _lam_g;
+    Eigen::MatrixXd _lam_x;
+
 
     std::vector<Temporaries> _tmp;
 
