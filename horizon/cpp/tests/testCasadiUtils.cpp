@@ -24,22 +24,23 @@ protected:
 
 };
 
-//TEST_F(testCasadiUtils, testSparseHessian)
-//{
+TEST_F(testCasadiUtils, testSparseHessian)
+{
 //    // This compile
-//    Eigen::MatrixXd A, B;
-//    A.resize(8,8);
-//    A.setRandom(8,8);
-//    B.resize(8, 8);
-//    B.triangularView<Eigen::Upper>() = A.transpose()*A;
+    Eigen::MatrixXd A, B;
+    A.resize(8,8);
+    A.setRandom(8,8);
+    B.resize(8, 8);
+    B.triangularView<Eigen::Upper>() = A.transpose()*A;
 
-//    //This does not compile
-//    Eigen::SparseMatrix<double> J, H;
-//    J.resize(8, 8);
-//    J.setIdentity();
-//    H.resize(8, 8);
-//    H.triangularView<Eigen::Upper>() = J.transpose()*J;
-//}
+    //This does not compile
+    Eigen::SparseMatrix<double> J, H;
+    J.resize(8, 8);
+    J.setIdentity();
+    H.resize(8, 8);
+    H.setZero();
+    H.selfadjointView<Eigen::Lower>().rankUpdate(J.transpose());
+}
 
 
 
