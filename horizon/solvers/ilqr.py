@@ -11,6 +11,7 @@ from typing import Dict, List
 from horizon.utils import integrators
 import casadi as cs
 import numpy as np
+from matplotlib import pyplot as plt
 
 class SolverILQR(Solver):
     
@@ -45,6 +46,9 @@ class SolverILQR(Solver):
 
         # set a default iteration callback
         self.ilqr.setIterationCallback(self._iter_callback)
+        self.plot_iter = False
+        self.xax = None 
+        self.uax = None
 
 
     def configure_rti(self) -> bool:
@@ -53,8 +57,14 @@ class SolverILQR(Solver):
 
     def solve(self):
         # get initial guess
+
+        x0 = self.prb.getState().getInitialGuess()
+
+        print(x0.shape)
+
         x0 = self.prb.getState().getInitialGuess().reshape((self.nx, self.N+1))
         u0 = self.prb.getInput().getInitialGuess().reshape((self.nu, self.N))
+
 
         # set initial condition
         x0[:, 0] = self.prb.getInitialState()
@@ -119,7 +129,7 @@ class SolverILQR(Solver):
 
             # state
             xlb, xub = self.prb.getState().getBounds(node=k)
-            if np.all(xlb == xub):
+            if np.all(xlb == xub) and k > 0:  # note: skip initial condition
                 value_list.append(self.x - xlb)
 
             # input
@@ -177,10 +187,46 @@ class SolverILQR(Solver):
 
     
     def _iter_callback(self, fpres):
+        # if not fpres.accepted:
+        #     return
         fmt = ' <#010.3e'
         fmtf = ' <#06.3f'
         star = '*' if fpres.accepted else ' '
-        print(f'{star}alpha={fpres.alpha:{fmtf}} merit={fpres.merit:{fmt}} cost={fpres.cost:{fmt}} delta_u={fpres.step_length:{fmt}} constr={fpres.constraint_violation:{fmt}} gap={fpres.defect_norm:{fmt}}')
+        print(f'{star}\
+alpha={fpres.alpha:{fmtf}}  \
+merit={fpres.merit:{fmt}}  \
+dm={fpres.merit_der:{fmt}}  \
+mu_f={fpres.mu_f:{fmt}}  \
+mu_c={fpres.mu_c:{fmt}}  \
+cost={fpres.cost:{fmt}}  \
+delta_u={fpres.step_length:{fmt}}  \
+constr={fpres.constraint_violation:{fmt}}  \
+gap={fpres.defect_norm:{fmt}}')
+
+        if self.plot_iter and fpres.accepted:
+
+            if self.xax is None:
+                _, (self.xax, self.uax) = plt.subplots(1, 2)
+            
+            plt.sca(self.xax)
+            plt.cla()
+            plt.plot(fpres.xtrj.T)
+            plt.grid()
+            plt.title(f'State trajectory (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('State')
+            plt.legend([f'x{i}' for i in range(self.nx)])
+
+            plt.sca(self.uax)
+            plt.cla()
+            plt.plot(fpres.utrj.T)
+            plt.grid()
+            plt.title(f'Input trajectory (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('Input')
+            plt.legend([f'u{i}' for i in range(self.nu)])
+            plt.draw()
+            plt.waitforbuttonpress()
 
 
                     
