@@ -148,7 +148,8 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
         }
     }
 
-    const double merit_safety_factor = 10.0;
+
+    const double merit_safety_factor = 2.0;
     double mu_f = lam_x_max * merit_safety_factor;
     double mu_c = lam_g_max * merit_safety_factor;
 
@@ -160,7 +161,7 @@ double IterativeLQR::compute_cost(const Eigen::MatrixXd& xtrj, const Eigen::Matr
 {
     double cost = 0.0;
 
-    // intermediatr cost
+    // intermediate cost
     for(int i = 0; i < _N; i++)
     {
         cost += _cost[i].evaluate(xtrj.col(i), utrj.col(i));
@@ -171,7 +172,7 @@ double IterativeLQR::compute_cost(const Eigen::MatrixXd& xtrj, const Eigen::Matr
     // todo: enforce this!
     cost += _cost[_N].evaluate(xtrj.col(_N), utrj.col(_N-1));
 
-    return cost;
+    return cost / _N;
 }
 
 double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj)
@@ -199,7 +200,7 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         constr += _constraint[_N].h().cwiseAbs().sum();
     }
 
-    return constr;
+    return constr / _N;
 }
 
 double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj)
@@ -217,20 +218,23 @@ double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         defect += _tmp[i].defect.cwiseAbs().sum();
     }
 
-    return defect;
+    return defect / _N;
 }
 
 void IterativeLQR::line_search(int iter)
 {
     TIC(line_search);
 
-    const double step_reduction_factor = 0.5 ;
+    const double step_reduction_factor = 0.5;
     const double alpha_min = 0.001;
     double alpha = 1.0;
-    const double eta = 0.01;
+    const double eta = 1e-4;
 
     // compute merit function weights
     auto [mu_f, mu_c] = compute_merit_weights();
+
+    _fp_res->mu_f = mu_f;
+    _fp_res->mu_c = mu_c;
 
     // compute merit function initial value
     double merit = compute_merit_value(mu_f, mu_c,
@@ -249,6 +253,8 @@ void IterativeLQR::line_search(int iter)
             _fp_res->defect_norm,
             _fp_res->constraint_violation);
 
+    _fp_res->merit_der = merit_der;
+
     // set best merit to +inf
     _fp_best->merit = std::numeric_limits<double>::max();
 
@@ -265,7 +271,7 @@ void IterativeLQR::line_search(int iter)
                                              _fp_res->constraint_violation);
 
         // evaluate Armijo's condition
-        _fp_res->accepted = _fp_res->merit <= merit - eta*alpha*merit_der;
+        _fp_res->accepted = _fp_res->merit <= merit + eta*alpha*merit_der;
 
         // invoke user defined callback
         report_result(*_fp_res);
@@ -285,6 +291,7 @@ void IterativeLQR::line_search(int iter)
 
 bool IterativeLQR::should_stop()
 {
+    // first, evaluate feasibility
     if(_fp_res->constraint_violation > 1e-6)
     {
         return false;
@@ -295,7 +302,17 @@ bool IterativeLQR::should_stop()
         return false;
     }
 
-    if(_fp_res->step_length < 1e-6)
+    // here we're feasible
+
+    // exit if merit function directional derivative (normalized)
+    // is too close to zero
+    if(_fp_res->merit_der/_fp_res->merit > -1e-9)
+    {
+        return true;
+    }
+
+    // exit if step size (normalized) is too short
+    if(_fp_res->step_length/_utrj.norm() < 1e-9)
     {
         return true;
     }
