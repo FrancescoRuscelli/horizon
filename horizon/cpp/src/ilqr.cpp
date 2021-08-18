@@ -174,7 +174,9 @@ bool IterativeLQR::solve(int max_iter)
     // solve
     for(int i = 0; i < max_iter; i++)
     {
-        TIC(solve)
+        TIC(solve);
+
+        _fp_res->iter = i;
 
         linearize_quadratize();
         backward_pass();
@@ -406,6 +408,7 @@ void IterativeLQR::ConstraintToGo::set(const IterativeLQR::Constraint &constr)
 {
     if(!constr.is_valid())
     {
+        clear();
         return;
     }
 
