@@ -122,8 +122,10 @@ void IterativeLQR::backward_pass_iter(int i)
     auto& S = value.S;
     auto& s = value.s;
 
-    S.noalias() = tmp.Hxx - Lz.transpose()*tmp.Huu*Lz;
+    S.noalias() = tmp.Hxx - Lz.transpose()*tmp.Huu*Lz;  // note: maybe not robust, loses symmetry
+    S = 0.5*(S + S.transpose());  // note: symmetrize
     s.noalias() = tmp.hx + tmp.Hux.transpose()*lz + Lz.transpose()*(tmp.hu + tmp.Huu*lz);
+
 
     // map to original input u
     if(has_constraints)
