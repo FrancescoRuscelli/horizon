@@ -40,7 +40,7 @@ int main()
     casadi::DMVector var_trj = sqp.getVariableTrajectory();
     std::vector<double> objs = sqp.getObjectiveIterations();
     std::vector<double> cons = sqp.getConstraintNormIterations();
-    for(unsigned int i = 0; i < var_trj.size(); ++i)
+    for(unsigned int i = 0; i < sqp.getNumberOfIterations(); ++i)
         std::cout<<"iter "<<i<<"-> sol: "<<var_trj[i]<<"    obj: "<<objs[i]<<"  cons: "<<cons[i]<<std::endl;
 
     /// CONSTRUCTOR 2
@@ -57,7 +57,7 @@ int main()
     casadi::DMVector var_trj2 = sqp2.getVariableTrajectory();
     std::vector<double> objs2 = sqp2.getObjectiveIterations();
     std::vector<double> cons2 = sqp2.getConstraintNormIterations();
-    for(unsigned int i = 0; i < var_trj2.size(); ++i)
+    for(unsigned int i = 0; i < sqp2.getNumberOfIterations(); ++i)
         std::cout<<"iter "<<i<<"-> sol2: "<<var_trj2[i]<<"    obj2: "<<objs2[i]<<"  cons: "<<cons2[i]<<std::endl;
 
 

@@ -369,6 +369,15 @@ public:
     }
 
     /**
+     * @brief getNumberOfIterations
+     * @return number of iteration to solve NLP
+     */
+    unsigned int getNumberOfIterations()
+    {
+        return _iteration_to_solve;
+    }
+
+    /**
      * @brief getObjectiveIterations
      * @return 0.5*norm2 of objective (one per iteration)
      */
