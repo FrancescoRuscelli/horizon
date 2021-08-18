@@ -209,7 +209,6 @@ public:
         _iteration_to_solve = 0;
         for(unsigned int k = 0; k < _max_iter; ++k)
         {
-            /* auto tac =  std::chrono::high_resolution_clock::now(); */
             //1. Cost function is linearized around actual x0
             _f.setInput(0, _sol); // cost function
             _f.call();
@@ -217,10 +216,7 @@ public:
             _df.setInput(0, _sol); // cost function Jacobian
             _df.call(sparse);
             _J = _df.getSparseOutput(0);
-            /*  auto tuc = std::chrono::high_resolution_clock::now();
-                std::cout<<"f and J update: "<<(tuc-tac).count()*1E-9<<"    [s]"<<std::endl; */
 
-            /* auto t1 = std::chrono::high_resolution_clock::now(); */
             //2. Constraints are linearized around actual x0
             _g_dict.input[_g.name_in(0)] = x0_;
             _g.call(_g_dict.input, _g_dict.output);
@@ -230,8 +226,6 @@ public:
 
             g_ = _g_dict.output[_g.name_out(0)];
             A_ = _A_dict.output[_dg.name_out(0)];
-            /* auto t2 = std::chrono::high_resolution_clock::now();
-               std::cout<<"g and dg update: "<<(t2-t1).count()*1E-9<<"    [s]"<<std::endl; */
 
             //2. We compute Gauss-Newton Hessian approximation and gradient function
             auto tic = std::chrono::high_resolution_clock::now();
@@ -241,16 +235,10 @@ public:
             auto toc = std::chrono::high_resolution_clock::now();
             _hessian_computation_time.push_back((toc-tic).count()*1E-9);
 
-            /* tic = std::chrono::high_resolution_clock::now(); */
             _grad = _J.transpose()*_f.getOutput(0);
-            /* toc = std::chrono::high_resolution_clock::now();
-               std::cout<<"gradient computation: "<<(toc-tic).count()*1E-9<<"    [s]"<<std::endl; */
-
 
             //3. Setup QP
-            /* tic = std::chrono::high_resolution_clock::now(); */
             casadi_utils::toCasadiMatrix(_grad, grad_);
-
 
             if(!H_.is_init())
                 H_ = casadi_utils::WrappedSparseMatrix<double>(_H);
@@ -272,16 +260,12 @@ public:
             _conic_dict.input["lbx"] = lbx - x0_;
             _conic_dict.input["ubx"] = ubx - x0_;
             _conic_dict.input["x0"] = x0_;
-            /* toc = std::chrono::high_resolution_clock::now();
-               std::cout<<"setup QP: "<<(toc-tic).count()*1E-9<<"    [s]"<<std::endl;*/
-
 
             tic = std::chrono::high_resolution_clock::now();
             _conic->call(_conic_dict.input, _conic_dict.output);
             toc = std::chrono::high_resolution_clock::now();
             _qp_computation_time.push_back((toc-tic).count()*1E-9);
 
-            /* tic = std::chrono::high_resolution_clock::now(); */
             casadi_utils::toEigen(_conic_dict.output["x"], _dx);
 
             /// BREAK CRITERIA
@@ -298,17 +282,12 @@ public:
             _variable_trj[k+1] = x0_;
 
             _iteration_to_solve++;
-            /* toc = std::chrono::high_resolution_clock::now();
-               std::cout<<"Newton step: "<<(toc-tic).count()*1E-9<<"    [s]"<<std::endl;*/
         }
 
-        /* auto tic = std::chrono::high_resolution_clock::now(); */
         _solution["x"] = x0_;
         double norm_f = _f.getOutput(0).norm();
         _solution["f"] = 0.5*norm_f*norm_f;
         _solution["g"] = casadi::norm_2(_g_dict.output[_g.name_out(0)].get_elements());
-        /* auto toc = std::chrono::high_resolution_clock::now();
-           std::cout<<"Final solution step: "<<(toc-tic).count()*1E-9<<"    [s]"<<std::endl; */
 
         return _solution;
     }
