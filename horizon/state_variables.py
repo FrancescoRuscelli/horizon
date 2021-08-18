@@ -970,7 +970,7 @@ class Aggregate(AbstractAggregate):
         Returns:
             [type]: [description]
         """
-        return np.hstack([var.getInitialGuess(node) for var in self])
+        return np.vstack([var.getInitialGuess(node) for var in self])
 
 class StateAggregate(Aggregate):
     """
