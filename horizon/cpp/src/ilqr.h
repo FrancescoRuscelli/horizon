@@ -117,9 +117,13 @@ public:
         double alpha;
         double cost;
         double merit;
+        double mu_f;
+        double mu_c;
+        double merit_der;
         double step_length;
         double constraint_violation;
         double defect_norm;
+        int iter;
         bool accepted;
 
         ForwardPassResult(int nx, int nu, int N);

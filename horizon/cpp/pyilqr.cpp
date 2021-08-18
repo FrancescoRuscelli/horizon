@@ -11,6 +11,10 @@ PYBIND11_MODULE(pyilqr, m) {
             .def_readonly("cost", &IterativeLQR::ForwardPassResult::cost)
             .def_readonly("defect_norm", &IterativeLQR::ForwardPassResult::defect_norm)
             .def_readonly("merit", &IterativeLQR::ForwardPassResult::merit)
+            .def_readonly("merit_der", &IterativeLQR::ForwardPassResult::merit_der)
+            .def_readonly("mu_f", &IterativeLQR::ForwardPassResult::mu_f)
+            .def_readonly("mu_c", &IterativeLQR::ForwardPassResult::mu_c)
+            .def_readonly("iter", &IterativeLQR::ForwardPassResult::iter)
             .def_readonly("step_length", &IterativeLQR::ForwardPassResult::step_length);
 
     py::class_<utils::ProfilingInfo>(m, "ProfilingInfo")
