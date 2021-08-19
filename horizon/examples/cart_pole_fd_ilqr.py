@@ -87,6 +87,7 @@ prb.createFinalConstraint("final_qdot", qdot)
 solver = Solver.make_solver(solver_type, prb, dt)  #, opts={'max_iter': 10})
 
 solver.plot_iter = True
+solver.set_iteration_callback()
 solver.max_iter = 400
 solver.solve()
 

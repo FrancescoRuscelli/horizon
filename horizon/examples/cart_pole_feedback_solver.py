@@ -25,6 +25,7 @@ ns = 20  # number of shooting nodes
 dt = 0.1
 tf = ns*dt  # [s]
 use_ms = True
+use_ilqr = True
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -69,7 +70,6 @@ prb.createFinalConstraint("qfinal", q - q_tgt)
 prb.createFinalConstraint("qdotfinal", qdot)
 
 # Create solver
-use_ilqr = False
 if use_ilqr:
     solver = ilqr.SolverILQR(prb, dt, opts={'realtime_iteration': True})
 else:
@@ -85,11 +85,11 @@ else:
 # the rti loop
 rti_dt = 0.01
 mpc = rti.RealTimeIteration(prb, solver, rti_dt)
-stateread = np.array([0.5, np.pi-0.01, 0.0, 0.0])
+stateread = np.array([0.0, np.pi-0.5, 0.0, 0.0])
 states = []
 inputs = []
 times = []
-for i in range(300):
+for i in range(500):
     states.append(stateread.copy())
     tic = time.time()
     input = mpc.run(stateread)
