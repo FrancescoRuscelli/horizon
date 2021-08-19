@@ -131,20 +131,19 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
 
     for(int i = 0; i < _N; i++)
     {
-        auto& tmp = _tmp[i];
         auto& res = _bp_res[i];
         auto& l = res.lu;
 
         // compute largest multiplier..
         // ..for dynamics (lam_x = S*dx + s)
-        tmp.lam_x = _value[i].s;
-        lam_x_max = std::max(lam_x_max, tmp.lam_x.cwiseAbs().maxCoeff());
+        _lam_x.col(i) = _value[i].s;
+        lam_x_max = std::max(lam_x_max, _lam_x.col(i).cwiseAbs().maxCoeff());
 
         // ..for constraints (lam_g = TBD)
         if(res.nc > 0)
         {
-            tmp.lam_g = res.glam + res.Gu*l;
-            lam_g_max = std::max(lam_g_max, tmp.lam_g.cwiseAbs().maxCoeff());
+            _lam_g[i] = res.glam + res.Gu*l;
+            lam_g_max = std::max(lam_g_max, _lam_g[i].cwiseAbs().maxCoeff());
         }
     }
 
@@ -255,9 +254,6 @@ void IterativeLQR::line_search(int iter)
 
     _fp_res->merit_der = merit_der;
 
-    // set best merit to +inf
-    _fp_best->merit = std::numeric_limits<double>::max();
-
     // run line search
     while(alpha >= alpha_min)
     {
@@ -283,6 +279,12 @@ void IterativeLQR::line_search(int iter)
 
         // reduce step size and try again
         alpha *= step_reduction_factor;
+    }
+
+    if(!_fp_res->accepted)
+    {
+        _fp_res->accepted = true;
+        report_result(*_fp_res);
     }
 
     _xtrj = _fp_res->xtrj;

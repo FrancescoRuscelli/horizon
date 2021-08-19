@@ -108,6 +108,8 @@ public:
 
     VecConstRef input(int i) const;
 
+    MatConstRef gain(int i) const;
+
     ~IterativeLQR();
 
     struct ForwardPassResult
@@ -179,7 +181,6 @@ private:
     std::vector<BackwardPassResult> _bp_res;
     std::unique_ptr<ConstraintToGo> _constraint_to_go;
     std::unique_ptr<ForwardPassResult> _fp_res;
-    std::unique_ptr<ForwardPassResult> _fp_best;
 
     Eigen::MatrixXd _xtrj;
     Eigen::MatrixXd _utrj;

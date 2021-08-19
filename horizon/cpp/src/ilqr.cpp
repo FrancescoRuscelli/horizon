@@ -15,7 +15,6 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _bp_res(N, BackwardPassResult(_nx, _nu)),
     _constraint_to_go(std::make_unique<ConstraintToGo>(_nx, _nu)),
     _fp_res(std::make_unique<ForwardPassResult>(_nx, _nu, _N)),
-    _fp_best(std::make_unique<ForwardPassResult>(_nx, _nu, _N)),
     _lam_g(_N+1),
     _tmp(_N)
 {
@@ -34,7 +33,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     // initialize trajectories
     _xtrj.setZero(_nx, _N+1);
     _utrj.setZero(_nu, _N);
-    _lam_x.setZero(_nx, _N+1);
+    _lam_x.setZero(_nx, _N);
+
 
     // a default cost so that it works out of the box
     //  *) default intermediate cost -> l(x, u) = eps*|u|^2
@@ -188,7 +188,7 @@ bool IterativeLQR::solve(int max_iter)
         }
     }
 
-    return should_stop();
+    return false;
 }
 
 void IterativeLQR::linearize_quadratize()
@@ -525,16 +525,12 @@ void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
     f.setInput(0, x);
     f.setInput(1, u);
     f.call();
-
-    // subtract desired value
-    f.out(0).col(0) -= hd;
 }
 
 void IterativeLQR::Constraint::setConstraint(casadi::Function h)
 {
     f = h;
     df = h.factory("dh", {"x", "u"}, {"jac:h:x", "jac:h:u"});
-    hd.setZero(h.size1_out(0));
 }
 
 IterativeLQR::~IterativeLQR() = default;

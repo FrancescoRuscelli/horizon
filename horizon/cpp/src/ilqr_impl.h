@@ -57,11 +57,8 @@ struct IterativeLQR::Constraint
     // dh/du
     const Eigen::MatrixXd& D() const;
 
-    // constraint violation f(x, u) - hd
+    // constraint violation f(x, u)
     VecConstRef h() const;
-
-    // desired value
-    Eigen::VectorXd hd;
 
     // valid flag
     bool is_valid() const;
@@ -168,8 +165,6 @@ struct IterativeLQR::Temporaries
     /* Forward pass */
     Eigen::VectorXd dx;
     Eigen::VectorXd defect;
-    Eigen::VectorXd lam_x;
-    Eigen::VectorXd lam_g;
 
 };
 

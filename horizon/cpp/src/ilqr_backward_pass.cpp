@@ -227,7 +227,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     // compute quadritized free value function (before constraints)
     tmp.huf.noalias() = r + B.transpose()*(snext + Snext*d);
     tmp.Huuf.noalias() = R + B.transpose()*Snext*B;
-    tmp.Huxf.noalias() = P + B.transpose()*Snext*A;
+    // tmp.Huxf.noalias() = P + B.transpose()*Snext*A;
 
     // compute lagrangian multipliers corresponding to the
     // satisfied component of the constraints, i.e.
@@ -235,10 +235,11 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     //  *) Gu = -U[:, :r]*sigma^-1*V[:, :r]'*Huu
     //  *) Gx = -U[:, :r]*sigma^-1*V[:, :r]'*Hux
     //  *) g = -U[:, :r]*sigma^-1*V[:, :r]'*hu
+    // note: we only compute the g and Gu term (assume dx = 0)
     tmp.UrSinvVrT.noalias() = U.leftCols(rank)*sv.head(rank).cwiseInverse().asDiagonal()*V.leftCols(rank).transpose();
-    res.Gu = -tmp.UrSinvVrT*tmp.Huuf;
-    res.Gx = -tmp.UrSinvVrT*tmp.Huxf;
     res.glam = -tmp.UrSinvVrT*tmp.huf;
+    res.Gu = -tmp.UrSinvVrT*tmp.Huuf;
+    // res.Gx = -tmp.UrSinvVrT*tmp.Huxf;
 
     // remove satisfied constraints from constraint to go
     _constraint_to_go->set(rotC.bottomRows(nc - rank),
