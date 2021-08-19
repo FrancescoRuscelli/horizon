@@ -67,6 +67,9 @@ void IterativeLQR::backward_pass_iter(int i)
     tmp.hx.noalias() = q + A.transpose()*tmp.s_plus_S_d;
     tmp.Hxx.noalias() = Q + A.transpose()*tmp.S_A;
 
+//    double eig_min_Q = Q.eigenvalues().real().minCoeff();
+//    tmp.Hxx.diagonal().array() -= std::min(eig_min_Q, 0.0)*2.0;
+
 
     // handle case where nz = 0, i.e. no nullspace left after constraints
     if(nz == 0)
@@ -107,6 +110,10 @@ void IterativeLQR::backward_pass_iter(int i)
     // after solveInPlace we will have huHux = [-l, -L]
     tmp.llt.compute(tmp.Huu);
     tmp.llt.solveInPlace(tmp.huHux);
+    if(tmp.llt.info() != Eigen::ComputationInfo::Success)
+    {
+        throw std::runtime_error("backward pass error: hessian not positive");
+    }
 
     // todo: check solution for nan, unable to solve, etc
 
@@ -122,10 +129,9 @@ void IterativeLQR::backward_pass_iter(int i)
     auto& S = value.S;
     auto& s = value.s;
 
-    S.noalias() = tmp.Hxx - Lz.transpose()*tmp.Huu*Lz;  // note: maybe not robust, loses symmetry
+    S.noalias() = tmp.Hxx + Lz.transpose()*(tmp.Huu*Lz + tmp.Hux) + tmp.Hux.transpose()*Lz;
     S = 0.5*(S + S.transpose());  // note: symmetrize
     s.noalias() = tmp.hx + tmp.Hux.transpose()*lz + Lz.transpose()*(tmp.hu + tmp.Huu*lz);
-
 
     // map to original input u
     if(has_constraints)
