@@ -250,6 +250,11 @@ VecConstRef IterativeLQR::input(int i) const
     return _utrj.col(i);
 }
 
+MatConstRef IterativeLQR::gain(int i) const
+{
+    return _bp_res[i].Lu;
+}
+
 const Eigen::MatrixXd &IterativeLQR::Dynamics::A() const
 {
     return df.getOutput(0);
