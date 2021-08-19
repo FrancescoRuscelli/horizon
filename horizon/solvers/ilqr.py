@@ -45,10 +45,16 @@ class SolverILQR(Solver):
             self._set_constraint_k(k)
 
         # set a default iteration callback
-        self.ilqr.setIterationCallback(self._iter_callback)
         self.plot_iter = False
         self.xax = None 
         self.uax = None
+
+    
+    def set_iteration_callback(self, cb=None):
+        if cb is None:
+            self.ilqr.setIterationCallback(self._iter_callback)
+        else:
+            self.ilqr.setIterationCallback(cb)
 
 
     def configure_rti(self) -> bool:
@@ -56,15 +62,10 @@ class SolverILQR(Solver):
     
 
     def solve(self):
+        
         # get initial guess
-
         x0 = self.prb.getState().getInitialGuess()
-
-        print(x0.shape)
-
-        x0 = self.prb.getState().getInitialGuess().reshape((self.nx, self.N+1))
-        u0 = self.prb.getInput().getInitialGuess().reshape((self.nu, self.N))
-
+        u0 = self.prb.getInput().getInitialGuess()
 
         # set initial condition
         x0[:, 0] = self.prb.getInitialState()
