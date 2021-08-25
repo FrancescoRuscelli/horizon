@@ -26,7 +26,7 @@ class horizonImpl():
         self.solver = None
 
         # todo hack!
-        # self.dt = 0.01
+        self.dt = 0.01
         # todo add to transctiptionHandler a class method to construct a method?
         # th = TranscriptionsHandler(self.casadi_prb, self.dt)
 
@@ -281,6 +281,9 @@ class horizonImpl():
             # else:
             # todo tapullo:
             self.casadi_prb.setDynamics(self.casadi_prb.getState().getVars())
+            # todo add transcription method
+
+            # todo add selection to choose solver
             self.solver = Solver.make_solver('ipopt', self.casadi_prb, self.dt)
             self.logger.info('Problem created succesfully!')
         except Exception as e:
