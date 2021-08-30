@@ -1,11 +1,8 @@
 #!/usr/bin/env python
-import logging
 
-import rospy
-import casadi as cs
-import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory
+from horizon.transcriptions import integrators
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
@@ -143,9 +140,7 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
 dd = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
 tau = casadi_kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
-
-prb.createConstraint("final_velocity", qdot, nodes=ns+1, bounds=dict(lb=np.zeros((nv, 1)), ub=np.zeros((nv, 1))))
-# prb.createFinalConstraint('final_velocity', qdot)
+prb.createFinalConstraint('final_velocity', qdot)
 
 # GROUND
 mu = 0.8 # friction coefficient

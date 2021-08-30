@@ -5,9 +5,7 @@ import casadi as cs
 import numpy as np
 from horizon import problem
 from horizon.solvers import Solver
-from horizon.utils.transcription_methods import TranscriptionsHandler
-from horizon.utils import plotter
-from horizon.ros.replay_trajectory import replay_trajectory
+from horizon.transcriptions.transcriptor import Transcriptor
 
 import matplotlib.pyplot as plt
 import os
@@ -71,12 +69,10 @@ prb.createIntermediateCost("tau", 1e-6*cs.sumsqr(tau))
 
 if solver_type != 'ilqr':
     # Dynamics
-    th = TranscriptionsHandler(prb, dt)
     if use_ms:
-        th.setDefaultIntegrator(type='EULER')
-        th.setMultipleShooting()
+        th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
     else:
-        th.setDirectCollocation()
+        th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
 
 # Constraints
 prb.createFinalConstraint("up", q[1] - qtgt[1])

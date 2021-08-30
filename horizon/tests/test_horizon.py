@@ -4,7 +4,7 @@ import pprint
 import numpy as np
 import logging
 import casadi as cs
-import horizon.utils.transcription_methods as tm
+import horizon.transcriptions.transcriptor as Transcriptor
 
 def test_singleParameter():
     nodes = 10
@@ -152,10 +152,7 @@ def test_prev():
     state_dot = cs.vertcat(v, u)
     prb.setDynamics(state_dot)
 
-    # integrator = integ.RK4(dae, opts, cs.SX)
-    hl = tm.TranscriptionsHandler(prb, 0.01)
-    # hl.set_integrator(integrator)
-    hl.setMultipleShooting()
+    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='RK4'))
 
     solver = Solver.make_solver('ipopt', prb, dt, opts)
     solver.solve()

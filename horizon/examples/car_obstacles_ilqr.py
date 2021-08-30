@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from horizon import problem
-from horizon.utils import integrators
 from horizon.solvers import ilqr
 import casadi as cs
 import numpy as np

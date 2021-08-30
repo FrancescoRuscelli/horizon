@@ -5,8 +5,8 @@ import casadi as cs
 import numpy as np
 import time
 from horizon import problem
-from horizon.utils import integrators
-from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.transcriptions import integrators
+from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
@@ -69,12 +69,10 @@ prb.createFinalConstraint("qfinal", q - q_tgt)
 prb.createFinalConstraint("qdotfinal", qdot)
 
 # Dynamics
-th = TranscriptionsHandler(prb, dt)
 if use_ms:
-    th.setDefaultIntegrator(type='EULER')
-    th.setMultipleShooting()
+    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
 else:
-    th.setDirectCollocation()
+    th = Transcriptor.make_method('direct_collocation', prb, dt)
 
 blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact
     'warmstart': False,

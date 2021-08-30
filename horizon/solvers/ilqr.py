@@ -6,9 +6,9 @@ except ImportError:
 
 from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.functions import Function, CostFunction, Constraint
+from horizon.functions import Function, Constraint
 from typing import Dict, List
-from horizon.utils import integrators
+from horizon.transcriptions import integrators
 import casadi as cs
 import numpy as np
 
@@ -79,7 +79,7 @@ class SolverILQR(Solver):
     def _set_cost_k(self, k):
         
         self._set_fun_k(k, 
-                container=self.prb.function_container.costfun_container, 
+                container=self.prb.function_container.getCost(),
                 set_to_ilqr=self.ilqr.setIntermediateCost, 
                 combine_elements=sum,
                 outname='l')
@@ -91,7 +91,7 @@ class SolverILQR(Solver):
             return cs.vertcat(*l)
 
         self._set_fun_k(k, 
-                container=self.prb.function_container.cnstr_container, 
+                container=self.prb.function_container.getCnstr(),
                 set_to_ilqr=self.ilqr.setIntermediateConstraint,
                 combine_elements=vertcat_list,
                 outname='h')
@@ -123,14 +123,14 @@ class SolverILQR(Solver):
             f: Function = f
 
             # if f does not act on node k, skip
-            if k not in f.nodes:
+            if k not in f.getNodes():
                 continue
                 
             # get input variables for this function
             input_list = f.getVariables()
 
             # save function value to list
-            value = f.fun(*input_list)
+            value = f.getFunction()(*input_list)
 
             # in the case of constraints, check bound values
             if isinstance(f, Constraint):

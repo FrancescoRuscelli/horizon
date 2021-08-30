@@ -5,8 +5,7 @@ import casadi as cs
 import numpy as np
 import time
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
-from horizon.ros.replay_trajectory import replay_trajectory
+from horizon.transcriptions import integrators
 from horizon.solvers import sqp
 
 import matplotlib.pyplot as plt
