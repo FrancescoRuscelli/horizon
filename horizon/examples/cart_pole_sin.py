@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-import logging
 
 from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
 from horizon import problem
 from horizon.utils import utils, casadi_kin_dyn
-from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
@@ -78,12 +77,10 @@ qddot.setInitialGuess(qddot_init)
 prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
 # Dynamics
-th = TranscriptionsHandler(prb, dt)
 if use_ms:
-    th.setDefaultIntegrator(type='EULER')
-    th.setMultipleShooting()
+    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
 else:
-    th.setDirectCollocation()
+    th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
 
 prb.createFinalConstraint("up", q[2] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)

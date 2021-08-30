@@ -1,11 +1,8 @@
 #!/usr/bin/env python
-import logging
 
-import rospy
-import casadi as cs
-import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
