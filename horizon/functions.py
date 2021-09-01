@@ -40,7 +40,6 @@ class Function:
         # create function of CASADI, dependent on (in order) [all_vars, all_pars]
         self._fun = cs.Function(name, self.vars + self.pars, [self._f])
         self._fun_impl = dict()
-
         self.setNodes(nodes)
 
     def getName(self) -> str:
@@ -261,7 +260,6 @@ class Constraint(Function):
         # constraints are initialize to 0.: 0. <= x <= 0.
         for node in nodes:
             self.bounds['n' + str(node)] = dict(lb=np.full(f.shape[0], 0.), ub=np.full(f.shape[0], 0.))
-
         super().__init__(name, f, used_vars, used_pars, nodes)
 
         # manage bounds
@@ -549,7 +547,10 @@ class FunctionsContainer:
         if name is None:
             cnsrt_dict = self._cnstr_container
         else:
-            cnsrt_dict = self._cnstr_container[name]
+            if name in self._cnstr_container:
+                cnsrt_dict = self._cnstr_container[name]
+            else:
+                cnsrt_dict = None
         return cnsrt_dict
 
     def getCost(self, name=None) -> OrderedDict:
@@ -586,6 +587,8 @@ class FunctionsContainer:
         Args:
             n_nodes: the desired number of nodes to be set
         """
+
+        # todo should find a way to understand which is the transcription function and project it over all the nodes
         # this is required to update the function_container EACH time a new number of node is set
         for cnstr in self._cnstr_container.values():
             # this is required to update the nodes consistently.

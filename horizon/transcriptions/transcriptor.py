@@ -37,7 +37,6 @@ class Transcriptor(ABC):
     def __init__(self, prb: Problem, dt: float, logger=None):
 
         self.logger = logger
-
         self.problem = prb
         self.integrator = None
 
@@ -60,7 +59,5 @@ class Transcriptor(ABC):
 
         self.input = cs.vertcat(*input_list)
         self.input_prev = cs.vertcat(*input_prev_list)
-
-
 
 
