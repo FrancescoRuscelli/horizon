@@ -124,7 +124,6 @@ class MultipleShooting(Transcriptor):
             integrator (string|any): name of the default integrator or custom integrator
         """
         super().__init__(prob, dt)
-
         # logic to pick a default integrator or keep a custom integrator
         # todo could be done dividing the arguments, for instance default_integrator_type and integrator
         if isinstance(integrator, str):

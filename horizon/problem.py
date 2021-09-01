@@ -286,7 +286,7 @@ class Problem:
             nodes = misc.checkNodes(nodes, range(self.nodes))
 
         # get vars that constraint depends upon
-        used_var = self._getUsedVar(g) # these now are fucking list!
+        used_var = self._getUsedVar(g)  # these now are fucking list!
         used_par = self._getUsedPar(g)
 
         if self.debug_mode:
@@ -623,6 +623,24 @@ class Problem:
 
 
 if __name__ == '__main__':
+    from horizon.transcriptions import transcriptor
+    N = 3
+    dt = 0.01
+    prob = Problem(N)
+    x = prob.createStateVariable('x', 1)
+    prob.setDynamics(x)
+    transcriptor.Transcriptor.make_method('multiple_shooting', prob, dt)
+    x_prev = x.getVarOffset(-1)
+
+    print('==============================')
+    prob.setNNodes(10)
+
+    prob.removeConstraint('multiple_shooting')
+    transcriptor.Transcriptor.make_method('multiple_shooting', prob, dt)
+
+    print(prob.getConstraints('multiple_shooting').getNodes())
+    exit()
+
     from horizon.solvers import Solver
     from horizon.utils import plotter
     import matplotlib.pyplot as plt

@@ -70,9 +70,12 @@ class OffsetVariable(AbstractVariable):
         super(OffsetVariable, self).__init__(tag, dim)
 
         self.parent_name = parent_name
-        self._nodes = nodes
+        self._nodes = list()
         self._offset = offset
         self._var_impl = var_impl
+
+        for node in self._var_impl.keys():
+            self._nodes.append(int(node.split("n", 1)[1]))
 
     def getImpl(self, nodes=None):
         """
@@ -84,6 +87,13 @@ class OffsetVariable(AbstractVariable):
         Returns:
             implemented instances of the abstract offsetted variable
         """
+
+        # todo is this nice? to update nodes given the _var_impl
+        #   another possibility is sharing also the _nodes
+        self._nodes.clear()
+        for node in self._var_impl.keys():
+            self._nodes.append(int(node.split("n", 1)[1]))
+
         if nodes is None:
             nodes = self._nodes
 
@@ -711,7 +721,9 @@ class Variable(AbstractVariable):
                 new_var_impl['n' + str(n)]['ub'] = np.full(self._dim, np.inf)
                 new_var_impl['n' + str(n)]['w0'] = np.zeros(self._dim)
 
-        self._var_impl = new_var_impl
+        # this is to keep the instance at the same memory position (since it is shared by the OffsetVariable)
+        self._var_impl.clear()
+        self._var_impl.update(new_var_impl)
 
     def getImpl(self, nodes=None):
         """
@@ -723,7 +735,6 @@ class Variable(AbstractVariable):
         Returns:
             implemented instances of the abstract variable
         """
-
         # embed this in getVals? difference between cs.vertcat and np.hstack
         if nodes is None:
             nodes = self._nodes
