@@ -1,0 +1,12 @@
+digraph G {
+"world" -> "base_link_x"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 1628183938.010 sec old)\nBuffer length: 0.000 sec\n"];
+"pole" -> "mass"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 1628183938.010 sec old)\nBuffer length: 0.000 sec\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1628183938.010"[ shape=plaintext ] ;
+ }->"world";
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1628183938.010"[ shape=plaintext ] ;
+ }->"pole";
+}

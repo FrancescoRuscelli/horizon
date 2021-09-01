@@ -1,6 +1,6 @@
 from horizon import problem as horizon
 from horizon.solvers import Solver
-from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.transcriptions.transcriptor import Transcriptor
 import parser
 import re
 import casadi as cs
@@ -27,8 +27,7 @@ class horizonImpl():
 
         # todo hack!
         self.dt = 0.01
-        # todo add to transctiptionHandler a class method to construct a method?
-        # th = TranscriptionsHandler(self.casadi_prb, self.dt)
+
 
 
     def _setVarGenerator(self, var_type):
@@ -227,8 +226,17 @@ class horizonImpl():
             signal = 'Failed editing of function "{}".'.format(name)
             return False, signal
 
-    # def addTranscriptionMethod(self):
+    def addTranscriptionMethod(self, type, opts):
+        try:
+            # remove old transcription methods if present
+            trans_cnsrt = ['multiple_shooting', 'direct_collocation']
+            for cnsrt in trans_cnsrt:
+                if self.casadi_prb.getConstraints(cnsrt):
+                    self.casadi_prb.removeConstraint(cnsrt)
 
+            Transcriptor.make_method(type, self.casadi_prb, self.dt, opts=opts)
+        except Exception as e:
+            self.logger.warning('gui_receiver.py, addTranscriptionMethod: {}'.format(e))
 
     def updateFunctionNodes(self, name, nodes):
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
@@ -263,6 +271,15 @@ class horizonImpl():
         self.nodes = n_nodes
         self.casadi_prb.setNNodes(self.nodes)
 
+    def setDynamics(self, dyn):
+        try:
+            fun, used_vars = self.fromTxtToFun(dyn)
+            self.casadi_prb.setDynamics(fun)
+            return self.casadi_prb.getDynamics()
+        except Exception as e:
+            self.logger.warning('gui_receiver.py: setDynamics {}'.format(e))
+            return False
+
     def _createAndAppendFun(self, name, str_fun):
 
         fun, used_vars = self.fromTxtToFun(str_fun)
@@ -279,13 +296,10 @@ class horizonImpl():
             # if self.solver is None:
             #     self.logger.warning('Solver not set. Please select a valid solver before building Horizon problem.')
             # else:
-            # todo tapullo:
-            self.casadi_prb.setDynamics(self.casadi_prb.getState().getVars())
-            # todo add transcription method
 
             # todo add selection to choose solver
             self.solver = Solver.make_solver('ipopt', self.casadi_prb, self.dt)
-            self.logger.info('Problem created succesfully!')
+            self.logger.info('Problem created successfully!')
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
             return False

@@ -2,14 +2,15 @@ import sys
 from functools import partial
 
 from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QRadioButton, QVBoxLayout, QHBoxLayout, QWidget,
-                             QLineEdit, QTableWidgetItem, QTableWidget, QCompleter, QHeaderView, QDialogButtonBox)
+                             QLineEdit, QTableWidgetItem, QTableWidget, QCompleter, QHeaderView, QDialogButtonBox,
+                             QComboBox, QSpinBox, QFrame, QToolBox, QTabWidget)
 
 from PyQt5.QtGui import QPalette, QFont, QColor
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from horizon_gui.gui.widget1_ui import Ui_HorizonGUI
 from horizon_gui.custom_functions import highlighter
-from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate, multi_slider
+from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate, multi_slider, option_container, separation_line
 from horizon_gui.definitions import CSS_DIR
 
 class MainInterface(QWidget, Ui_HorizonGUI):
@@ -74,6 +75,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.singleVarAddButton.clicked.connect(partial(self.generateVariable, 'Single'))
         self.customVarAddButton.clicked.connect(self.openCustomVarOptions)
         self.funCustomButton.clicked.connect(self.generateCustomFunction)
+        self.dynButton.clicked.connect(self.openDynamics)
+        self.transButton.clicked.connect(self.openTranscription)
         self.funDefaultButton.clicked.connect(self.generateDefaultFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
         self.varTable.itemDoubleClicked.connect(self.openVar)
@@ -168,8 +171,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.ProblemMain.setCurrentIndex(abs(index-1))
 
     def _fillFunComboBox(self):
-        self.funComboBox.addItem('multiple shooting')
-        self.funComboBox.addItem('direct collocation')
+        self.funComboBox.addItem('nothing')
+        self.funComboBox.addItem('yet')
+        self.funComboBox.addItem('implemented')
         self.funComboBox.setCurrentIndex(-1)
 
 
@@ -473,8 +477,169 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             self.on_generic_sig(signal)
 
     def generateDefaultFunction(self):
+        print('not yet implemented')
 
-        print(self.funComboBox.currentText())
+    def openDynamics(self):
+        self.dyn_win = on_destroy_signal_window.DestroySignalWindow()
+        self.dyn_win_layout = QGridLayout()
+
+        dyn_tab = QTabWidget()
+        self.dyn_win_layout.addWidget(dyn_tab, 0, 0, 1, 1)
+
+        # n_row = 0
+        # # populate it
+        # self.label_default = QLabel("Default:")
+        # self.dyn_win_layout.addWidget(self.label_default, n_row, 0, 1, 1)
+        #
+        # n_row = n_row + 1
+        tab_default = QWidget()
+        tab_default_layout = QHBoxLayout(tab_default)
+
+        label_dyn_default = QLabel('xdot:')
+        tab_default_layout.addWidget(label_dyn_default)
+
+        self.dyn_combo_box = QComboBox()
+        self.dyn_combo_box.addItem('vertcat_state')
+        self.dyn_combo_box.addItem('double_integrator')
+        self.dyn_combo_box.addItem('double_integrator_fb')
+        self.dyn_combo_box.setCurrentIndex(-1)
+        tab_default_layout.addWidget(self.dyn_combo_box)
+
+        dyn_tab.addTab(tab_default, 'Default')
+
+
+        tab_custom = QWidget()
+        tab_custom_layout = QHBoxLayout(tab_custom)
+
+        label_dyn_default = QLabel('xdot:')
+        tab_custom_layout.addWidget(label_dyn_default)
+
+        self.dyn_line_edit = line_edit.LineEdit()
+        self.dyn_line_edit.textChanged.connect(self.disableDynButton)
+        tab_custom_layout.addWidget(self.dyn_line_edit)
+
+        dyn_tab.addTab(tab_custom, 'Custom')
+
+        # n_row = n_row + 1
+        # separation_line_2 = separation_line.SeparationLine()
+        # self.dyn_win_layout.addWidget(separation_line_2, n_row, 0, 1, 1)
+        #
+        widget_dialog = QWidget()
+        widget_dialog_layout = QHBoxLayout(widget_dialog)
+        self.dyn_no_button = QPushButton('Cancel')
+        self.dyn_yes_button = QPushButton('Create')
+        self.dyn_yes_button.setDisabled(True)
+        #
+        widget_dialog_layout.addWidget(self.dyn_no_button)
+        widget_dialog_layout.addWidget(self.dyn_yes_button)
+        #
+        self.dyn_win_layout.addWidget(widget_dialog)
+
+        self.dyn_no_button.clicked.connect(self.dyn_win.close)
+        self.dyn_yes_button.clicked.connect(self.setDynamics)
+        self.dyn_yes_button.clicked.connect(self.dyn_win.close)
+        # palette = QPalette()
+        # palette.setColor(QPalette.Text, Qt.black)
+        # self.display_name.setPalette(palette)
+
+        self.dyn_win.setLayout(self.dyn_win_layout)
+        self.dyn_win.show()
+
+    def disableDynButton(self):
+        if len(self.dyn_line_edit.toPlainText()) > 0:
+            self.dyn_yes_button.setDisabled(False)
+        else:
+            self.dyn_yes_button.setDisabled(True)
+
+    def setDynamics(self):
+        dyn = self.dyn_line_edit.toPlainText()
+        self.horizon_receiver.setDynamics(dyn)
+
+    def openTranscription(self):
+        self.trans_win = on_destroy_signal_window.DestroySignalWindow()
+
+        # create a layout for the window
+        #widget, fromRow, int fromColumn, int rowSpan, int columnSpan, Qt::Alignment alignment = Qt::Alignment()
+        self.trans_window_layout = QGridLayout()
+
+        n_row = 0
+        # populate it
+        self.label_type = QLabel("Types:")
+        self.trans_window_layout.addWidget(self.label_type, n_row, 0, 1, 1)
+
+        n_row = n_row + 1
+        self.trans_combo_box = QComboBox()
+        self.trans_combo_box.addItem('multiple_shooting')
+        self.trans_combo_box.addItem('direct_collocation')
+        self.trans_combo_box.setCurrentIndex(-1)
+        self.trans_combo_box.currentTextChanged.connect(self.editTranscriptionOptions)
+        self.trans_window_layout.addWidget(self.trans_combo_box, n_row, 0, 1, 1)
+
+        n_row = n_row + 1
+        separation_line_1 = separation_line.SeparationLine()
+        self.trans_window_layout.addWidget(separation_line_1, n_row, 0, 1, 1)
+
+        n_row = n_row + 1
+        self.label_options = QLabel("Options:")
+        self.trans_window_layout.addWidget(self.label_options, n_row, 0, 1, 1)
+
+        n_row = n_row + 1
+        self.option_widget = option_container.OptionContainer()
+        self.trans_window_layout.addWidget(self.option_widget, n_row, 0, 1, 1)
+
+        n_row = n_row + 1
+        separation_line_2 = separation_line.SeparationLine()
+        self.trans_window_layout.addWidget(separation_line_2, n_row, 0, 1, 1)
+
+        widget_dialog = QWidget()
+        widget_dialog_layout = QHBoxLayout(widget_dialog)
+        self.trans_no_button = QPushButton('Cancel')
+        self.trans_yes_button = QPushButton('Create')
+        self.trans_yes_button.setDisabled(True)
+
+        widget_dialog_layout.addWidget(self.trans_no_button)
+        widget_dialog_layout.addWidget(self.trans_yes_button)
+
+
+        self.trans_window_layout.addWidget(widget_dialog)
+
+        self.trans_no_button.clicked.connect(self.trans_win.close)
+        self.trans_yes_button.clicked.connect(self.addTranscriptionMethod)
+        self.trans_yes_button.clicked.connect(self.trans_win.close)
+        # palette = QPalette()
+        # palette.setColor(QPalette.Text, Qt.black)
+        # self.display_name.setPalette(palette)
+
+        self.trans_win.setLayout(self.trans_window_layout)
+        self.trans_win.show()
+
+    def editTranscriptionOptions(self, type):
+        # clear widget
+        self.trans_yes_button.setDisabled(False)
+
+        if type == 'multiple_shooting':
+
+            integrator_combo_box = QComboBox()
+            integrator_combo_box.addItem('EULER')
+            integrator_combo_box.addItem('RK2')
+            integrator_combo_box.addItem('RK4')
+            integrator_combo_box.addItem('LEAPFROG')
+            self.option_widget.addOption('Integrator', integrator_combo_box, integrator_combo_box.currentText)
+
+        elif type == 'direct_collocation':
+            degree_spin_box = QSpinBox()
+            degree_spin_box.setValue(3)
+            self.option_widget.addOption('Degree', degree_spin_box, degree_spin_box.value)
+
+
+    def addTranscriptionMethod(self):
+        type = self.trans_combo_box.currentText()
+        self.transcriptionDisplay.setText(type)
+        opts = self.option_widget.getOptions()
+        self.horizon_receiver.addTranscriptionMethod(type, opts)
+
+        self.transcriptionDisplay.setReady(True)
+
     # GUI
     def setFunEditor(self, parent):
         font = QFont()
