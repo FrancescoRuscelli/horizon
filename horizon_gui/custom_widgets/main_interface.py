@@ -9,14 +9,15 @@ from PyQt5.QtGui import QPalette, QFont, QColor
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from horizon_gui.gui.widget1_ui import Ui_HorizonGUI
+from horizon_gui.gui.txt_to_fun import TxtToFun
 from horizon_gui.custom_functions import highlighter
 from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate, multi_slider, option_container, separation_line
 from horizon_gui.definitions import CSS_DIR
-
+from horizon_gui.gui.gui_receiver import horizonImpl
 class MainInterface(QWidget, Ui_HorizonGUI):
     generic_sig = pyqtSignal(str)
 
-    def __init__(self, horizon_receiver, logger=None):
+    def __init__(self, horizon_receiver: horizonImpl, logger=None):
         super(MainInterface, self).__init__()
 
         self.setupUi(self)
@@ -104,7 +105,14 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.NodesSpinBox.valueChanged.connect(partial(self.ledSolve.setReady, False))
         self.constraintLine.function_nodes_changed.connect(partial(self.ledCreate.setReady, False))
         self.constraintLine.function_nodes_changed.connect(partial(self.ledSolve.setReady, False))
+
         self.ledSolve.setEnabled(False)
+
+        # the transcription need to be updated if nodes changed
+        self.NodesSpinBox.valueChanged.connect(self.updateTranscriptionMethod)
+
+        # the dynamics becomes not ready if new state or input variables are inserted
+        self.stateVarAddButton.clicked.connect(self.manageDynDisplay)
 
 
         # when opening horizon, fill the GUI
@@ -156,8 +164,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         n_nodes = self.NodesSpinBox.value()
         self.nodes = n_nodes
         self.horizon_receiver.setHorizonNodes(n_nodes)  # setting to casadi the new number of nodes
-        self.constraintLine.setHorizonNodes(n_nodes+1)  # n_nodes+1 to account for the final node
-        self.costfunctionLine.setHorizonNodes(n_nodes+1)  # n_nodes+1 to account for the final node
+        self.constraintLine.setHorizonNodes(n_nodes + 1)  # n_nodes+1 to account for the final node
+        self.costfunctionLine.setHorizonNodes(n_nodes + 1)  # n_nodes+1 to account for the final node
         # self.ledCreate.setReady(False)
         # self.ledSolve.setReady(False)
 
@@ -483,8 +491,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.dyn_win = on_destroy_signal_window.DestroySignalWindow()
         self.dyn_win_layout = QGridLayout()
 
-        dyn_tab = QTabWidget()
-        self.dyn_win_layout.addWidget(dyn_tab, 0, 0, 1, 1)
+        self.dyn_tab = QTabWidget()
+        self.dyn_win_layout.addWidget(self.dyn_tab, 0, 0, 1, 1)
 
         # n_row = 0
         # # populate it
@@ -493,32 +501,36 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         #
         # n_row = n_row + 1
         tab_default = QWidget()
+        tab_default.setObjectName('default')
         tab_default_layout = QHBoxLayout(tab_default)
 
         label_dyn_default = QLabel('xdot:')
         tab_default_layout.addWidget(label_dyn_default)
 
         self.dyn_combo_box = QComboBox()
-        self.dyn_combo_box.addItem('vertcat_state')
-        self.dyn_combo_box.addItem('double_integrator')
-        self.dyn_combo_box.addItem('double_integrator_fb')
+        dyn_methods_list = self.horizon_receiver.getDefaultDynList()
+        for item in dyn_methods_list:
+            self.dyn_combo_box.addItem(item)
+
         self.dyn_combo_box.setCurrentIndex(-1)
+        self.dyn_combo_box.currentIndexChanged.connect(self.manageYesDynButton)
         tab_default_layout.addWidget(self.dyn_combo_box)
 
-        dyn_tab.addTab(tab_default, 'Default')
+        self.dyn_tab.addTab(tab_default, 'Default')
 
 
         tab_custom = QWidget()
+        tab_custom.setObjectName('custom')
         tab_custom_layout = QHBoxLayout(tab_custom)
 
         label_dyn_default = QLabel('xdot:')
         tab_custom_layout.addWidget(label_dyn_default)
 
         self.dyn_line_edit = line_edit.LineEdit()
-        self.dyn_line_edit.textChanged.connect(self.disableDynButton)
+        self.dyn_line_edit.textChanged.connect(self.manageYesDynButton)
         tab_custom_layout.addWidget(self.dyn_line_edit)
 
-        dyn_tab.addTab(tab_custom, 'Custom')
+        self.dyn_tab.addTab(tab_custom, 'Custom')
 
         # n_row = n_row + 1
         # separation_line_2 = separation_line.SeparationLine()
@@ -541,19 +553,45 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         # palette = QPalette()
         # palette.setColor(QPalette.Text, Qt.black)
         # self.display_name.setPalette(palette)
+        self.dyn_tab.currentChanged.connect(self.manageYesDynButton)
 
         self.dyn_win.setLayout(self.dyn_win_layout)
         self.dyn_win.show()
 
-    def disableDynButton(self):
-        if len(self.dyn_line_edit.toPlainText()) > 0:
-            self.dyn_yes_button.setDisabled(False)
-        else:
-            self.dyn_yes_button.setDisabled(True)
+    def manageYesDynButton(self):
+
+        if self.dyn_tab.currentWidget().objectName() == 'custom':
+            # if self.dyn_tab.currentWidget().objectName():
+            if len(self.dyn_line_edit.toPlainText()) > 0:
+                self.dyn_yes_button.setDisabled(False)
+            else:
+                self.dyn_yes_button.setDisabled(True)
+        elif self.dyn_tab.currentWidget().objectName() == 'default':
+            if self.dyn_combo_box.currentIndex() == -1:
+                self.dyn_yes_button.setDisabled(True)
+            else:
+                self.dyn_yes_button.setDisabled(False)
 
     def setDynamics(self):
-        dyn = self.dyn_line_edit.toPlainText()
-        self.horizon_receiver.setDynamics(dyn)
+        # todo can optimize form
+        type_dyn = self.dyn_tab.currentWidget().objectName()
+
+        if type_dyn == 'custom':
+            dyn = self.dyn_line_edit.toPlainText()
+            self.horizon_receiver.setDynamics(type_dyn, dyn)
+            self.dynDisplay.setText(type_dyn)
+        elif type_dyn == 'default':
+            dyn = self.dyn_combo_box.currentText()
+            self.horizon_receiver.setDynamics(type_dyn, dyn)
+            self.dynDisplay.setText(dyn)
+
+
+        self.dynDisplay.setReady(True)
+
+    def manageDynDisplay(self):
+        if not self.horizon_receiver.isDynamicsReady():
+            self.dynDisplay.clear()
+            self.dynDisplay.setReady(False)
 
     def openTranscription(self):
         self.trans_win = on_destroy_signal_window.DestroySignalWindow()
@@ -604,7 +642,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.trans_window_layout.addWidget(widget_dialog)
 
         self.trans_no_button.clicked.connect(self.trans_win.close)
-        self.trans_yes_button.clicked.connect(self.addTranscriptionMethod)
+        self.trans_yes_button.clicked.connect(self.setTranscriptionMethod)
         self.trans_yes_button.clicked.connect(self.trans_win.close)
         # palette = QPalette()
         # palette.setColor(QPalette.Text, Qt.black)
@@ -618,7 +656,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.trans_yes_button.setDisabled(False)
 
         if type == 'multiple_shooting':
-
+            # todo optimize
             integrator_combo_box = QComboBox()
             integrator_combo_box.addItem('EULER')
             integrator_combo_box.addItem('RK2')
@@ -631,14 +669,17 @@ class MainInterface(QWidget, Ui_HorizonGUI):
             degree_spin_box.setValue(3)
             self.option_widget.addOption('Degree', degree_spin_box, degree_spin_box.value)
 
-
-    def addTranscriptionMethod(self):
+    def setTranscriptionMethod(self):
         type = self.trans_combo_box.currentText()
         self.transcriptionDisplay.setText(type)
         opts = self.option_widget.getOptions()
-        self.horizon_receiver.addTranscriptionMethod(type, opts)
+        self.horizon_receiver.setTranscriptionMethod(type, opts)
 
         self.transcriptionDisplay.setReady(True)
+
+    def updateTranscriptionMethod(self):
+        if self.horizon_receiver.isTranscriptionReady():
+            self.setTranscriptionMethod()
 
     # GUI
     def setFunEditor(self, parent):
@@ -649,7 +690,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         # with QLineEdit doesn't work, so I had to override QTextEdit
         self.highlighter = highlighter.Highlighter(self.funInput.document())
-        self.highlighter.addOperators(self.horizon_receiver.getValidOperators())
+        self.highlighter.addOperators(TxtToFun.getValidOperators())
 
 
         self.completer = QCompleter(self.fun_keywords)

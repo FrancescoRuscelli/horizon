@@ -744,6 +744,9 @@
               <property name="alignment">
                <set>Qt::AlignCenter</set>
               </property>
+              <property name="minimum">
+               <number>1</number>
+              </property>
              </widget>
             </item>
            </layout>

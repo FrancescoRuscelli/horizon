@@ -33,7 +33,7 @@ class HorizonLine(QScrollArea):
     bounds_changed = pyqtSignal()
     function_nodes_changed = pyqtSignal()
 
-    def __init__(self, horizon, fun_type, nodes=0, logger=None, parent=None):
+    def __init__(self, horizon, fun_type, nodes=1, logger=None, parent=None):
         super().__init__(parent)
 
         self.setAcceptDrops(True)
@@ -46,7 +46,7 @@ class HorizonLine(QScrollArea):
         self.fun_type = fun_type  # can be Constraint or Cost Function
         if fun_type == 'costfunction':
             self.bounds_flag = False
-        self.n_nodes = nodes
+        self.n_nodes = nodes + 1 # to account for final node
 
         if logger:
             self.logger = logger

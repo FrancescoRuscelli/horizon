@@ -1,5 +1,7 @@
 from horizon import problem as horizon
 from horizon.solvers import Solver
+from horizon_gui.gui.dynamics_handler import DynamicsHandler
+from horizon_gui.gui.txt_to_fun import TxtToFun
 from horizon.transcriptions.transcriptor import Transcriptor
 import parser
 import re
@@ -28,6 +30,12 @@ class horizonImpl():
         # todo hack!
         self.dt = 0.01
 
+        # list of dynamics that can be defined
+        self.txt_to_fun_converter = TxtToFun(self.sv_dict, self.fun_dict, self.logger)
+        self.dyn_han = DynamicsHandler(self.casadi_prb, self.logger)
+
+        self.transcription_flag = False
+        self.dynamics_flag = False
 
 
     def _setVarGenerator(self, var_type):
@@ -48,6 +56,11 @@ class horizonImpl():
 
             if offset == 0:
                 if var_type == 'State':
+
+                    if self.dynamics_flag:
+                        self.casadi_prb.resetDynamics()
+                        self.dynamics_flag = False
+                        self.logger.warning('system dynamics has been resetted due to the adding of a new state variable')
                     var = self.casadi_prb.createStateVariable(name, dim)
                 if var_type == 'Input':
                     var = self.casadi_prb.createInputVariable(name, dim)
@@ -226,7 +239,7 @@ class horizonImpl():
             signal = 'Failed editing of function "{}".'.format(name)
             return False, signal
 
-    def addTranscriptionMethod(self, type, opts):
+    def setTranscriptionMethod(self, type, opts):
         try:
             # remove old transcription methods if present
             trans_cnsrt = ['multiple_shooting', 'direct_collocation']
@@ -235,8 +248,9 @@ class horizonImpl():
                     self.casadi_prb.removeConstraint(cnsrt)
 
             Transcriptor.make_method(type, self.casadi_prb, self.dt, opts=opts)
+            self.transcription_flag = True
         except Exception as e:
-            self.logger.warning('gui_receiver.py, addTranscriptionMethod: {}'.format(e))
+            self.logger.warning('gui_receiver.py, setTranscriptionMethod: {}'.format(e))
 
     def updateFunctionNodes(self, name, nodes):
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
@@ -271,18 +285,27 @@ class horizonImpl():
         self.nodes = n_nodes
         self.casadi_prb.setNNodes(self.nodes)
 
-    def setDynamics(self, dyn):
-        try:
-            fun, used_vars = self.fromTxtToFun(dyn)
-            self.casadi_prb.setDynamics(fun)
-            return self.casadi_prb.getDynamics()
-        except Exception as e:
-            self.logger.warning('gui_receiver.py: setDynamics {}'.format(e))
-            return False
+    def setDynamics(self, type, dyn):
+        if type == 'default':
+            self.dyn_han.set_default_dynamics(dyn)
+            self.dynamics_flag = True
+        elif type == 'custom':
+            dyn, used_vars = self.txt_to_fun_converter.convert(dyn)
+            self.dyn_han.set_custom_dynamics(dyn)
+            self.dynamics_flag = True
+
+    def isDynamicsReady(self):
+        return self.dynamics_flag
+
+    def isTranscriptionReady(self):
+        return self.transcription_flag
+
+    def getDefaultDynList(self):
+        return self.dyn_han.getList()
 
     def _createAndAppendFun(self, name, str_fun):
 
-        fun, used_vars = self.fromTxtToFun(str_fun)
+        fun, used_vars = self.txt_to_fun_converter.convert(str_fun)
         # fill horizon_receiver.fun_dict and funList
 
         if fun is not None:
@@ -375,18 +398,6 @@ class horizonImpl():
         # deserialize functions
         for name, data in self.fun_dict.items():
             self.fun_dict[name]['fun'] = cs.SX.deserialize(data['fun'])
-
-    def getValidOperators(self):
-        '''
-        return dictionary:
-        keys: packages imported
-        values: all the elements from the imported package that are considered "valid"
-        '''
-
-        full_list = dict()
-        full_list['math'] = [elem for elem in dir(math) if not elem.startswith('_')]
-        full_list['cs'] = ['cs.' + elem for elem in dir(cs) if not elem.startswith('_')]
-        return full_list
 
 if __name__ == '__main__':
 

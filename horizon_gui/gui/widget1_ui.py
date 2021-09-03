@@ -393,6 +393,7 @@ class Ui_HorizonGUI(object):
         self.NodesSpinBox.setSizePolicy(sizePolicy)
         self.NodesSpinBox.setMinimumSize(QtCore.QSize(0, 26))
         self.NodesSpinBox.setAlignment(QtCore.Qt.AlignCenter)
+        self.NodesSpinBox.setMinimum(1)
         self.NodesSpinBox.setObjectName("NodesSpinBox")
         self.gridLayout_6.addWidget(self.NodesSpinBox, 0, 1, 1, 1)
         self.verticalLayout_2.addWidget(self.groupBox)
