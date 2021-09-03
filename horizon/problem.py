@@ -218,6 +218,9 @@ class Problem:
             raise ValueError('dynamics not defined, have you called setDynamics?')
         return self.state_der
 
+    def resetDynamics(self):
+        self.state_der = None
+
     def setInitialState(self, x0: Iterable):
         self.getState().setBounds(lb=x0, ub=x0, nodes=0)
 
