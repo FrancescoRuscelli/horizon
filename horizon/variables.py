@@ -571,6 +571,9 @@ class Variable(AbstractVariable):
         """
         super(Variable, self).__init__(tag, dim)
 
+        if isinstance(nodes, list):
+            nodes.sort()
+
         self._nodes = nodes
 
         self.var_offset = dict()
@@ -1361,6 +1364,12 @@ class VariablesContainer:
             par_dict = self._pars[name]
         return par_dict
 
+    def removeVar(self, var_name):
+        if var_name in self._vars:
+            del self._vars[var_name]
+            return True
+        else:
+            return False
 
     def setNNodes(self, n_nodes):
         """

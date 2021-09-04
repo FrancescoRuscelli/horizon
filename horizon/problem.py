@@ -414,6 +414,19 @@ class Problem:
 
         return self.createCostFunction(name, j, nodes=nodes)
 
+    def removeVariable(self, name: str) -> bool:
+        """
+        remove the desired variable.
+
+        Args:
+            name: name of the cost function to be removed
+
+        Returns: False if function name is not found.
+
+        """
+        # todo add also remove from variable instance not only name
+        return self.var_container.removeVar(name)
+
     def removeCostFunction(self, name: str) -> bool:
         """
         remove the desired cost function.
@@ -626,6 +639,20 @@ class Problem:
 
 
 if __name__ == '__main__':
+
+    prob = Problem(5)
+    dan = prob.createVariable('dan', 3)
+    print(dan.getNodes())
+
+    exit()
+    prob = Problem(2)
+    dan = prob.createStateVariable('dan', 3)
+    print(prob.getVariables())
+    prob.removeVariable('dan')
+
+    print(prob.getVariables())
+
+    exit()
     from horizon.transcriptions import transcriptor
     N = 3
     dt = 0.01
