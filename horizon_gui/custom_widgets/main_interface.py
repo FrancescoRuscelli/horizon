@@ -148,7 +148,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         # when opening horizon, fill the GUI
         for name, data in horizon_receiver.getVarDict().items():
-            self.addStateVariableToGUI(name)
+            self.variables_gui.addVariableToGUI(name)
 
         for name, data in horizon_receiver.getFunctionDict().items():
             self.addFunctionToGUI(name, data['str'])
@@ -166,20 +166,71 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         # fill function combo box
         self._fillFunComboBox()
 
-        # self.initDummyStuff()
+        self.initDummyStuff()
 
     def initDummyStuff(self):
-        import os
-        urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
+
+        self.setBoxNodes(30)
+        # urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
+        urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
         self.model_gui.loadModel(urdf_file)
 
-        vars = dict(q=2, q_dot=2)
+        state_vars = dict(q=2, q_dot=2)
+        input_vars = dict(q_ddot=2)
 
-        for name, dim in vars.items():
+        # variables
+        for name, dim in state_vars.items():
             flag, signal = self.horizon_receiver.createVariable('State', name, dim, 0)
             if flag:
-                self.addStateVariableToGUI(name)
+                self.variables_gui.addVariableToGUI(name)
 
+        for name, dim in input_vars.items():
+            flag, signal = self.horizon_receiver.createVariable('Input', name, dim, 0)
+            if flag:
+                self.variables_gui.addVariableToGUI(name)
+
+        # Limits
+        import numpy as np
+        self.variables_gui.on_var_lb_changed('q', range(self.nodes+1), [-0.5, -2. * np.pi])
+        self.variables_gui.on_var_ub_changed('q', range(self.nodes+1), [0.5, 2. * np.pi])
+        self.variables_gui.on_var_lb_changed('q', 0, [0., 0.])
+        self.variables_gui.on_var_ub_changed('q', 0, [0., 0.])
+
+        self.variables_gui.on_var_lb_changed('q_dot', range(self.nodes+1), [-100., -100.])
+        self.variables_gui.on_var_ub_changed('q_dot', range(self.nodes+1), [100., 100.])
+        self.variables_gui.on_var_lb_changed('q_dot', 0, [0., 0.])
+        self.variables_gui.on_var_ub_changed('q_dot', 0, [0., 0.])
+
+        self.variables_gui.on_var_lb_changed('q_ddot', range(self.nodes+1), [-1000., -1000.])
+        self.variables_gui.on_var_ub_changed('q_ddot', range(self.nodes+1), [1000., 1000.])
+        self.variables_gui.on_var_lb_changed('q_ddot', 0, [0., 0.])
+        self.variables_gui.on_var_ub_changed('q_ddot', 0, [0., 0.])
+
+        # # Intial guesses
+        self.variables_gui.on_var_ig_changed('q', range(self.nodes+1), [0., 0.])
+        self.variables_gui.on_var_ig_changed('q_dot', range(self.nodes+1), [0., 0.])
+        self.variables_gui.on_var_ig_changed('q_ddot', range(self.nodes+1), [0., 0.])
+
+        # # Dynamics
+        dyn = 'cs.vertcat(q_dot, q_ddot)'
+        self.horizon_receiver.setDynamics('custom', dyn)
+        self.dyn_gui.display.setText('custom')
+        self.dyn_gui.display.setReady(True)
+
+        # # Transcription
+        type = 'multiple_shooting' # direct_collocation
+        opts = 'RK4' #3
+        self.horizon_receiver.setTranscriptionMethod(type, opts)
+
+        self.trans_gui.display.setText(type)
+        self.trans_gui.display.setReady(True)
+
+        #
+        # # Cost function
+        # prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
+        # # Constraint
+        # prb.createFinalConstraint("up", q[1] - np.pi)
+        # prb.createFinalConstraint("final_qdot", qdot)
 
 
     def updateHighlighter(self, var_name):
@@ -215,8 +266,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     def on_generic_sig(self, str):
         self.generic_sig.emit(str)
 
-    def setBoxNodes(self):
-        n_nodes = self.NodesSpinBox.value()
+    def setBoxNodes(self, n_nodes):
         self.nodes = n_nodes
         self.horizon_receiver.setHorizonNodes(n_nodes)  # setting to casadi the new number of nodes
         self.constraintLine.setHorizonNodes(n_nodes + 1)  # n_nodes+1 to account for the final node

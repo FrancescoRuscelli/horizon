@@ -83,8 +83,8 @@ class TranscriptionGui(GenericDisplayMask):
         opts = self.option_widget.getOptions()
         self.horizon_receiver.setTranscriptionMethod(type, opts)
 
-        self.transcriptionDisplay.setText(type)
-        self.transcriptionDisplay.setReady(True)
+        self.display.setText(type)
+        self.display.setReady(True)
 
 
     def updateTranscriptionMethod(self):

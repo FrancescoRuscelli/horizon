@@ -70,8 +70,6 @@ class DynamicsGui(GenericDisplayMask):
 
         self.dyn_tab.currentChanged.connect(self.manageYesDynButton)
 
-
-
     def manageYesDynButton(self):
 
         if self.dyn_tab.currentWidget().objectName() == 'custom':

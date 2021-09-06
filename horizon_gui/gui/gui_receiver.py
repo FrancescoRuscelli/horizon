@@ -277,6 +277,9 @@ class horizonImpl():
     def updateVarUb(self, name, ub, nodes):
         self.sv_dict[name]['var'].setUpperBounds(ub, nodes)
 
+    def updateVarIg(self, name, ub, nodes):
+        self.sv_dict[name]['var'].setInitialGuess(ub, nodes)
+
     def getFunctionDict(self):
         return self.fun_dict
 

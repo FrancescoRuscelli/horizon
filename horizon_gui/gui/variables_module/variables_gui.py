@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QHBoxLayout, QWid
                                 QLineEdit, QTableWidget, QHeaderView, QTableWidgetItem, QVBoxLayout)
 from PyQt5.QtGui import QPalette
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
-from horizon_gui.custom_widgets import on_destroy_signal_window, highlight_delegate, bounds_line, multi_slider
+from horizon_gui.custom_widgets import on_destroy_signal_window, highlight_delegate, bounds_line, multi_slider, spinbox_line
 from horizon_gui.gui.gui_receiver import horizonImpl
 from horizon_gui.gui.variables_module.variables_module_ui import Ui_VariablesGUI
 from functools import partial
@@ -170,12 +170,24 @@ class VariablesGui(QWidget, Ui_VariablesGUI):
 
         disabled_nodes = [node for node in range(n_nodes) if node not in active_nodes]
 
-        # def __init__(self, name, nodes=0, dim=1, disabled_nodes=None, initial_bounds=None, parent=None):
+        # adding bounds
+        n_row = n_row + 1
         self.var_bounds = bounds_line.BoundsLine(item.text(), n_nodes, var_dim, disabled_nodes, [lb_matrix, ub_matrix])
         self.var_bounds.lbChanged.connect(partial(self.on_var_lb_changed, item.text()))
         self.var_bounds.ubChanged.connect(partial(self.on_var_ub_changed, item.text()))
 
         self.sv_window_layout.addWidget(self.var_bounds, n_row, 0, 1, 4)
+
+        # adding intial guess
+        n_row = n_row + 1
+        initial_guess_colors = dict(base='lightblue', selected='blue', background='blue', border='blue')
+        initial_guess = var.getInitialGuess()
+        # reshape it in a matrix with row (dim) and columns (nodes)
+        ig_matrix = np.reshape(initial_guess, (var_dim, len(active_nodes)), order='F')
+
+        self.var_initial_guess = spinbox_line.SpinboxLine('Initial Guess', n_nodes, var_dim, disabled_nodes, initial_values=ig_matrix, colors=initial_guess_colors)
+        self.var_initial_guess.valueChanged.connect(partial(self.on_var_ig_changed, item.text()))
+        self.sv_window_layout.addWidget(self.var_initial_guess, n_row, 0, 1, 4)
 
         n_row = n_row + 1
         self.remove_var_button = QPushButton('Remove Variable')
@@ -214,7 +226,7 @@ class VariablesGui(QWidget, Ui_VariablesGUI):
 
         if flag:
 
-            self.addStateVariableToGUI(var_name)
+            self.addVariableToGUI(var_name)
             self.varNameInput.clear()
             self.varDimInput.setValue(default_dim)
             self.varOffsetInput.setValue(default_past_node)
@@ -266,7 +278,7 @@ class VariablesGui(QWidget, Ui_VariablesGUI):
         nodes = node_selector.getRanges()
         self.generateVariable('Custom', nodes)
 
-    def addStateVariableToGUI(self, sv_name):
+    def addVariableToGUI(self, sv_name):
 
         self._addRowToSVTable(sv_name)
 
@@ -305,6 +317,10 @@ class VariablesGui(QWidget, Ui_VariablesGUI):
     @pyqtSlot(str, int, list)
     def on_var_ub_changed(self, var_name, node, lims):
         self.horizon_receiver.updateVarUb(var_name, lims, node)
+
+    @pyqtSlot(str, int, list)
+    def on_var_ig_changed(self, var_name, node, lims):
+        self.horizon_receiver.updateVarIg(var_name, lims, node)
 
 
 if __name__ == '__main__':

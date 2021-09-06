@@ -111,5 +111,5 @@ class FunctionTabWidget(QTabWidget):
 
             boundsline = self.widget(i).findChild(BoundsLine)
             if boundsline:
-                boundsline.setNodes(self.n_nodes)
+                boundsline.setNNodes(self.n_nodes)
 
