@@ -10,8 +10,12 @@ from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 
 from horizon_gui.gui.widget1_ui import Ui_HorizonGUI
 from horizon_gui.gui.txt_to_fun import TxtToFun
+from horizon_gui.gui.variables_module.variables_gui import VariablesGui
+from horizon_gui.gui.transcriptions_module.transcriptions_gui import TranscriptionGui
+from horizon_gui.gui.dynamics_module.dynamics_gui import DynamicsGui
+from horizon_gui.gui.model_module.model_gui import ModelGui
 from horizon_gui.custom_functions import highlighter
-from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate, multi_slider, option_container, separation_line
+from horizon_gui.custom_widgets import horizon_line, line_edit, on_destroy_signal_window, highlight_delegate, multi_slider, option_container, separation_line, bounds_line
 from horizon_gui.definitions import CSS_DIR
 from horizon_gui.gui.gui_receiver import horizonImpl
 class MainInterface(QWidget, Ui_HorizonGUI):
@@ -37,10 +41,30 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         self.fun_keywords = list()
 
+        self.variables_gui = VariablesGui(self.horizon_receiver, self.logger, self)
+        var_box_layout = QVBoxLayout()
+        self.varBox.setLayout(var_box_layout)
+        var_box_layout.addWidget(self.variables_gui)
+
         # self._connectActions()
+        self.trans_gui = TranscriptionGui(self.horizon_receiver, self.logger, self)
+        transcription_box_layout = QVBoxLayout()
+        self.TranscriptionBox.setLayout(transcription_box_layout)
+        transcription_box_layout.addWidget(self.trans_gui)
+        # ===============================
+        self.dyn_gui = DynamicsGui(self.horizon_receiver, self.logger, self)
+        dynamics_box_layout = QVBoxLayout()
+        self.DynamicsBox.setLayout(dynamics_box_layout)
+        dynamics_box_layout.addWidget(self.dyn_gui)
+        # ===============================
+        self.model_gui = ModelGui(self.logger, self)
+        model_box_layout = QVBoxLayout()
+        self.ModelBox.setLayout(model_box_layout)
+        model_box_layout.addWidget(self.model_gui)
 
         # spinbox to set offset variables
         # self.varOffsetInput.setRange(-N, 0)
+
 
         self.layout_ct = QVBoxLayout(self.CTPage)
 
@@ -71,16 +95,11 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         #
         # with open(CSS_DIR + '/button_old.css', 'r') as f:
         #     self.PlotButton.setStyleSheet(f.read())
-        self.stateVarAddButton.clicked.connect(partial(self.generateVariable, 'State'))
-        self.inputVarAddButton.clicked.connect(partial(self.generateVariable, 'Input'))
-        self.singleVarAddButton.clicked.connect(partial(self.generateVariable, 'Single'))
-        self.customVarAddButton.clicked.connect(self.openCustomVarOptions)
+
         self.funCustomButton.clicked.connect(self.generateCustomFunction)
-        self.dynButton.clicked.connect(self.openDynamics)
-        self.transButton.clicked.connect(self.openTranscription)
         self.funDefaultButton.clicked.connect(self.generateDefaultFunction)
         self.funTable.itemDoubleClicked.connect(self.openFunction)
-        self.varTable.itemDoubleClicked.connect(self.openVar)
+
         self.switchPageButton.clicked.connect(self.switchPage)
         # self.NodesSpinBox.editingFinished.connect(self.setBoxNodes)
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
@@ -91,6 +110,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.CreateButton.clicked.connect(self.createButtonPushed)
         self.SolveButton.clicked.connect(self.solveButtonPushed)
         self.PlotButton.clicked.connect(self.plotButtonPushed)
+
 
         # these set to NOT READY the create/solve problem buttons if something in the horizon problem is changed
         self.constraintLine.active_fun_horizon.connect(partial(self.ledCreate.setReady, False))
@@ -108,11 +128,22 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         self.ledSolve.setEnabled(False)
 
+        # TRANSCRIPTION STUFF
         # the transcription need to be updated if nodes changed
-        self.NodesSpinBox.valueChanged.connect(self.updateTranscriptionMethod)
+        self.NodesSpinBox.valueChanged.connect(self.trans_gui.updateTranscriptionMethod)
 
+        # MODEL STUFF
+        # self.model_gui.modelLoaded.connect(self.writeInStatusBar('Opening Horizon problem!'))
+
+        # VARIABLES STUFF
         # the dynamics becomes not ready if new state or input variables are inserted
-        self.stateVarAddButton.clicked.connect(self.manageDynDisplay)
+        # self.variables_gui.stateVarAdded.connect(self.dyn_gui.manageDisplay())
+        # self.variables_gui.stateVarAdded.connect(self.updateHighlighter)
+        # self.variables_gui.genericSignal.connect(self.on_generic_sig)
+        # self.variables_gui.stateVarAdded.connect(partial(self.ledCreate, False))
+        # self.variables_gui.stateVarAdded.connect(partial(self.ledSolve, False))
+
+
 
 
         # when opening horizon, fill the GUI
@@ -134,6 +165,30 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         # fill function combo box
         self._fillFunComboBox()
+
+        # self.initDummyStuff()
+
+    def initDummyStuff(self):
+        import os
+        urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
+        self.model_gui.loadModel(urdf_file)
+
+        vars = dict(q=2, q_dot=2)
+
+        for name, dim in vars.items():
+            flag, signal = self.horizon_receiver.createVariable('State', name, dim, 0)
+            if flag:
+                self.addStateVariableToGUI(name)
+
+
+
+    def updateHighlighter(self, var_name):
+        # add variable to highlighter and to completer
+        self.highlighter.addKeyword(var_name)
+        self.fun_keywords.append('{}'.format(var_name))
+        model = self.completer.model()
+        model.setStringList(self.fun_keywords)
+
 
     def createButtonPushed(self):
         if self.horizon_receiver.generate():
@@ -192,7 +247,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         item = self.funTable.item(self.funTable.row(item), 0)
 
         # create window that emit a signal when closed
-        self.temp_win = on_destroy_signal_window.DestroySignalWindow()
+        self.fun_temp_win = on_destroy_signal_window.DestroySignalWindow()
 
         # create a layout for the window
         # widget, fromRow, int fromColumn, int rowSpan, int columnSpan, Qt::Alignment alignment = Qt::Alignment()
@@ -239,18 +294,18 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         self.close_button = QPushButton('Ok')
         # self.edit_button.setCheckable(True)
-        self.close_button.clicked.connect(self.temp_win.close)
+        self.close_button.clicked.connect(self.fun_temp_win.close)
         self.window_layout.addWidget(self.close_button, 2, 1, 1, 1)
 
-        self.temp_win.setWindowTitle(item.text())
-        self.temp_win.setLayout(self.window_layout)
+        self.fun_temp_win.setWindowTitle(item.text())
+        self.fun_temp_win.setLayout(self.window_layout)
 
         # show window
-        self.temp_win.show()
+        self.fun_temp_win.show()
 
         # temp_win emits a message when it is closed, before being destroyed.
         # remember that I have to manually destroy it
-        self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
+        self.fun_temp_win.returnDestroyed.connect(self.yieldHighlighter)
     # GUI
 
     def showWrappedFun(self, item):
@@ -292,150 +347,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     # GUI
     def yieldHighlighter(self):
         # return the highlighter to the funInput
-        self.temp_win.destroyCompletely()
+        self.fun_temp_win.destroyCompletely()
         self.highlighter.setDocument(self.funInput.document())
-
-    # GUI
-    def openVar(self, item):
-
-        # regardless of where I click, get the first item of the table
-        item = self.varTable.item(self.varTable.row(item), 0)
-        n_row = 0
-        # create window that emit a signal when closed
-        self.temp_win = on_destroy_signal_window.DestroySignalWindow()
-
-        # create a layout for the window
-        #widget, fromRow, int fromColumn, int rowSpan, int columnSpan, Qt::Alignment alignment = Qt::Alignment()
-        self.sv_window_layout = QGridLayout()
-
-        # populate it
-        self.label_name = QLabel("name:")
-        self.sv_window_layout.addWidget(self.label_name, n_row, 0, 1, 1)
-
-        palette = QPalette()
-        palette.setColor(QPalette.Text, Qt.black)
-
-        self.display_name = QLineEdit()
-        self.display_name.setFixedWidth(50)
-        self.display_name.setText(item.text())
-        self.display_name.setDisabled(True)
-        self.display_name.setPalette(palette)
-
-        self.sv_window_layout.addWidget(self.display_name, n_row, 1, 1, 1)
-
-        self.label_dim = QLabel("dimension:")
-        self.sv_window_layout.addWidget(self.label_dim, n_row, 2, 1, 1)
-
-        self.display_dim = QLineEdit()
-        self.display_dim.setFixedWidth(20)
-        self.display_dim.setText(str(self.horizon_receiver.getVar(item.text())['dim']))
-        self.display_dim.setDisabled(True)
-        self.display_dim.setPalette(palette)
-        self.sv_window_layout.addWidget(self.display_dim, n_row, 3, 1, 1)
-
-        # next row
-        n_row = n_row+1
-        self.label_fun = QLabel("var:")
-        self.sv_window_layout.addWidget(self.label_fun, n_row, 0, 1, 1)
-
-        self.display_fun = QLineEdit()
-        # as width as the vari text
-        width = self.display_fun.fontMetrics().width(str(self.horizon_receiver.getVar(item.text())['var']))
-        self.display_fun.setText(str(self.horizon_receiver.getVar(item.text())['var']))
-        self.display_fun.setDisabled(True)
-        # todo magic number?
-        self.display_fun.setMinimumWidth(width+5)
-        self.display_fun.setAlignment(Qt.AlignCenter)
-        self.display_fun.setPalette(palette)
-        self.sv_window_layout.addWidget(self.display_fun, n_row, 1, 1, 3)
-
-        # next row
-        n_row = n_row+1
-        self.label_type = QLabel("type:")
-        self.sv_window_layout.addWidget(self.label_type, n_row, 0, 1, 1)
-
-        self.type_var = QLineEdit()
-        self.type_var.setText(str(self.horizon_receiver.getVar(item.text())['type']))
-        self.type_var.setDisabled(True)
-        self.type_var.setAlignment(Qt.AlignCenter)
-        self.type_var.setPalette(palette)
-        self.sv_window_layout.addWidget(self.type_var, n_row, 1, 1, 3)
-
-
-        if self.horizon_receiver.getVar(item.text())['type'] == 'Custom':
-            # next row
-            n_row = n_row + 1
-            self.label_nodes = QLabel("active nodes:")
-            self.sv_window_layout.addWidget(self.label_nodes, n_row, 0, 1, 1)
-
-            node_list = str(self.horizon_receiver.getVar(item.text())['var'].getNodes())
-            self.nodes_var = QLineEdit("active nodes:")
-            width = self.display_fun.fontMetrics().width(node_list)
-            self.nodes_var.setMinimumWidth(width + 5)
-            self.nodes_var.setText(node_list)
-            self.nodes_var.setDisabled(True)
-            self.nodes_var.setAlignment(Qt.AlignCenter)
-            self.nodes_var.setPalette(palette)
-            self.sv_window_layout.addWidget(self.nodes_var, n_row, 1, 1, 3)
-
-        # next row
-        n_row = n_row + 1
-        self.label_usages = QLabel("usages:")
-        self.sv_window_layout.addWidget(self.label_usages, n_row, 0, 1, 4)
-
-        self.usages_table = QTableWidget()
-        self.usages_table.setColumnCount(3)
-        self.usages_table.setHorizontalHeaderLabels(['Name', 'Function', 'Type'])
-        self._delegate = highlight_delegate.HighlightDelegate(self.usages_table)
-        self.usages_table.setItemDelegateForColumn(1, self._delegate)
-        self._delegate.setFilters(item.text())
-
-        header = self.usages_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-
-        # next row
-        n_row = n_row + 1
-        self.sv_window_layout.addWidget(self.usages_table, n_row, 0, 1, 4)
-        # # todo add usages (add constraint logic and check if constraint depends on variable)
-        # TODO REMOVE CT ADD FUNCTION
-        # get only active function
-        active_fun_list = [i for i in [(elem['str'], elem['active']) for name, elem in self.horizon_receiver.getFunctionDict().items() if 'active' in elem] if i[1]]
-
-        for str_function, function in active_fun_list:
-            if item.text() in function.getVariables():
-                row_pos = self.usages_table.rowCount()
-                self.usages_table.insertRow(row_pos)
-                fun_name = QTableWidgetItem(function.getName())
-                fun_name.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-
-                fun_str = QTableWidgetItem(str_function)
-                fun_str.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-
-                fun_type = QTableWidgetItem(function.getType())
-                fun_type.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-
-                self.usages_table.setItem(row_pos, 0, fun_name)
-                self.usages_table.setItem(row_pos, 1, fun_str)
-                self.usages_table.setItem(row_pos, 2, fun_type)
-
-
-        self.remove_button = QPushButton('Remove Variable')
-        # self.edit_button.setStyleSheet("background-color : lightblue")
-        self.remove_button.clicked.connect(partial(self.horizon_receiver.removeStateVariable, item))
-
-        self.sv_window_layout.addWidget(self.remove_button)
-
-        self.temp_win.setWindowTitle(item.text())
-        self.temp_win.setLayout(self.sv_window_layout)
-
-        # show window
-        self.temp_win.show()
-
-        # temp_win emits a message when it is closed, before being destroyed.
-        # remember that I have to manually destroy it
-        # self.temp_win.returnDestroyed.connect(self.yieldHighlighter)
 
     def addFunctionToGUI(self, name, str_fun):
 
@@ -487,200 +400,6 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     def generateDefaultFunction(self):
         print('not yet implemented')
 
-    def openDynamics(self):
-        self.dyn_win = on_destroy_signal_window.DestroySignalWindow()
-        self.dyn_win_layout = QGridLayout()
-
-        self.dyn_tab = QTabWidget()
-        self.dyn_win_layout.addWidget(self.dyn_tab, 0, 0, 1, 1)
-
-        # n_row = 0
-        # # populate it
-        # self.label_default = QLabel("Default:")
-        # self.dyn_win_layout.addWidget(self.label_default, n_row, 0, 1, 1)
-        #
-        # n_row = n_row + 1
-        tab_default = QWidget()
-        tab_default.setObjectName('default')
-        tab_default_layout = QHBoxLayout(tab_default)
-
-        label_dyn_default = QLabel('xdot:')
-        tab_default_layout.addWidget(label_dyn_default)
-
-        self.dyn_combo_box = QComboBox()
-        dyn_methods_list = self.horizon_receiver.getDefaultDynList()
-        for item in dyn_methods_list:
-            self.dyn_combo_box.addItem(item)
-
-        self.dyn_combo_box.setCurrentIndex(-1)
-        self.dyn_combo_box.currentIndexChanged.connect(self.manageYesDynButton)
-        tab_default_layout.addWidget(self.dyn_combo_box)
-
-        self.dyn_tab.addTab(tab_default, 'Default')
-
-
-        tab_custom = QWidget()
-        tab_custom.setObjectName('custom')
-        tab_custom_layout = QHBoxLayout(tab_custom)
-
-        label_dyn_default = QLabel('xdot:')
-        tab_custom_layout.addWidget(label_dyn_default)
-
-        self.dyn_line_edit = line_edit.LineEdit()
-        self.dyn_line_edit.textChanged.connect(self.manageYesDynButton)
-        tab_custom_layout.addWidget(self.dyn_line_edit)
-
-        self.dyn_tab.addTab(tab_custom, 'Custom')
-
-        # n_row = n_row + 1
-        # separation_line_2 = separation_line.SeparationLine()
-        # self.dyn_win_layout.addWidget(separation_line_2, n_row, 0, 1, 1)
-        #
-        widget_dialog = QWidget()
-        widget_dialog_layout = QHBoxLayout(widget_dialog)
-        self.dyn_no_button = QPushButton('Cancel')
-        self.dyn_yes_button = QPushButton('Create')
-        self.dyn_yes_button.setDisabled(True)
-        #
-        widget_dialog_layout.addWidget(self.dyn_no_button)
-        widget_dialog_layout.addWidget(self.dyn_yes_button)
-        #
-        self.dyn_win_layout.addWidget(widget_dialog)
-
-        self.dyn_no_button.clicked.connect(self.dyn_win.close)
-        self.dyn_yes_button.clicked.connect(self.setDynamics)
-        self.dyn_yes_button.clicked.connect(self.dyn_win.close)
-        # palette = QPalette()
-        # palette.setColor(QPalette.Text, Qt.black)
-        # self.display_name.setPalette(palette)
-        self.dyn_tab.currentChanged.connect(self.manageYesDynButton)
-
-        self.dyn_win.setLayout(self.dyn_win_layout)
-        self.dyn_win.show()
-
-    def manageYesDynButton(self):
-
-        if self.dyn_tab.currentWidget().objectName() == 'custom':
-            # if self.dyn_tab.currentWidget().objectName():
-            if len(self.dyn_line_edit.toPlainText()) > 0:
-                self.dyn_yes_button.setDisabled(False)
-            else:
-                self.dyn_yes_button.setDisabled(True)
-        elif self.dyn_tab.currentWidget().objectName() == 'default':
-            if self.dyn_combo_box.currentIndex() == -1:
-                self.dyn_yes_button.setDisabled(True)
-            else:
-                self.dyn_yes_button.setDisabled(False)
-
-    def setDynamics(self):
-        # todo can optimize form
-        type_dyn = self.dyn_tab.currentWidget().objectName()
-
-        if type_dyn == 'custom':
-            dyn = self.dyn_line_edit.toPlainText()
-            self.horizon_receiver.setDynamics(type_dyn, dyn)
-            self.dynDisplay.setText(type_dyn)
-        elif type_dyn == 'default':
-            dyn = self.dyn_combo_box.currentText()
-            self.horizon_receiver.setDynamics(type_dyn, dyn)
-            self.dynDisplay.setText(dyn)
-
-
-        self.dynDisplay.setReady(True)
-
-    def manageDynDisplay(self):
-        if not self.horizon_receiver.isDynamicsReady():
-            self.dynDisplay.clear()
-            self.dynDisplay.setReady(False)
-
-    def openTranscription(self):
-        self.trans_win = on_destroy_signal_window.DestroySignalWindow()
-
-        # create a layout for the window
-        #widget, fromRow, int fromColumn, int rowSpan, int columnSpan, Qt::Alignment alignment = Qt::Alignment()
-        self.trans_window_layout = QGridLayout()
-
-        n_row = 0
-        # populate it
-        self.label_type = QLabel("Types:")
-        self.trans_window_layout.addWidget(self.label_type, n_row, 0, 1, 1)
-
-        n_row = n_row + 1
-        self.trans_combo_box = QComboBox()
-        self.trans_combo_box.addItem('multiple_shooting')
-        self.trans_combo_box.addItem('direct_collocation')
-        self.trans_combo_box.setCurrentIndex(-1)
-        self.trans_combo_box.currentTextChanged.connect(self.editTranscriptionOptions)
-        self.trans_window_layout.addWidget(self.trans_combo_box, n_row, 0, 1, 1)
-
-        n_row = n_row + 1
-        separation_line_1 = separation_line.SeparationLine()
-        self.trans_window_layout.addWidget(separation_line_1, n_row, 0, 1, 1)
-
-        n_row = n_row + 1
-        self.label_options = QLabel("Options:")
-        self.trans_window_layout.addWidget(self.label_options, n_row, 0, 1, 1)
-
-        n_row = n_row + 1
-        self.option_widget = option_container.OptionContainer()
-        self.trans_window_layout.addWidget(self.option_widget, n_row, 0, 1, 1)
-
-        n_row = n_row + 1
-        separation_line_2 = separation_line.SeparationLine()
-        self.trans_window_layout.addWidget(separation_line_2, n_row, 0, 1, 1)
-
-        widget_dialog = QWidget()
-        widget_dialog_layout = QHBoxLayout(widget_dialog)
-        self.trans_no_button = QPushButton('Cancel')
-        self.trans_yes_button = QPushButton('Create')
-        self.trans_yes_button.setDisabled(True)
-
-        widget_dialog_layout.addWidget(self.trans_no_button)
-        widget_dialog_layout.addWidget(self.trans_yes_button)
-
-
-        self.trans_window_layout.addWidget(widget_dialog)
-
-        self.trans_no_button.clicked.connect(self.trans_win.close)
-        self.trans_yes_button.clicked.connect(self.setTranscriptionMethod)
-        self.trans_yes_button.clicked.connect(self.trans_win.close)
-        # palette = QPalette()
-        # palette.setColor(QPalette.Text, Qt.black)
-        # self.display_name.setPalette(palette)
-
-        self.trans_win.setLayout(self.trans_window_layout)
-        self.trans_win.show()
-
-    def editTranscriptionOptions(self, type):
-        # clear widget
-        self.trans_yes_button.setDisabled(False)
-
-        if type == 'multiple_shooting':
-            # todo optimize
-            integrator_combo_box = QComboBox()
-            integrator_combo_box.addItem('EULER')
-            integrator_combo_box.addItem('RK2')
-            integrator_combo_box.addItem('RK4')
-            integrator_combo_box.addItem('LEAPFROG')
-            self.option_widget.addOption('Integrator', integrator_combo_box, integrator_combo_box.currentText)
-
-        elif type == 'direct_collocation':
-            degree_spin_box = QSpinBox()
-            degree_spin_box.setValue(3)
-            self.option_widget.addOption('Degree', degree_spin_box, degree_spin_box.value)
-
-    def setTranscriptionMethod(self):
-        type = self.trans_combo_box.currentText()
-        self.transcriptionDisplay.setText(type)
-        opts = self.option_widget.getOptions()
-        self.horizon_receiver.setTranscriptionMethod(type, opts)
-
-        self.transcriptionDisplay.setReady(True)
-
-    def updateTranscriptionMethod(self):
-        if self.horizon_receiver.isTranscriptionReady():
-            self.setTranscriptionMethod()
-
     # GUI
     def setFunEditor(self, parent):
         font = QFont()
@@ -699,77 +418,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.funInput.setCompleter(self.completer)
 
     # GUI
-    def addStateVariableToGUI(self, sv_name):
-
-        self._addRowToSVTable(sv_name)
-        # add variable to highlighter and to completer
-        self.highlighter.addKeyword(sv_name)
-        self.fun_keywords.append('{}'.format(sv_name))
-        model = self.completer.model()
-        model.setStringList(self.fun_keywords)
-
-    def generateVariable(self, var_type, nodes=None):
-
-        default_dim = 1
-        default_past_node = 0
-
-        var_name = self.varNameInput.text()
-        var_dim = self.varDimInput.value()
-        var_offset = self.varOffsetInput.value()
-
-        flag, signal = self.horizon_receiver.createVariable(var_type, var_name, var_dim, var_offset, nodes)
-
-        if flag:
-
-            self.addStateVariableToGUI(var_name)
-            self.varNameInput.clear()
-            self.varDimInput.setValue(default_dim)
-            self.varOffsetInput.setValue(default_past_node)
-
-            self.logger.info(signal)
-            self.on_generic_sig(signal)
-            # todo here is it ok?
-            self.ledCreate.setReady(False)
-            self.ledSolve.setReady(False)
-
-        else:
-            self.varNameInput.setFocus()
-            self.logger.warning('main_interface {}'.format(signal))
-            self.on_generic_sig(signal)
-
-    def openCustomVarOptions(self):
-
-        self.box = QWidget()
-        layout_box = QVBoxLayout(self.box)
-
-        options = dict()
-        options['background_color'] = Qt.darkCyan
-        options['slice_color'] = Qt.darkMagenta
-        options['minmax_color'] = Qt.darkRed
-        options['ticks_color'] = Qt.darkGreen
-        node_selector = multi_slider.QMultiSlider(slider_range=[0, self.nodes, 1], options=options, number_bar=True)
-        layout_box.addWidget(node_selector)
-
-        widget_dialog = QWidget()
-        widget_dialog_layout = QHBoxLayout(widget_dialog)
-        no_button = QPushButton('Cancel')
-        yes_button = QPushButton('Create')
 
 
-        widget_dialog_layout.addWidget(no_button)
-        widget_dialog_layout.addWidget(yes_button)
-
-        layout_box.addWidget(widget_dialog)
-
-        no_button.clicked.connect(self.box.close)
-        yes_button.clicked.connect(partial(self.assembleCustomVar, node_selector))
-        yes_button.clicked.connect(self.box.close)
-        self.box.show()
-
-    def assembleCustomVar(self, node_selector):
-
-        nodes = node_selector.getRanges()
-        self.generateVariable('Custom', nodes)
 
     # GUI
     def _connectActions(self):
@@ -778,34 +428,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         # self.SVAddButton.clicked.connect(self.generateStateVariable)
 
     # GUI
-    def _addRowToSVTable(self, name):
 
-        row_pos = self.varTable.rowCount()
-        self.varTable.insertRow(row_pos)
-
-        self.varTable.setItem(row_pos, 0, QTableWidgetItem(name))
-        self.varTable.setItem(row_pos, 1, QTableWidgetItem(str(self.horizon_receiver.getVar(name)['dim'])))
-
-        item_type = QTableWidgetItem(str(self.horizon_receiver.getVar(name)['type']))
-        item_type.setTextAlignment(Qt.AlignCenter)
-        self.varTable.setItem(row_pos, 2, item_type)
-
-
-        # self.SVTable.setCellWidget(row_pos, 2, scroll)
-
-    # def normalOutputWritten(self, text):
-    #
-    #     cursor = self.codeStream.textCursor()
-    #     cursor.movePosition(QTextCursor.End)
-    #     cursor.insertText(text)
-    #     self.codeStream.setTextCursor(cursor)
-    #     self.codeStream.ensureCursorVisible()
-    #
-    # def closeEvent(self, event):
-    #     """Shuts down application on close."""
-    #     # Return stdout to defaults.
-    #     sys.stdout = sys.__stdout__
-    #     super().closeEvent(event)
 
     def __del__(self):
         # Restore sys.stdout

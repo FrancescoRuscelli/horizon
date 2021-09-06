@@ -1,14 +1,13 @@
 from horizon import problem as horizon
 from horizon.solvers import Solver
-from horizon_gui.gui.dynamics_handler import DynamicsHandler
+from horizon_gui.gui.dynamics_module.dynamics_handler import DynamicsHandler
 from horizon_gui.gui.txt_to_fun import TxtToFun
 from horizon.transcriptions.transcriptor import Transcriptor
 import parser
 import re
 import casadi as cs
-import math
 import pickle
-from logging import INFO, DEBUG
+from logging import DEBUG
 from horizon.utils import plotter as plt
 
 class horizonImpl():
@@ -17,7 +16,7 @@ class horizonImpl():
         # #todo logger! use it everywhere!
         self.logger = logger
 
-        self.nodes = nodes
+        self.nodes = nodes # this is without the last node!!!
         self.casadi_prb = horizon.Problem(self.nodes, logging_level=DEBUG)
 
         self.sv_dict = dict()  # state variables
@@ -131,8 +130,17 @@ class horizonImpl():
 
         return True, 'Function "{}" successfully removed.'.format(name)
 
-    def removeStateVariable(self, data):
-        print('"removeStateVariable" yet to implement. Data: {}'.format(data))
+    def removeStateVariable(self, name):
+        try:
+            self.casadi_prb.removeVariable(name)
+            del self.sv_dict[name]
+            if self.logger:
+                self.logger.info(f'Variable "{name}" successfully removed.')
+            return True
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f'Failed to remove variable "{name}": {e}')
+            return False
 
     def checkActiveFunction(self, name):
 
@@ -223,7 +231,6 @@ class horizonImpl():
             if cs.depends_on(fun, var["var"]):
                 used_variables.append(var["var"])
 
-
         return fun, used_variables
 
     def editFunction(self, name, str_fun):
@@ -258,11 +265,17 @@ class horizonImpl():
     def updateFunctionUpperBounds(self, name, ub, nodes):
         self.fun_dict[name]['active'].setUpperBounds(ub, nodes)
 
-    def updateFunctionLowerBounds(self, name, ub, nodes):
-        self.fun_dict[name]['active'].setLowerBounds(ub, nodes)
+    def updateFunctionLowerBounds(self, name, lb, nodes):
+        self.fun_dict[name]['active'].setLowerBounds(lb, nodes)
 
     def updateFunctionBounds(self, name, lb, ub, nodes):
         self.fun_dict[name]['active'].setBounds(lb, ub, nodes)
+
+    def updateVarLb(self, name, lb, nodes):
+        self.sv_dict[name]['var'].setLowerBounds(lb, nodes)
+
+    def updateVarUb(self, name, ub, nodes):
+        self.sv_dict[name]['var'].setUpperBounds(ub, nodes)
 
     def getFunctionDict(self):
         return self.fun_dict

@@ -46,7 +46,9 @@ class OptionContainer(QWidget):
 
             return val
 
-
+    def clear(self):
+        for i in reversed(range(self.layout.count())):
+            self.layout.itemAt(i).widget().setParent(None)
 if __name__ == '__main__':
 
     app = QApplication(sys.argv)

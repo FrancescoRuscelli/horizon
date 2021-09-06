@@ -35,7 +35,7 @@ class FunctionTabWidget(QTabWidget):
     def addFunctionToGUI(self, fun_name, dim, disabled_nodes, initial_bounds):
         self.ft = FunctionLine(fun_name, self.n_nodes, disabled_nodes, options=self.options)
         self.ft.nodesChanged.connect(self.on_fun_nodes_changed)
-        print(disabled_nodes)
+
         # todo hardcoded bottom margin
         self.intab_layout = QVBoxLayout()
         self.intab_layout.setSpacing(0)

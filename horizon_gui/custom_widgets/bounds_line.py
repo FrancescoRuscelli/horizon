@@ -24,14 +24,15 @@ class BoundsLine(QWidget):
     def __init__(self, name, nodes=0, dim=1, disabled_nodes=None, initial_bounds=None, parent=None):
         super().__init__(parent)
 
+        enabled_nodes = [node for node in range(nodes) if node not in disabled_nodes]
         self.name = name
 
-        if initial_bounds is None:
-            self.lb = np.matrix(np.ones((dim, nodes)) * 0.)
-            self.ub = np.matrix(np.ones((dim, nodes)) * 0.)
-        else:
-            self.lb = initial_bounds[0]
-            self.ub = initial_bounds[1]
+        self.lb = np.matrix(np.ones((dim, nodes)) * 0.)
+        self.ub = np.matrix(np.ones((dim, nodes)) * 0.)
+
+        if initial_bounds:
+            self.lb[:, enabled_nodes] = initial_bounds[0]
+            self.ub[:, enabled_nodes] = initial_bounds[1]
 
         self.min_color_base = "MediumSeaGreen"
         self.min_color_selected = "Crimson"

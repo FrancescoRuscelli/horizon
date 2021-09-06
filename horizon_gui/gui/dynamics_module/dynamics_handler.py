@@ -1,6 +1,7 @@
 from horizon.problem import Problem
 from horizon.utils import utils
 from logging import Logger
+
 class DynamicsHandler:
     def __init__(self, prob: Problem, logger: Logger):
 
