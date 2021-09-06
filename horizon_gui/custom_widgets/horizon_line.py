@@ -138,9 +138,6 @@ class HorizonLine(QScrollArea):
     def setHorizonNodes(self, nodes):
         # update nodes
         self.n_nodes = nodes
-        # update nodes in horizon
-        self.horizon_receiver.setHorizonNodes(nodes)
-
         # update nodes in first widget (nodes line)
         self.nodes_line.setBoxNodes(nodes)
 
@@ -191,8 +188,8 @@ class HorizonLine(QScrollArea):
     def on_repeated_fun(self, str):
         self.repeated_fun.emit(str)
 
-    def addFunctionToSingleLine(self, name, dim):
-        self.function_tab.addFunctionToGUI(name, dim)
+    def addFunctionToSingleLine(self, name, dim, initial_bounds):
+        self.function_tab.addFunctionToGUI(name, dim, initial_bounds)
         self.updateMarginsSingleLine()
 
     def addFunctionToMultiLine(self, name):
@@ -203,9 +200,10 @@ class HorizonLine(QScrollArea):
         flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
 
         dim = self.horizon_receiver.getFunction(name)['active'].getDim()[0]
+        initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
         if flag:
 
-            self.addFunctionToSingleLine(name, dim)
+            self.addFunctionToSingleLine(name, dim, initial_bounds)
             self.addFunctionToMultiLine(name)
             self.logger.info(signal)
         else:
@@ -276,13 +274,14 @@ class HorizonLine(QScrollArea):
         table_constr.setHorizontalHeaderLabels(['Name', 'Function', 'Lower Bounds', 'Upper Bounds'])
         info_box_layout.addWidget(table_constr, 1, 1)
 
-        for name, item in cnstrs.items():
-            rowPosition = table_constr.rowCount()
-            table_constr.insertRow(rowPosition)
-            table_constr.setItem(rowPosition, 0, QTableWidgetItem(name))
-            table_constr.setItem(rowPosition, 1, QTableWidgetItem((str(item['val']))))
-            table_constr.setItem(rowPosition, 2, QTableWidgetItem((str(item['lb']))))
-            table_constr.setItem(rowPosition, 3, QTableWidgetItem((str(item['ub']))))
+        if cnstrs is not None:
+            for name, item in cnstrs.items():
+                rowPosition = table_constr.rowCount()
+                table_constr.insertRow(rowPosition)
+                table_constr.setItem(rowPosition, 0, QTableWidgetItem(name))
+                table_constr.setItem(rowPosition, 1, QTableWidgetItem((str(item['val']))))
+                table_constr.setItem(rowPosition, 2, QTableWidgetItem((str(item['lb']))))
+                table_constr.setItem(rowPosition, 3, QTableWidgetItem((str(item['ub']))))
 
         table_constr.resizeColumnsToContents()
 
@@ -296,10 +295,11 @@ class HorizonLine(QScrollArea):
         table_costfun.setHorizontalHeaderLabels(['Name', 'Function'])
         info_box_layout.addWidget(table_costfun, 2, 1)
 
-        for name, item in costfuns.items():
-            rowPosition = table_costfun.rowCount()
-            table_costfun.insertRow(rowPosition)
-            table_costfun.setItem(rowPosition, 0, QTableWidgetItem(name))
-            table_costfun.setItem(rowPosition, 1, QTableWidgetItem((str(item))))
+        if cnstrs is not None:
+            for name, item in costfuns.items():
+                rowPosition = table_costfun.rowCount()
+                table_costfun.insertRow(rowPosition)
+                table_costfun.setItem(rowPosition, 0, QTableWidgetItem(name))
+                table_costfun.setItem(rowPosition, 1, QTableWidgetItem((str(item))))
 
         table_costfun.resizeColumnsToContents()

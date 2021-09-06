@@ -32,7 +32,7 @@ class FunctionTabWidget(QTabWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)
 
 
-    def addFunctionToGUI(self, fun_name, dim):
+    def addFunctionToGUI(self, fun_name, dim, initial_bounds):
         self.ft = FunctionLine(fun_name, self.n_nodes, options=self.options)
         self.ft.nodesChanged.connect(self.on_fun_nodes_changed)
 
@@ -43,7 +43,8 @@ class FunctionTabWidget(QTabWidget):
         self.intab_layout.addWidget(self.ft)
         # self.intab_layout.addSpacing(120)
         if self.bounds_flag:
-            self.bl = BoundsLine(fun_name, self.n_nodes, dim)
+            # todo adding initial value?
+            self.bl = BoundsLine(fun_name, self.n_nodes, dim, initial_bounds)
             self.bl.lbChanged.connect(partial(self.on_fun_lb_changed, fun_name))
             self.bl.ubChanged.connect(partial(self.on_fun_ub_changed, fun_name))
 

@@ -1,16 +1,24 @@
 #!/usr/bin/env python
 
-import casadi_kin_dyn.pycasadi_kin_dyn as cas_kin_dyn
+from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
-import logging
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
-from horizon.ros.replay_trajectory import *
+from horizon.utils import utils, casadi_kin_dyn
+from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.utils.plotter import PlotterHorizon
 import matplotlib.pyplot as plt
+import os
+
+try:
+    from horizon.ros.replay_trajectory import *
+    do_replay = True
+except ImportError:
+    do_replay = False
 
 # Loading URDF model in pinocchio
-urdf = rospy.get_param('robot_description')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
+urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
 nq = kindyn.nq()
@@ -20,10 +28,13 @@ print("nq: ", nq)
 print("nv: ", nv)
 
 # OPTIMIZATION PARAMETERS
+tf = 5.0  # [s]
 ns = 100  # number of shooting nodes
+dt = tf/ns
+use_ms = True
 
 # Create horizon problem
-prb = problem.Problem(ns, logging_level=logging.DEBUG)
+prb = problem.Problem(ns)
 
 # Creates problem STATE variables
 q = prb.createStateVariable("q", nq)
@@ -34,18 +45,7 @@ qddot = prb.createInputVariable("qddot", nv)
 
 # Creates double integrator
 x, xdot = utils.double_integrator(q, qdot, qddot)
-
-q_prev = prb.createStateVariable("q", nq, -1)
-qdot_prev = prb.createStateVariable("qdot", nv, -1)
-qddot_prev = prb.createInputVariable("qddot", nv, -1)
-x_prev, _ = utils.double_integrator(q_prev, qdot_prev, qddot_prev)
-
-# Formulate discrete time dynamics
-tf = 5.0  # [s]
-L = 0.5*cs.dot(qdot, qdot)  # Objective term
-dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
-opts = {'tf': tf/ns}
-F_integrator = integrators.RK4(dae, opts, "SX")
+prb.setDynamics(xdot)
 
 # Limits
 q_min = [-0.5, -2.*np.pi]
@@ -69,25 +69,26 @@ qdot.setInitialGuess(qdot_init)
 qddot.setInitialGuess(qddot_init)
 
 # Cost function
-l = F_integrator(x0=x, p=qddot)
-prb.createCostFunction("qddot", cs.dot(qddot, qddot), nodes=0)
-prb.createCostFunction("L", l["qf"], nodes=list(range(0, ns)))
+prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
-# Constraints
-x_int = F_integrator(x0=x_prev, p=qddot_prev)
-prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
-prb.createConstraint("up", q[1] - np.pi, nodes=ns, bounds=dict(lb = [0], ub = [0]))
-prb.createConstraint("final_qdot", qdot - np.array([0., 0.]), nodes=ns, bounds=dict(lb = np.zeros(2).tolist(), ub = np.zeros(2).tolist()))
+# Dynamics
+th = TranscriptionsHandler(prb, dt)
+if use_ms:
+    th.setDefaultIntegrator(type='EULER')
+    th.setMultipleShooting()
+else:
+    th.setDirectCollocation()
+
+prb.createFinalConstraint("up", q[1] - np.pi)
+prb.createFinalConstraint("final_qdot", qdot)
 
 
 tau_lims = np.array([1000., 0.])
 tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=(-tau_lims).tolist(), ub=tau_lims.tolist()))
+prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
-opts = {"nlpsol.ipopt":True}
-prb.createProblem(opts)
-
+prb.createProblem(opts = {'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
 solution = prb.solveProblem()
 q_hist = solution["q"]
 
@@ -100,8 +101,16 @@ plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[m]}$', size = 20)
 plt.show()
 
-joint_list=["cart_joint", "pole_joint"]
-replay_trajectory(tf/ns, joint_list, q_hist).replay(is_floating_base=False)
+plot_all = True
+if plot_all:
+    hplt = PlotterHorizon(prb)
+    hplt.plotVariables()
+    hplt.plotFunctions()
+    plt.show()
+
+if do_replay:
+    joint_list=["cart_joint", "pole_joint"]
+    replay_trajectory(tf/ns, joint_list, q_hist).replay(is_floating_base=False)
 
 
 
