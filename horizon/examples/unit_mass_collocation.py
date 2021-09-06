@@ -2,10 +2,9 @@
 
 import horizon.problem as prb
 import horizon.utils.plotter as plotter
-import casadi as cs 
-import numpy as np
-from horizon.utils.integrators import make_direct_collocation
-import horizon.utils.transcription_methods as transmet
+import casadi as cs
+from horizon.transcriptions.transcriptor import Transcriptor
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
 
 def make_integrator(x, xdot, u, l, dt):
@@ -33,13 +32,16 @@ if use_transcription_methods:
 
 
     xdot = cs.vertcat(v, F)
+    prob.setDynamics(xdot)
     l = cs.sumsqr(F)  # useless
 
-    th = transmet.TranscriptionsHandler(prob, dt)
-    my_integrator = make_integrator(x, xdot, F, l, dt)
+    use_ms = True
+    if use_ms:  # multiple shooting
+        my_integrator = make_integrator(x, xdot, F, l, dt)
+        th = Transcriptor.make_method('multiple_shooting', prob, dt, opts=dict(integrator=my_integrator))
+    else:
+        th = Transcriptor.make_method('direct_collocation', prob, dt)
 
-    th.setIntegrator(my_integrator)
-    th.setMultipleShooting()
 
 else:
 
@@ -50,14 +52,13 @@ else:
     x = cs.vertcat(p, v)
     x_prev = cs.vertcat(p_prev, v_prev)
     xdot = cs.vertcat(v, F)
+    prob.setDynamics(xdot)
     l = cs.sumsqr(F)  # useless
 
-    use_ms = False
-    if use_ms:  # multiple shooting
-        my_integrator = make_integrator(x, xdot, F, l, dt)
-        ms = prob.createConstraint('ms', my_integrator(x_prev, F_prev)[0] - x, nodes=range(1, N+1))
-    else:  # collocation
-        make_direct_collocation(prob=prob, x=x, x_prev=x_prev, xdot=xdot, degree=3, dt=dt)
+
+    my_integrator = make_integrator(x, xdot, F, l, dt)
+    ms = prob.createConstraint('ms', my_integrator(x_prev, F_prev)[0] - x, nodes=range(1, N+1))
+
 
 # set initial state (rest in zero)
 p.setBounds(lb=0, ub=0, nodes=0)
@@ -71,13 +72,16 @@ v.setBounds(lb=0, ub=0, nodes=N)
 prob.createCostFunction('cost', cs.sumsqr(F), nodes=range(N))  # TODO: intermediate vs final cost
 
 # solve
-prob.createProblem(opts={'ipopt.max_iter': 10})
-solution = prob.solveProblem()
+opts={'ipopt.max_iter': 10}
+solver = solver.Solver.make_solver('ipopt', prob, dt, opts)
+solver.solve()
+
+solution = solver.getSolutionDict()
 
 # plot
 plot_all = True
 if plot_all:
-    hplt = plotter.PlotterHorizon(prob)
+    hplt = plotter.PlotterHorizon(prob, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
     plt.show()

@@ -35,7 +35,7 @@ class MultiFunctionBox(QScrollArea):
     def getNFunctions(self):
         return len(self.fun_list)
 
-    def addFunctionToGUI(self, fun_name):
+    def addFunctionToGUI(self, fun_name, disabled_nodes):
 
         # removing the QSpacerItem, if present, before adding a new multiline widget
         for i in range(self.main_layout.count()):
@@ -57,7 +57,7 @@ class MultiFunctionBox(QScrollArea):
         self.close_buttons[fun_name].setIcon(self.style().standardIcon(QStyle.SP_MessageBoxCritical))  # icon
         self.close_buttons[fun_name].setStyleSheet('background-color: blue;')
 
-        self.fun_list[fun_name] = FunctionLine(fun_name, self.n_nodes, options=self.options)
+        self.fun_list[fun_name] = FunctionLine(fun_name, self.n_nodes, disabled_nodes, options=self.options)
         self.fun_list[fun_name].nodesChanged.connect(self.emitFunctionNodes)
         self.fun_list[fun_name].setStyleSheet('background-color: red;')
 
@@ -110,6 +110,14 @@ class MultiFunctionBox(QScrollArea):
     def updateMargins(self, margins):
         for i in range(self.main_layout.count()):
             self.main_layout.setContentsMargins(margins)
+
+    def getFunctionNames(self):
+        return [name for name in self.fun_list.keys()]
+
+    def setFunctionDisabledNodes(self, fun_name, ranges):
+        for widget_fl in self.findChildren(FunctionLine):
+            if widget_fl.getName() == fun_name:
+                widget_fl.setDisabledNodes(ranges)
 
     # def get_index(self, pos):
     #     for i in range(self.main_layout.count()):

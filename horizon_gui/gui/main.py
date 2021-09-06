@@ -79,7 +79,7 @@ class HorizonGUI(QMainWindow):
     def createSetup(self):
 
         self.setup_opt = dict()
-        self.setup_opt['nodes'] = 0 # todo make it 0
+        self.setup_opt['nodes'] = 1 # one state + final state
 
     def setNodes(self, nodes):
         self.setup_opt['nodes'] = nodes
@@ -293,7 +293,7 @@ class HorizonGUI(QMainWindow):
         nodes_input_label = QLabel("Number of nodes:")
         # state_variables_label = QLabel("Add state variable:")
         nodes_input = QSpinBox()
-        nodes_input.setRange(0, 999)
+        nodes_input.setRange(1, 999)
         nodes_input.setValue(self.setup_opt['nodes'])
         # state_variables = QLineEdit()
         # state_variables_button = QPushButton("Add")

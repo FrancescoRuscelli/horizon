@@ -1,3 +1,4 @@
+import numpy as np
 from PyQt5.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QScrollArea, QTableWidget, \
     QLabel, QTableWidgetItem, QGridLayout, QAbstractScrollArea, QSizePolicy, QHeaderView, QLayout
 
@@ -9,7 +10,7 @@ from horizon_gui.custom_widgets.function_tab import FunctionTabWidget
 from horizon_gui.custom_widgets.multi_function_box import MultiFunctionBox
 
 from horizon_gui.custom_widgets.on_destroy_signal_window import DestroySignalWindow
-from horizon.misc_function import listOfListFLOATtoINT, unravelElements
+from horizon.misc_function import listOfListFLOATtoINT, unravelElements, ravelElements
 from functools import partial
 import os
 
@@ -32,7 +33,7 @@ class HorizonLine(QScrollArea):
     bounds_changed = pyqtSignal()
     function_nodes_changed = pyqtSignal()
 
-    def __init__(self, horizon, fun_type, nodes=0, logger=None, parent=None):
+    def __init__(self, horizon, fun_type, nodes=1, logger=None, parent=None):
         super().__init__(parent)
 
         self.setAcceptDrops(True)
@@ -45,7 +46,7 @@ class HorizonLine(QScrollArea):
         self.fun_type = fun_type  # can be Constraint or Cost Function
         if fun_type == 'costfunction':
             self.bounds_flag = False
-        self.n_nodes = nodes
+        self.n_nodes = nodes + 1 # to account for final node
 
         if logger:
             self.logger = logger
@@ -143,13 +144,38 @@ class HorizonLine(QScrollArea):
 
         # update nodes in second widget (function line) + set margins
         self.function_tab.setHorizonNodes(nodes)
+
+        # mechanics to update disabled nodes when nodes of problem are changed.
+        # for example, for a function with an input variable, always and only the last node is disabled.
+        for i in range(self.function_tab.count()):
+            fun_name = self.function_tab.tabText(i)
+            used_vars = self.horizon_receiver.getFunction(fun_name)['used_vars']
+            disabled_nodes = self._getDisableNodes(used_vars)
+            self.function_tab.setFunctionDisabledNodes(fun_name, disabled_nodes)
+
         if self.function_tab.count():
             self.updateMarginsSingleLine()
 
         # update nodes in multi_function window widget
         self.multi_function_box.setHorizonNodes(nodes)
+
+        for fun_name in self.multi_function_box.getFunctionNames():
+            used_vars = self.horizon_receiver.getFunction(fun_name)['used_vars']
+            disabled_nodes = self._getDisableNodes(used_vars)
+            self.multi_function_box.setFunctionDisabledNodes(fun_name, disabled_nodes)
+
         if self.multi_function_box.getNFunctions():
             self.updateMarginsMultiLine()
+
+    def _getDisableNodes(self, used_vars):
+        available_nodes = set(range(self.n_nodes))
+        for var in used_vars:
+            if not var.getNodes() == [-1]:
+                available_nodes.intersection_update(var.getNodes())
+
+        disabled_nodes = [node for node in range(self.n_nodes) if node not in available_nodes]
+        disabled_nodes = ravelElements(disabled_nodes)
+        return disabled_nodes
 
     def updateMarginsSingleLine(self):
         node_box_width = self.nodes_line.getBoxWidth()
@@ -161,7 +187,6 @@ class HorizonLine(QScrollArea):
         margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
         self.multi_function_box.updateMargins(margins)
 
-    #
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
         # items = source_Widget.selectedItems()
@@ -180,6 +205,7 @@ class HorizonLine(QScrollArea):
         source_item = QStandardItemModel()
         source_item.dropMimeData(event.mimeData(), Qt.CopyAction, 0, 0, QModelIndex())
         fun_name = source_item.item(0, 0).text()
+
         # fun = source_item.item(0, 0).data(Qt.UserRole)
         self.active_fun_horizon.emit()
         self.addFunctionToHorizon(fun_name)
@@ -188,28 +214,45 @@ class HorizonLine(QScrollArea):
     def on_repeated_fun(self, str):
         self.repeated_fun.emit(str)
 
-    def addFunctionToSingleLine(self, name, dim, initial_bounds):
-        self.function_tab.addFunctionToGUI(name, dim, initial_bounds)
+    def addFunctionToSingleLine(self, name, dim, disabled_nodes, initial_bounds):
+        self.function_tab.addFunctionToGUI(name, dim, disabled_nodes, initial_bounds)
         self.updateMarginsSingleLine()
 
-    def addFunctionToMultiLine(self, name):
-        self.multi_function_box.addFunctionToGUI(name)
+    def addFunctionToMultiLine(self, name, disabled_nodes):
+        self.multi_function_box.addFunctionToGUI(name, disabled_nodes)
         self.updateMarginsMultiLine()
 
     def addFunctionToHorizon(self, name):
-        flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type)
 
-        dim = self.horizon_receiver.getFunction(name)['active'].getDim()[0]
+        # getting used_vars from function not yet activated
+        # and compute all the available nodes based on the type of variable (if input, tha last node is not available, and so on...)
+        used_vars = self.horizon_receiver.getFunction(name)['used_vars']
+        available_nodes = set(range(self.n_nodes))
+        for var in used_vars:
+            if not var.getNodes() == [-1]:  # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
+                available_nodes.intersection_update(var.getNodes())
+
+        disabled_nodes = [node for node in range(self.n_nodes) if node not in available_nodes]
+        disabled_nodes = ravelElements(disabled_nodes)
+
+
+        # activate the function using only the available nodes
+        flag, signal = self.horizon_receiver.activateFunction(name, self.fun_type, available_nodes)
+
+        # get dimension and bounds from the activated function to set them in gui
+        dim = self.horizon_receiver.getFunction(name)['active'].getDim()
         initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
-        if flag:
 
-            self.addFunctionToSingleLine(name, dim, initial_bounds)
-            self.addFunctionToMultiLine(name)
+        lb_matrix = np.reshape(initial_bounds[0], (dim, len(available_nodes)), order='F')
+        ub_matrix = np.reshape(initial_bounds[1], (dim, len(available_nodes)), order='F')
+
+        if flag:
+            self.addFunctionToSingleLine(name, dim, disabled_nodes, [lb_matrix, ub_matrix])
+            self.addFunctionToMultiLine(name, disabled_nodes)
             self.logger.info(signal)
         else:
             self.logger.warning(signal)
 
-    #
     # def removeFunctionFromHorizon(self, name):
     #     flag, signal = self.horizon_receiver.removeActiveFunction(name)
 

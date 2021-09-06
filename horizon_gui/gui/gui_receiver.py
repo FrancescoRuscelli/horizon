@@ -1,10 +1,13 @@
 from horizon import problem as horizon
+from horizon.solvers import Solver
+from horizon_gui.gui.dynamics_module.dynamics_handler import DynamicsHandler
+from horizon_gui.gui.txt_to_fun import TxtToFun
+from horizon.transcriptions.transcriptor import Transcriptor
 import parser
 import re
 import casadi as cs
-import math
 import pickle
-from logging import INFO, DEBUG
+from logging import DEBUG
 from horizon.utils import plotter as plt
 
 class horizonImpl():
@@ -13,7 +16,7 @@ class horizonImpl():
         # #todo logger! use it everywhere!
         self.logger = logger
 
-        self.nodes = nodes
+        self.nodes = nodes # this is without the last node!!!
         self.casadi_prb = horizon.Problem(self.nodes, logging_level=DEBUG)
 
         self.sv_dict = dict()  # state variables
@@ -21,15 +24,27 @@ class horizonImpl():
 
         self.plt = plt.PlotterHorizon(self.casadi_prb)
         # self.active_fun_list = list()
+        self.solver = None
+
+        # todo hack!
+        self.dt = 0.01
+
+        # list of dynamics that can be defined
+        self.txt_to_fun_converter = TxtToFun(self.sv_dict, self.fun_dict, self.logger)
+        self.dyn_han = DynamicsHandler(self.casadi_prb, self.logger)
+
+        self.transcription_flag = False
+        self.dynamics_flag = False
+
 
     def _setVarGenerator(self, var_type):
-        if var_type == 'state_var':
+        if var_type == 'State':
             return self.casadi_prb.createStateVariable
-        if var_type == 'input_var':
+        if var_type == 'Input':
             return self.casadi_prb.createInputVariable
-        if var_type == 'single_var':
+        if var_type == 'Single':
             return self.casadi_prb.createSingleVariable
-        if var_type == 'custom_var':
+        if var_type == 'Custom':
             return self.casadi_prb.createVariable
 
     def createVariable(self, var_type, name, dim, offset, nodes=None):
@@ -39,18 +54,23 @@ class horizonImpl():
         if flag:
 
             if offset == 0:
-                if var_type == 'state_var':
+                if var_type == 'State':
+
+                    if self.dynamics_flag:
+                        self.casadi_prb.resetDynamics()
+                        self.dynamics_flag = False
+                        self.logger.warning('system dynamics has been resetted due to the adding of a new state variable')
                     var = self.casadi_prb.createStateVariable(name, dim)
-                if var_type == 'input_var':
+                if var_type == 'Input':
                     var = self.casadi_prb.createInputVariable(name, dim)
-                if var_type == 'single_var':
+                if var_type == 'Single':
                     var = self.casadi_prb.createSingleVariable(name, dim)
-                if var_type == 'custom_var':
+                if var_type == 'Custom':
                     var = self.casadi_prb.createVariable(name, dim, nodes)
             else:
                 raise Exception('TBD prev/next state variables')
 
-            self.sv_dict[name] = dict(var=var, dim=dim)
+            self.sv_dict[name] = dict(var=var, dim=dim, type=var_type)
 
             return True, signal + f'. Type: {type(var)}'
         else:
@@ -72,20 +92,14 @@ class horizonImpl():
         else:
             return False, signal
 
-    def activateFunction(self, name, fun_type):
+    def activateFunction(self, name, fun_type, nodes):
 
         flag, signal = self.checkActiveFunction(name)
-
-        active_nodes = None
-        for var in self.fun_dict[name]['used_vars']:
-            print(var.getNodes())
-
 
         if flag:
             if fun_type == 'constraint':
                 try:
-                    # self.logger.info('Adding function: {}'.format(self.fun_dict[name]))
-                    active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'])
+                    active_fun = self.casadi_prb.createConstraint(name, self.fun_dict[name]['fun'], nodes=nodes)
                     # self.active_fun_list.append(active_fun)
                     self.fun_dict[name].update({'active': active_fun})
                 except Exception as e:
@@ -93,7 +107,7 @@ class horizonImpl():
 
             elif fun_type == 'costfunction':
                 try:
-                    active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'])
+                    active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'], nodes=nodes)
                     self.fun_dict[name].update({'active': active_fun})
                 except Exception as e:
                     return False, e
@@ -116,8 +130,17 @@ class horizonImpl():
 
         return True, 'Function "{}" successfully removed.'.format(name)
 
-    def removeStateVariable(self, data):
-        print('"removeStateVariable" yet to implement. Data: {}'.format(data))
+    def removeStateVariable(self, name):
+        try:
+            self.casadi_prb.removeVariable(name)
+            del self.sv_dict[name]
+            if self.logger:
+                self.logger.info(f'Variable "{name}" successfully removed.')
+            return True
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f'Failed to remove variable "{name}": {e}')
+            return False
 
     def checkActiveFunction(self, name):
 
@@ -208,7 +231,6 @@ class horizonImpl():
             if cs.depends_on(fun, var["var"]):
                 used_variables.append(var["var"])
 
-
         return fun, used_variables
 
     def editFunction(self, name, str_fun):
@@ -224,18 +246,36 @@ class horizonImpl():
             signal = 'Failed editing of function "{}".'.format(name)
             return False, signal
 
+    def setTranscriptionMethod(self, type, opts):
+        try:
+            # remove old transcription methods if present
+            trans_cnsrt = ['multiple_shooting', 'direct_collocation']
+            for cnsrt in trans_cnsrt:
+                if self.casadi_prb.getConstraints(cnsrt):
+                    self.casadi_prb.removeConstraint(cnsrt)
+
+            Transcriptor.make_method(type, self.casadi_prb, self.dt, opts=opts)
+            self.transcription_flag = True
+        except Exception as e:
+            self.logger.warning('gui_receiver.py, setTranscriptionMethod: {}'.format(e))
+
     def updateFunctionNodes(self, name, nodes):
-        print(nodes)
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
 
     def updateFunctionUpperBounds(self, name, ub, nodes):
         self.fun_dict[name]['active'].setUpperBounds(ub, nodes)
 
-    def updateFunctionLowerBounds(self, name, ub, nodes):
-        self.fun_dict[name]['active'].setLowerBounds(ub, nodes)
+    def updateFunctionLowerBounds(self, name, lb, nodes):
+        self.fun_dict[name]['active'].setLowerBounds(lb, nodes)
 
     def updateFunctionBounds(self, name, lb, ub, nodes):
         self.fun_dict[name]['active'].setBounds(lb, ub, nodes)
+
+    def updateVarLb(self, name, lb, nodes):
+        self.sv_dict[name]['var'].setLowerBounds(lb, nodes)
+
+    def updateVarUb(self, name, ub, nodes):
+        self.sv_dict[name]['var'].setUpperBounds(ub, nodes)
 
     def getFunctionDict(self):
         return self.fun_dict
@@ -249,7 +289,6 @@ class horizonImpl():
         return self.sv_dict
 
     def getVar(self, elem):
-
         return self.sv_dict[elem]
 
     def getNodes(self):
@@ -259,9 +298,27 @@ class horizonImpl():
         self.nodes = n_nodes
         self.casadi_prb.setNNodes(self.nodes)
 
+    def setDynamics(self, type, dyn):
+        if type == 'default':
+            self.dyn_han.set_default_dynamics(dyn)
+            self.dynamics_flag = True
+        elif type == 'custom':
+            dyn, used_vars = self.txt_to_fun_converter.convert(dyn)
+            self.dyn_han.set_custom_dynamics(dyn)
+            self.dynamics_flag = True
+
+    def isDynamicsReady(self):
+        return self.dynamics_flag
+
+    def isTranscriptionReady(self):
+        return self.transcription_flag
+
+    def getDefaultDynList(self):
+        return self.dyn_han.getList()
+
     def _createAndAppendFun(self, name, str_fun):
 
-        fun, used_vars = self.fromTxtToFun(str_fun)
+        fun, used_vars = self.txt_to_fun_converter.convert(str_fun)
         # fill horizon_receiver.fun_dict and funList
 
         if fun is not None:
@@ -272,19 +329,32 @@ class horizonImpl():
 
     def generate(self):
         try:
-            self.casadi_prb.createProblem()
+            # if self.solver is None:
+            #     self.logger.warning('Solver not set. Please select a valid solver before building Horizon problem.')
+            # else:
+
+            # todo add selection to choose solver
+            self.solver = Solver.make_solver('ipopt', self.casadi_prb, self.dt)
+            self.logger.info('Problem created successfully!')
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
+            return False
         return True
 
     def solve(self):
         try:
-            self.casadi_prb.solveProblem()
+            if self.solver is None:
+                self.logger.warning('Solver not set. Cannot solve.')
+            else:
+                self.solver.solve()
+                self.logger.info('Problem solved succesfully!')
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
+            return False
         return True
 
     def getInfoAtNodes(self, node):
+        raise Exception('getInfoAtNodes yet to be done')
         vars = list()
         vars_dict = self.casadi_prb.scopeNodeVars(node) #lb, ub, w0
         if vars_dict is not None:
@@ -297,7 +367,9 @@ class horizonImpl():
         return vars, cnstrs, costfuns
 
     def plot(self):
+        self.plt.setSolution(self.solver.getSolutionDict())
         self.plt.plotVariables()
+        self.plt.plotFunctions()
 
     def serialize(self):
 
@@ -339,18 +411,6 @@ class horizonImpl():
         # deserialize functions
         for name, data in self.fun_dict.items():
             self.fun_dict[name]['fun'] = cs.SX.deserialize(data['fun'])
-
-    def getValidOperators(self):
-        '''
-        return dictionary:
-        keys: packages imported
-        values: all the elements from the imported package that are considered "valid"
-        '''
-
-        full_list = dict()
-        full_list['math'] = [elem for elem in dir(math) if not elem.startswith('_')]
-        full_list['cs'] = ['cs.' + elem for elem in dir(cs) if not elem.startswith('_')]
-        return full_list
 
 if __name__ == '__main__':
 

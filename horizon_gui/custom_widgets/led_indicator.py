@@ -127,7 +127,7 @@ class ExampleWindow(QWidget):
         main_layout = QGridLayout(self)
 
         self.led = LedIndicator()
-        self.led.setEnabled(False)
+        self.led.setEnabled(True)
 
 
 

@@ -4,20 +4,25 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib import gridspec
 from horizon.problem import Problem
-from horizon.state_variables import InputVariable
+from horizon.variables import InputVariable
 import math
 import numpy as np
 import casadi as cs
 
 class PlotterHorizon:
-    def __init__(self, prb: Problem, logger=None):
+    def __init__(self, prb: Problem, solution=None, logger=None):
 
+        self.solution = solution
         self.prb = prb
         self.logger = logger
+
+    def setSolution(self, solution):
+        self.solution = solution
 
     def _createPlotGrid(self, n_rows_max, n_plots, title):
 
         cols = n_plots if n_plots < n_rows_max else n_rows_max
+
         rows = int(math.ceil(n_plots / cols))
 
         gs = gridspec.GridSpec(rows, cols)
@@ -32,30 +37,33 @@ class PlotterHorizon:
             for dim in range(val.shape[0]):
                 for i in range(val.shape[1]-1):
                     if baseline:
-                        baseline, = ax.plot(range(val.shape[1])[i:i+2], [val[dim, i]] * 2, color=baseline.get_color())
+                        baseline, = ax.plot(range(val.shape[1])[i:i + 2], [val[dim, i]] * 2, color=baseline.get_color())
                     else:
                         baseline, = ax.plot(range(val.shape[1])[i:i + 2], [val[dim, i]] * 2)
 
                     lb, ub = abstract_var.getBounds()
-                    ax.plot(range(val.shape[1]), lb[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
-                    ax.plot(range(val.shape[1]), ub[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
+                    lb_mat = np.reshape(lb, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
+                    ub_mat = np.reshape(ub, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
+                    ax.plot(range(val.shape[1]), lb_mat[dim, :], marker="x", markersize=3, linestyle='dotted',linewidth=1, color=baseline.get_color())
+                    ax.plot(range(val.shape[1]), ub_mat[dim, :], marker="x", markersize=3, linestyle='dotted',linewidth=1, color=baseline.get_color())
         else:
             for dim in range(val.shape[0]):
                 baseline, = ax.plot(range(val.shape[1]), val[dim, :], marker="o", markersize=2)
-                lb, ub = abstract_var.getBounds()
-                ax.plot(range(val.shape[1]), lb[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
-                ax.plot(range(val.shape[1]), ub[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
 
+                lb, ub = abstract_var.getBounds()
+                lb_mat = np.reshape(lb, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
+                ub_mat = np.reshape(ub, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
+                ax.plot(range(val.shape[1]), lb_mat[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
+                ax.plot(range(val.shape[1]), ub_mat[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
 
     def plotVariables(self, grid=False):
 
-        sol = self.prb.getSolution()
-        if sol is None:
-            raise Exception('Problem must contain a solution.')
+        if self.solution is None:
+            raise Exception('Solution not set. Cannot plot variables.')
 
-        fig, gs = self._createPlotGrid(3, len(sol), 'Variables')
+        fig, gs = self._createPlotGrid(3, len(self.solution), 'Variables')
         i = 0
-        for key, val in sol.items():
+        for key, val in self.solution.items():
             ax = fig.add_subplot(gs[i])
             if grid:
                 ax.grid(axis='x')
@@ -74,11 +82,10 @@ class PlotterHorizon:
 
     def plotVariable(self, name, grid=False):
 
-        sol = self.prb.getSolution()
-        if sol is None:
-            raise Exception('Problem must contain a solution.')
+        if self.solution is None:
+            raise Exception('Solution not set. Cannot plot variable.')
 
-        val = sol[name]
+        val = self.solution[name]
 
         fig, ax = plt.subplots()
         if grid:
@@ -91,28 +98,28 @@ class PlotterHorizon:
 
     def plotFunctions(self, grid=False):
 
-        sol = self.prb.getSolution()
-        if sol is None:
-            raise Exception('Problem must contain a solution.')
+        if self.solution is None:
+            raise Exception('Solution not set. Cannot plot functions.')
 
-        fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
+        if self.prb.getConstraints():
+            fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
 
-        i = 0
-        for name, fun in self.prb.getConstraints().items():
-            ax = fig.add_subplot(gs[i])
-            if grid:
-                ax.grid(axis='x')
-            fun_evaluated = self.prb.evalFun(fun)
-            self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name))
+            i = 0
+            for name, fun in self.prb.getConstraints().items():
+                ax = fig.add_subplot(gs[i])
+                if grid:
+                    ax.grid(axis='x')
+                fun_evaluated = self.prb.evalFun(fun, self.solution)
+                self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name))
 
-            ax.set_title('{}'.format(name))
-            plt.xticks(list(range(fun_evaluated.shape[1])))
-            ax.ticklabel_format(useOffset=False, style='plain')
-            ax.yaxis.set_major_formatter(FormatStrFormatter('%g'))
-            i = i+1
+                ax.set_title('{}'.format(name))
+                plt.xticks(list(range(fun_evaluated.shape[1])))
+                ax.ticklabel_format(useOffset=False, style='plain')
+                ax.yaxis.set_major_formatter(FormatStrFormatter('%g'))
+                i = i+1
 
-        fig.tight_layout()
-        plt.show(block=False)
+            fig.tight_layout()
+            plt.show(block=False)
 
 if __name__ == '__main__':
 

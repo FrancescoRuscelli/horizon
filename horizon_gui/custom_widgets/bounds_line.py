@@ -21,17 +21,18 @@ class BoundsLine(QWidget):
     lbChanged = pyqtSignal(int, list)
     ubChanged = pyqtSignal(int, list)
 
-    def __init__(self, name, nodes=0, dim=1, initial_bounds=None, parent=None):
+    def __init__(self, name, nodes=0, dim=1, disabled_nodes=None, initial_bounds=None, parent=None):
         super().__init__(parent)
 
+        enabled_nodes = [node for node in range(nodes) if node not in disabled_nodes]
         self.name = name
 
-        if initial_bounds is None:
-            self.lb = np.matrix(np.ones((dim, nodes)) * 0.)
-            self.ub = np.matrix(np.ones((dim, nodes)) * 0.)
-        else:
-            self.lb = initial_bounds[0]
-            self.ub = initial_bounds[1]
+        self.lb = np.matrix(np.ones((dim, nodes)) * 0.)
+        self.ub = np.matrix(np.ones((dim, nodes)) * 0.)
+
+        if initial_bounds:
+            self.lb[:, enabled_nodes] = initial_bounds[0]
+            self.ub[:, enabled_nodes] = initial_bounds[1]
 
         self.min_color_base = "MediumSeaGreen"
         self.min_color_selected = "Crimson"
@@ -82,6 +83,12 @@ class BoundsLine(QWidget):
         self.selected = []
         self.setNodes(nodes)
 
+        if disabled_nodes is None:
+            disabled_nodes = []
+
+        self.disabled_nodes = disabled_nodes
+        self.hideNodes(self.disabled_nodes)
+
         QApplication.instance().focusChanged.connect(self.on_focusChanged)
 
     def setNodes(self, nodes):
@@ -101,8 +108,8 @@ class BoundsLine(QWidget):
                 layout.itemAt(i).widget().deleteLater()
                 layout.removeItem(layout.itemAt(i))
 
-        temp_lb = np.matrix(np.ones((self.dim, self.n_nodes)) * -np.inf)
-        temp_ub = np.matrix(np.ones((self.dim, self.n_nodes)) * np.inf)
+        temp_lb = np.matrix(np.zeros((self.dim, self.n_nodes)))
+        temp_ub = np.matrix(np.zeros((self.dim, self.n_nodes)))
 
         temp_lb[:self.lb.shape[0], :self.lb.shape[1]] = self.lb[:temp_lb.shape[0], :temp_lb.shape[1]]
         temp_ub[:self.ub.shape[0], :self.ub.shape[1]] = self.ub[:temp_ub.shape[0], :temp_ub.shape[1]]
@@ -117,8 +124,6 @@ class BoundsLine(QWidget):
 
     def createCustomSpinboxLine(self, parent, updatefun, values, color_base=None, color_selected=None):
 
-
-
         for i in range(self.dim):
             for j in range(self.n_nodes):
                 n_i = InfinitySpinBox(color_base=color_base, color_selected=color_selected)
@@ -126,7 +131,6 @@ class BoundsLine(QWidget):
                 n_i.valueChanged.connect(self.multipleSet)
                 n_i.valueChanged.connect(partial(updatefun, i, j))
                 parent.addWidget(n_i, i, j)
-
 
     def hideNodes(self, node_list):
         for item in self.bounds_widgets:
@@ -146,7 +150,7 @@ class BoundsLine(QWidget):
             for i in range(self.dim):
                 for j in range(self.n_nodes):
                     spinbox = layout.itemAtPosition(i, j).widget()
-                    if j in node_list:
+                    if j in node_list and j not in self.disabled_nodes:
                         spinbox.show()
 
     def mousePressEvent(self, event):

@@ -1,20 +1,22 @@
 import numpy as np
 
 def unravelElements(elements):
-    if isinstance(elements, int):
-        unraveled_elem = [elements]
-        pass
-    elif any(isinstance(el, list) for el in elements):
-        unraveled_elem = list()
-        for el in elements:
-            temp = list(range(el[0], el[1]+1)) # +1 # todo cannot add+1 here?
+    unraveled_elem = list()
+    if elements:
+        if isinstance(elements, int):
+            unraveled_elem = [elements]
+            pass
+        elif any(isinstance(el, list) for el in elements):
+            unraveled_elem = list()
+            for el in elements:
+                temp = list(range(el[0], el[1]+1))
+                for item in temp:
+                    unraveled_elem.append(item) if item not in unraveled_elem else unraveled_elem
+        elif isinstance(elements, list):
+            unraveled_elem = list()
+            temp = list(range(elements[0], elements[1]+1)) # +1
             for item in temp:
-                unraveled_elem.append(item) if item not in unraveled_elem else unraveled_elem
-    elif isinstance(elements, list):
-        unraveled_elem = list()
-        temp = list(range(elements[0], elements[1]+1)) # +1
-        for item in temp:
-            unraveled_elem.append(item)
+                unraveled_elem.append(item)
 
     return unraveled_elem
 
@@ -30,12 +32,18 @@ def listOfListFLOATtoINT(listOfList):
 
     return listOfList
 
-def checkNodes(nodes, nodes_self):
+def checkNodes(nodes, nodes_self=None):
 
     if hasattr(nodes, "__iter__") and not isinstance(nodes, str):
-        nodes = [node for node in nodes if node in nodes_self]
+        if nodes_self is None:
+            pass
+        else:
+            nodes = [node for node in nodes if node in nodes_self]
     elif isinstance(nodes, int):
-        nodes = [nodes] if nodes in nodes_self else []
+        if nodes_self is None:
+            nodes = [nodes]
+        else:
+            nodes = [nodes] if nodes in nodes_self else []
     else:
         raise Exception('Type {} is not supported to specify nodes.'.format(type(nodes)))
 
@@ -51,6 +59,31 @@ def checkValueEntry(val):
 
     return val
 
+def ravelElements(list_values):
+    list_ranges = list()
+    if list_values:
+        first = list_values[0]
+        if len(list_values) == 1:
+            list_ranges.append([first, list_values[0]])
+        else:
+            for i in range(1, len(list_values)):
+                if list_values[i] - list_values[i - 1] > 1:
+                    last = list_values[i-1]
+                    list_ranges.append([first, last])
+                    first = list_values[i]
+
+                if i ==len(list_values)-1:
+                    last = list_values[i]
+                    list_ranges.append([first, last])
+    else:
+        list_ranges = list_values
+
+    return list_ranges
+
 if __name__ == '__main__':
     penis = [[1, 5], [3, 9], [12, 18]]
-    print(unravelElements(penis))
+    unr_elem = unravelElements(penis)
+    print(unr_elem)
+
+    another = [20]
+    print(ravelElements(another))
