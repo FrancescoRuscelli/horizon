@@ -226,7 +226,7 @@ class VariablesGui(QWidget, Ui_VariablesGUI):
 
         if flag:
 
-            self.addVariableToGUI(var_name)
+            self.addVariableToGui(var_name)
             self.varNameInput.clear()
             self.varDimInput.setValue(default_dim)
             self.varOffsetInput.setValue(default_past_node)
@@ -278,7 +278,7 @@ class VariablesGui(QWidget, Ui_VariablesGUI):
         nodes = node_selector.getRanges()
         self.generateVariable('Custom', nodes)
 
-    def addVariableToGUI(self, sv_name):
+    def addVariableToGui(self, sv_name):
 
         self._addRowToSVTable(sv_name)
 

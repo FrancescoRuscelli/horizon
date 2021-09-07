@@ -1,7 +1,7 @@
 from horizon import problem as horizon
 from horizon.solvers import Solver
 from horizon_gui.gui.dynamics_module.dynamics_handler import DynamicsHandler
-from horizon_gui.gui.txt_to_fun import TxtToFun
+from horizon_gui.custom_functions.txt_to_fun import TxtToFun
 from horizon.transcriptions.transcriptor import Transcriptor
 import parser
 import re
@@ -33,7 +33,7 @@ class horizonImpl():
         self.txt_to_fun_converter = TxtToFun(self.sv_dict, self.fun_dict, self.logger)
         self.dyn_han = DynamicsHandler(self.casadi_prb, self.logger)
 
-        self.transcription_flag = False
+        self.trans_method = None
         self.dynamics_flag = False
 
 
@@ -236,12 +236,12 @@ class horizonImpl():
     def editFunction(self, name, str_fun):
 
         if name in self.fun_dict.keys():
-            flag_syntax, signal_syntax = self._createAndAppendFun(name, str_fun)
-            if flag_syntax:
+            flag = self._createAndAppendFun(name, str_fun)
+            if flag:
                 signal = 'Function "{}" edited with {}. Updated function: {}'.format(name, str_fun, self.fun_dict[name])
                 return True, signal
             else:
-                return False, signal_syntax
+                return False
         else:
             signal = 'Failed editing of function "{}".'.format(name)
             return False, signal
@@ -249,15 +249,21 @@ class horizonImpl():
     def setTranscriptionMethod(self, type, opts):
         try:
             # remove old transcription methods if present
+
             trans_cnsrt = ['multiple_shooting', 'direct_collocation']
             for cnsrt in trans_cnsrt:
                 if self.casadi_prb.getConstraints(cnsrt):
                     self.casadi_prb.removeConstraint(cnsrt)
 
+            self.trans_method = dict(type=type, opts=opts)
+
             Transcriptor.make_method(type, self.casadi_prb, self.dt, opts=opts)
             self.transcription_flag = True
         except Exception as e:
             self.logger.warning('gui_receiver.py, setTranscriptionMethod: {}'.format(e))
+
+    def getTranscriptionMethod(self):
+        return self.trans_method
 
     def updateFunctionNodes(self, name, nodes):
         self.fun_dict[name]['active'].setNodes(nodes, erasing=True)
@@ -312,9 +318,6 @@ class horizonImpl():
 
     def isDynamicsReady(self):
         return self.dynamics_flag
-
-    def isTranscriptionReady(self):
-        return self.transcription_flag
 
     def getDefaultDynList(self):
         return self.dyn_han.getList()

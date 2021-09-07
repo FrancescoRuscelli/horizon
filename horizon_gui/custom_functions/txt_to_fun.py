@@ -22,20 +22,27 @@ class TxtToFun:
         # is it possible for some of the variables not to be substituted?
 
         # get from text all variables and substitute them with self.horizon_receiver.sv_dict[''] ..
-
         # todo add also generic functions
         dict_vars = dict()
         for var in self.sv_dict.keys():
-            dict_vars[var] = "self.sv_dict['{}']['var']".format(var)
+            dict_vars[var] = f"self.sv_dict['{var}']['var']"
 
-        for var in self.fun_dict.keys():
-            dict_vars[var] = "self.fun_dict['{}']['fun']".format(var)
+        for fun in self.fun_dict.keys():
+            dict_vars[fun] = f"self.fun_dict['{fun}']['fun']"
 
         # these are all the state variable found in sv_dict and fun_dict
         all_variables = list(self.sv_dict.keys()) + list(self.fun_dict.keys())
 
+        math_operators = self.getValidOperators()['math']
+
+        # if a variable has the same name of an operator, var wins
+        for overrided_var in [var for var in all_variables if var in math_operators]:
+            math_operators.remove(overrided_var)
+
+        # generate regex with all the variables found: x\b|y\b|z\b
         regex_vars = '\\b|'.join(sorted(re.escape(k) for k in all_variables))
-        regex_math = '\\b|'.join(sorted(re.escape(k) for k in self.getValidOperators()['math']))
+        regex_math = '\\b|'.join(sorted(f'\b{re.escape(k)}\b' for k in math_operators))
+
 
         # If repl is a function, it is called for every non-overlapping occurrence of pattern.
         modified_fun = re.sub(regex_vars, lambda m: dict_vars.get(m.group(0)), str_fun, flags=re.IGNORECASE)
@@ -55,7 +62,8 @@ class TxtToFun:
         try:
             fun = eval(code)
         except Exception as e:
-            self.logger.warning('gui_receiver.py: {}'.format(e))
+            if self.logger:
+                self.logger.warning('gui_receiver.py: {}'.format(e))
 
         used_variables = list()
         for var in self.sv_dict.values():
@@ -66,13 +74,9 @@ class TxtToFun:
 
     @staticmethod
     def getValidOperators():
-        '''
-        return dictionary:
-        keys: packages imported
-        values: all the elements from the imported package that are considered "valid"
-        '''
 
         full_list = dict()
         full_list['math'] = [elem for elem in dir(math) if not elem.startswith('_')]
         full_list['cs'] = ['cs.' + elem for elem in dir(cs) if not elem.startswith('_')]
         return full_list
+

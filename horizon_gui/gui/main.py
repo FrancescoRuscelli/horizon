@@ -328,8 +328,8 @@ class HorizonGUI(QMainWindow):
     def _connectGuiActions(self):
         # This is amazing, I can connect a custom signal from a widget to the main window here
         # basically horizonLine in widget1 sends a signal with a msg, which I connect to the status bar
-        self.widget_gui.constraintLine.repeated_fun.connect(self.writeInStatusBar)
-        self.widget_gui.costfunctionLine.repeated_fun.connect(self.writeInStatusBar)
+        self.widget_gui.problem_gui.constraint_line.repeated_fun.connect(self.writeInStatusBar)
+        self.widget_gui.problem_gui.cost_line.repeated_fun.connect(self.writeInStatusBar)
         self.widget_gui.generic_sig.connect(self.writeInStatusBar)
 
     def _createContextMenu(self):

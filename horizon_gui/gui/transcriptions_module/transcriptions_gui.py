@@ -12,6 +12,9 @@ class TranscriptionGui(GenericDisplayMask):
         self.horizon_receiver = horizon_receiver
         self.logger = logger
 
+        self.trans_method = None
+        self.options = None
+
 
     def openWindow(self):
 
@@ -55,7 +58,7 @@ class TranscriptionGui(GenericDisplayMask):
 
         # connect buttons
         self.no_button.clicked.connect(self.win.close)
-        self.yes_button.clicked.connect(self.setTranscriptionMethod)
+        self.yes_button.clicked.connect(self.yesClicked)
         self.yes_button.clicked.connect(self.win.close)
 
 
@@ -77,19 +80,22 @@ class TranscriptionGui(GenericDisplayMask):
             degree_spin_box.setValue(3)
             self.option_widget.addOption('Degree', degree_spin_box, degree_spin_box.value)
 
-
-    def setTranscriptionMethod(self):
+    def yesClicked(self):
         type = self.trans_combo_box.currentText()
         opts = self.option_widget.getOptions()
+
+        self.setTranscriptionMethod(type, opts)
+
+    def setTranscriptionMethod(self, type, opts):
         self.horizon_receiver.setTranscriptionMethod(type, opts)
 
         self.display.setText(type)
         self.display.setReady(True)
 
-
     def updateTranscriptionMethod(self):
-        if self.horizon_receiver.isTranscriptionReady():
-            self.setTranscriptionMethod()
+        trans_meth = self.horizon_receiver.getTranscriptionMethod()
+        if trans_meth is not None:
+            self.setTranscriptionMethod(trans_meth['type'], trans_meth['opts'])
 
 
 if __name__ == '__main__':

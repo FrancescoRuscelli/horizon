@@ -54,6 +54,9 @@ class Highlighter(QSyntaxHighlighter):
             modified_list = ["\\b" + elem + "\\b" for elem in op_list] # make every element independent for regex (ex: sqrtsqrt is not highlighted)
             self.highlightingRules.append(('|'.join(modified_list), self.baseOperatorFormat))
 
+    def removeOperators(self, string):
+        self.highlightingRules.remove(string)
+
     def highlightBlock(self, text):
         for pattern, format in self.highlightingRules:
             expression = QRegExp(pattern)
