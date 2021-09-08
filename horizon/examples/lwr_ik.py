@@ -55,12 +55,12 @@ qdot.setBounds(qdot_init, qdot_init, nodes=0)
 q.setInitialGuess(q_init)
 
 # Cost function (min velocity)
-prb.createIntermediateCost("qdot", 10*cs.sumsqr(qdot))
+prb.createIntermediateCost("qdot", 1e-1*cs.sumsqr(qdot))
 
 # Cost function (min effort)
 id = cs.Function.deserialize(kindyn.rnea())
 gcomp = id(q, 0, 0)
-prb.createIntermediateCost("min_effort", 1e-2*cs.sumsqr(gcomp))
+prb.createIntermediateCost("min_effort", 1*cs.sumsqr(gcomp))
 
 # Final goal
 fk = cs.Function.deserialize(kindyn.fk('lwr_7_link'))
@@ -77,6 +77,10 @@ prb.createFinalConstraint("goal", pos - pos_des)
 
 # Creates problem
 solver = Solver.make_solver(solver_type, prb, dt)  #, opts={'max_iter': 10})
+
+if solver_type == 'ilqr':
+    solver.plot_iter = True
+    solver.set_iteration_callback()
 
 # solver.plot_iter = True
 # solver.set_iteration_callback()

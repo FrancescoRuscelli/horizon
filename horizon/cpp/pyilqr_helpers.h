@@ -22,9 +22,9 @@ casadi::Function to_cpp(py::object pyfn)
     return casadi::Function::deserialize(fstr);
 }
 
-auto construct(py::object fdyn, int N)
+auto construct(py::object fdyn, int N, IterativeLQR::OptionDict opt)
 {
-    return std::make_unique<IterativeLQR>(to_cpp(fdyn), N);
+    return std::make_unique<IterativeLQR>(to_cpp(fdyn), N, opt);
 }
 
 auto set_inter_cost_wrapper(IterativeLQR& self, std::vector<py::object> flist)

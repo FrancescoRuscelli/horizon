@@ -1,13 +1,38 @@
 #include "ilqr_impl.h"
+#include <cxxabi.h>
 
 utils::Timer::TocCallback on_timer_toc;
 
+template <typename T>
+T value_or(const IterativeLQR::OptionDict& opt, std::string key, T dfl)
+{
+    auto it = opt.find(key);
+
+    if(it == opt.end())
+    {
+        return dfl;
+    }
+
+    try
+    {
+        return std::get<T>(it->second);
+    }
+    catch(std::bad_variant_access& e)
+    {
+        throw std::runtime_error("bad type for parameter '" + key + "': expected " +
+                                 abi::__cxa_demangle(typeid(T).name(), 0, 0, 0));
+    }
+}
+
 IterativeLQR::IterativeLQR(cs::Function fdyn,
-                           int N):
+                           int N,
+                           OptionDict opt):
     _nx(fdyn.size1_in(0)),
     _nu(fdyn.size1_in(1)),
     _N(N),
     _step_length(1.0),
+    _hxx_reg(0.0),
+    _hxx_reg_growth_factor(1e3),
     _cost(N+1, IntermediateCost(_nx, _nu)),
     _constraint(N+1),
     _value(N+1, ValueFunction(_nx)),
@@ -18,6 +43,11 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _lam_g(_N+1),
     _tmp(_N)
 {
+    // set options
+    _step_length = value_or(opt, "step_length", 1.0);
+    _hxx_reg = value_or(opt, "hxx_reg", 0.0);
+    _hxx_reg_growth_factor = value_or(opt, "hxx_reg_growth_factor", 1e3);
+
     // set timer callback
     on_timer_toc = [this](const char * name, double usec)
     {
@@ -384,6 +414,7 @@ IterativeLQR::BackwardPassResult::BackwardPassResult(int nx, int nu)
 
 IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N):
     alpha(0),
+    hxx_reg(0),
     accepted(false)
 {
     xtrj.setZero(nx, N+1);

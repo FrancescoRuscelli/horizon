@@ -24,7 +24,7 @@ class SolverILQR(Solver):
         super().__init__(prb, dt, opts)
 
         # save max iter if any
-        self.max_iter = self.opts.get('max_iter', 10)
+        self.max_iter = self.opts.get('max_iter', 100)
         
         # num shooting interval
         self.N = prb.getNNodes() - 1  
@@ -37,7 +37,7 @@ class SolverILQR(Solver):
                                ['x', 'u'], ['f'])
 
         # create ilqr solver
-        self.ilqr = IterativeLQR(self.dyn, self.N)
+        self.ilqr = IterativeLQR(self.dyn, self.N, self.opts)
 
         # set costs and constraints
         for k in range(self.N + 1):
@@ -181,6 +181,7 @@ class SolverILQR(Solver):
         star = '*' if fpres.accepted else ' '
         print(f'{star}\
 alpha={fpres.alpha:{fmtf}}  \
+reg={fpres.hxx_reg:{fmt}}  \
 merit={fpres.merit:{fmt}}  \
 dm={fpres.merit_der:{fmt}}  \
 mu_f={fpres.mu_f:{fmt}}  \

@@ -1,8 +1,13 @@
 #include "ilqr_impl.h"
 
+struct HessianIndefinite : std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+};
+
 void IterativeLQR::backward_pass()
 {
-    TIC(backward_pass)
+    TIC(backward_pass);
 
     // initialize backward recursion from final cost..
     _value.back().S = _cost.back().Q();
@@ -12,9 +17,26 @@ void IterativeLQR::backward_pass()
     _constraint_to_go->set(_constraint.back());
 
     // backward pass
-    for(int i = _N-1; i >= 0; i--)
+    bool reg_needed = false;
+    int i = _N - 1;
+    while(i >= 0)
     {
-        backward_pass_iter(i);
+        try
+        {
+            backward_pass_iter(i);
+            --i;
+        }
+        catch(HessianIndefinite&)
+        {
+            increase_regularization();
+            reg_needed = true;
+            ++i;
+        }
+    }
+
+    if(!reg_needed)
+    {
+        reduce_regularization();
     }
 }
 
@@ -66,9 +88,10 @@ void IterativeLQR::backward_pass_iter(int i)
 
     tmp.hx.noalias() = q + A.transpose()*tmp.s_plus_S_d;
     tmp.Hxx.noalias() = Q + A.transpose()*tmp.S_A;
+    tmp.Hxx.diagonal().array() += _hxx_reg;
 
-//    double eig_min_Q = Q.eigenvalues().real().minCoeff();
-//    tmp.Hxx.diagonal().array() -= std::min(eig_min_Q, 0.0)*2.0;
+    //    double eig_min_Q = Q.eigenvalues().real().minCoeff();
+    //    tmp.Hxx.diagonal().array() -= std::min(eig_min_Q, 0.0)*2.0;
 
 
     // handle case where nz = 0, i.e. no nullspace left after constraints
@@ -112,7 +135,7 @@ void IterativeLQR::backward_pass_iter(int i)
     tmp.llt.solveInPlace(tmp.huHux);
     if(tmp.llt.info() != Eigen::ComputationInfo::Success)
     {
-        throw std::runtime_error("backward pass error: hessian not positive");
+        throw HessianIndefinite("backward pass error: hessian not positive");
     }
 
     // todo: check solution for nan, unable to solve, etc
@@ -145,6 +168,21 @@ void IterativeLQR::backward_pass_iter(int i)
         res.Lu = Lz;
     }
 
+}
+
+void IterativeLQR::increase_regularization()
+{
+    if(_hxx_reg < 1e-6)
+    {
+        _hxx_reg = 1.0;
+    }
+
+    _hxx_reg *= _hxx_reg_growth_factor;
+}
+
+void IterativeLQR::reduce_regularization()
+{
+    _hxx_reg /= std::sqrt(_hxx_reg_growth_factor);
 }
 
 IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)

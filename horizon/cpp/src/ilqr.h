@@ -1,6 +1,7 @@
 #include <casadi/casadi.hpp>
 #include <Eigen/Dense>
 #include <memory>
+#include <variant>
 
 #include "profiling.h"
 
@@ -39,6 +40,9 @@ public:
      */
     typedef std::function<bool(const ForwardPassResult& res)> CallbackType;
 
+    typedef std::variant<int, double, bool, std::string> OptionTypes;
+    typedef std::map<std::string, OptionTypes> OptionDict;
+
 
     /**
      * @brief Class constructor
@@ -47,7 +51,8 @@ public:
      * @param N is the number of shooting intervals
      */
     IterativeLQR(casadi::Function fdyn,
-                 int N);
+                 int N,
+                 OptionDict opt = OptionDict());
 
     /**
      * @brief setStepLength
@@ -116,6 +121,7 @@ public:
     {
         Eigen::MatrixXd xtrj;
         Eigen::MatrixXd utrj;
+        double hxx_reg;
         double alpha;
         double cost;
         double merit;
@@ -153,6 +159,8 @@ private:
     void report_result(const ForwardPassResult& fpres);
     void backward_pass();
     void backward_pass_iter(int i);
+    void increase_regularization();
+    void reduce_regularization();
     HandleConstraintsRetType handle_constraints(int i);
     double compute_merit_value(double mu_f, double mu_c, double cost, double defect_norm, double constr_viol);
     double compute_merit_slope(double mu_f, double mu_c, double defect_norm, double constr_viol);
@@ -172,6 +180,8 @@ private:
     const int _N;
 
     double _step_length;
+    double _hxx_reg;
+    double _hxx_reg_growth_factor;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;

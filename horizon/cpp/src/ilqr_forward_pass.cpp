@@ -9,6 +9,7 @@ bool IterativeLQR::forward_pass(double alpha)
     _fp_res->accepted = false;
     _fp_res->alpha = alpha;
     _fp_res->step_length = 0.0;
+    _fp_res->hxx_reg = _hxx_reg;
 
     // initialize forward pass with initial state
     _fp_res->xtrj.col(0) = _xtrj.col(0);
@@ -226,7 +227,7 @@ void IterativeLQR::line_search(int iter)
 
     const double step_reduction_factor = 0.5;
     const double alpha_min = 0.001;
-    double alpha = 1.0;
+    double alpha = _step_length;
     const double eta = 1e-4;
 
     // compute merit function weights

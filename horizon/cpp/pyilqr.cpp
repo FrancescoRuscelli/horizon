@@ -7,6 +7,7 @@ PYBIND11_MODULE(pyilqr, m) {
             .def_readonly("utrj", &IterativeLQR::ForwardPassResult::utrj)
             .def_readonly("accepted", &IterativeLQR::ForwardPassResult::accepted)
             .def_readonly("alpha", &IterativeLQR::ForwardPassResult::alpha)
+            .def_readonly("hxx_reg", &IterativeLQR::ForwardPassResult::hxx_reg)
             .def_readonly("constraint_violation", &IterativeLQR::ForwardPassResult::constraint_violation)
             .def_readonly("cost", &IterativeLQR::ForwardPassResult::cost)
             .def_readonly("defect_norm", &IterativeLQR::ForwardPassResult::defect_norm)
