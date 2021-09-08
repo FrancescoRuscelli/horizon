@@ -44,7 +44,7 @@ class HorizonLine(QScrollArea):
         self.bounds_flag = True
         self.horizon_receiver = horizon
         self.fun_type = fun_type  # can be Constraint or Cost Function
-        if fun_type == 'costfunction':
+        if fun_type == 'cost':
             self.bounds_flag = False
         self.n_nodes = nodes + 1 # to account for final node
 
@@ -100,7 +100,7 @@ class HorizonLine(QScrollArea):
             self.options['slice_color'] = Qt.green
             self.options['minmax_color'] = Qt.darkRed
             self.options['ticks_color'] = Qt.darkCyan
-        elif self.fun_type == 'costfunction':
+        elif self.fun_type == 'cost':
             self.options['background_color'] = Qt.darkBlue
             self.options['slice_color'] = Qt.blue
             self.options['minmax_color'] = Qt.darkRed
@@ -109,9 +109,9 @@ class HorizonLine(QScrollArea):
     def switchPage(self, index):
         self.stacked_lines.setCurrentIndex(index)
 
-    def updateFunctionNodes(self, parent, fun_name, ranges):
+    def setFunNodes(self, fun_name, nodes):
         # transform from float to INT (nodes are integer)
-        ranges = listOfListFLOATtoINT(ranges)
+        ranges = listOfListFLOATtoINT(nodes)
         # TODO HERE I SHOULD DO UNRAVEL
         # update bounds widgets
         nodes = unravelElements(ranges)
@@ -122,6 +122,9 @@ class HorizonLine(QScrollArea):
         # print('New nodes for Function {}: {}'.format(fun_name, ranges))
         self.horizon_receiver.updateFunctionNodes(fun_name, nodes)
 
+    def updateFunctionNodes(self, parent, fun_name, ranges):
+
+        self.setFunNodes(fun_name, ranges)
         # update ranges in sliders
         if parent == 'multi':
             self.function_tab.setFunctionNodes(fun_name, ranges)
@@ -215,11 +218,11 @@ class HorizonLine(QScrollArea):
         self.repeated_fun.emit(str)
 
     def addFunctionToSingleLine(self, name, dim, disabled_nodes, initial_bounds):
-        self.function_tab.addFunctionToGUI(name, dim, disabled_nodes, initial_bounds)
+        self.function_tab.addFunctionToGui(name, dim, disabled_nodes, initial_bounds)
         self.updateMarginsSingleLine()
 
     def addFunctionToMultiLine(self, name, disabled_nodes):
-        self.multi_function_box.addFunctionToGUI(name, disabled_nodes)
+        self.multi_function_box.addFunctionToGui(name, disabled_nodes)
         self.updateMarginsMultiLine()
 
     def addFunctionToHorizon(self, name):
@@ -241,13 +244,18 @@ class HorizonLine(QScrollArea):
 
         # get dimension and bounds from the activated function to set them in gui
         dim = self.horizon_receiver.getFunction(name)['active'].getDim()
-        initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
+        self.horizon_receiver.getFunction(name)
+        if self.fun_type == 'constraint':
+            initial_bounds = self.horizon_receiver.getFunction(name)['active'].getBounds()
 
-        lb_matrix = np.reshape(initial_bounds[0], (dim, len(available_nodes)), order='F')
-        ub_matrix = np.reshape(initial_bounds[1], (dim, len(available_nodes)), order='F')
+            lb_matrix = np.reshape(initial_bounds[0], (dim, len(available_nodes)), order='F')
+            ub_matrix = np.reshape(initial_bounds[1], (dim, len(available_nodes)), order='F')
+            bounds = [lb_matrix, ub_matrix]
+        else:
+            bounds = None
 
         if flag:
-            self.addFunctionToSingleLine(name, dim, disabled_nodes, [lb_matrix, ub_matrix])
+            self.addFunctionToSingleLine(name, dim, disabled_nodes, bounds)
             self.addFunctionToMultiLine(name, disabled_nodes)
             self.logger.info(signal)
         else:

@@ -145,7 +145,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
                     # todo getDim() only taking the row, what if it's a matrix?
                     line.addFunctionToSingleLine(name, data['active'].getDim()[0])
                     line.addFunctionToMultiLine(name)
-                elif data['active'].getType() == 'costfunction':
+                elif data['active'].getType() == 'cost':
                     line = self.costfunctionLine
                     line.addFunctionToSingleLine(name, data['active'].getDim()[0])
                     line.addFunctionToMultiLine(name)
@@ -215,14 +215,27 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.trans_gui.display.setReady(True)
 
         # # Cost function
-        cost_name = 'minimize_q_ddot'
-        str_fun = 'cs.sumsqr(q_ddot)'
-        flag = self.horizon_receiver.addFunction(dict(name=cost_name, str=str_fun, active=None))
+        fun_name = 'minimize_q_ddot'
+        fun_str = 'cs.sumsqr(q_ddot)'
+        flag = self.horizon_receiver.addFunction(dict(name=fun_name, str=fun_str, active=None))
         if flag:
-            self.functions_gui.addFunctionToGui(cost_name, str_fun)
+            self.functions_gui.addFunctionToGui(fun_name, fun_str)
 
-        # prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
-        # # Constraint
+        self.problem_gui.cost_line.addFunctionToHorizon(fun_name)
+
+        # # Cost function
+        fun_name = 'up'
+        fun_str = 'q[1] - np.pi'
+        flag = self.horizon_receiver.addFunction(dict(name=fun_name, str=fun_str, active=None))
+        if flag:
+            self.functions_gui.addFunctionToGui(fun_name, fun_str)
+
+        ranges = [self.nodes, self.nodes]
+        self.problem_gui.constraint_line.addFunctionToHorizon(fun_name)
+        self.problem_gui.constraint_line.setFunNodes(fun_name, ranges)
+        # update ranges in sliders
+        self.problem_gui.constraint_line.function_tab.setFunctionNodes(fun_name, ranges)
+        self.problem_gui.constraint_line.multi_function_box.setFunctionNodes(fun_name, ranges)
         # prb.createFinalConstraint("up", q[1] - np.pi)
         # prb.createFinalConstraint("final_qdot", qdot)
 

@@ -1,5 +1,7 @@
+# todo somehow find a way to import the necessary stuff from GUI
 import math
 import casadi as cs
+import numpy as np
 import parser
 import re
 

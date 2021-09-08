@@ -32,7 +32,7 @@ class FunctionTabWidget(QTabWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)
 
 
-    def addFunctionToGUI(self, fun_name, dim, disabled_nodes, initial_bounds):
+    def addFunctionToGui(self, fun_name, dim, disabled_nodes, initial_bounds=None):
         self.ft = FunctionLine(fun_name, self.n_nodes, disabled_nodes, options=self.options)
         self.ft.nodesChanged.connect(self.on_fun_nodes_changed)
 
@@ -84,7 +84,6 @@ class FunctionTabWidget(QTabWidget):
         for widget_fl in self.findChildren(FunctionLine):
             if widget_fl.getName() == fun_name:
                 widget_fl.updateSlices(ranges)
-
 
     def setFunctionBounds(self, fun_name, active_nodes):
 

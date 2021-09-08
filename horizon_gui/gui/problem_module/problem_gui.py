@@ -43,6 +43,7 @@ class ProblemGui(QWidget):
         self.widget_buttons = QWidget()
         self.widget_buttons_layer = QHBoxLayout(self.widget_buttons)
 
+        # todo how to put choose position of spacer item?
         spacer_item = QSpacerItem(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.widget_buttons_layer.addItem(spacer_item)
 
@@ -91,7 +92,7 @@ class ProblemGui(QWidget):
         cost_title.setAlignment(Qt.AlignCenter)
         self.cost_page_layout.addWidget(cost_title)
 
-        self.cost_line = HorizonLine(self.horizon_receiver, 'costfunction', nodes=nodes, logger=self.logger)
+        self.cost_line = HorizonLine(self.horizon_receiver, 'cost', nodes=nodes, logger=self.logger)
         self.cost_line.setContentsMargins(0, 40, 0, 0)
         self.cost_page_layout.addWidget(self.cost_line)
 

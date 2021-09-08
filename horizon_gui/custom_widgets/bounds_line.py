@@ -68,6 +68,9 @@ class BoundsLine(QWidget):
         self.ubChanged.emit(node, bounds_list)  # pass only the bounds at the changed node
         print(node, bounds_list)
 
+    def getName(self):
+        return self.name
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     gui = BoundsLine('daniele', nodes=1, dim=3)

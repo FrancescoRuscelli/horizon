@@ -105,7 +105,7 @@ class horizonImpl():
                 except Exception as e:
                     return False, e
 
-            elif fun_type == 'costfunction':
+            elif fun_type == 'cost':
                 try:
                     active_fun = self.casadi_prb.createCostFunction(name, self.fun_dict[name]['fun'], nodes=nodes)
                     self.fun_dict[name].update({'active': active_fun})
@@ -123,7 +123,7 @@ class horizonImpl():
 
         if active_fun_type == 'constraint':
             self.casadi_prb.removeConstraint(name)
-        elif active_fun_type == 'costfunction':
+        elif active_fun_type == 'cost':
             self.casadi_prb.removeCostFunction(name)
         else:
             return False, 'Function type "{}" not recognized'.format(active_fun_type)

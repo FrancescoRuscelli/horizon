@@ -35,7 +35,7 @@ class MultiFunctionBox(QScrollArea):
     def getNFunctions(self):
         return len(self.fun_list)
 
-    def addFunctionToGUI(self, fun_name, disabled_nodes):
+    def addFunctionToGui(self, fun_name, disabled_nodes):
 
         # removing the QSpacerItem, if present, before adding a new multiline widget
         for i in range(self.main_layout.count()):
