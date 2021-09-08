@@ -1,15 +1,15 @@
 #!/usr/bin/env python
-import logging
 
-import rospy
-import casadi as cs
-import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory
+from horizon.transcriptions import integrators
 from horizon.ros.replay_trajectory import *
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
+import os
 
-urdf = rospy.get_param('robot_description')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'quadruped.urdf')
+urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
 # OPTIMIZATION PARAMETERS
@@ -37,6 +37,7 @@ dt = prb.createInputVariable("dt", 1)
 
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
+prb.setDynamics(xdot)
 # Formulate discrete time dynamics
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
@@ -139,8 +140,7 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
 dd = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
 tau = casadi_kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
-
-prb.createConstraint("final_velocity", qdot, nodes=ns+1, bounds=dict(lb=np.zeros((nv, 1)), ub=np.zeros((nv, 1))))
+prb.createFinalConstraint('final_velocity', qdot)
 
 # GROUND
 mu = 0.8 # friction coefficient
@@ -170,17 +170,14 @@ for frame, f in zip(contact_names, forces):
     prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=list(range(lift_node, touch_down_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
 # Create problem
-prb.createProblem()
-
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 5000,
-        'ipopt.linear_solver': 'ma57'}
+        'ipopt.max_iter': 5000}
 
-solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
-prb.setSolver(solver)
+solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+solver.solve()
 
-solution = prb.solveProblem()
+solution = solver.getSolutionDict()
 
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]

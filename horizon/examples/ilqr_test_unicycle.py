@@ -1,13 +1,7 @@
-import sys
-import os
-
 import numpy as np
 import casadi as cs
 from horizon.problem import Problem as HorizonProblem
-from horizon.utils import integrators
-
-import matplotlib.pyplot as plt
-
+from horizon.transcriptions import integrators
 
 np.set_printoptions(suppress=True, precision=3)
 

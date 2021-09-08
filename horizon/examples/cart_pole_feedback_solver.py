@@ -6,8 +6,8 @@ import numpy as np
 import time
 from horizon import problem
 from horizon.solvers import ilqr, blocksqp
-from horizon.utils import integrators, rti
-from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.utils import rti
+from horizon.transcriptions.transcriptor import Transcriptor
 import matplotlib.pyplot as plt
 import os
 
@@ -74,12 +74,11 @@ if use_ilqr:
     solver = ilqr.SolverILQR(prb, dt, opts={'realtime_iteration': True})
 else:
     # Dynamics
-    th = TranscriptionsHandler(prb, dt)
     if use_ms:
-        th.setDefaultIntegrator(type='EULER')
-        th.setMultipleShooting()
+        th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
     else:
-        th.setDirectCollocation()
+        th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
+
     solver = blocksqp.BlockSqpSolver(prb, dt, opts={'realtime_iteration': True})
 
 # the rti loop

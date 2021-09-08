@@ -1,14 +1,14 @@
 try:
-    from .pyilqr import IterativeLQR
+    from horizon.solvers.pyilqr import IterativeLQR
 except ImportError:
     print('failed to import pyilqr extension; did you compile it?')
     exit(1)
 
-from .solver import Solver
+from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.function import Function, CostFunction, Constraint
+from horizon.functions import Function, Constraint
 from typing import Dict, List
-from horizon.utils import integrators
+from horizon.transcriptions import integrators
 import casadi as cs
 import numpy as np
 from matplotlib import pyplot as plt
@@ -60,19 +60,11 @@ class SolverILQR(Solver):
     def configure_rti(self) -> bool:
         self.opts['max_iter'] = 1
     
-
     def solve(self):
-        
-        # get initial guess
-        x0 = self.prb.getState().getInitialGuess()
-        u0 = self.prb.getInput().getInitialGuess()
-
-        # set initial condition
-        x0[:, 0] = self.prb.getInitialState()
-
-        # set it to solver and solve
-        self.ilqr.setStateInitialGuess(x0)
-        self.ilqr.setInputInitialGuess(u0)
+        x0 = self.prb.getInitialState().reshape((self.nx, 1))
+        self.x_opt = np.hstack(([x0]*(self.N+1)))
+        self.ilqr.setStateInitialGuess(self.x_opt)
+        self.ilqr.setIterationCallback(self._iter_callback)
         self.ilqr.solve(self.max_iter)
 
         # get solution
@@ -103,7 +95,7 @@ class SolverILQR(Solver):
     def _set_cost_k(self, k):
         
         self._set_fun_k(k, 
-                container=self.prb.function_container.costfun_container, 
+                container=self.prb.function_container.getCost(),
                 set_to_ilqr=self.ilqr.setIntermediateCost, 
                 combine_elements=sum,
                 outname='l')
@@ -115,7 +107,7 @@ class SolverILQR(Solver):
             return cs.vertcat(*l)
 
         self._set_fun_k(k, 
-                container=self.prb.function_container.cnstr_container, 
+                container=self.prb.function_container.getCnstr(),
                 set_to_ilqr=self.ilqr.setIntermediateConstraint,
                 combine_elements=vertcat_list,
                 outname='h')
@@ -147,20 +139,14 @@ class SolverILQR(Solver):
             f: Function = f
 
             # if f does not act on node k, skip
-            if k not in f.nodes:
+            if k not in f.getNodes():
                 continue
                 
             # get input variables for this function
-            input_vars = f.getVariables()
-
-            # make input list for this function
-            input_list = list()
-            for vname, vlist in input_vars.items():
-                var: cs.SX = vlist[0]
-                input_list.append(var)
+            input_list = f.getVariables()
 
             # save function value to list
-            value = f.fun(*input_list)
+            value = f.getFunction()(*input_list)
 
             # in the case of constraints, check bound values
             if isinstance(f, Constraint):

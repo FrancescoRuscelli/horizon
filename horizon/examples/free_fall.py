@@ -1,19 +1,18 @@
 #!/usr/bin/env python
-import logging
 
-import rospy
-import casadi as cs
-import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.transcriptions import integrators
+from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
-
+import os
 # Switch between suspended and free fall
 FREE_FALL = True
 
 # Loading URDF model in pinocchio
-urdf = rospy.get_param('robot_description')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')
+urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
 # Forward Kinematics of interested links
@@ -46,6 +45,7 @@ frope = prb.createInputVariable("frope", nf)
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
+prb.setDynamics(xdot)
 # Formulate discrete time dynamics
 tf = 1.0  # [s]
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
@@ -148,21 +148,18 @@ p_rope = FKRope(q=q)['ee_pos']
 prb.createConstraint("rope_anchor_point", p_rope-p_rope_init, bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
 # Creates problem
-prb.createProblem()
-
-# SETUP SOLVER
 opts = {'ipopt.tol': 1e-4,
         'ipopt.max_iter': 2000,
         'ipopt.linear_solver': 'ma57'}
 
-solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
-prb.setSolver(solver)
+solver = solver.Solver.make_solver('ipopt', prb, tf/ns, opts)
+solver.solve()
 
-solution = prb.solveProblem()
+solution = solver.getSolutionDict()
 
 plot_all = True
 if plot_all:
-    hplt = plotter.PlotterHorizon(prb)
+    hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
 

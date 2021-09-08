@@ -5,8 +5,9 @@ import casadi as cs
 import numpy as np
 from horizon import problem
 from horizon.utils import utils, casadi_kin_dyn
-from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils.plotter import PlotterHorizon
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 
@@ -29,9 +30,9 @@ print("nv: ", nv)
 
 # OPTIMIZATION PARAMETERS
 tf = 5.0  # [s]
-ns = 100  # number of shooting nodes
+ns = 30  # number of shooting nodes
 dt = tf/ns
-use_ms = True
+use_ms = False
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -72,12 +73,10 @@ qddot.setInitialGuess(qddot_init)
 prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
 # Dynamics
-th = TranscriptionsHandler(prb, dt)
 if use_ms:
-    th.setDefaultIntegrator(type='EULER')
-    th.setMultipleShooting()
+    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='RK4'))
 else:
-    th.setDirectCollocation()
+    th = Transcriptor.make_method('direct_collocation', prb, dt) # opts=dict(degree=5)
 
 prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
@@ -88,8 +87,9 @@ tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
-prb.createProblem(opts = {'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
-solution = prb.solveProblem()
+solver = solver.Solver.make_solver('ipopt', prb, dt, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
+solver.solve()
+solution = solver.getSolutionDict()
 q_hist = solution["q"]
 
 time = np.arange(0.0, tf+1e-6, tf/ns)
@@ -99,13 +99,13 @@ plt.plot(time, q_hist[1,:])
 plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[m]}$', size = 20)
-plt.show()
 
 plot_all = True
 if plot_all:
-    hplt = PlotterHorizon(prb)
+    hplt = PlotterHorizon(prb, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
+    plt.show()
 
 if do_replay:
     joint_list=["cart_joint", "pole_joint"]

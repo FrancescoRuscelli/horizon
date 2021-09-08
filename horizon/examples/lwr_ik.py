@@ -5,7 +5,7 @@ import casadi as cs
 import numpy as np
 from horizon import problem
 from horizon.solvers import Solver
-from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils import plotter
 from horizon.ros.replay_trajectory import replay_trajectory
 
@@ -25,8 +25,8 @@ nv = kindyn.nv()
 ns = 100  # number of shooting nodes
 tf = 1.0  # [s]
 dt = tf/ns
-use_ms = True
-solver_type = 'ilqr'
+transcription = 'multiple_shooting'
+solver_type = 'ipopt'
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -70,12 +70,7 @@ pos_des[2] += 0.1
 
 if solver_type != 'ilqr':
     # Dynamics
-    th = TranscriptionsHandler(prb, dt)
-    if use_ms:
-        th.setDefaultIntegrator(type='EULER')
-        th.setMultipleShooting()
-    else:
-        th.setDirectCollocation()
+    Transcriptor.make_method(transcription, prb, dt, opts={'integrator': 'EULER'})
 
 # Constraints
 prb.createFinalConstraint("goal", pos - pos_des)

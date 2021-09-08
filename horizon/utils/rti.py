@@ -1,6 +1,6 @@
 from horizon.problem import Problem
 from horizon.solvers import Solver
-from . import integrators
+from ..transcriptions import integrators
 import numpy as np
 
 class RealTimeIteration:
