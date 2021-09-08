@@ -1,7 +1,8 @@
 import setuptools
-
+import subprocess
 # with open("README.md", "r", encoding="utf-8") as fh:
 #     long_description = fh.read()
+
 
 setuptools.setup(
     name="casadi_horizon",
@@ -20,7 +21,7 @@ setuptools.setup(
     #     "Operating System :: Ubuntu",
     # ],
     # package_dir={"": "horizon"},
-    packages=['horizon', 'horizon.utils'],
+    packages=['horizon', 'horizon.utils', 'horizon.solvers'],
     install_requires=['casadi', 'numpy'],
     # packages=setuptools.find_packages(),
     python_requires=">=3.6"

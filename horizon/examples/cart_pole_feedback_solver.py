@@ -5,9 +5,9 @@ import casadi as cs
 import numpy as np
 import time
 from horizon import problem
-from horizon.transcriptions import integrators
+from horizon.solvers import ilqr, blocksqp
+from horizon.utils import rti
 from horizon.transcriptions.transcriptor import Transcriptor
-from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 
@@ -25,6 +25,7 @@ ns = 20  # number of shooting nodes
 dt = 0.1
 tf = ns*dt  # [s]
 use_ms = True
+use_ilqr = True
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -68,71 +69,32 @@ prb.createIntermediateCost("reg", 1e-6*cs.sumsqr(u))
 prb.createFinalConstraint("qfinal", q - q_tgt)
 prb.createFinalConstraint("qdotfinal", qdot)
 
-# Dynamics
-if use_ms:
-    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
+# Create solver
+if use_ilqr:
+    solver = ilqr.SolverILQR(prb, dt, opts={'realtime_iteration': True})
 else:
-    th = Transcriptor.make_method('direct_collocation', prb, dt)
+    # Dynamics
+    if use_ms:
+        th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
+    else:
+        th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
 
-blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact
-    'warmstart': False,
-    'max_iter': 1,
-    'print_iteration': False,
-    'print_maxit_reached': False,
-    'print_header': False,
-    'verbose_init': False,
-    'print_time': 0,
-    'opttol': 1e-4,
-    'linsol': 'ma27',
-    }
-
-# Creates problem
-solver = solver.Solver.make_solver('blocksqp', prb, dt, opts=blocksqp_opts)
-# prb.createProblem(solver_plugin='blocksqp', opts=blocksqp_opts)
-
-
-class RealTimeIteration:
-
-    def __init__(self, prb: problem.Problem, dt: float) -> None:
-        # define integrator to simulate the system (should be optional)
-        x = prb.getState().getVars()
-        u = prb.getInput().getVars()
-        xdot = prb.getDynamics()
-        dae = {'x': x, 'p': u, 'ode': xdot, 'quad': 0}
-        self.integrator = integrators.RK4(dae, {'tf': dt})
-        
-        self.solution = None
-        self.state = prb.getState()
-
-    def run(self, stateread: np.array):
-    
-        # set initial state
-        self.state.setBounds(lb=stateread, ub=stateread, nodes=0)
-        
-        # solve
-        solver.solve()
-        self.solution = solver.getSolutionDict()
-
-        # get control input to apply
-        u_opt = self.solution['u'][:, 0]
-
-        # integrate input and return
-        stateint = self.integrator(x0=stateread, p=u_opt)['xf'].toarray().flatten()
-        return stateint, u_opt
-
+    solver = blocksqp.BlockSqpSolver(prb, dt, opts={'realtime_iteration': True})
 
 # the rti loop
-rti = RealTimeIteration(prb=prb, dt=0.01)
-stateread = np.array([-0.5, np.pi-0.30, 0.0, 0.0])
+rti_dt = 0.01
+mpc = rti.RealTimeIteration(prb, solver, rti_dt)
+stateread = np.array([0.0, np.pi-0.5, 0.0, 0.0])
 states = []
 inputs = []
 times = []
-for i in range(300):
+for i in range(500):
     states.append(stateread.copy())
     tic = time.time()
-    stateread, input = rti.run(stateread)
+    input = mpc.run(stateread)
     toc = time.time()
-    inputs.append(input)
+    stateread = mpc.integrate(stateread, input)
+    inputs.append(input.copy())
     times.append(toc-tic)
 
 plt.figure()

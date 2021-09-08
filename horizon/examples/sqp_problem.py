@@ -3,7 +3,7 @@
 import logging
 import casadi as cs
 from horizon import problem
-from horizon.utils import integrators
+from horizon.transcriptions import integrators
 from horizon.solvers import sqp
 import matplotlib.pyplot as plt
 import numpy as np
