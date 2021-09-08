@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QHBoxLayout, QWid
                                 QLineEdit, QTableWidget, QHeaderView, QTableWidgetItem, QVBoxLayout)
 from PyQt5.QtGui import QPalette
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
-from horizon_gui.custom_widgets import on_destroy_signal_window, highlight_delegate, bounds_line, multi_slider, spinbox_line
+from horizon_gui.custom_widgets import on_destroy_signal_window, highlight_delegate, bounds_line, multi_slider_v1, spinbox_line
 from horizon_gui.gui.gui_receiver import horizonImpl
 from horizon_gui.gui.variables_module.variables_module_ui import Ui_VariablesGUI
 from functools import partial
@@ -254,7 +254,7 @@ class VariablesGui(QWidget, Ui_VariablesGUI):
         options['slice_color'] = Qt.darkMagenta
         options['minmax_color'] = Qt.darkRed
         options['ticks_color'] = Qt.darkGreen
-        node_selector = multi_slider.QMultiSlider(slider_range=[0, self.horizon_receiver.getNodes(), 1], options=options, number_bar=True)
+        node_selector = multi_slider_v1.QMultiSlider(slider_range=[0, self.horizon_receiver.getNodes(), 1], options=options, number_bar=True)
         layout_box.addWidget(node_selector)
 
         widget_dialog = QWidget()

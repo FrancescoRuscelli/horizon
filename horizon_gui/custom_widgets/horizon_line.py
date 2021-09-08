@@ -182,13 +182,13 @@ class HorizonLine(QScrollArea):
 
     def updateMarginsSingleLine(self):
         node_box_width = self.nodes_line.getBoxWidth()
-        margins = QMargins(node_box_width / 2, 0, node_box_width / 2, 0)  # todo why?
-        self.function_tab.updateMargins(margins)
+        # margins = QMargins(node_box_width / 2, 0, node_box_width / 2, 0)  # todo why?
+        # self.function_tab.updateMargins(margins)
 
     def updateMarginsMultiLine(self):
         node_box_width = self.nodes_line.getBoxWidth()
-        margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
-        self.multi_function_box.updateMargins(margins)
+        # margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
+        # self.multi_function_box.updateMargins(margins)
 
     def dragEnterEvent(self, event):
         # source_Widget = event.source()
