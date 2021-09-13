@@ -8,6 +8,10 @@ from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
+from horizon.ros import utils as horizon_ros_utils
+
+horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
+time.sleep(3.)
 
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')
 urdf = open(urdffile, 'r').read()
@@ -227,7 +231,7 @@ if PRINT:
 
     plt.show()
 
-inbuild_plot = True
+inbuild_plot = False
 if inbuild_plot:
     hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables()
