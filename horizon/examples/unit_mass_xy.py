@@ -4,8 +4,8 @@ import horizon.problem as prb
 import horizon.utils.plotter as plotter
 import casadi as cs
 import numpy as np
-from horizon.utils.integrators import make_direct_collocation
-import horizon.utils.transcription_methods as transmet
+from horizon.transcriptions.transcriptor import Transcriptor
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
 
 n_nodes = 50
@@ -27,9 +27,11 @@ x = state.getVars()
 xdot = cs.vertcat(v, F) #- mu*grav*np.sign(v)
 prob.setDynamics(xdot)
 
-th = transmet.TranscriptionsHandler(prob, dt)
-th.setMultipleShooting()  # here I could use different integrators, such as RK2, Euler, ... (the default is RK4)
-# th.setDirectCollocation(3)
+use_ms = False
+if use_ms:
+    th = Transcriptor.make_method('multiple_shooting', prob, dt)
+else:
+    th = Transcriptor.make_method('direct_collocation', prob, dt) # opts=dict(degree=5)
 
 # set initial state (rest in zero)
 p.setBounds(lb=[0, 0], ub=[0, 0], nodes=0)
@@ -50,14 +52,15 @@ obs_cnsrt.setUpperBounds(np.inf)
 prob.createIntermediateCost('cost', cs.sumsqr(F))
 
 # solve
-prob.createProblem()
-solution = prob.solveProblem()
+solver = solver.Solver.make_solver('ipopt', prob, dt)
+solver.solve()
+solution = solver.getSolutionDict()
 
 # plot
 plot_all = True
 
 if plot_all:
-    hplt = plotter.PlotterHorizon(prob)
+    hplt = plotter.PlotterHorizon(prob, solution)
     hplt.plotVariables(grid=True)
     hplt.plotFunctions(grid=True)
 

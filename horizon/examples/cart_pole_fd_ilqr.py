@@ -5,9 +5,7 @@ import casadi as cs
 import numpy as np
 from horizon import problem
 from horizon.solvers import Solver
-from horizon.utils.transcription_methods import TranscriptionsHandler
-from horizon.utils import plotter
-from horizon.ros.replay_trajectory import replay_trajectory
+from horizon.transcriptions.transcriptor import Transcriptor
 
 import matplotlib.pyplot as plt
 import os
@@ -22,8 +20,8 @@ nq = kindyn.nq()
 nv = kindyn.nv()
 
 # OPTIMIZATION PARAMETERS
-ns = 20  # number of shooting nodes
-tf = 3.0  # [s]
+ns = 300  # number of shooting nodes
+tf = 5.0  # [s]
 dt = tf/ns
 use_ms = True
 solver_type = 'ilqr'
@@ -48,7 +46,7 @@ prb.setDynamics(xdot)
 # Limits
 q_min = [-1, -2.*np.pi]
 q_max = [1, 2.*np.pi]
-q_init = [0.0, np.pi-0.1]
+q_init = [0.0, np.pi-1]
 
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
@@ -64,19 +62,17 @@ qdot.setBounds(qdot_init, qdot_init, nodes=0)
 u.setBounds(-tau_lims, tau_lims)
 
 # Cost function
-qtgt = np.array([0.5, np.pi])
+qtgt = np.array([0.0, np.pi])
 prb.createIntermediateCost("err", cs.sumsqr(q - qtgt))
-prb.createIntermediateCost("tau", 1e-6*cs.sumsqr(tau))
-# prb.createIntermediateCost("qdot", cs.sumsqr(qdot))
+prb.createIntermediateCost("tau", cs.sumsqr(tau))
+prb.createIntermediateCost("qdot", cs.sumsqr(qdot))
 
 if solver_type != 'ilqr':
     # Dynamics
-    th = TranscriptionsHandler(prb, dt)
     if use_ms:
-        th.setDefaultIntegrator(type='EULER')
-        th.setMultipleShooting()
+        th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
     else:
-        th.setDirectCollocation()
+        th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
 
 # Constraints
 prb.createFinalConstraint("up", q[1] - qtgt[1])
@@ -85,8 +81,12 @@ prb.createFinalConstraint("final_qdot", qdot)
 
 # Creates problem
 solver = Solver.make_solver(solver_type, prb, dt)  #, opts={'max_iter': 10})
-solver.ilqr.setStepLength(1)
+
+solver.plot_iter = True
+solver.set_iteration_callback()
+solver.max_iter = 400
 solver.solve()
+
 q_hist = solver.x_opt[:2, :]
 qdot_hist = solver.x_opt[2:4, :]
 
@@ -104,10 +104,11 @@ plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[ms^-1]}$', size = 20)
 
 plt.figure()
-plt.plot(time[:-1], solver.u_opt.T)
+plt.plot(time[:-1], solver.u_opt.T, '-')
 plt.suptitle('$\mathrm{Force}$', size = 20)
 plt.xlabel('$\mathrm{[sec]}$', size = 20)
 plt.ylabel('$\mathrm{[N]}$', size = 20)
+plt.grid()
 plt.show()
 
 # plot_all = True

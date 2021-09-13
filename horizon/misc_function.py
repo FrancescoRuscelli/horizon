@@ -30,12 +30,18 @@ def listOfListFLOATtoINT(listOfList):
 
     return listOfList
 
-def checkNodes(nodes, nodes_self):
+def checkNodes(nodes, nodes_self=None):
 
     if hasattr(nodes, "__iter__") and not isinstance(nodes, str):
-        nodes = [node for node in nodes if node in nodes_self]
+        if nodes_self is None:
+            pass
+        else:
+            nodes = [node for node in nodes if node in nodes_self]
     elif isinstance(nodes, int):
-        nodes = [nodes] if nodes in nodes_self else []
+        if nodes_self is None:
+            nodes = [nodes]
+        else:
+            nodes = [nodes] if nodes in nodes_self else []
     else:
         raise Exception('Type {} is not supported to specify nodes.'.format(type(nodes)))
 

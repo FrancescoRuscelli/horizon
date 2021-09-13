@@ -6,8 +6,8 @@ import numpy as np
 import time
 from horizon import problem
 from horizon.solvers import ilqr, blocksqp
-from horizon.utils import integrators, rti
-from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.utils import rti
+from horizon.transcriptions.transcriptor import Transcriptor
 import matplotlib.pyplot as plt
 import os
 
@@ -25,6 +25,7 @@ ns = 20  # number of shooting nodes
 dt = 0.1
 tf = ns*dt  # [s]
 use_ms = True
+use_ilqr = True
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -69,27 +70,25 @@ prb.createFinalConstraint("qfinal", q - q_tgt)
 prb.createFinalConstraint("qdotfinal", qdot)
 
 # Create solver
-use_ilqr = True
 if use_ilqr:
     solver = ilqr.SolverILQR(prb, dt, opts={'realtime_iteration': True})
 else:
     # Dynamics
-    th = TranscriptionsHandler(prb, dt)
     if use_ms:
-        th.setDefaultIntegrator(type='EULER')
-        th.setMultipleShooting()
+        th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
     else:
-        th.setDirectCollocation()
+        th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
+
     solver = blocksqp.BlockSqpSolver(prb, dt, opts={'realtime_iteration': True})
 
 # the rti loop
 rti_dt = 0.01
 mpc = rti.RealTimeIteration(prb, solver, rti_dt)
-stateread = np.array([0.5, np.pi-0.01, 0.0, 0.0])
+stateread = np.array([0.0, np.pi-0.5, 0.0, 0.0])
 states = []
 inputs = []
 times = []
-for i in range(300):
+for i in range(500):
     states.append(stateread.copy())
     tic = time.time()
     input = mpc.run(stateread)
