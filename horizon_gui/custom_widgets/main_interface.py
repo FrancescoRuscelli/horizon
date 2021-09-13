@@ -223,7 +223,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
 
         self.problem_gui.cost_line.addFunctionToHorizon(fun_name)
 
-        # # Cost function
+        # # Constraint function
         fun_name = 'up'
         fun_str = 'q[1] - np.pi'
         flag = self.horizon_receiver.addFunction(dict(name=fun_name, str=fun_str, active=None))
@@ -236,8 +236,21 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         # update ranges in sliders
         self.problem_gui.constraint_line.function_tab.setFunctionNodes(fun_name, ranges)
         self.problem_gui.constraint_line.multi_function_box.setFunctionNodes(fun_name, ranges)
-        # prb.createFinalConstraint("up", q[1] - np.pi)
-        # prb.createFinalConstraint("final_qdot", qdot)
+
+        fun_name = 'final_q_dot'
+        fun_str = 'q_dot'
+        flag = self.horizon_receiver.addFunction(dict(name=fun_name, str=fun_str, active=None))
+        if flag:
+            self.functions_gui.addFunctionToGui(fun_name, fun_str)
+
+        ranges = [self.nodes, self.nodes]
+        self.problem_gui.constraint_line.addFunctionToHorizon(fun_name)
+        self.problem_gui.constraint_line.setFunNodes(fun_name, ranges)
+        # update ranges in sliders
+        self.problem_gui.constraint_line.function_tab.setFunctionNodes(fun_name, ranges)
+        self.problem_gui.constraint_line.multi_function_box.setFunctionNodes(fun_name, ranges)
+
+
 
 
     def setupHighlighter(self):

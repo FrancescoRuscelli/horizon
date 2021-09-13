@@ -156,24 +156,25 @@ class QMultiSlider(QtWidgets.QWidget):
             for slice in self.slices:
                 if isinstance(slice, DisabledSlice):
                     self._removeSlice(slice)
+        slices_to_be_added = list()
 
         for slice in self.slices:
-            print('new_min:', min, 'old_min:', slice.getValues()[0])
-            print('new_max:', max, 'old_max:', slice.getValues()[1])
+            if min <= slice.getValues()[0] and max >= slice.getValues()[1]:
+                self._removeSlice(slice)
             if max >= slice.getValues()[1] >= min > slice.getValues()[0]:
-                print('entered max')
                 slice.setMax(min)
             if min <= slice.getValues()[0] <= max < slice.getValues()[1]:
-                print('entered min')
                 slice.setMin(max)
             if slice.getValues()[0] < min and slice.getValues()[1] > max:
-                print('entered both')
                 slice_min = slice.getValues()[0]
                 slice_max = slice.getValues()[1]
                 self._removeSlice(slice)
-                self._addSlice(Slice(slice_min, min))
-                self._addSlice(Slice(max, slice_max))
-            print('==============================')
+                slices_to_be_added.append(Slice(slice_min, min))
+                slices_to_be_added.append(Slice(max, slice_max))
+
+        for slice in slices_to_be_added:
+            self._addSlice(slice)
+
         disabled_value = DisabledSlice(min, max)
         self._addSlice(disabled_value)
 
@@ -393,10 +394,9 @@ class QMultiSlider(QtWidgets.QWidget):
 
     def _mergeSlider(self):
         active_display_min, active_display_max = self._fromValueToDisplay(self.active_slice)
-        # print('entered merge')
-        # print('all slices', self.slices)
-        # print('current slice', self.active_slice.getValues())
+
         for slice in self.slices:
+            # todo should do a case for disabled slices
             if slice is not self.active_slice and not isinstance(slice, DisabledSlice):
                 display_min, display_max = self._fromValueToDisplay(slice)
 
@@ -709,8 +709,8 @@ if (__name__ == "__main__"):
     hslider.disableValues(6, 6)
     print('========disabled===========')
     hslider.disableValues(0, 6)
-    # hslider.enableValues(4, 6)
-    # hslider.disableValues(4, 6)
+    hslider.enableValues(4, 6)
+    hslider.disableValues(3, 6)
     # hslider.disableValues(20, 25)
     # hslider.disableValues(26, 30)
 
