@@ -57,13 +57,13 @@ axs[0].set_title('State trajectory')
 axs[1].legend(['v', 'omega'])
 axs[1].set_title('Input trajectory')
 
-def iter_callback(xtrj, utrj, du, cost, defect, constr):
+def iter_callback(info):
     fmt = ' <#010.3f'
-    print(f'delta_u={du:{fmt}}  cost={cost:{fmt}}  constr={constr:{fmt}}  gap={defect:{fmt}}')
+    print(f'delta_u={info.step_length:{fmt}}  cost={info.merit:{fmt}}  constr={info.constraint_violation:{fmt}}  gap={info.defect_norm:{fmt}}')
     for i, l in enumerate(xline):
-        l.set_data(np.arange(N+1), xtrj[i, :])
+        l.set_data(np.arange(N+1), info.xtrj[i, :])
     for i, l in enumerate(uline):
-        l.set_data(np.arange(N), utrj[i, :])
+        l.set_data(np.arange(N), info.utrj[i, :])
     for ax in axs: 
         ax.relim()
         ax.autoscale_view()

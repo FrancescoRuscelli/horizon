@@ -13,7 +13,7 @@ class NlpsolSolver(Solver):
         
         self.solution: Dict[str:np.array] = None 
         
-        # generate problem to be solver
+        # generate problem to be solved
         self.var_container = self.prb.var_container
         self.fun_container = self.prb.function_container
 
@@ -62,10 +62,6 @@ class NlpsolSolver(Solver):
             par_list.append(par.getImpl())
 
         p = cs.vertcat(*par_list)
-
-
-        print(f'w {w.shape[0]}: {w}')
-        print(f'p {p.shape[0]}: {p}')
 
         # this is good but the problem is that, without some tampering, i get the variables repeated
         # ORDERED AS NODES
@@ -154,10 +150,6 @@ class NlpsolSolver(Solver):
         for fun in self.fun_container.getCost().values():
             fun_list.append(fun.getImpl())
         j = cs.sum1(cs.vertcat(*fun_list))
-
-        print(f'g ({g.shape[0]}): {g}')
-        print(f'j ({j.shape[0]}): {j}')
-
 
         return j, w, g, p
 

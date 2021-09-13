@@ -11,6 +11,7 @@ from typing import Dict, List
 from horizon.transcriptions import integrators
 import casadi as cs
 import numpy as np
+from matplotlib import pyplot as plt
 
 class SolverILQR(Solver):
     
@@ -43,6 +44,19 @@ class SolverILQR(Solver):
             self._set_cost_k(k)
             self._set_constraint_k(k)
 
+        # set a default iteration callback
+        self.plot_iter = False
+        self.xax = None 
+        self.uax = None
+
+    
+    def set_iteration_callback(self, cb=None):
+        if cb is None:
+            self.ilqr.setIterationCallback(self._iter_callback)
+        else:
+            self.ilqr.setIterationCallback(cb)
+
+
     def configure_rti(self) -> bool:
         self.opts['max_iter'] = 1
     
@@ -52,6 +66,8 @@ class SolverILQR(Solver):
         self.ilqr.setStateInitialGuess(self.x_opt)
         self.ilqr.setIterationCallback(self._iter_callback)
         self.ilqr.solve(self.max_iter)
+
+        # get solution
         self.x_opt = self.ilqr.getStateTrajectory()
         self.u_opt = self.ilqr.getInputTrajectory()
         
@@ -106,7 +122,7 @@ class SolverILQR(Solver):
 
             # state
             xlb, xub = self.prb.getState().getBounds(node=k)
-            if np.all(xlb == xub):
+            if np.all(xlb == xub) and k > 0:  # note: skip initial condition
                 value_list.append(self.x - xlb)
 
             # input
@@ -157,9 +173,47 @@ class SolverILQR(Solver):
 
 
     
-    def _iter_callback(self, xtrj, utrj, du, cost, defect, constr):
-        fmt = ' <#010.3f'
-        print(f'delta_u={du:{fmt}}  cost={cost:{fmt}}  constr={constr:{fmt}}  gap={defect:{fmt}}')
+    def _iter_callback(self, fpres):
+        # if not fpres.accepted:
+        #     return
+        fmt = ' <#010.3e'
+        fmtf = ' <#06.3f'
+        star = '*' if fpres.accepted else ' '
+        print(f'{star}\
+alpha={fpres.alpha:{fmtf}}  \
+merit={fpres.merit:{fmt}}  \
+dm={fpres.merit_der:{fmt}}  \
+mu_f={fpres.mu_f:{fmt}}  \
+mu_c={fpres.mu_c:{fmt}}  \
+cost={fpres.cost:{fmt}}  \
+delta_u={fpres.step_length:{fmt}}  \
+constr={fpres.constraint_violation:{fmt}}  \
+gap={fpres.defect_norm:{fmt}}')
+
+        if self.plot_iter and fpres.accepted:
+
+            if self.xax is None:
+                _, (self.xax, self.uax) = plt.subplots(1, 2)
+            
+            plt.sca(self.xax)
+            plt.cla()
+            plt.plot(fpres.xtrj.T)
+            plt.grid()
+            plt.title(f'State trajectory (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('State')
+            plt.legend([f'x{i}' for i in range(self.nx)])
+
+            plt.sca(self.uax)
+            plt.cla()
+            plt.plot(fpres.utrj.T)
+            plt.grid()
+            plt.title(f'Input trajectory (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('Input')
+            plt.legend([f'u{i}' for i in range(self.nu)])
+            plt.draw()
+            plt.waitforbuttonpress()
 
 
                     
