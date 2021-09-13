@@ -1,9 +1,10 @@
 import os
-from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
+from horizon_gui.gui.model_module.model_handler import ModelHandler
 from horizon_gui.custom_widgets.generic_display_mask import GenericDisplayMask
-from PyQt5.QtWidgets import QFileDialog, QApplication, QGridLayout, QLabel, QLineEdit
+from PyQt5.QtWidgets import QFileDialog, QApplication, QGridLayout, QLabel, QLineEdit, QWidget, QRadioButton, QPushButton
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QPalette
+from horizon_gui.definitions import ROOT_DIR
 import sys
 import ntpath
 
@@ -15,7 +16,7 @@ class ModelGui(GenericDisplayMask):
         super().__init__(parent)
 
         self.logger = logger
-        self.kindyn = None
+        self.model_handler = ModelHandler()
 
     def openWindow(self):
 
@@ -25,6 +26,7 @@ class ModelGui(GenericDisplayMask):
         self.main_widget.setLayout(self.main_widget_layout)
 
         self.populateWindow()
+        self._addVarSelector()
 
     def populateWindow(self):
         self.yes_button.setDisabled(False)
@@ -53,16 +55,57 @@ class ModelGui(GenericDisplayMask):
         self.nv_line.setAlignment(Qt.AlignCenter)
         self.main_widget_layout.addWidget(self.nv_line, 2, 1)
 
-        if self.kindyn:
-            self.nq_line.setText(str(self.kindyn.nq()))
-            self.nv_line.setText(str(self.kindyn.nv()))
+        # self.var_button = QPushButton('Variables')
+        # self.main_widget_layout.addWidget(self.var_button, 3, 1)
+
+        if self.model_handler.getKinDyn():
+            self.nq_line.setText(str(self.model_handler.getNq()))
+            self.nv_line.setText(str(self.model_handler.getNqdot()))
 
         self.no_button.clicked.connect(self.win.close)
         self.yes_button.clicked.connect(self.openFileFromDialog)
 
+    def _addVarSelector(self):
+
+        self.var_widget = QWidget()
+        self.var_widget_layout = QGridLayout(self.var_widget)
+        self.var_title = QLabel('Variables:')
+        self.q_title = QLabel('q:')
+        self.q_dot_title = QLabel('q_dot:')
+        self.q_ddot_title = QLabel('q_ddot:')
+
+        self.state_title = QLabel('state')
+        self.input_title = QLabel('input')
+
+        self.state_button = [QRadioButton(), QRadioButton(), QRadioButton()]
+        self.input_button = [QRadioButton(), QRadioButton(), QRadioButton()]
+
+        self.var_widget_layout.addWidget(self.state_title, 0, 1)
+        self.var_widget_layout.addWidget(self.input_title, 0, 2)
+
+        self.var_widget_layout.addWidget(self.q_title, 1, 0)
+        self.var_widget_layout.addWidget(self.q_dot_title, 2, 0)
+        self.var_widget_layout.addWidget(self.q_ddot_title, 3, 0)
+
+        # QButtonGroup
+        self.var_widget_layout.addWidget(self.state_button[0], 1, 1)
+        self.var_widget_layout.addWidget(self.state_button[1], 2, 1)
+        self.var_widget_layout.addWidget(self.state_button[2], 3, 1)
+
+        self.var_widget_layout.addWidget(self.input_button[0], 1, 2)
+        self.var_widget_layout.addWidget(self.input_button[1], 2, 2)
+        self.var_widget_layout.addWidget(self.input_button[2], 3, 2)
+
+
+
+        self.var_widget.show()
+
+
+
+
     def openFileFromDialog(self):
 
-        dir = '/home/francesco/hhcm_workspace/src/horizon/horizon'
+        dir = ROOT_DIR
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         # file_selected = QFileDialog.getExistingDirectory(self, "Open URDF", dir, options=options)
@@ -82,14 +125,14 @@ class ModelGui(GenericDisplayMask):
         self.loadModel(file_path)
         self.win.close()
 
-        self.nq_line.setText(str(self.kindyn.nq()))
-        self.nv_line.setText(str(self.kindyn.nv()))
+        self.nq_line.setText(str(self.model_handler.getNq()))
+        self.nv_line.setText(str(self.model_handler.getNqdot()))
         # self.writeInStatusBar('Opening Horizon problem!')
 
     def loadModel(self, urdf_file):
         try:
             urdf = open(urdf_file, 'r').read()
-            self.kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
+            self.model_handler.setModel(urdf)
 
             # should this go here?
             self.display.setText(ntpath.basename(urdf_file))
@@ -100,8 +143,7 @@ class ModelGui(GenericDisplayMask):
                 self.logger.warning(f'Could not load model in file {urdf_file}: {e}')
 
     def getKinDin(self):
-        return self.kindyn
-
+        return self.model_handler.getKinDyn()
 
 if __name__ == '__main__':
 
