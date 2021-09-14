@@ -156,8 +156,8 @@ class HorizonLine(QScrollArea):
             disabled_nodes = self._getDisableNodes(used_vars)
             self.function_tab.setFunctionDisabledNodes(fun_name, disabled_nodes)
 
-        if self.function_tab.count():
-            self.updateMarginsSingleLine()
+        # if self.function_tab.count():
+        #     self.updateMarginsSingleLine()
 
         # update nodes in multi_function window widget
         self.multi_function_box.setHorizonNodes(nodes)
@@ -166,9 +166,9 @@ class HorizonLine(QScrollArea):
             used_vars = self.horizon_receiver.getFunction(fun_name)['used_vars']
             disabled_nodes = self._getDisableNodes(used_vars)
             self.multi_function_box.setFunctionDisabledNodes(fun_name, disabled_nodes)
-
-        if self.multi_function_box.getNFunctions():
-            self.updateMarginsMultiLine()
+        #
+        # if self.multi_function_box.getNFunctions():
+        #     self.updateMarginsMultiLine()
 
     def _getDisableNodes(self, used_vars):
         available_nodes = set(range(self.n_nodes))
@@ -180,13 +180,13 @@ class HorizonLine(QScrollArea):
         disabled_nodes = ravelElements(disabled_nodes)
         return disabled_nodes
 
-    def updateMarginsSingleLine(self):
-        node_box_width = self.nodes_line.getBoxWidth()
+    # def updateMarginsSingleLine(self):
+    #     node_box_width = self.nodes_line.getBoxWidth()
         # margins = QMargins(node_box_width / 2, 0, node_box_width / 2, 0)  # todo why?
         # self.function_tab.updateMargins(margins)
 
-    def updateMarginsMultiLine(self):
-        node_box_width = self.nodes_line.getBoxWidth()
+    # def updateMarginsMultiLine(self):
+    #     node_box_width = self.nodes_line.getBoxWidth()
         # margins = QMargins(node_box_width / 2 + 11, 0, node_box_width / 2 + 11, 0)
         # self.multi_function_box.updateMargins(margins)
 
@@ -219,11 +219,11 @@ class HorizonLine(QScrollArea):
 
     def addFunctionToSingleLine(self, name, dim, disabled_nodes, initial_bounds):
         self.function_tab.addFunctionToGui(name, dim, disabled_nodes, initial_bounds)
-        self.updateMarginsSingleLine()
+        # self.updateMarginsSingleLine()
 
     def addFunctionToMultiLine(self, name, disabled_nodes):
         self.multi_function_box.addFunctionToGui(name, disabled_nodes)
-        self.updateMarginsMultiLine()
+        # self.updateMarginsMultiLine()
 
     def addFunctionToHorizon(self, name):
 

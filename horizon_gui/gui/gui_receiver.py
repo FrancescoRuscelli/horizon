@@ -1,6 +1,7 @@
 from horizon import problem as horizon
 from horizon.solvers import Solver
 from horizon_gui.gui.dynamics_module.dynamics_handler import DynamicsHandler
+from horizon_gui.gui.model_module.model_handler import ModelHandler
 from horizon_gui.custom_functions.txt_to_fun import TxtToFun
 from horizon.transcriptions.transcriptor import Transcriptor
 import parser
@@ -32,6 +33,7 @@ class horizonImpl():
         # list of dynamics that can be defined
         self.txt_to_fun_converter = TxtToFun(self.sv_dict, self.fun_dict, self.logger)
         self.dyn_han = DynamicsHandler(self.casadi_prb, self.logger)
+        self.model_han = ModelHandler(self.logger)
 
         self.trans_method = None
         self.dynamics_flag = False
@@ -297,8 +299,11 @@ class horizonImpl():
     def getVarDict(self):
         return self.sv_dict
 
-    def getVar(self, elem):
-        return self.sv_dict[elem]
+    def getVar(self, elem=None):
+        if elem is None:
+            return self.sv_dict
+        else:
+            return self.sv_dict[elem]
 
     def getNodes(self):
         return self.nodes
@@ -321,6 +326,9 @@ class horizonImpl():
 
     def getDefaultDynList(self):
         return self.dyn_han.getList()
+
+    def getModelHandler(self):
+        return self.model_han
 
     def _createAndAppendFun(self, name, str_fun):
 

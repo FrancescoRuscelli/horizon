@@ -1,8 +1,13 @@
 from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 from horizon.utils.casadi_kin_dyn import InverseDynamics
+from horizon.problem import Problem
+from logging import Logger
 
 class ModelHandler:
-    def __init__(self):
+    def __init__(self, logger: Logger):
+
+        self.logger = logger
+
         self.kindyn = None
 
     def setModel(self, urdf):

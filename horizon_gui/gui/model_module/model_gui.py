@@ -1,24 +1,27 @@
 import os
+from horizon_gui.gui.gui_receiver import horizonImpl
 from horizon_gui.gui.model_module.model_handler import ModelHandler
 from horizon_gui.custom_widgets.generic_display_mask import GenericDisplayMask
 from horizon_gui.custom_widgets.display_line import DisplayLine
 from horizon_gui.custom_widgets.on_destroy_signal_window import DestroySignalWindow
-from PyQt5.QtWidgets import QFileDialog, QApplication, QGridLayout, QLabel, QLineEdit, QWidget, QRadioButton, QPushButton, QButtonGroup
+from PyQt5.QtWidgets import QFileDialog, QApplication, QGridLayout, QLabel, QLineEdit, QRadioButton, QPushButton, QButtonGroup, QListWidget
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QPalette
 from horizon_gui.definitions import ROOT_DIR
 import sys
+from functools import partial
 import ntpath
 
 
 class ModelGui(GenericDisplayMask):
     modelLoaded = pyqtSignal(bool)
 
-    def __init__(self, logger=None, parent=None):
+    def __init__(self, horizon_receiver: horizonImpl, logger=None, parent=None):
         super().__init__(parent)
 
         self.logger = logger
-        self.model_handler = ModelHandler()
+        self.horizon_receiver = horizon_receiver
+        self.model_handler = self.horizon_receiver.getModelHandler()
 
     def openWindow(self):
 
@@ -29,7 +32,6 @@ class ModelGui(GenericDisplayMask):
 
         self.populateWindow()
         # self._initVarSelector()
-        self._initIDWidget()
 
     def populateWindow(self):
         self.yes_button.setDisabled(False)
@@ -166,37 +168,12 @@ class ModelGui(GenericDisplayMask):
     def getKinDin(self):
         return self.model_handler.getKinDyn()
 
-    def _initIDWidget(self):
-        self.id_widget = DestroySignalWindow()
-        self.id_widget_layout = QGridLayout(self.id_widget)
-
-        vars = ['q', 'q_dot', 'q_ddot']
-
-        id_buttons = list()
-
-
-        id_title = QLabel('Variables:')
-        self.id_widget_layout.addWidget(id_title, 0, 0)
-
-        for i in range(len(vars)):
-            id_var_title = QLabel(f'{vars[i]}:')
-            self.id_widget_layout.addWidget(id_var_title, i+1, 0)
-            display = DisplayLine()
-            self.id_widget_layout.addWidget(display, i+1, 1)
-
-            open_button = QPushButton('...')
-            open_button.clicked.connect(self.openVar)
-            self.id_widget_layout.addWidget(open_button, i+1, 2)
-
-        self.id_widget.show()
-
-    def openVar(self):
-        self.model_handler.
-
 if __name__ == '__main__':
 
     app = QApplication(sys.argv)
-    gui = ModelGui()
+    hr = horizonImpl(10)
+    hr.createVariable('State', 'x', 2, 0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    gui = ModelGui(hr)
     gui.show()
 
     sys.exit(app.exec_())

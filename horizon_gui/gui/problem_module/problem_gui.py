@@ -1,7 +1,6 @@
 from PyQt5.QtWidgets import QLabel, QStackedWidget, QWidget, QApplication, QVBoxLayout, QHBoxLayout, QRadioButton, QGridLayout, QPushButton, QSizePolicy, QSpacerItem
 from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
-from horizon_gui.custom_widgets import on_destroy_signal_window, highlight_delegate, bounds_line, multi_slider_v1, spinbox_line
+from PyQt5.QtCore import Qt
 from horizon_gui.gui.gui_receiver import horizonImpl
 from horizon_gui.custom_widgets.horizon_line import HorizonLine
 from functools import partial
