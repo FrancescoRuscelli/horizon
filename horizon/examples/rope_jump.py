@@ -5,8 +5,10 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.ros.replay_trajectory import *
+from horizon.transcriptions import integrators
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 import time
@@ -46,6 +48,7 @@ dt = prb.createVariable("dt", 1, nodes=list(range(0, ns)))
 
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
+prb.setDynamics(xdot)
 
 # Formulate discrete time dynamics
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
@@ -74,9 +77,14 @@ q_init = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
            0., alpha, 0.,
            rope_lenght]
 q.setInitialGuess(q_init)
+q.setBounds(q_init, q_init, 0)
+
 
 qdot.setBounds(-100.*np.ones(nv), 100.*np.ones(nv))
 qdot.setInitialGuess(np.zeros(nv))
+qdot.setBounds(np.zeros(nv), np.zeros(nv), 0)
+qdot.setBounds(np.zeros(nv), np.zeros(nv), ns+1)
+
 qddot.setBounds(-100.*np.ones(nv), 100.*np.ones(nv))
 qddot.setInitialGuess(np.zeros(nv))
 f1.setBounds(-10000.*np.ones(nf), 10000.*np.ones(nf))
@@ -86,8 +94,9 @@ f2.setInitialGuess(np.zeros(nf))
 frope.setBounds(-10000.*np.ones(nf), 10000.*np.ones(nf))
 frope.setInitialGuess(np.zeros(nf))
 
-dt.setBounds(0.01, 0.08)
-dt.setInitialGuess(0.01)
+dt.setBounds([0.01], [0.08])
+dt.setInitialGuess([0.01])
+
 
 # Cost function
 lift_node = 3 #20
@@ -101,7 +110,7 @@ q_trg = np.array([-.4, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                   0.3]).tolist()
 
 x_distance = -0.4
-prb.createCostFunction("wall_distance", 100.*cs.sumsqr(q[0] - x_distance), nodes=list(range(lift_node, touch_down_node)))
+prb.createCostFunction("wall_distance", 100.*cs.sumsqr(q[0] - x_distance), nodes=list(range(lift_node, ns+1)))
 prb.createCostFunction("min_qdot", cs.sumsqr(qdot))
 #prb.createCostFunction("min_legs_vel", cs.sumsqr(qdot[6:12]), nodes=list(range(lift_node, touch_down_node)))
 #prb.createCostFunction("min_base_vel", cs.sumsqr(qdot[0:6]), nodes=list(range(lift_node, ns+1)))
@@ -120,9 +129,6 @@ dt_prev = dt.getVarOffset(-1)
 x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt_prev)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))
 
-prb.createConstraint("initial_q", cs.sumsqr(q-q_init), nodes=0)
-#prb.createConstraint("initial_qdot", cs.sumsqr(qdot-np.zeros(nv)), nodes=0)
-prb.createConstraint("final_qdot", cs.sumsqr(qdot-np.zeros(nv)), nodes=ns+1)
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
             -1000., -1000., -1000.,  # Contact 1
@@ -187,17 +193,15 @@ for frame, f in zip(contact_names, forces):
     prb.createConstraint(f"{frame}_on_wall", c, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=lb, ub=ub))
 
 # Creates problem
-prb.createProblem()
-
-opts = {'ipopt.tol': 0.001,
-        'ipopt.constr_viol_tol': 0.001,
+opts = {'ipopt.tol': 0.01,
+        'ipopt.constr_viol_tol': 0.01,
         'ipopt.max_iter': 5000,
         'ipopt.linear_solver': 'ma57'}
 
-solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
-prb.setSolver(solver)
+solver = solver.Solver.make_solver('ipopt', prb, None, opts)
+solver.solve()
 
-solution = prb.solveProblem()
+solution = solver.getSolutionDict()
 
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]
@@ -232,7 +236,9 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
               'rope_joint']
 
-replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping).replay()
+repl = replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping)
+repl.sleep(1.)
+repl.replay()
 
 
 
