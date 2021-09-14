@@ -5,7 +5,9 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory
+from horizon.transcriptions import integrators
+from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 import os
@@ -181,7 +183,7 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
         'ipopt.max_iter': 5000}
 
-solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+solver = solver.Solver.make_solver('ipopt', prb, None, opts)
 solver.solve()
 
 solution = solver.getSolutionDict()
