@@ -29,7 +29,7 @@ class Solver(ABC):
         Args:
             type (str): a string indicating the solver type (e.g., blocksqp, ipopt, ilqr)
             prb (Problem): the horizon's problem instance to be solved
-            dt (float): the discretization step
+            dt (float): the discretization step, None if not needed
             opts (Dict, optional): A solver-dependent Dict of options. Defaults to None.
         """
 
@@ -57,7 +57,7 @@ class Solver(ABC):
 
         Args:
             prb (Problem): the horizon's problem instance to be solved
-            dt (float): the discretization step
+            dt (float): the discretization step, None if not needed
             opts (Dict, optional): A solver-dependent Dict of options. Defaults to None.
         """
         
