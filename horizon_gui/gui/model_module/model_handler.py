@@ -16,6 +16,7 @@ class ModelHandler:
             raise Exception('kindyn is not setted. Cannot compute inverse dynamics.')
 
         tau = InverseDynamics(self.kindyn).call(q, q_dot, q_ddot)
+        return tau
 
     def getNq(self):
         if not self.kindyn:

@@ -1,7 +1,9 @@
 import os
 from horizon_gui.gui.model_module.model_handler import ModelHandler
 from horizon_gui.custom_widgets.generic_display_mask import GenericDisplayMask
-from PyQt5.QtWidgets import QFileDialog, QApplication, QGridLayout, QLabel, QLineEdit, QWidget, QRadioButton, QPushButton
+from horizon_gui.custom_widgets.display_line import DisplayLine
+from horizon_gui.custom_widgets.on_destroy_signal_window import DestroySignalWindow
+from PyQt5.QtWidgets import QFileDialog, QApplication, QGridLayout, QLabel, QLineEdit, QWidget, QRadioButton, QPushButton, QButtonGroup
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QPalette
 from horizon_gui.definitions import ROOT_DIR
@@ -26,7 +28,8 @@ class ModelGui(GenericDisplayMask):
         self.main_widget.setLayout(self.main_widget_layout)
 
         self.populateWindow()
-        self._addVarSelector()
+        # self._initVarSelector()
+        self._initIDWidget()
 
     def populateWindow(self):
         self.yes_button.setDisabled(False)
@@ -65,43 +68,61 @@ class ModelGui(GenericDisplayMask):
         self.no_button.clicked.connect(self.win.close)
         self.yes_button.clicked.connect(self.openFileFromDialog)
 
-    def _addVarSelector(self):
+    def _initVarSelector(self):
 
-        self.var_widget = QWidget()
+        self.var_widget = DestroySignalWindow()
         self.var_widget_layout = QGridLayout(self.var_widget)
         self.var_title = QLabel('Variables:')
-        self.q_title = QLabel('q:')
-        self.q_dot_title = QLabel('q_dot:')
-        self.q_ddot_title = QLabel('q_ddot:')
 
-        self.state_title = QLabel('state')
-        self.input_title = QLabel('input')
+        '______|__state__|__input__'
+        'q     |         |         '
+        '______|_________|_________'
+        'qdot  |         |         '
+        '______|_________|_________'
+        'qddot |         |         '
+        '______|_________|_________'
+        vars = ['q', 'q_dot', 'q_ddot']
+        types = ['state', 'input']
 
-        self.state_button = [QRadioButton(), QRadioButton(), QRadioButton()]
-        self.input_button = [QRadioButton(), QRadioButton(), QRadioButton()]
+        self.var_titles = list()
+        for var in vars:
+            self.var_titles.append(QLabel(f'{var}:'))
 
-        self.var_widget_layout.addWidget(self.state_title, 0, 1)
-        self.var_widget_layout.addWidget(self.input_title, 0, 2)
+        self.type_titles = list()
+        for type in types:
+            self.type_titles.append(QLabel(type))
 
-        self.var_widget_layout.addWidget(self.q_title, 1, 0)
-        self.var_widget_layout.addWidget(self.q_dot_title, 2, 0)
-        self.var_widget_layout.addWidget(self.q_ddot_title, 3, 0)
+        self.type_buttons = list()
+        for n in range(len(types)):
+            var_buttons = list()
+            for i in range(len(vars)):
+                var_buttons.append(QRadioButton())
+            self.type_buttons.append(var_buttons)
 
-        # QButtonGroup
-        self.var_widget_layout.addWidget(self.state_button[0], 1, 1)
-        self.var_widget_layout.addWidget(self.state_button[1], 2, 1)
-        self.var_widget_layout.addWidget(self.state_button[2], 3, 1)
+        button_groups = list()
 
-        self.var_widget_layout.addWidget(self.input_button[0], 1, 2)
-        self.var_widget_layout.addWidget(self.input_button[1], 2, 2)
-        self.var_widget_layout.addWidget(self.input_button[2], 3, 2)
+        for i in range(len(vars)):
+            temp_group = QButtonGroup(self)
+            for type_button in self.type_buttons:
+                temp_group.addButton(type_button[i])
+            button_groups.append(temp_group)
 
+        # for type_button in self.type_buttons:
+        #     type_button[0].setChecked(True)
 
+        for n in range(len(types)):
+            self.var_widget_layout.addWidget(self.type_titles[n], 0, n+1)
+
+        for i in range(len(vars)):
+            self.var_widget_layout.addWidget(self.var_titles[i], i+1, 0)
+
+        k = 0
+        for type_button in self.type_buttons:
+            k = k+1
+            for i in range(len(type_button)):
+                self.var_widget_layout.addWidget(type_button[i], i+1, k)
 
         self.var_widget.show()
-
-
-
 
     def openFileFromDialog(self):
 
@@ -144,6 +165,33 @@ class ModelGui(GenericDisplayMask):
 
     def getKinDin(self):
         return self.model_handler.getKinDyn()
+
+    def _initIDWidget(self):
+        self.id_widget = DestroySignalWindow()
+        self.id_widget_layout = QGridLayout(self.id_widget)
+
+        vars = ['q', 'q_dot', 'q_ddot']
+
+        id_buttons = list()
+
+
+        id_title = QLabel('Variables:')
+        self.id_widget_layout.addWidget(id_title, 0, 0)
+
+        for i in range(len(vars)):
+            id_var_title = QLabel(f'{vars[i]}:')
+            self.id_widget_layout.addWidget(id_var_title, i+1, 0)
+            display = DisplayLine()
+            self.id_widget_layout.addWidget(display, i+1, 1)
+
+            open_button = QPushButton('...')
+            open_button.clicked.connect(self.openVar)
+            self.id_widget_layout.addWidget(open_button, i+1, 2)
+
+        self.id_widget.show()
+
+    def openVar(self):
+        self.model_handler.
 
 if __name__ == '__main__':
 
