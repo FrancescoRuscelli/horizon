@@ -21,6 +21,7 @@ class AbstractVariable(ABC, cs.SX):
     Notes:
           Horizon allows the user to work only with abstract variables. Internally, these variables are projected over the horizon nodes.
     """
+
     def __init__(self, tag: str, dim: int):
         """
         Initialize the Abstract Variable. Inherits from the symbolic CASADI varaible SX.
@@ -55,8 +56,27 @@ class AbstractVariable(ABC, cs.SX):
     def getOffset(self):
         return self._offset
 
+    def __getitem__(self, item):
+        view = AbstractVariableView(self, item)
+        return view
+
+class AbstractVariableView(cs.SX):
+    def __init__(self, parent: AbstractVariable, indices):
+        elems = parent.elements()
+        sx = cs.vertcat(*elems[indices]) if isinstance(indices, slice) else elems[indices]
+        super().__init__(sx)
+        self._parent = parent
+        self._indices = indices
+        self._dim = len(range(*self._indices.indices(self._parent.getDim()))) if isinstance(self._indices, slice) else 1
+
+    def getName(self):
+        return self._parent.getName()
+
+    def __getitem__(self, item):
+        return self._parent[item]
+
 class OffsetVariable(AbstractVariable):
-    def __init__(self, parent_name, tag, dim, nodes, offset, var_impl):
+    def __init__(self, parent_name, tag, dim, offset, var_impl):
         """
         Initialize the Offset Variable.
 
@@ -216,6 +236,30 @@ class SingleParameter(AbstractVariable):
         """
         return self._tag
 
+    def __getitem__(self, item):
+        view = SingleParameterView(self, item)
+        return view
+
+class SingleParameterView(AbstractVariableView):
+    def __init__(self, parent: SingleParameter, indices):
+        super().__init__(parent, indices)
+
+    def assign(self, vals):
+        """
+        Assign a value to the parameter. Can be assigned also after the problem is built, before solving the problem.
+        If not assigned, its default value is zero.
+
+        Args:
+            vals: value of the parameter
+        """
+        vals = misc.checkValueEntry(vals)
+
+        # todo what if vals has no shape?
+        if vals.shape[0] != self._dim:
+            raise Exception('Wrong dimension of parameter values inserted.')
+
+        self._parent._par_impl['val'][self._indices] = vals
+
 class Parameter(AbstractVariable):
     """
     Parameter of Horizon Problem.
@@ -338,6 +382,10 @@ class Parameter(AbstractVariable):
         """
         return self._tag
 
+    def __getitem__(self, item):
+        view = ParameterView(self, item)
+        return view
+
     def __reduce__(self):
         """
         Experimental function to serialize this element.
@@ -346,6 +394,32 @@ class Parameter(AbstractVariable):
             instance of this element serialized
         """
         return (self.__class__, (self._tag, self._dim, self._nodes,))
+
+class ParameterView(AbstractVariableView):
+    def __init__(self, parent: SingleParameter, indices):
+        super().__init__(parent, indices)
+
+    def assign(self, vals, nodes=None):
+        """
+       Assign a value to the parameter at a desired node. Can be assigned also after the problem is built, before solving the problem.
+       If not assigned, its default value is zero.
+
+       Args:
+           vals: value of the parameter
+           nodes: nodes at which the parameter is assigned
+       """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        vals = misc.checkValueEntry(vals)
+
+        if vals.shape[0] != self._dim:
+            raise Exception('Wrong dimension of parameter values inserted.')
+
+        for node in nodes:
+            self._parent._par_impl['n' + str(node)]['val'][self._indices] = vals
 
 class SingleVariable(AbstractVariable):
     """
@@ -549,6 +623,67 @@ class SingleVariable(AbstractVariable):
         """
         return self._tag
 
+    def __getitem__(self, item):
+        view = SingleVariableView(self, item)
+        return view
+
+class SingleVariableView(AbstractVariableView):
+    def __init__(self, parent: SingleVariable, indices):
+        super().__init__(parent, indices)
+
+    def setLowerBounds(self, bounds):
+        """
+        Setter for the lower bounds of the variable.
+
+        Args:
+            bounds: value of the lower bounds
+        """
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self._dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
+
+        self._parent._var_impl['lb'][self._indices] = bounds
+
+    def setUpperBounds(self, bounds):
+        """
+        Setter for the upper bounds of the variable.
+
+        Args:
+            bounds: value of the upper bounds
+        """
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self._dim:
+            raise Exception('Wrong dimension of upper bounds inserted.')
+
+        self._var_impl['ub'][self._indices] = bounds
+
+    def setBounds(self, lb, ub):
+        """
+        Setter for the bounds of the variable.
+
+        Args:
+            lb: value of the lower bounds
+            ub: value of the upper bounds
+        """
+        self.setLowerBounds(lb)
+        self.setUpperBounds(ub)
+
+    def setInitialGuess(self, val):
+        """
+        Setter for the initial guess of the variable.
+
+        Args:
+            val: value of the initial guess
+        """
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self._dim:
+            raise Exception('Wrong dimension of initial guess inserted.')
+
+        self._var_impl['w0'][self._indices] = val
+
 class Variable(AbstractVariable):
     """
     Variable of Horizon Problem: generic variable of the optimization problem.
@@ -681,7 +816,7 @@ class Variable(AbstractVariable):
             createTag = lambda name, node: name + str(node) if node is not None else name
 
             new_tag = createTag(self._tag, node)
-            var = OffsetVariable(self._tag, new_tag, self._dim, self._nodes, int(node), self._var_impl)
+            var = OffsetVariable(self._tag, new_tag, self._dim, int(node), self._var_impl)
 
             self.var_offset[node] = var
         return var
@@ -847,6 +982,10 @@ class Variable(AbstractVariable):
         """
         return self._tag
 
+    def __getitem__(self, item):
+        view = VariableView(self, item)
+        return view
+
     def __reduce__(self):
         """
         Experimental function to serialize this element.
@@ -855,6 +994,84 @@ class Variable(AbstractVariable):
             instance of this element serialized
         """
         return (self.__class__, (self._tag, self._dim, self._nodes, ))
+
+class VariableView(AbstractVariableView):
+    def __init__(self, parent: Variable, indices):
+        super().__init__(parent, indices)
+
+    def setLowerBounds(self, bounds, nodes=None):
+        """
+        Setter for the lower bounds of the variable.
+
+        Args:
+            bounds: desired bounds of the variable
+            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+        """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        bounds = misc.checkValueEntry(bounds)
+        if bounds.shape[0] != self._dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
+
+        for node in nodes:
+            self._parent._var_impl['n' + str(node)]['lb'][self._indices] = bounds
+
+    def setUpperBounds(self, bounds, nodes=None):
+        """
+        Setter for the upper bounds of the variable.
+
+        Args:
+            bounds: desired bounds of the variable
+            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+        """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self._dim:
+            raise Exception('Wrong dimension of upper bounds inserted.')
+
+        for node in nodes:
+            self._parent._var_impl['n' + str(node)]['ub'][self._indices] = bounds
+
+    def setBounds(self, lb, ub, nodes=None):
+        """
+        Setter for the bounds of the variable.
+
+        Args:
+            lb: desired lower bounds of the variable
+            ub: desired upper bounds of the variable
+            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+        """
+        self.setLowerBounds(lb, nodes)
+        self.setUpperBounds(ub, nodes)
+
+    def setInitialGuess(self, val, nodes=None):
+        """
+        Setter for the initial guess of the variable.
+
+        Args:
+            val: desired initial guess of the variable
+            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+        """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self._dim:
+            raise Exception('Wrong dimension of initial guess inserted.')
+
+        for node in nodes:
+            self._parent._var_impl['n' + str(node)]['w0'][self._indices] = val
 
 class InputVariable(Variable):
     """
@@ -877,6 +1094,10 @@ class InputVariable(Variable):
         """
         super(InputVariable, self).__init__(tag, dim, nodes)
 
+    def __getitem__(self, item):
+        view = VariableView(self, item)
+        return view
+
 class StateVariable(Variable):
     """
     State Variable of Horizon Problem.
@@ -887,6 +1108,7 @@ class StateVariable(Variable):
 
         Implemented variable "x" --> x_0, x_1, ... x_N-1, x_N
     """
+
     def __init__(self, tag, dim, nodes):
         """
         Initialize the State Variable.
@@ -897,6 +1119,10 @@ class StateVariable(Variable):
             nodes: should always be N, where N is the number of horizon nodes
         """
         super(StateVariable, self).__init__(tag, dim, nodes)
+
+    def __getitem__(self, item):
+        view = VariableView(self, item)
+        return view
 
 class AbstractAggregate(ABC):
     """
@@ -1466,9 +1692,42 @@ class VariablesContainer:
 
 if __name__ == '__main__':
 
-    # a = AbstractVariable('a', 2)
-    # print(a.getName())
-    p = StateVariable('x', 2, [0,2])
+    # PARAMETER
+    # a = Parameter('p', 6, [0, 1, 2, 3, 4, 5])
+    # print(a[2:4], f'type: {type(a[2:4])}')
+    # a.assign([1, 1, 1, 1, 1, 1])
+    # a[1:3].assign([2, 3])
+    # print(a.getValues())
+    # INPUT
+    # i = InputVariable('u', 6, [0, 1, 2, 3, 4, 5])
+    # print(i[2:4], f'type: {type(i[2:4])}')
+    # i[2:4].setLowerBounds([1, 1])
+    # print(i.getLowerBounds())
+    # exit()
+    # STATE VARIABLE
+    p = StateVariable('x', 6, [0, 1, 2, 3, 4, 5])
+    # print(p, f'type: {type(p)}')
+    # print(p[0:2], f'type: {type(p[0:2])}')
+    # print(p[0:2]+2)
+    # p_sliced = p[0:2]
+    # p_sliced[0].setLowerBounds(5)
+    # p[-1].setLowerBounds(0)
+    # print(p.getLowerBounds())
+    print(p[0].setInitialGuess(10, [1]))
+    print(p.getInitialGuess())
+    # SINGLE VARIABLE
+    # p = SingleVariable('x', 6, [0, 1, 2])
+    # print(p, f'type: {type(p)}')
+    # print(p[0:2], f'type: {type(p[0:2])}')
+    # print(p[0:2]+2)
+    # print(f'type: {type(p[-1])}')
+    # p[-1].setLowerBounds(0)
+    # print(p.getLowerBounds())
+
+
+
+
+
     exit()
     n_nodes = 10
     sv = VariablesContainer(n_nodes)
