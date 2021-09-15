@@ -32,7 +32,8 @@ class InverseDynamicsGui(QWidget):
 
     def _initDummy(self):
 
-        urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
+        # urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
+        urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
         urdf = open(urdf_file, 'r').read()
         self.horizon_receiver.getModelHandler().setModel(urdf)
         self.horizon_receiver.createVariable('State', 'x', 2, 0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -40,9 +41,15 @@ class InverseDynamicsGui(QWidget):
         self.horizon_receiver.createVariable('State', 'x_ddot', 2, 0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
         self.setVar('q', 'x')
-        self.updateDisplay()
         self.setVar('q_dot', 'x_dot')
         self.setVar('q_ddot', 'x_ddot')
+
+        self.openIDWidget()
+        i = 0
+        for display in self.id_widget.findChildren(DisplayLine):
+            self.updateDisplay(display, self.variables_name[i])
+            i = i+1
+
 
 
 

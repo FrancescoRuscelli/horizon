@@ -74,7 +74,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.DynamicsBox.setLayout(dynamics_box_layout)
         dynamics_box_layout.addWidget(self.dyn_gui)
         # model
-        self.model_gui = ModelGui(self.logger, self)
+        self.model_gui = ModelGui(self.horizon_receiver, self.logger, self)
         model_box_layout = QVBoxLayout()
         self.ModelBox.setLayout(model_box_layout)
         model_box_layout.addWidget(self.model_gui)
@@ -158,8 +158,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         n_nodes = 30
         self.NodesSpinBox.setValue(n_nodes)
         self.setBoxNodes(n_nodes)
-        # urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
-        urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
+        urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
+        # urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
         self.model_gui.loadModel(urdf_file)
 
         state_vars = dict(q=2, q_dot=2)
