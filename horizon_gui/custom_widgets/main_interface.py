@@ -14,6 +14,7 @@ from horizon_gui.gui.transcriptions_module.transcriptions_gui import Transcripti
 from horizon_gui.gui.dynamics_module.dynamics_gui import DynamicsGui
 from horizon_gui.gui.model_module.model_gui import ModelGui
 from horizon_gui.gui.problem_module.problem_gui import ProblemGui
+from horizon_gui.gui.id_module.id_gui import InverseDynamicsGui
 from horizon_gui.custom_widgets import horizon_line
 from horizon_gui.custom_functions.txt_to_fun import TxtToFun
 from horizon_gui.definitions import CSS_DIR
@@ -49,11 +50,18 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         # completer
         self.completer = self.setupCompleter()
 
+
         # variables
         self.variables_gui = VariablesGui(self.horizon_receiver, self.logger, self)
         var_box_layout = QVBoxLayout()
         self.varBox.setLayout(var_box_layout)
         var_box_layout.addWidget(self.variables_gui)
+
+        # inverse dynamics ## order is important! function must be intialized after this inverse dynamics
+        self.id_gui = InverseDynamicsGui(self.horizon_receiver, self.logger, self)
+        id_box_layout = QVBoxLayout()
+        self.IDBox.setLayout(id_box_layout)
+        id_box_layout.addWidget(self.id_gui)
 
         # functions
         # todo remove in some ways highlighter and completer from here?
@@ -73,6 +81,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         dynamics_box_layout = QVBoxLayout()
         self.DynamicsBox.setLayout(dynamics_box_layout)
         dynamics_box_layout.addWidget(self.dyn_gui)
+
         # model
         self.model_gui = ModelGui(self.horizon_receiver, self.logger, self)
         model_box_layout = QVBoxLayout()
@@ -93,6 +102,10 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         #
         # with open(CSS_DIR + '/button_old.css', 'r') as f:
         #     self.PlotButton.setStyleSheet(f.read())
+        self.id_gui.idComputed.connect(self.functions_gui.addFunctionToGui)
+        self.id_gui.idComputed.connect(self.problem_gui.constraint_line.addFunctionToHorizon)
+        # self.problem_gui.constraint_line.addFunctionToHorizon(fun_name)
+        # self.problem_gui.constraint_line.setFunNodes(fun_name, ranges)
 
         self.NodesSpinBox.valueChanged.connect(self.setBoxNodes)
         self.CreateButton.clicked.connect(self.createButtonPushed)
@@ -158,8 +171,8 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         n_nodes = 30
         self.NodesSpinBox.setValue(n_nodes)
         self.setBoxNodes(n_nodes)
-        urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
-        # urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
+        # urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
+        urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
         self.model_gui.loadModel(urdf_file)
 
         state_vars = dict(q=2, q_dot=2)
@@ -233,10 +246,12 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         ranges = [self.nodes, self.nodes]
         self.problem_gui.constraint_line.addFunctionToHorizon(fun_name)
         self.problem_gui.constraint_line.setFunNodes(fun_name, ranges)
+
         # update ranges in sliders
         self.problem_gui.constraint_line.function_tab.setFunctionNodes(fun_name, ranges)
         self.problem_gui.constraint_line.multi_function_box.setFunctionNodes(fun_name, ranges)
 
+        # # constraint function
         fun_name = 'final_q_dot'
         fun_str = 'q_dot'
         flag = self.horizon_receiver.addFunction(dict(name=fun_name, str=fun_str, active=None))
@@ -250,7 +265,28 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         self.problem_gui.constraint_line.function_tab.setFunctionNodes(fun_name, ranges)
         self.problem_gui.constraint_line.multi_function_box.setFunctionNodes(fun_name, ranges)
 
+        # inverse dynamics
+        self.id_gui.setVar('q', 'q')
+        self.id_gui.setVar('q_dot', 'q_dot')
+        self.id_gui.setVar('q_ddot', 'q_ddot')
 
+        # constraint function
+        self.id_gui.gen_id_clicked()
+        tau_lims = np.array([[1000.], [0.]])
+        tau_lims_expanded = np.repeat(tau_lims, self.nodes-2, axis=1)
+        print(tau_lims)
+        print(tau_lims_expanded)
+        self.problem_gui.constraint_line.updateFunctionUb('tau_id', range(self.nodes-1), tau_lims)
+        self.problem_gui.constraint_line.function_tab.bl.setLowerBounds(range(self.nodes-1), tau_lims_expanded)
+
+    # def addFunctionFromCode(self, fun, name, str, type, nodes, bounds):
+    #     # overrides the funfromtext
+    #     self.horizon_receiver.appendFun(fun, name, str)
+    #     self.functions_gui.addFunctionToGui(name, str)
+    #     self.horizon_receiver.activateFunction(name, type, nodes)
+
+        # if bounds is not None:
+        #     self.horizon_receiver.getFunction(name)['active'].setBounds()
 
 
     def setupHighlighter(self):
@@ -262,6 +298,7 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         math_operators = TxtToFun.getValidOperators()
         highlighter.addOperators(math_operators)
         return highlighter
+
     def setupCompleter(self):
         completer = QCompleter(self.fun_keywords)
         completer.setCaseSensitivity(Qt.CaseInsensitive)

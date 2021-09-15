@@ -27,7 +27,10 @@ class FunctionsGui(QWidget, Ui_FunctionsGUI):
 
         self._connectActions()
         self._fillFunComboBox()
+
         # self._dummyInit()
+        self._initFunctionList()
+
 
     def _dummyInit(self):
 
@@ -36,10 +39,18 @@ class FunctionsGui(QWidget, Ui_FunctionsGUI):
         self.horizon_receiver.createVariable('State', 'e', 2, 0)
         self.horizon_receiver.createVariable('State', 'danie', 2, 0)
 
+        fun = self.horizon_receiver.getVar('x')['var'] + self.horizon_receiver.getVar('e')['var']
+        self.horizon_receiver.appendFun('ciao', fun, 'x+e')
+
+
         self.highlighter.addKeyword('x')
         self.highlighter.addKeyword('danie')
         self.highlighter.addKeyword('xe')
         self.highlighter.addKeyword('e')
+
+    def _initFunctionList(self):
+        for fun_name, fun in self.horizon_receiver.getFunction().items():
+            self.addFunctionToGui(fun_name, fun['str'])
 
     # connect actions
     def _connectActions(self):

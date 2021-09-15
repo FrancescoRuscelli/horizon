@@ -86,7 +86,7 @@ class horizonImpl():
 
         flag, signal = self.checkFunction(name, str_fun)
         if flag:
-            flag_syntax = self._createAndAppendFun(name, str_fun)
+            flag_syntax = self._createFun(name, str_fun)
             if flag_syntax:
                 return True, signal
             else:
@@ -238,7 +238,7 @@ class horizonImpl():
     def editFunction(self, name, str_fun):
 
         if name in self.fun_dict.keys():
-            flag = self._createAndAppendFun(name, str_fun)
+            flag = self._createFun(name, str_fun)
             if flag:
                 signal = 'Function "{}" edited with {}. Updated function: {}'.format(name, str_fun, self.fun_dict[name])
                 return True, signal
@@ -291,9 +291,14 @@ class horizonImpl():
     def getFunctionDict(self):
         return self.fun_dict
 
-    def getFunction(self, name):
-        if name in self.fun_dict.keys():
-            return self.fun_dict[name]
+    def getFunction(self, name=None):
+        if name is None:
+            return self.fun_dict
+        else:
+            if name in self.fun_dict.keys():
+                return self.fun_dict[name]
+            else:
+                return None
         #todo change? return only active?
 
     def getVarDict(self):
@@ -317,7 +322,7 @@ class horizonImpl():
             self.dyn_han.set_default_dynamics(dyn)
             self.dynamics_flag = True
         elif type == 'custom':
-            dyn, used_vars = self.txt_to_fun_converter.convert(dyn)
+            dyn = self.txt_to_fun_converter.convert(dyn)
             self.dyn_han.set_custom_dynamics(dyn)
             self.dynamics_flag = True
 
@@ -330,16 +335,25 @@ class horizonImpl():
     def getModelHandler(self):
         return self.model_han
 
-    def _createAndAppendFun(self, name, str_fun):
+    def _createFun(self, name, str_fun):
 
-        fun, used_vars = self.txt_to_fun_converter.convert(str_fun)
+        fun = self.txt_to_fun_converter.convert(str_fun)
         # fill horizon_receiver.fun_dict and funList
 
         if fun is not None:
-            self.fun_dict[name] = dict(fun=fun, str=str_fun, active=None, used_vars=used_vars)
+            self.appendFun(fun, name, str_fun)
             return True
         else:
             return False
+
+    def appendFun(self, function, function_name, str_function):
+
+        used_variables = list()
+        for var in self.sv_dict.values():
+            if cs.depends_on(function, var["var"]):
+                used_variables.append(var["var"])
+
+        self.fun_dict[function_name] = dict(fun=function, str=str_function, active=None, used_vars=used_variables)
 
     def generate(self):
         try:

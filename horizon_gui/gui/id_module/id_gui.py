@@ -13,6 +13,8 @@ from functools import partial
 
 
 class InverseDynamicsGui(QWidget):
+    idComputed = pyqtSignal(str, str)
+
     def __init__(self, horizon_receiver: horizonImpl, logger=None, parent=None):
         super().__init__(parent)
 
@@ -28,12 +30,12 @@ class InverseDynamicsGui(QWidget):
         self.main_layout.addWidget(self.button)
         self.button.clicked.connect(self.openIDWidget)
 
-        self._initDummy()
+        # self._initDummy()
 
     def _initDummy(self):
 
-        # urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
-        urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
+        urdf_file = '/home/francesco/catkin_ws/external/casadi_horizon/horizon/examples/urdf/cart_pole.urdf'
+        # urdf_file = '/home/francesco/hhcm_workspace/src/horizon/horizon/examples/urdf/cart_pole.urdf'
         urdf = open(urdf_file, 'r').read()
         self.horizon_receiver.getModelHandler().setModel(urdf)
         self.horizon_receiver.createVariable('State', 'x', 2, 0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -44,14 +46,6 @@ class InverseDynamicsGui(QWidget):
         self.setVar('q_dot', 'x_dot')
         self.setVar('q_ddot', 'x_ddot')
 
-        self.openIDWidget()
-        i = 0
-        for display in self.id_widget.findChildren(DisplayLine):
-            self.updateDisplay(display, self.variables_name[i])
-            i = i+1
-
-
-
 
     def openIDWidget(self):
         self.id_widget = DestroySignalWindow()
@@ -60,6 +54,10 @@ class InverseDynamicsGui(QWidget):
 
         id_title = QLabel('Variables:')
         self.id_widget_layout.addWidget(id_title, 0, 0)
+
+        self.gen_id_button = QPushButton('Generate ID')
+        self.gen_id_button.clicked.connect(self.gen_id_clicked)
+        self.gen_id_button.setDisabled(True)
 
         for i in range(len(self.variables_name)):
             id_var_title = QLabel(f'{self.variables_name[i]}:')
@@ -71,11 +69,12 @@ class InverseDynamicsGui(QWidget):
             open_button = QPushButton('...')
             open_button.clicked.connect(partial(self.openVar, display))
             self.id_widget_layout.addWidget(open_button, i + 1, 2)
+            if self.variables[self.variables_name[i]] is not None:
+                self.updateDisplay(display, self.variables_name[i])
 
-        self.gen_id_button = QPushButton('Generate ID')
+
         self.id_widget_layout.addWidget(self.gen_id_button)
-        self.gen_id_button.clicked.connect(self.gen_id_clicked)
-        self.gen_id_button.setDisabled(True)
+
 
         self.checkReady()
 
@@ -110,12 +109,11 @@ class InverseDynamicsGui(QWidget):
         display.setReady(True)
         self.checkReady()
 
-
-
-
     def gen_id_clicked(self):
         tau = self.model_handler.computeID(self.variables['q']['var'], self.variables['q_dot']['var'], self.variables['q_ddot']['var'])
-        print(tau)
+        self.horizon_receiver.appendFun(tau, 'tau_id', 'tau')
+        self.idComputed.emit('tau_id', 'tau')
+
 
 if __name__ == '__main__':
 

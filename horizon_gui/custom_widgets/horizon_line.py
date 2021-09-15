@@ -21,7 +21,7 @@ import os
 #     | |
 #     | |________ function tab
 #     |                 |  | ______ function_line
-#     |                 |__________ limits_line
+#     |                 |__________ bounds_line
 #     |
 #     |__________ multi_function_box
 

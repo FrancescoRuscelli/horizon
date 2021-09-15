@@ -31,7 +31,7 @@ class BoundsLine(QWidget):
         self.nodes = nodes
         self.dim = dim
         self.disabled_nodes = disabled_nodes
-        self.lines = []
+        self.lines = dict()
 
         if initial_bounds is None:
             self.addLine('Lower Bounds', self.emitLowerBounds)
@@ -45,31 +45,39 @@ class BoundsLine(QWidget):
         line = SpinboxLine(title, self.nodes, self.dim, self.disabled_nodes, initial_values)
         line.valueChanged.connect(emitter)
         self.main_layout.addWidget(line)
-        self.lines.append(line)
+        self.lines[title] = line
 
     def setNNodes(self, nodes):
         self.n_nodes = nodes
-        for line in self.lines:
+        for line in self.lines.values():
             line.setNodes(self.n_nodes)
 
     def hideNodes(self, nodes_list):
-        for line in self.lines:
+        for line in self.lines.values():
             line.hideNodes(nodes_list)
 
     def showNodes(self, nodes_list):
-        for line in self.lines:
+        for line in self.lines.values():
             line.showNodes(nodes_list)
 
     def emitLowerBounds(self, node, bounds_list):
         self.lbChanged.emit(node, bounds_list)  # pass only the bounds at the changed node
-        print(node, bounds_list)
 
     def emitUpperBounds(self, node, bounds_list):
         self.ubChanged.emit(node, bounds_list)  # pass only the bounds at the changed node
-        print(node, bounds_list)
 
     def getName(self):
         return self.name
+
+    def setLowerBounds(self, nodes, lb_matrix):
+        self.lines['Lower Bounds'].setValues(lb_matrix, nodes)
+
+    def setUpperBounds(self, nodes, ub_matrix):
+        self.lines['Upper Bounds'].setValues(ub_matrix, nodes)
+
+    def setBounds(self, nodes, lb_matrix, ub_matrix):
+        self.setLowerBounds(lb_matrix, nodes)
+        self.setUpperBounds(ub_matrix, nodes)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

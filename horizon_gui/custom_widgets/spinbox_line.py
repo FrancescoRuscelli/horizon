@@ -75,7 +75,7 @@ class SpinboxLine(QWidget):
         if disabled_nodes is None:
             disabled_nodes = []
 
-        self.setInitialValues(self.initial_values)
+        self.setValues(self.initial_values)
         self.setNodes(nodes)
 
         self.hideNodes(disabled_nodes)
@@ -86,9 +86,14 @@ class SpinboxLine(QWidget):
         self.n_nodes = nodes
         self._updateNodes()
 
-    def setInitialValues(self, initial_bounds):
+    # set bounds at specific nodes
+    def setValues(self, bounds, nodes=None):
+        if nodes is None:
+            self.values_matrix[:, self.enabled_nodes] = bounds
+        else:
+            self.values_matrix[:, nodes] = bounds
+        self._updateNodes()
 
-        self.values_matrix[:, self.enabled_nodes] = initial_bounds
     def _updateNodes(self):
         # Remove all the nodes
         for i in reversed(range(self.spinbox_layout.count())):
@@ -210,9 +215,10 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     # row = dim
     # column = nodes
-    iv = np.ones([3, 5])
+    iv = np.ones([3, 3])
     gui = SpinboxLine('spin', nodes=5, dim=3, disabled_nodes=None)
     # gui = SpinboxLine('spin', nodes=5, dim=3, disabled_nodes=None, initial_values=iv)
+    gui.setValues(iv, [2,3,4])
 
     gui.show()
     sys.exit(app.exec_())

@@ -55,7 +55,7 @@ class TxtToFun:
             res = parser.expr(modified_fun)
         except Exception as e:
             self.logger.warning('gui_receiver.py: {}'.format(e))
-            return fun
+            return None
 
         code = res.compile()
 
@@ -67,12 +67,7 @@ class TxtToFun:
             if self.logger:
                 self.logger.warning('gui_receiver.py: {}'.format(e))
 
-        used_variables = list()
-        for var in self.sv_dict.values():
-            if cs.depends_on(fun, var["var"]):
-                used_variables.append(var["var"])
-
-        return fun, used_variables
+        return fun
 
     @staticmethod
     def getValidOperators():
