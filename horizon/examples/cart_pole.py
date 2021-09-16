@@ -87,7 +87,7 @@ tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
-solver = solver.Solver.make_solver('ipopt', prb, dt, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
+solver = solver.Solver.make_solver('ipopt', prb, dt, opts={'ipopt.tol': 1e-4, 'ipopt.max_iter': 2000})
 solver.solve()
 solution = solver.getSolutionDict()
 q_hist = solution["q"]

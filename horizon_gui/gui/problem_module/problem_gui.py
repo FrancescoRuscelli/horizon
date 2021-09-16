@@ -52,12 +52,12 @@ class ProblemGui(QWidget):
         self.line_view_layout.addWidget(self.label_view_title)
 
         self.multiple_line_button = QRadioButton()
-        self.multiple_line_button.setText('Single')
+        self.multiple_line_button.setText('Multiple')
         self.multiple_line_button.setChecked(True)
         self.line_view_layout.addWidget(self.multiple_line_button)
 
         self.single_line_button = QRadioButton()
-        self.single_line_button.setText('Multiple')
+        self.single_line_button.setText('Single')
         self.single_line_button.setChecked(False)
         self.line_view_layout.addWidget(self.single_line_button)
         self.widget_buttons_layer.addWidget(self.line_view)

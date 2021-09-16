@@ -52,13 +52,13 @@ class BoundsLine(QWidget):
         for line in self.lines.values():
             line.setNodes(self.n_nodes)
 
-    def hideNodes(self, nodes_list):
+    def setHiddenNodes(self, nodes_list):
         for line in self.lines.values():
-            line.hideNodes(nodes_list)
+            line.setHiddenNodes(nodes_list)
 
-    def showNodes(self, nodes_list):
-        for line in self.lines.values():
-            line.showNodes(nodes_list)
+    # def showNodes(self, nodes_list):
+    #     for line in self.lines.values():
+    #         line.showNodes(nodes_list)
 
     def emitLowerBounds(self, node, bounds_list):
         self.lbChanged.emit(node, bounds_list)  # pass only the bounds at the changed node
@@ -84,6 +84,8 @@ if __name__ == '__main__':
     gui = BoundsLine('daniele', nodes=1, dim=3)
     gui.setNNodes(10)
     gui.hideNodes([0,1,2,4,5,6,7,8])
+    iv = 5 * np.ones([3, 3])
+    gui.setLowerBounds([1,2,3], iv)
     # gui.showNodes([1,4,5])
 
     pushbutton = QPushButton('daniele')

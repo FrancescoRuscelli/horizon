@@ -92,8 +92,8 @@ class FunctionTabWidget(QTabWidget):
 
         for widget_bl in self.findChildren(BoundsLine):
             if widget_bl.getName() == fun_name:
-                widget_bl.hideNodes(inactive_nodes)
-                widget_bl.showNodes(active_nodes)
+                widget_bl.setHiddenNodes(inactive_nodes)
+                # widget_bl.showNodes(active_nodes)
 
     def updateMargins(self, margins):
         # self.intab_layout.setContentsMargins(margins)

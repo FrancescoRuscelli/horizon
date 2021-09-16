@@ -273,11 +273,14 @@ class MainInterface(QWidget, Ui_HorizonGUI):
         # constraint function
         self.id_gui.gen_id_clicked()
         tau_lims = np.array([[1000.], [0.]])
-        tau_lims_expanded = np.repeat(tau_lims, self.nodes-2, axis=1)
-        print(tau_lims)
-        print(tau_lims_expanded)
-        self.problem_gui.constraint_line.updateFunctionUb('tau_id', range(self.nodes-1), tau_lims)
-        self.problem_gui.constraint_line.function_tab.bl.setLowerBounds(range(self.nodes-1), tau_lims_expanded)
+        tau_lims_expanded = np.repeat(tau_lims, self.nodes, axis=1)
+
+        self.problem_gui.constraint_line.updateFunctionLb('tau_id', range(self.nodes), -tau_lims)
+        self.problem_gui.constraint_line.function_tab.bl.setLowerBounds(range(self.nodes), -tau_lims_expanded)
+
+        self.problem_gui.constraint_line.updateFunctionUb('tau_id', range(self.nodes), tau_lims)
+        self.problem_gui.constraint_line.function_tab.bl.setUpperBounds(range(self.nodes), tau_lims_expanded)
+
 
     # def addFunctionFromCode(self, fun, name, str, type, nodes, bounds):
     #     # overrides the funfromtext
@@ -332,9 +335,9 @@ class MainInterface(QWidget, Ui_HorizonGUI):
     def plotButtonPushed(self):
         self.horizon_receiver.plot()
 
-    @pyqtSlot()
-    def on_generic_sig(self, str):
-        self.generic_sig.emit(str)
+    @pyqtSlot(str)
+    def on_generic_sig(self, text):
+        self.generic_sig.emit(text)
 
     def setBoxNodes(self, n_nodes):
         self.nodes = n_nodes

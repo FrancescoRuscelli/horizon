@@ -17,6 +17,7 @@ class SpinboxLine(QWidget):
         self.dim = dim
         self.n_nodes = nodes
         self.values_matrix = np.matrix(np.ones((dim, nodes)) * 0.)
+        self.hidden_nodes = []
 
         if disabled_nodes:
             self.disabled_nodes = disabled_nodes
@@ -78,7 +79,7 @@ class SpinboxLine(QWidget):
         self.setValues(self.initial_values)
         self.setNodes(nodes)
 
-        self.hideNodes(disabled_nodes)
+        self.setHiddenNodes(disabled_nodes)
 
         QApplication.instance().focusChanged.connect(self.on_focusChanged)
 
@@ -107,6 +108,17 @@ class SpinboxLine(QWidget):
         self.values_matrix = temp_values
 
         self.createCustomSpinboxLine()
+        self.hideNodes()
+
+        # hide nodes
+        for i in range(self.dim):
+            for j in range(self.n_nodes):
+                spinbox = self.spinbox_layout.itemAtPosition(i, j).widget()
+                if j in self.hidden_nodes:
+                    sp_retain = spinbox.sizePolicy()
+                    sp_retain.setRetainSizeWhenHidden(True)
+                    spinbox.setSizePolicy(sp_retain)
+                    spinbox.hide()
 
     def createCustomSpinboxLine(self):
         for i in range(self.dim):
@@ -117,22 +129,31 @@ class SpinboxLine(QWidget):
                 n_i.valueChanged.connect(partial(self.updateValues, i, j))
                 self.spinbox_layout.addWidget(n_i, i, j)
 
-    def hideNodes(self, node_list):
+
+    def hideNodes(self):
         for i in range(self.dim):
             for j in range(self.n_nodes):
                 spinbox = self.spinbox_layout.itemAtPosition(i, j).widget()
-                if j in node_list:
+                if j in self.hidden_nodes:
                     sp_retain = spinbox.sizePolicy()
                     sp_retain.setRetainSizeWhenHidden(True)
                     spinbox.setSizePolicy(sp_retain)
                     spinbox.hide()
-
-    def showNodes(self, node_list):
-        for i in range(self.dim):
-            for j in range(self.n_nodes):
-                spinbox = self.spinbox_layout.itemAtPosition(i, j).widget()
-                if j in node_list and j not in self.disabled_nodes:
+                else:
                     spinbox.show()
+
+    def setHiddenNodes(self, node_list):
+        self.hidden_nodes = node_list
+        self.hideNodes()
+
+    # def showNodes(self, node_list):
+    #     self.hidden_nodes = [node for node in self.hidden_nodes if node not in node_list]
+    #
+    #     for i in range(self.dim):
+    #         for j in range(self.n_nodes):
+    #             spinbox = self.spinbox_layout.itemAtPosition(i, j).widget()
+    #             if j in node_list and j not in self.disabled_nodes:
+    #                 spinbox.show()
 
     def multipleSet(self, i):
         for child in self.findChildren(InfinitySpinBox):
@@ -218,6 +239,10 @@ if __name__ == '__main__':
     iv = np.ones([3, 3])
     gui = SpinboxLine('spin', nodes=5, dim=3, disabled_nodes=None)
     # gui = SpinboxLine('spin', nodes=5, dim=3, disabled_nodes=None, initial_values=iv)
+    gui.setHiddenNodes([2])
+    gui.setHiddenNodes([])
+    # gui.showNodes([2])
+
     gui.setValues(iv, [2,3,4])
 
     gui.show()

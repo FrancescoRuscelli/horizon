@@ -239,7 +239,6 @@ class VariablesGui(QWidget, Ui_VariablesGUI):
 
         else:
             self.varNameInput.setFocus()
-
             self.genericSignal.emit(signal)
             if self.logger:
                 self.logger.warning('main_interface {}'.format(signal))
