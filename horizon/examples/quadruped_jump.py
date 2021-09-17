@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, kin_dyn, resampler_trajectory
 from horizon.transcriptions import integrators
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
@@ -138,7 +138,7 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
             1000., 1000., 1000.,  # Contact 3
             1000., 1000., 1000.]  # Contact 4
 dd = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
-tau = casadi_kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
+tau = kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
 prb.createFinalConstraint('final_velocity', qdot)
 
@@ -162,7 +162,7 @@ for frame, f in zip(contact_names, forces):
     prb.createConstraint(f"{frame}_vel_before_jump", v, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
     prb.createConstraint(f"{frame}_vel_after_jump", v, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
-    fc, fc_lb, fc_ub = casadi_kin_dyn.linearized_friciton_cone(f, mu, R)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
     prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=list(range(0, lift_node)), bounds=dict(lb=fc_lb, ub=fc_ub))
     prb.createConstraint(f"{frame}_friction_cone_after_jump", fc, nodes=list(range(touch_down_node, ns)), bounds=dict(lb=fc_lb, ub=fc_ub))
 
@@ -189,7 +189,7 @@ f4_hist = solution["f4"]
 dt_hist = solution["dt"]
 
 tau_hist = np.zeros(qddot_hist.shape)
-ID = casadi_kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+ID = kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 for i in range(ns):
     frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'Contact3': f3_hist[:, i], 'Contact4': f4_hist[:, i]}
     tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()

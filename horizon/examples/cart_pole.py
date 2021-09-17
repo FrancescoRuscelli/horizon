@@ -4,7 +4,7 @@ from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn
+from horizon.utils import utils, kin_dyn
 from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver
@@ -83,7 +83,7 @@ prb.createFinalConstraint("final_qdot", qdot)
 
 
 tau_lims = np.array([1000., 0.])
-tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
+tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
