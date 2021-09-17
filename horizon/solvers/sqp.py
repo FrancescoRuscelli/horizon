@@ -18,62 +18,123 @@ class GNSQPSolver(Solver):
         super().__init__(prb, dt, opts=opts)
 
         self.solution: Dict[str:np.array] = None
+        self.prb = prb
+
+        # generate problem to be solved
+        self.var_container = self.prb.var_container
+        self.fun_container = self.prb.function_container
 
         # generate problem to be solver
-        problem_dict = prb.createProblem()
+        var_list = list()
+        for var in prb.var_container.getVarList(offset=False):
+            var_list.append(var.getImpl())
+        w = cs.vertcat(*var_list)  #
+
+        fun_list = list()
+        for fun in prb.function_container.getCnstr().values():
+            fun_list.append(fun.getImpl())
+        g = cs.vertcat(*fun_list)
+
+        # build cost functions list
+        cost_list = list()
+        for fun in prb.function_container.getCost().values():
+            cost_list.append(fun.getImpl())
+        f = cs.vertcat(cs.vertcat(*cost_list))
 
         # create solver from prob
-        F = cs.Function('f', [problem_dict['x']], [problem_dict['f']], ['x'], ['f'])
-        G = cs.Function('g', [problem_dict['x']], [problem_dict['g']], ['x'], ['g'])
+        F = cs.Function('f', [w], [f], ['x'], ['f'])
+        G = cs.Function('g', [w], [g], ['x'], ['g'])
         self.solver = SQPGaussNewtonSX('gnsqp', qp_solver_plugin, F, G, self.opts)
 
     def solve(self) -> bool:
         # update bounds and initial guess
-        w0, lbw, ubw, lbg, ubg, p = self.prb.updateProblem()
+
+        lb_list = list()
+        for var in self.prb.var_container.getVarList(offset=False):
+            lb_list.append(var.getLowerBounds())
+        lbw = cs.vertcat(*lb_list)
+
+        # update upper bounds of variables
+        ub_list = list()
+        for var in self.prb.var_container.getVarList(offset=False):
+            ub_list.append(var.getUpperBounds())
+        ubw = cs.vertcat(*ub_list)
+
+        # update initial guess of variables
+        w0_list = list()
+        for var in self.prb.var_container.getVarList(offset=False):
+            w0_list.append(var.getInitialGuess())
+        w0 = cs.vertcat(*w0_list)
+        # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
+
+        # update parameters
+        p_list = list()
+        for par in self.prb.var_container.getParList():
+            p_list.append(par.getValues())
+        p = cs.vertcat(*p_list)
+
+        # update lower bounds of constraints
+        lbg_list = list()
+        for fun in self.prb.function_container.getCnstr().values():
+            lbg_list.append(fun.getLowerBounds())
+        lbg = cs.vertcat(*lbg_list)
+
+        # update upper bounds of constraints
+        ubg_list = list()
+        for fun in self.prb.function_container.getCnstr().values():
+            ubg_list.append(fun.getUpperBounds())
+        ubg = cs.vertcat(*ubg_list)
 
         # solve
         sol = self.solver.solve(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
         # retrieve state and input trajector
-        input_vars = [v.tag for v in self.prb.getInput().var_list]
-        state_vars = [v.tag for v in self.prb.getState().var_list]
+        input_vars = [v.getName() for v in self.prb.getInput().var_list]
+        state_vars = [v.getName() for v in self.prb.getState().var_list]
+
+        # get solution dict
         pos = 0
+        solution_dict = dict()
+        for var in self.var_container.getVarList(offset=False):
+            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
+            # this is to divide in rows the each dim of the var
+            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
+            solution_dict[var.getName()] = val_sol_matrix
+            pos = pos + var.shape[0] * len(var.getNodes())
 
-        # loop over nodes
-        for node, val in self.prb.var_container.getVarImplDict().items():
+        self.solution = solution_dict
 
-            # variables which don't depend on the node (ignore for now)
-            if node == 'nNone':
-                # note: for now, we only focus on state and input!!
-                for name, var in val.items():
-                    dim = var['var'].shape[0]
-                    pos += dim
-                continue
-
-            node_number = int(node[node.index('n') + 1:])
-
-            # for loop handling state vars
-            for name, var in val.items():
-                if name not in state_vars:
-                    continue
+        # get solution as state/input
+        pos = 0
+        for name, var in self.var_container.getVar().items():
+            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
+            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
+            if name in state_vars:
                 off, _ = self.prb.getState().getVarIndex(name)
-                var_nodes = self.prb.var_container.getVarAbstrDict(offset=False)[name].getNodes()
-                if node_number in var_nodes:
-                    dim = var['var'].shape[0]
-                    self.x_opt[off:off + dim, node_number - var_nodes[0]] = sol['x'][pos:pos + dim].flatten()
-                    pos += dim
-
-            # for loop handling input vars (pretty ugly: todo refactor)
-            for name, var in val.items():
-                if name not in input_vars:
-                    continue
+                self.x_opt[off:off + var.shape[0], :] = val_sol_matrix
+            elif name in input_vars:
                 off, _ = self.prb.getInput().getVarIndex(name)
-                var_nodes = self.prb.var_container.getVarAbstrDict(offset=False)[name].getNodes()
-                if node_number in var_nodes:
-                    dim = var['var'].shape[0]
-                    self.u_opt[off:off + dim, node_number - var_nodes[0]] = sol['x'][pos:pos + dim].flatten()
-                    pos += dim
+                self.u_opt[off:off + var.shape[0], :] = val_sol_matrix
+            else:
+                pass
+            pos = pos + var.shape[0] * len(var.getNodes())
+
+        # print(f'{self.x_opt.shape}:, {self.x_opt}')
+        # print(f'{self.u_opt.shape}:, {self.u_opt}')
 
         return True
 
+    def getSolutionDict(self):
+        return self.solution
 
+    def getHessianComputationTime(self):
+        return self.solver.getHessianComputationTime()
+
+    def getQPComputationTime(self):
+        return self.solver.getQPComputationTime()
+
+    def getObjectiveIterations(self):
+        return self.solver.getObjectiveIterations()
+
+    def getConstraintNormIterations(self):
+        return self.solver.getConstraintNormIterations()
