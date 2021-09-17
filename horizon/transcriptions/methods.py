@@ -134,6 +134,7 @@ class MultipleShooting(Transcriptor):
         else:
             self.integrator = integrator
 
+        # todo here I should add dt if variable dt!!!!!! self.dt_prev
         state_int = self.__integrate(self.state_prev, self.input_prev)
         ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
 
