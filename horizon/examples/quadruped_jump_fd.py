@@ -5,7 +5,9 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory
+from horizon.transcriptions import integrators
+from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 import os
@@ -50,6 +52,7 @@ frame_force_mapping = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4
 qddot = fd.call(q, qdot, tau, frame_force_mapping)
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
+prb.setDynamics(xdot)
 # Formulate discrete time dynamics
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': prb.getInput().getVars(), 'ode': xdot, 'quad': L}
@@ -174,17 +177,15 @@ for frame, f in zip(contact_names, forces):
     prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=list(range(lift_node, touch_down_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
 # Create problem
-prb.createProblem()
-
 opts = {'ipopt.tol': 0.01,
         'ipopt.constr_viol_tol': 0.01,
         'ipopt.max_iter': 5000,
         'ipopt.linear_solver': 'ma57'}
 
-solver = cs.nlpsol('solver', 'ipopt', prb.getProblem(), opts)
-prb.setSolver(solver)
+solver = solver.Solver.make_solver('ipopt', prb, None, opts)
+solver.solve()
 
-solution = prb.solveProblem()
+solution = solver.getSolutionDict()
 
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]
