@@ -4,7 +4,9 @@ from casadi_kin_dyn import pycasadi_kin_dyn
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import integrators, utils
+from horizon.utils import utils
+from horizon.transcriptions import integrators
+from horizon.solvers import solver
 from horizon.ros.replay_trajectory import replay_trajectory
 
 import matplotlib.pyplot as plt
@@ -48,6 +50,8 @@ tf = prb.createVariable("tf", 1)
 fd = kindyn.aba()  # this is the forward dynamics function:
 qddot = fd(q=q, v=qdot, tau=tau)['a'] # qddot = M^-1(tau - h)
 x, xdot = utils.double_integrator(q, qdot, qddot) # xdot = [qdot, qddot]
+prb.setDynamics(xdot)
+
 
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': u, 'ode': xdot, 'quad': L}
@@ -92,8 +96,11 @@ prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
 
 # Creates problem
-prb.createProblem()
-solution = prb.solveProblem()
+solver = solver.Solver.make_solver('ipopt', prb, None, opts=None)
+solver.solve()
+
+solution = solver.getSolutionDict()
+
 q_hist = solution["q"]
 Tf = solution["tf"]
 
