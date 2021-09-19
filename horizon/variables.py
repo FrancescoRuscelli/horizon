@@ -57,23 +57,51 @@ class AbstractVariable(ABC, cs.SX):
         return self._offset
 
     def __getitem__(self, item):
-        view = AbstractVariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = AbstractVariableView(self, var_slice, item)
         return view
 
+    # todo old stuff
+    # def __getitem__(self, item):
+    #     view = AbstractVariableView(self, item)
+    #     return view
+
 class AbstractVariableView(cs.SX):
-    def __init__(self, parent: AbstractVariable, indices):
-        elems = parent.elements()
-        sx = cs.vertcat(*elems[indices]) if isinstance(indices, slice) else elems[indices]
-        super().__init__(sx)
+    def __init__(self, parent: AbstractVariable, var_slice, indices):
+        super().__init__(var_slice)
         self._parent = parent
         self._indices = indices
-        self._dim = len(range(*self._indices.indices(self._parent.getDim()))) if isinstance(self._indices, slice) else 1
+        self._dim = len(range(*self._indices.indices(self._parent.shape[0]))) if isinstance(self._indices, slice) else 1
 
     def getName(self):
         return self._parent.getName()
 
     def __getitem__(self, item):
-        return self._parent[item]
+        var_slice = super().__getitem__(item)
+        view = self.__class__(self._parent, var_slice, item)
+        return view
+
+    # todo old stuff
+# class AbstractVariableView(cs.SX):
+#     def __init__(self, parent: AbstractVariable, indices):
+#         elems = parent.elements()
+#         sx = cs.vertcat(*elems[indices]) if isinstance(indices, slice) else elems[indices]
+#         super().__init__(sx)
+#         self._parent = parent
+#         self._indices = indices
+#         self._dim = len(range(*self._indices.indices(self._parent.shape[0]))) if isinstance(self._indices, slice) else 1
+#
+#     def getName(self):
+#         return self._parent.getName()
+#
+#     def __getitem__(self, item):
+#         print(f'getitem of {type(self)} called with indices {item}')
+        # todo this is wrong, since getitem will return an AbstractVariableView initialized with the whole parent.
+        #  basically, if if I do x_slice = x[0:2] (where x is 6-dimensional), with this formulation I could get x_slice[3], since
+        #  i am plucking the values from the original parent. I should only be able to do x_slice[0] and x_slice[1]!!!
+        #  IMPORTANT: also it was fucking up the ipopt solver
+#         view = self.__class__(self._parent, item)
+#         return view
 
 class OffsetVariable(AbstractVariable):
     def __init__(self, parent_name, tag, dim, offset, var_impl):
@@ -237,12 +265,13 @@ class SingleParameter(AbstractVariable):
         return self._tag
 
     def __getitem__(self, item):
-        view = SingleParameterView(self, item)
+        par_slice = super().__getitem__(item)
+        view = SingleParameterView(self, par_slice, item)
         return view
 
 class SingleParameterView(AbstractVariableView):
-    def __init__(self, parent: SingleParameter, indices):
-        super().__init__(parent, indices)
+    def __init__(self, parent: SingleParameter, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
 
     def assign(self, vals):
         """
@@ -383,7 +412,8 @@ class Parameter(AbstractVariable):
         return self._tag
 
     def __getitem__(self, item):
-        view = ParameterView(self, item)
+        par_slice = super().__getitem__(item)
+        view = ParameterView(self, par_slice, item)
         return view
 
     def __reduce__(self):
@@ -396,8 +426,8 @@ class Parameter(AbstractVariable):
         return (self.__class__, (self._tag, self._dim, self._nodes,))
 
 class ParameterView(AbstractVariableView):
-    def __init__(self, parent: SingleParameter, indices):
-        super().__init__(parent, indices)
+    def __init__(self, parent: SingleParameter, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
 
     def assign(self, vals, nodes=None):
         """
@@ -624,12 +654,13 @@ class SingleVariable(AbstractVariable):
         return self._tag
 
     def __getitem__(self, item):
-        view = SingleVariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = SingleVariableView(self, var_slice, item)
         return view
 
 class SingleVariableView(AbstractVariableView):
-    def __init__(self, parent: SingleVariable, indices):
-        super().__init__(parent, indices)
+    def __init__(self, parent: SingleVariable, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
 
     def setLowerBounds(self, bounds):
         """
@@ -983,7 +1014,8 @@ class Variable(AbstractVariable):
         return self._tag
 
     def __getitem__(self, item):
-        view = VariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
         return view
 
     def __reduce__(self):
@@ -996,8 +1028,8 @@ class Variable(AbstractVariable):
         return (self.__class__, (self._tag, self._dim, self._nodes, ))
 
 class VariableView(AbstractVariableView):
-    def __init__(self, parent: Variable, indices):
-        super().__init__(parent, indices)
+    def __init__(self, parent: Variable, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
 
     def setLowerBounds(self, bounds, nodes=None):
         """
@@ -1095,7 +1127,8 @@ class InputVariable(Variable):
         super(InputVariable, self).__init__(tag, dim, nodes)
 
     def __getitem__(self, item):
-        view = VariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
         return view
 
 class StateVariable(Variable):
@@ -1121,7 +1154,8 @@ class StateVariable(Variable):
         super(StateVariable, self).__init__(tag, dim, nodes)
 
     def __getitem__(self, item):
-        view = VariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
         return view
 
 class AbstractAggregate(ABC):
@@ -1666,13 +1700,14 @@ class VariablesContainer:
 
 if __name__ == '__main__':
 
-    # PARAMETER
+    ## PARAMETER
     # a = Parameter('p', 6, [0, 1, 2, 3, 4, 5])
     # print(a[2:4], f'type: {type(a[2:4])}')
     # a.assign([1, 1, 1, 1, 1, 1])
     # a[1:3].assign([2, 3])
     # print(a.getValues())
-    # INPUT
+    # exit()
+    ## INPUT
     # i = InputVariable('u', 6, [0, 1, 2, 3, 4, 5])
     # print(i[2:4], f'type: {type(i[2:4])}')
     # i[2:4].setLowerBounds([1, 1])
@@ -1683,10 +1718,16 @@ if __name__ == '__main__':
     # print(p, f'type: {type(p)}')
     # print(p[0:2], f'type: {type(p[0:2])}')
     # print(p[0:2]+2)
-    # p_sliced = p[0:2]
-    # p_sliced[0].setLowerBounds(5)
-    # p[-1].setLowerBounds(0)
-    # print(p.getLowerBounds())
+    p_sliced = p[0:2]
+    print(p_sliced[1])
+    # print(p_sliced[0], f'type: {type(p_sliced[0])}')
+
+    p_sliced[0].setLowerBounds(5)
+
+    exit()
+
+    p[-1].setLowerBounds(0)
+    print(p.getLowerBounds())
     print(p[0].setInitialGuess(10, [1]))
     print(p.getInitialGuess())
     # SINGLE VARIABLE
