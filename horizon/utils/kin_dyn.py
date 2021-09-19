@@ -30,6 +30,7 @@ def linearized_friciton_cone(f, mu, R):
 
     A_fr_R = cs.mtimes(A_fr, R.T)
 
+
     return cs.mtimes(A_fr_R, f), [-np.inf, -np.inf, -np.inf, -np.inf, -np.inf], [0., 0., 0., 0., 0.]
 
 class InverseDynamics():
@@ -51,6 +52,7 @@ class InverseDynamics():
         self.contact_jacobians = dict()
         for frame in contact_frames:
             self.contact_jacobians[frame] = cs.Function.deserialize(kindyn.jacobian(frame, force_reference_frame))
+
 
     def call(self, q, qdot, qddot, frame_force_mapping = dict()):
         """
