@@ -5,10 +5,9 @@ import casadi as cs
 import numpy as np
 import time
 from horizon import problem
-from horizon.utils import utils, integrators, casadi_kin_dyn, resampler_trajectory, plotter
-from horizon.ros.replay_trajectory import replay_trajectory
-from horizon.solvers import pysqp
-
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.transcriptions import integrators
+from horizon.solvers import solver, pysqp
 import matplotlib.pyplot as plt
 import os
 
@@ -41,6 +40,7 @@ tau = cs.vertcat(u, 0)
 fd = kindyn.aba()  # this is the forward dynamics function
 x = cs.vertcat(q, qdot)
 xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
+prb.setDynamics(xdot)
 
 # Quantities at previous time step (to be removed!)
 q_prev = q.getVarOffset(-1)
@@ -72,14 +72,19 @@ q.setInitialGuess(q_init)
 qdot.setBounds(qdot_init, qdot_init, nodes=0)
 u.setBounds(-tau_lims, tau_lims)
 
+q_tgt = np.array([0.5, np.pi])  # forward 0.5m, and stay up!
+
 # Cost function
-prb.createCostFunction("damp", 0.1 * qdot)
-prb.createCostFunction("reg", 0.001 * u, nodes=range(ns))
+prb.createIntermediateCost("tau", 1e-2*u)
+prb.createIntermediateCost("qdot", 2.*qdot)
+prb.createIntermediateCost("qfinal", 1e-3*(q - q_tgt))
+prb.createFinalCost("qdot_f", 0.1*qdot)
+prb.createFinalCost("qfinal_f", 1.*(q - q_tgt))
 
 # Final constraint
-q_tgt = np.array([0.5, np.pi])  # forward 0.5m, and stay up!
-prb.createConstraint("qfinal", q - q_tgt, nodes=ns+1)
-prb.createConstraint("qdotfinal", qdot, nodes=ns+1)
+prb.createFinalConstraint("up", q[1] - q_tgt[1])
+prb.createFinalConstraint("center", q[0] - q_tgt[0])
+prb.createFinalConstraint("final_qdot", qdot)
 
 # Dynamics
 if use_ms:
@@ -90,14 +95,12 @@ else:
     integrators.make_direct_collocation(prob=prb, degree=3, dt=tf / ns)
 
 # Creates problem
-prb.createProblem()
-
-problem_dict = prb.getProblem()
-problem_dict['f'] = prb.function_container.getCostFList()
 
 
 opts = dict()
-qp_solver = "osqp"
+qp_solver = "qpoases"
+
+opts['gnsqp.qp_solver'] = qp_solver
 
 if qp_solver == "qpoases":
     opts = pysqp.SQPGaussNewtonSX.getQPOasesOptionsMPC()
@@ -114,11 +117,8 @@ if qp_solver == "osqp":
 opts['max_iter'] = 1
 
 
+solver = solver.Solver.make_solver('gnsqp', prb, None, opts)
 
-F = cs.Function('f', [problem_dict['x']], [problem_dict['f']], ['x'], ['f'])
-G = cs.Function('g', [problem_dict['x']], [problem_dict['g']], ['x'], ['g'])
-solver = pysqp.SQPGaussNewtonSX('gnsqp', qp_solver, F, G, opts)
-prb.setSolver(solver)
 
 class RealTimeIteration:
 
@@ -133,7 +133,8 @@ class RealTimeIteration:
         qdot.setBounds(lb=qdotread, ub=qdotread, nodes=0)
 
         # solve
-        solution = prb.solveProblem()
+        solver.solve()
+        solution = solver.getSolutionDict()
 
         # get control input to apply
         u_opt = solution['u'][:, 0]
@@ -145,7 +146,7 @@ class RealTimeIteration:
 
 # the rti loop
 rti = RealTimeIteration(dt=0.01)
-stateread = np.array([0.5, np.pi-0.01, 0.0, 0.0])
+stateread = np.array([0.0, np.pi-0.5, 0.0, 0.0])
 states = []
 inputs = []
 times = []
