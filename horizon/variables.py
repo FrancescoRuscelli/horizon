@@ -96,6 +96,10 @@ class AbstractVariableView(cs.SX):
 #
 #     def __getitem__(self, item):
 #         print(f'getitem of {type(self)} called with indices {item}')
+        # todo this is wrong, since getitem will return an AbstractVariableView initialized with the whole parent.
+        #  basically, if if I do x_slice = x[0:2] (where x is 6-dimensional), with this formulation I could get x_slice[3], since
+        #  i am plucking the values from the original parent. I should only be able to do x_slice[0] and x_slice[1]!!!
+        #  IMPORTANT: also it was fucking up the ipopt solver
 #         view = self.__class__(self._parent, item)
 #         return view
 
@@ -1715,7 +1719,7 @@ if __name__ == '__main__':
     # print(p[0:2], f'type: {type(p[0:2])}')
     # print(p[0:2]+2)
     p_sliced = p[0:2]
-    print(p_sliced[0])
+    print(p_sliced[1])
     # print(p_sliced[0], f'type: {type(p_sliced[0])}')
 
     p_sliced[0].setLowerBounds(5)
