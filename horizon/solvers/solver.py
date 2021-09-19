@@ -44,7 +44,12 @@ class Solver(ABC):
             return ilqr.SolverILQR(prb, dt, opts)
         elif type == 'gnsqp':
             from . import sqp
-            return sqp.GNSQPSolver(prb, dt, opts, 'qpoases')
+            qp_solver = 'qpoases'
+            if opts is not None:
+                if 'gnsqp.qp_solver' in opts:
+                    qp_solver = opts['gnsqp.qp_solver']
+                    del opts['gnsqp.qp_solver']
+            return sqp.GNSQPSolver(prb, dt, opts, qp_solver)
         else:
             raise KeyError(f'unsupperted solver type "{type}"')
 
