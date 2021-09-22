@@ -5,6 +5,7 @@ from horizon.utils import utils, kin_dyn, resampler_trajectory
 from horizon.transcriptions import integrators
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
+from horizon.utils.plotter import PlotterHorizon
 import matplotlib.pyplot as plt
 import os
 
@@ -172,12 +173,20 @@ for frame, f in zip(contact_names, forces):
 # Create problem
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 5000}
+        'ipopt.max_iter': 5000}#,
+        # 'ipopt.linear_solver': 'ma57'}
 
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
 solver.solve()
 
 solution = solver.getSolutionDict()
+
+plot_all = True
+if plot_all:
+    hplt = PlotterHorizon(prb, solution)
+    hplt.plotVariables(show_bounds=False, legend=True)
+    # hplt.plotFunctions(show_bounds=False)
+    plt.show()
 
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]
