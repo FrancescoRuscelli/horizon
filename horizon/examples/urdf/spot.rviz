@@ -10,10 +10,6 @@ Panels:
         - /RobotModel1
         - /TF1
         - /TF1/Frames1
-        - /WrenchStamped1
-        - /WrenchStamped2
-        - /WrenchStamped3
-        - /WrenchStamped4
       Splitter Ratio: 0.5
     Tree Height: 746
   - Class: rviz/Selection
@@ -276,7 +272,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.095045566558838
+      Distance: 1.7909255027770996
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -284,17 +280,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: -0.046511001884937286
+        Y: -0.007932459935545921
+        Z: -0.1456461250782013
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.045398466289043427
+      Pitch: 0.055398616939783096
       Target Frame: <Fixed Frame>
-      Yaw: 4.848581314086914
+      Yaw: 1.8203926086425781
     Saved: ~
 Window Geometry:
   Displays:

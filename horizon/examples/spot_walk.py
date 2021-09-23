@@ -49,11 +49,11 @@ if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint
 
 
 tot_time = 1
-dt = 0.02
+dt_hint = 0.02
 duration_step = 0.5
 
-n_nodes = int(tot_time / dt)
-n_nodes_step = int(duration_step / dt)
+n_nodes = int(tot_time / dt_hint)
+n_nodes_step = int(duration_step / dt_hint)
 
 n_c = 4
 n_q = kindyn.nq()
@@ -95,7 +95,7 @@ if load_initial_guess:
         f_ig_list.append(prev_solution[f'f{i}'])
 
 # SET DYNAMICS
-# dt = prb.createInputVariable("dt", 1)  # variable dt as input
+dt = prb.createInputVariable("dt", 1)  # variable dt as input
 # Computing dynamics
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
@@ -123,6 +123,9 @@ q_ddot_lim = 100. * np.ones(n_v)
 # f bounds
 f_lim = 10000. * np.ones(n_f)
 
+dt_min = 0.01  # [s]
+dt_max = 0.15  # [s]
+
 # set bounds and of q
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, 0)
@@ -135,6 +138,9 @@ q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
 # set bounds of f
 for f in f_list:
     f.setBounds(-f_lim, f_lim)
+
+# set bounds of dt
+dt.setBounds(dt_min, dt_max)
 
 # SET INITIAL GUESS
 if load_initial_guess:
@@ -152,6 +158,8 @@ if load_initial_guess:
             f.setInitialGuess(f_ig[:, node], node)
 else:
     q.setInitialGuess(q_init)
+
+dt.setInitialGuess(dt_min)
 # SET TRANSCRIPTION METHOD
 th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
 
@@ -169,9 +177,9 @@ prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_li
 
 # SET CONTACT POSITION CONSTRAINTS
 active_leg = list()
-# active_leg = next(iter(contact_map))
+active_leg = next(iter(contact_map))
 # active_leg = ['lf_foot', 'rf_foot']
-active_leg = ['lf_foot', 'rf_foot', 'lh_foot']
+# active_leg = ['lf_foot', 'rf_foot', 'lh_foot']
 # active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
 mu = 0.8
@@ -182,7 +190,7 @@ for frame, f in contact_map.items():
     p = FK(q=q)['ee_pos']
     p_start = FK(q=q_init)['ee_pos']
 
-    p_goal = p_start + [0., 0., 0.1]
+    p_goal = p_start + [0.1, 0., 0.2]
     # 1. position of each end effector and its initial position must be the same
     # if frame != active_leg:
     #     prb.createConstraint(f"{frame}_fixed", p - p_start)
@@ -247,8 +255,8 @@ plot_all = True
 if plot_all:
     hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables(show_bounds=False, legend=True)
-    # hplt.plotFunctions(show_bounds=False)
-    plt.show()
+    hplt.plotFunctions(show_bounds=False)
+    # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
 
     pos_contact_list = list()
     for contact in contacts_name:
@@ -278,11 +286,28 @@ if plot_all:
         plt.scatter(np.array(pos[0, :]), np.array(pos[2, :]), linewidth=0.1)
 
     plt.show()
+# ======================================================
+
 
 contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
-# remember to run a robot_state_publisher
-repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+# resampling
+resampling = True
+if resampling:
+    dt_res = 0.001
+    dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
+    q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
+        solution["q"], solution["q_dot"], solution["q_ddot"], solution['dt'].flatten(), dt_res, dae, contact_map, kindyn,
+                                                                            cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+
+
+
+    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+else:
+    # remember to run a robot_state_publisher
+    repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+
 repl.sleep(1.)
 repl.replay(is_floating_base=True)
+
