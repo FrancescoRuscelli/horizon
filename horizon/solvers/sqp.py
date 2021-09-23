@@ -1,290 +1,140 @@
+#try:
+from .pysqp import SQPGaussNewtonSX
+#except ImportError:
+#    print('failed to import pysqp extension; did you compile it?')
+#    exit(1)
+
+from .solver import Solver
+from horizon.problem import Problem
+from typing import Dict
+import numpy as np
 import casadi as cs
-import time
-import numpy
-from horizon.utils import utils
 
 
-def sqpsol(name, qp_solver, problem_dict, options_dict):
-    """
-    sqpsol creates a sqp solver using Gauss-Newton approximation of the Hessian
-    Args:
-        name: name of the solver (not used at the moment)
-        qp_solver: internal qp solver name
-        problem_dict: {'f': cost_function (residual!), 'g': constraints, 'x': variables}
-        options_dict: {'max_iter': iterations}
+class GNSQPSolver(Solver):
 
-    Returns: a sqp object
+    def __init__(self, prb: Problem, dt: float, opts: Dict, qp_solver_plugin: str) -> None:
 
-    NOTE: the cost function has to be passed in a residual form: [f1, f2, f3, ...]
-    where F = ||f1|| + ||f2|| + ...
+        super().__init__(prb, dt, opts=opts)
 
-    """
-    return sqp(name, qp_solver, problem_dict, options_dict)
+        self.solution: Dict[str:np.array] = None
+        self.prb = prb
 
-def qpoasesMPCOptions():
-    opts = {'qpoases.sparse': True,
-            'qpoases.linsol_plugin': 'ma57',
-            'qpoases.enableRamping': False,
-            'qpoases.enableFarBounds': False,
-            'qpoases.enableFlippingBounds': False,
-            'qpoases.enableFullLITests': False,
-            'qpoases.enableNZCTests': False,
-            'qpoases.enableDriftCorrection': 0,
-            'qpoases.enableCholeskyRefactorisation': 0,
-            'qpoases.enableEqualities': True,
-            'qpoases.initialStatusBounds': 'inactive',
-            'qpoases.numRefinementSteps': 0,
-            'qpoases.terminationTolerance': 1e9 * np.finfo(float).eps,
-            'qpoases.enableInertiaCorrection': False,
-            'qpoases.printLevel': 'none'}
-    return opts
+        # generate problem to be solved
+        self.var_container = self.prb.var_container
+        self.fun_container = self.prb.function_container
 
-def osqpOptions():
-    opts = {'osqp.osqp': {'verbose': False}}
+        # generate problem to be solver
+        var_list = list()
+        for var in prb.var_container.getVarList(offset=False):
+            var_list.append(var.getImpl())
+        w = cs.vertcat(*var_list)  #
 
-    return opts
+        fun_list = list()
+        for fun in prb.function_container.getCnstr().values():
+            fun_list.append(fun.getImpl())
+        g = cs.vertcat(*fun_list)
 
-class sqp(object):
-    """
-    Implements a sqp solver using Gauss-Newton approximation of the Hessian
-    """
-    def __init__(self, name, qp_solver, problem_dict, options_dict):
-        """
+        # build cost functions list
+        cost_list = list()
+        for fun in prb.function_container.getCost().values():
+            cost_list.append(fun.getImpl())
+        f = cs.vertcat(cs.vertcat(*cost_list))
 
-        Args:
-            name: name of the solver (not used at the moment)
-            problem_dict: {'f': residual of cost function, 'g': constraints, 'x': variables}
-            options_dict: {'max_iter': iterations, 'qpsolver': internal_qpsolver
-        """
-        self.__name = name
-        self.__problem_dict = problem_dict
-        self.__options_dict = options_dict
-        self.__qpsolver = qp_solver
+        # create solver from prob
+        F = cs.Function('f', [w], [f], ['x'], ['f'])
+        G = cs.Function('g', [w], [g], ['x'], ['g'])
+        self.solver = SQPGaussNewtonSX('gnsqp', qp_solver_plugin, F, G, self.opts)
 
-        self.__qpsolver_options = self.qpsolver_option_parser(self.__qpsolver, self.__options_dict)
+    def solve(self) -> bool:
+        # update bounds and initial guess
 
-        self.__f = self.__problem_dict['f']
-        self.__g = None
-        if 'g' in self.__problem_dict:
-            self.__g = self.__problem_dict['g']
+        lb_list = list()
+        for var in self.prb.var_container.getVarList(offset=False):
+            lb_list.append(var.getLowerBounds())
+        lbw = cs.vertcat(*lb_list)
 
-        self.__x = self.__problem_dict['x']
+        # update upper bounds of variables
+        ub_list = list()
+        for var in self.prb.var_container.getVarList(offset=False):
+            ub_list.append(var.getUpperBounds())
+        ubw = cs.vertcat(*ub_list)
 
-        self.__max_iter = 1000
-        if 'max_iter' in self.__options_dict:
-            self.__max_iter = self.__options_dict['max_iter']
+        # update initial guess of variables
+        w0_list = list()
+        for var in self.prb.var_container.getVarList(offset=False):
+            w0_list.append(var.getInitialGuess())
+        w0 = cs.vertcat(*w0_list)
+        # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
 
-        self.__reinitialize_qpsolver = False
-        if 'reinitialize_qpsolver' in self.__options_dict:
-            self.__reinitialize_qpsolver = self.__options_dict['reinitialize_qpsolver']
+        # update parameters
+        p_list = list()
+        for par in self.prb.var_container.getParList():
+            p_list.append(par.getValues())
+        p = cs.vertcat(*p_list)
 
+        # update lower bounds of constraints
+        lbg_list = list()
+        for fun in self.prb.function_container.getCnstr().values():
+            lbg_list.append(fun.getLowerBounds())
+        lbg = cs.vertcat(*lbg_list)
 
+        # update upper bounds of constraints
+        ubg_list = list()
+        for fun in self.prb.function_container.getCnstr().values():
+            ubg_list.append(fun.getUpperBounds())
+        ubg = cs.vertcat(*ubg_list)
 
+        # solve
+        sol = self.solver.solve(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
-        # Form function for calculating the Gauss-Newton objective
-        self.__r_fcn = cs.Function('r_fcn', {'v': self.__x, 'r': self.__f}, ['v'], ['r'])
+        # retrieve state and input trajector
+        input_vars = [v.getName() for v in self.prb.getInput().var_list]
+        state_vars = [v.getName() for v in self.prb.getState().var_list]
 
-        # Form function for calculating the constraints
-        self.__g_fcn = []
-        if self.__g is not None:
-            self.__g_fcn = cs.Function('g_fcn', {'v': self.__x, 'g': self.__g}, ['v'], ['g'])
+        # get solution dict
+        pos = 0
+        solution_dict = dict()
+        for var in self.var_container.getVarList(offset=False):
+            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
+            # this is to divide in rows the each dim of the var
+            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
+            solution_dict[var.getName()] = val_sol_matrix
+            pos = pos + var.shape[0] * len(var.getNodes())
 
-        # Generate functions for the Jacobians
-        # self.__Jac_r_fcn = self.__r_fcn.jac()
-        self.__Jac_r_fcn, _ = utils.jac({'v': self.__x, 'r': self.__f}, ['v'], ['r'])
+        self.solution = solution_dict
 
-        self.__Jac_g_fcn = []
-        if self.__g is not None:
-            # self.__Jac_g_fcn = self.__g_fcn.jac()
-            self.__Jac_g_fcn, _ = utils.jac({'v': self.__x, 'g': self.__g}, ['v'], ['g'])
+        # get solution as state/input
+        pos = 0
+        for name, var in self.var_container.getVar().items():
+            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
+            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
+            if name in state_vars:
+                off, _ = self.prb.getState().getVarIndex(name)
+                self.x_opt[off:off + var.shape[0], :] = val_sol_matrix
+            elif name in input_vars:
+                off, _ = self.prb.getInput().getVarIndex(name)
+                self.u_opt[off:off + var.shape[0], :] = val_sol_matrix
+            else:
+                pass
+            pos = pos + var.shape[0] * len(var.getNodes())
 
-        self.__v0 = []
-        self.__vmin = []
-        self.__vmax = []
-        self.__gmin = []
-        self.__gmax = []
+        # print(f'{self.x_opt.shape}:, {self.x_opt}')
+        # print(f'{self.u_opt.shape}:, {self.u_opt}')
 
-        self.__v_opt = []
-        self.__obj = []
-        self.__constr = []
+        return True
 
-        self.__solver = []
-        self.__qp = {}
+    def getSolutionDict(self):
+        return self.solution
 
-    def qpsolve(self, H, g, lbx, ubx, A, lba, uba, init=True):
-        """
-        Internal qp solver to solve differential problem
-        Args:
-            H: Hessian cos function
-            g: gradient cost function
-            lbx: lower bounds
-            ubx: upper bounds
-            A: Constraints
-            lba: lower constraints
-            uba: upper constraints
+    def getHessianComputationTime(self):
+        return self.solver.getHessianComputationTime()
 
-        Returns: solution of differential problem
+    def getQPComputationTime(self):
+        return self.solver.getQPComputationTime()
 
-        """
+    def getObjectiveIterations(self):
+        return self.solver.getObjectiveIterations()
 
-        if init:
-            # QP structure
-            self.__qp['h'] = H.sparsity()
-            if A is not None:
-                self.__qp['a'] = A.sparsity()
-
-            # Create CasADi solver instance
-            self.__solver = cs.conic('S', self.__qpsolver, self.__qp, self.__qpsolver_options)
-
-        if A is None:
-            A = []
-        r = self.__solver(h=H, g=g, a=A, lbx=lbx, ubx=ubx, lba=lba, uba=uba)
-
-        # Return the solution
-        return r['x']
-
-    def __call__(self, x0, lbx, ubx, lbg=None, ubg=None, alpha=1.):
-        """
-        Compute solution of non linear problem
-        Args:
-            x0: initial guess
-            lbx: lower bounds
-            ubx: upper bounds
-            lbg: lower constraints
-            ubg: upper constraints
-
-        Returns: solution dict {'x': nlp_solution, 'f': value_cost_function, 'g': value_constraints}
-
-        """
-
-        if ubg is None:
-            ubg = []
-        if lbg is None:
-            lbg = []
-        self.__hessian_computation_time = []
-        self.__qp_computation_time = []
-
-        self.__v0 = x0
-        self.__vmin = lbx
-        self.__vmax = ubx
-        self.__gmin = lbg
-        self.__gmax = ubg
-
-        self.__v_opt = self.__v0
-        for k in range(self.__max_iter):
-
-            init = self.__reinitialize_qpsolver
-            if k == 0:
-                init = True
-
-            # Form quadratic approximation of objective
-            Jac_r_fcn_value = self.__Jac_r_fcn(v=self.__v_opt)  # evaluate in v_opt
-            J_r_k = Jac_r_fcn_value['DrDv']
-            r_k = self.__r_fcn(v=self.__v_opt)['r']
-
-            # Form quadratic approximation of constraints
-            Jac_g_fcn_value = []
-            J_g_k = None
-            g_k = []
-            if self.__g is not None:
-                Jac_g_fcn_value = self.__Jac_g_fcn(v=self.__v_opt)  # evaluate in v_opt
-                J_g_k = Jac_g_fcn_value['DgDv']
-                g_k = -self.__g_fcn(v=self.__v_opt)['g']
-
-            # Gauss-Newton Hessian
-            t = time.time()
-            H_k = cs.mtimes(J_r_k.T, J_r_k)
-            elapsed = time.time() - t
-            self.__hessian_computation_time.append(elapsed)
-
-            # Gradient of the objective function
-            Grad_obj_k = cs.mtimes(J_r_k.T, r_k)
-
-            # Bounds on delta_v
-            dv_min = self.__vmin - self.__v_opt
-            dv_max = self.__vmax - self.__v_opt
-
-            # Solve the QP
-            t = time.time()
-            dv = self.qpsolve(H_k, Grad_obj_k, dv_min, dv_max, J_g_k, g_k, g_k, init)
-            elapsed = time.time() - t
-            self.__qp_computation_time.append(elapsed)
-
-            # Take the full step
-            self.__v_opt += alpha*dv.toarray().flatten()
-            self.__obj.append(float(numpy.dot(r_k.T, r_k) / 2.))
-            if self.__g is not None:
-                self.__constr.append(float(cs.norm_2(g_k)))
-
-        solution_dict = {'x': cs.DM(self.__v_opt.tolist()), 'f': self.__obj, 'g': self.__constr}
-        return solution_dict
-
-    def f(self, f):
-        """
-        Permits to update cost function
-        Args:
-            f: new cost function
-        """
-        self.__f = f
-        # Form function for calculating the Gauss-Newton objective
-        self.__r_fcn = cs.Function('r_fcn', {'v': self.__x, 'r': self.__f}, ['v'], ['r'])
-        # Generate functions for the Jacobians
-        # self.__Jac_r_fcn = self.__r_fcn.jac()
-        self.__Jac_r_fcn, _ = utils.jac({'v': self.__x, 'r': self.__f}, ['v'], ['r'])
-
-    def g(self, g):
-        """
-        permits to update constraints
-        Args:
-            g: new constraints
-        """
-        self.__g = g
-        self.__g_fcn = cs.Function('g_fcn', {'v': self.__x, 'g': self.__g}, ['v'], ['g'])
-        # self.__Jac_g_fcn = self.__g_fcn.jac()
-        self.__Jac_g_fcn, _ = utils.jac({'v': self.__x, 'g': self.__g}, ['v'], ['g'])
-
-    def qpsolver_option_parser(self, qpsolver, options):
-        parsed_options = {}
-        for key in options:
-            list = key.split(".")
-            if list[0] == qpsolver:
-                parsed_options[list[1]] = options[key]
-        return parsed_options
-
-
-    def plot(self):
-        """
-        Shows plots of value of objective function and constraint violation
-        """
-        import matplotlib.pyplot as plt
-        # Plot the results
-        plt.figure(1)
-
-        plt.title("SQP solver output")
-        plt.semilogy(self.__obj)
-        if self.__constr:
-            plt.semilogy(self.__constr)
-        plt.xlabel('iteration')
-        if self.__constr:
-            plt.legend(['Objective value', 'Constraint violation'], loc='center right')
-        else:
-            plt.legend(['Objective value'], loc='center right')
-        plt.grid()
-
-        plt.show()
-
-    def get_qp_computation_time(self):
-        """
-
-        Returns: list of logged time to setup and solve a QP
-
-        """
-        return self.__qp_computation_time
-
-    def get_hessian_computation_time(self):
-        """
-
-        Returns: list of logged time to compute the hessian
-
-        """
-        return self.__hessian_computation_time
+    def getConstraintNormIterations(self):
+        return self.solver.getConstraintNormIterations()

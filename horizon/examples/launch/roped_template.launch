@@ -1,6 +1,6 @@
 <launch>
      <!-- send the cogimon robot XML to param server -->
-     <param name="robot_description" textfile="../urdf/roped_template.urdf" />
+     <param name="robot_description" textfile="$(find horizon_examples)/urdf/roped_template.urdf" />
      
         
     <!-- start robot state publisher -->
@@ -8,6 +8,6 @@
         <param name="publish_frequency" type="double" value="250.0" />
     </node>
     
-    <!-- node type="rviz" name="rviz" pkg="rviz" args="-d free_fall.rviz" output="screen"/ -->
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find horizon_examples)/rviz/roped_template.rviz" output="screen"/>
 
 </launch>

@@ -17,6 +17,7 @@ from horizon.ros import utils as horizon_ros_utils
 horizon_ros_utils.roslaunch("horizon_examples", "quadruped_template.launch")
 time.sleep(3.)
 
+
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'quadruped_template.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
@@ -37,20 +38,26 @@ q = prb.createStateVariable("q", nq)
 qdot = prb.createStateVariable("qdot", nv)
 
 # Creates problem CONTROL variables
-qddot = prb.createInputVariable("qddot", nv)
+dt = prb.createVariable("dt", 1, nodes=list(range(0, ns)))
+
+u = prb.createInputVariable("actuated_torques", nv - 6)
 f1 = prb.createInputVariable("f1", nf)
 f2 = prb.createInputVariable("f2", nf)
 f3 = prb.createInputVariable("f3", nf)
 f4 = prb.createInputVariable("f4", nf)
-dt = prb.createInputVariable("dt", 1)
-
+tau = cs.vertcat(cs.SX.zeros(6, 1), u)
+contact_names = ['Contact1', 'Contact2', 'Contact3', 'Contact4']
+fd = casadi_kin_dyn.ForwardDynamics(kindyn, contact_names, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+frame_force_mapping = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
+qddot = fd.call(q, qdot, tau, frame_force_mapping)
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
 prb.setDynamics(xdot)
 # Formulate discrete time dynamics
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
-dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
+dae = {'x': x, 'p': prb.getInput().getVars(), 'ode': xdot, 'quad': L}
 F_integrator = integrators.RK4(dae, {}, cs.SX)
+
 
 # Limits
 disp_z = 0.2
@@ -83,11 +90,11 @@ qdot.setBounds(qdot_min, qdot_max)
 qdot.setBounds(qdot_init, qdot_init, 0)
 qdot.setInitialGuess(qdot_init)
 
-qddot_min = (-100.*np.ones(nv)).tolist()
-qddot_max = (100.*np.ones(nv)).tolist()
-qddot_init = np.zeros(nv).tolist()
-qddot.setBounds(qddot_min, qddot_max)
-qddot.setInitialGuess(qddot_init)
+u_min = (-1000.*np.ones(nv-6)).tolist()
+u_max = (1000.*np.ones(nv-6)).tolist()
+u_init = np.zeros(nv-6).tolist()
+u.setBounds(u_min, u_max)
+u.setInitialGuess(u_init)
 
 f_min = (-10000.*np.ones(nf)).tolist()
 f_max = (10000.*np.ones(nf)).tolist()
@@ -113,50 +120,41 @@ touch_down_node = 30
 q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.9, 0.0, 0.0, 0.0, 1.0]).tolist()
 
 prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes=list(range(lift_node, touch_down_node)))
-prb.createCostFunction("min_qdot", 10.*cs.dot(qdot, qdot))
-#prb.createCostFunction("min_qddot", 1e-4*cs.dot(qddot, qddot), nodes= list(range(0, ns)))
-#prb.createCostFunction("min_force", 1e-4*cs.dot( f1 + f2 + f3 + f4, f1 + f2 + f3 + f4), nodes=list(range(0, ns)))
-
-
+prb.createCostFunction("min_qdot", 50.*cs.dot(qdot, qdot))
+#prb.createCostFunction("min_f", 0.0001*cs.sumsqr(f1+f2+f3+f4), nodes=list(range(0, ns)))
+prb.createCostFunction("min_u", 0.0001*cs.sumsqr(u), nodes=list(range(0, ns)))
 #f1_prev = f1.getVarOffset(-1)
 #f2_prev = f2.getVarOffset(-1)
 #f3_prev = f3.getVarOffset(-1)
 #f4_prev = f4.getVarOffset(-1)
-#prb.createCostFunction("min_deltaforce", 1e-4*cs.dot( (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev),
-#                                                      (f1-f1_prev) + (f2-f2_prev) + (f3-f3_prev) + (f4-f4_prev)),
-#                                                      nodes= list(range(1, ns)))
+#prb.createCostFunction("min_df", 0.001*cs.sumsqr(f1-f1_prev+f2-f2_prev+f3-f3_prev+f4-f4_prev), nodes=list(range(1, ns)))
 
 # Constraints
 q_prev = q.getVarOffset(-1)
 qdot_prev = qdot.getVarOffset(-1)
-qddot_prev = qddot.getVarOffset(-1)
 dt_prev = dt.getVarOffset(-1)
+
+u_prev = u.getVarOffset(-1)
+f1_prev = f1.getVarOffset(-1)
+f2_prev = f2.getVarOffset(-1)
+f3_prev = f3.getVarOffset(-1)
+f4_prev = f4.getVarOffset(-1)
+tau_prev = cs.vertcat(cs.SX.zeros(6, 1), u_prev)
+frame_force_mapping_prev = {'Contact1': f1_prev, 'Contact2': f2_prev, 'Contact3': f3_prev, 'Contact4': f4_prev}
+qddot_prev = fd.call(q_prev, qdot_prev, tau_prev, frame_force_mapping_prev)
 x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
-x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt_prev)
+
+x_int = F_integrator(x0=x_prev, p=cs.vertcat(u_prev, f1_prev, f2_prev, f3_prev, f4_prev), time=dt_prev)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))
 
-tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
-            -1000., -1000., -1000.,  # Contact 1
-            -1000., -1000., -1000.,  # Contact 2
-            -1000., -1000., -1000.,  # Contact 3
-            -1000., -1000., -1000.]  # Contact 4
 
-tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
-            1000., 1000., 1000.,  # Contact 1
-            1000., 1000., 1000.,  # Contact 2
-            1000., 1000., 1000.,  # Contact 3
-            1000., 1000., 1000.]  # Contact 4
-dd = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
-tau = casadi_kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
-prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
-prb.createFinalConstraint('final_velocity', qdot)
+#prb.createConstraint("final_velocity", qdot, nodes=ns+1, bounds=dict(lb=np.zeros((nv, 1)), ub=np.zeros((nv, 1))))
 
 # GROUND
 mu = 0.8 # friction coefficient
 R = np.identity(3, dtype=float) # environment rotation wrt inertial frame
 
 # foot
-contact_names = ['Contact1', 'Contact2', 'Contact3', 'Contact4']
 forces = [f1, f2, f3, f4]
 for frame, f in zip(contact_names, forces):
     # BEFORE AND AFTER FLIGHT PHASE
@@ -179,9 +177,10 @@ for frame, f in zip(contact_names, forces):
     prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=list(range(lift_node, touch_down_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
 # Create problem
-opts = {'ipopt.tol': 0.001,
-        'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 5000}
+opts = {'ipopt.tol': 0.01,
+        'ipopt.constr_viol_tol': 0.01,
+        'ipopt.max_iter': 5000,
+        'ipopt.linear_solver': 'ma57'}
 
 solver = solver.Solver.make_solver('ipopt', prb, None, opts)
 solver.solve()
@@ -190,28 +189,38 @@ solution = solver.getSolutionDict()
 
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]
-qddot_hist = solution["qddot"]
+u_hist = solution["actuated_torques"]
+tau_hist = np.zeros((qdot_hist.shape[0], qdot_hist.shape[1]-1))
+for i in range(tau_hist.shape[1]):
+    tau_hist[6:, i] = solution["actuated_torques"][:, i]
 f1_hist = solution["f1"]
 f2_hist = solution["f2"]
 f3_hist = solution["f3"]
 f4_hist = solution["f4"]
 dt_hist = solution["dt"]
 
-tau_hist = np.zeros(qddot_hist.shape)
-ID = casadi_kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+qddot_hist = np.zeros(tau_hist.shape)
+FD = casadi_kin_dyn.ForwardDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 for i in range(ns):
     frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'Contact3': f3_hist[:, i], 'Contact4': f4_hist[:, i]}
-    tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()
-
+    qddot_hist[:, i] = FD.call(q_hist[:, i], qdot_hist[:, i], tau_hist[:, i], frame_force_mapping_i).toarray().flatten()
 
 
 # resampling
 dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'Contact3': f3_hist, 'Contact4': f4_hist}
-q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(
-                                                                        q_hist, qdot_hist, qddot_hist, dt_hist.flatten(),
-                                                                        dt, dae, frame_force_hist_mapping, kindyn,
-                                                                        cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+q_res, qdot_res, input_res = resampler_trajectory.second_order_resample_integrator(q_hist, qdot_hist, np.array(cs.vertcat(u_hist, f1_hist, f2_hist, f3_hist, f4_hist)),
+    dt_hist.flatten(), dt, dae)
+
+tau_res = resampler_trajectory.resample_input(tau_hist, dt_hist.flatten(), dt)
+f1_res = resampler_trajectory.resample_input(f1_hist, dt_hist.flatten(), dt)
+f2_res = resampler_trajectory.resample_input(f2_hist, dt_hist.flatten(), dt)
+f3_res = resampler_trajectory.resample_input(f3_hist, dt_hist.flatten(), dt)
+f4_res = resampler_trajectory.resample_input(f4_hist, dt_hist.flatten(), dt)
+
+frame_force_res_mapping = {'Contact1': f1_res, 'Contact2': f2_res, 'Contact3': f3_res, 'Contact4': f4_res}
+
+
 
 PLOTS = True
 if PLOTS:
@@ -252,12 +261,12 @@ if PLOTS:
     plt.xlabel('$\mathrm{[sec]}$', size=20)
     plt.ylabel('$\mathrm{\dot{q}}$', size=20)
 
-    plt.figure()
-    for i in range(qddot_res.shape[0]):
-        plt.plot(time[:-1], qddot_res[i, :])
-    plt.suptitle('$\mathrm{\ddot{q} \ Resampled}$', size=20)
-    plt.xlabel('$\mathrm{[sec]}$', size=20)
-    plt.ylabel('$\mathrm{\ddot{q}}$', size=20)
+    #plt.figure()
+    #for i in range(qddot_res.shape[0]):
+    #    plt.plot(time[:-1], qddot_res[i, :])
+    #plt.suptitle('$\mathrm{\ddot{q} \ Resampled}$', size=20)
+    #plt.xlabel('$\mathrm{[sec]}$', size=20)
+    #plt.ylabel('$\mathrm{\ddot{q}}$', size=20)
 
     plt.show()
 
@@ -273,4 +282,3 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
 repl = replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
 repl.sleep(1.)
 repl.replay()
-
