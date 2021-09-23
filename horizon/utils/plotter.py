@@ -33,21 +33,28 @@ class PlotterHorizon:
 
         return fig, gs
 
-    def _plotVar(self, val, ax, abstract_var, markers, show_bounds, legend):
+    def _plotVar(self, val, ax, abstract_var, markers, show_bounds, legend, dim):
+        var_dim_select = set(range(val.shape[0]))
+        if dim is not None:
+            if not set(dim).issubset(var_dim_select):
+                raise Exception('Wrong selected dimension.')
+            else:
+                var_dim_select = dim
+
         baseline = None
         legend_list = list()
         if isinstance(abstract_var, InputVariable):
-            for dim in range(val.shape[0]):
+            for i in var_dim_select: # get i-th dimension
 
                 r = random.random()
                 b = random.random()
                 g = random.random()
                 color = (r, g, b)
 
-                for i in range(val.shape[1]-1):
-                    ax.plot(np.array(range(val.shape[1])), val[dim, :], linewidth=0.1, color=color)
-                    # ax.plot(range(val.shape[1])[i:i + 2], [val[dim, i]] * 2, color=color)
-                    # ax.plot(np.array(range(val.shape[1])), val[dim, :], linewidth=0.1, color=color, label='_nolegend_')
+                for j in range(val.shape[1]-1):
+                    # ax.plot(np.array(range(val.shape[1])), val[i, :], linewidth=0.1, color=color)
+                    ax.plot(range(val.shape[1])[j:j + 2], [val[i, j]] * 2, color=color)
+                    ax.plot(np.array(range(val.shape[1])), val[i, :], linewidth=0.1, color=color, label='_nolegend_')
 
                     if show_bounds:
                         lb, ub = abstract_var.getBounds()
@@ -55,24 +62,24 @@ class PlotterHorizon:
                         ub_mat = np.reshape(ub, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
 
                         if markers:
-                            ax.plot(range(val.shape[1]), lb_mat[dim, :], marker="x", markersize=3, linestyle='dotted',linewidth=1, color=color)
-                            ax.plot(range(val.shape[1]), ub_mat[dim, :], marker="x", markersize=3, linestyle='dotted',linewidth=1, color=color)
+                            ax.plot(range(val.shape[1]), lb_mat[i, :], marker="x", markersize=3, linestyle='dotted',linewidth=1, color=color)
+                            ax.plot(range(val.shape[1]), ub_mat[i, :], marker="x", markersize=3, linestyle='dotted',linewidth=1, color=color)
                         else:
-                            ax.plot(range(val.shape[1]), lb_mat[dim, :], linestyle='dotted')
-                            ax.plot(range(val.shape[1]), ub_mat[dim, :], linestyle='dotted')
+                            ax.plot(range(val.shape[1]), lb_mat[i, :], linestyle='dotted')
+                            ax.plot(range(val.shape[1]), ub_mat[i, :], linestyle='dotted')
 
                 if legend:
-                    legend_list.append(f'{abstract_var.getName()}_{dim}')
+                    legend_list.append(f'{abstract_var.getName()}_{i}')
                     if show_bounds:
-                        legend_list.append(f'{abstract_var.getName()}_{dim}_lb')
-                        legend_list.append(f'{abstract_var.getName()}_{dim}_ub')
+                        legend_list.append(f'{abstract_var.getName()}_{i}_lb')
+                        legend_list.append(f'{abstract_var.getName()}_{i}_ub')
         else:
-            for dim in range(val.shape[0]):
+            for i in var_dim_select:
                 if markers:
-                    baseline, = ax.plot(range(val.shape[1]), val[dim, :], marker="o", markersize=2)
+                    baseline, = ax.plot(range(val.shape[1]), val[i, :], marker="o", markersize=2)
 
                 else:
-                    baseline, = ax.plot(range(val.shape[1]), val[dim, :])
+                    baseline, = ax.plot(range(val.shape[1]), val[i, :])
 
                 if show_bounds:
                     lb, ub = abstract_var.getBounds()
@@ -80,21 +87,21 @@ class PlotterHorizon:
                     ub_mat = np.reshape(ub, (abstract_var.getDim(), len(abstract_var.getNodes())), order='F')
 
                     if markers:
-                        ax.plot(range(val.shape[1]), lb_mat[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
-                        ax.plot(range(val.shape[1]), ub_mat[dim, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
+                        ax.plot(range(val.shape[1]), lb_mat[i, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
+                        ax.plot(range(val.shape[1]), ub_mat[i, :], marker="x", markersize=3, linestyle='dotted', linewidth=1, color=baseline.get_color())
                     else:
-                        ax.plot(range(val.shape[1]), lb_mat[dim, :], linestyle='dotted')
-                        ax.plot(range(val.shape[1]), ub_mat[dim, :], linestyle='dotted')
+                        ax.plot(range(val.shape[1]), lb_mat[i, :], linestyle='dotted')
+                        ax.plot(range(val.shape[1]), ub_mat[i, :], linestyle='dotted')
 
                     if legend:
-                        legend_list.append(f'{abstract_var.getName()}_{dim}')
-                        legend_list.append(f'{abstract_var.getName()}_{dim}_lb')
-                        legend_list.append(f'{abstract_var.getName()}_{dim}_ub')
+                        legend_list.append(f'{abstract_var.getName()}_{i}')
+                        legend_list.append(f'{abstract_var.getName()}_{i}_lb')
+                        legend_list.append(f'{abstract_var.getName()}_{i}_ub')
 
         if legend:
             ax.legend(legend_list)
 
-    def plotVariables(self, grid=False, same_fig=False, markers=False, show_bounds=True, legend=True):
+    def plotVariables(self, grid=False, same_fig=False, markers=False, show_bounds=True, legend=True, dim=None):
 
         if self.solution is None:
             raise Exception('Solution not set. Cannot plot variables.')
@@ -106,7 +113,7 @@ class PlotterHorizon:
                 ax = fig.add_subplot(gs[i])
                 if grid:
                     ax.grid(axis='x')
-                self._plotVar(val, ax, self.prb.getVariables(key), markers=markers, show_bounds=show_bounds)
+                self._plotVar(val, ax, self.prb.getVariables(key), markers=markers, show_bounds=show_bounds, dim=dim)
 
                 # options
                 ax.set_title('{}'.format(key))
@@ -121,13 +128,13 @@ class PlotterHorizon:
                 ax.set_title('{}'.format(key))
                 if grid:
                     ax.grid(axis='x')
-                self._plotVar(val, ax, self.prb.getVariables(key), markers=markers, show_bounds=show_bounds, legend=legend)
+                self._plotVar(val, ax, self.prb.getVariables(key), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
 
 
         fig.tight_layout()
         plt.show(block=False)
 
-    def plotVariable(self, name, grid=False, markers=None, show_bounds=None, legend=None):
+    def plotVariable(self, name, grid=False, markers=None, show_bounds=None, legend=None, dim=None):
 
         if self.solution is None:
             raise Exception('Solution not set. Cannot plot variable.')
@@ -137,13 +144,13 @@ class PlotterHorizon:
         fig, ax = plt.subplots()
         if grid:
             ax.grid(axis='x')
-        self._plotVar(val, ax, prb.getVariables(name), markers=markers, show_bounds=show_bounds, legend=legend)
+        self._plotVar(val, ax, prb.getVariables(name), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
 
         ax.set_title('{}'.format(name))
         plt.xticks(list(range(val.shape[1])))
         ax.set(xlabel='nodes', ylabel='vals')
 
-    def plotFunctions(self, grid=False, same_fig=False, markers=None, show_bounds=None, legend=None):
+    def plotFunctions(self, grid=False, same_fig=False, markers=None, show_bounds=None, legend=None, dim=None):
 
         if self.solution is None:
             raise Exception('Solution not set. Cannot plot functions.')
@@ -159,7 +166,7 @@ class PlotterHorizon:
                     if grid:
                         ax.grid(axis='x')
                     fun_evaluated = self.prb.evalFun(fun, self.solution)
-                    self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name), markers=markers, show_bounds=show_bounds, legend=legend)
+                    self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
 
                     ax.set_title('{}'.format(name))
                     plt.xticks(list(range(fun_evaluated.shape[1])))
@@ -174,10 +181,27 @@ class PlotterHorizon:
                     if grid:
                         ax.grid(axis='x')
                     fun_evaluated = self.prb.evalFun(fun, self.solution)
-                    self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name), markers=markers, show_bounds=show_bounds, legend=legend)
+                    self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
 
             fig.tight_layout()
             plt.show(block=False)
+
+    def plotFunction(self, name, grid=False, markers=None, show_bounds=None, legend=None, dim=None):
+
+        if self.solution is None:
+            raise Exception('Solution not set. Cannot plot functions.')
+
+        fun = self.prb.getConstraints(name)
+
+        fig, ax = plt.subplots()
+        ax.set_title('{}'.format(name))
+        if grid:
+            ax.grid(axis='x')
+        fun_evaluated = self.prb.evalFun(fun, self.solution)
+        self._plotVar(fun_evaluated, ax, self.prb.getConstraints(name), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
+
+        fig.tight_layout()
+        plt.show(block=False)
 
 if __name__ == '__main__':
 
