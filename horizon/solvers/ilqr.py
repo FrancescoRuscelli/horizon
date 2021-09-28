@@ -97,25 +97,18 @@ class SolverILQR(Solver):
         self._set_fun_k(k, 
                 container=self.prb.function_container.getCost(),
                 set_to_ilqr=self.ilqr.setIntermediateCost, 
-                combine_elements=sum,
                 outname='l')
 
     
     def _set_constraint_k(self, k):
-        
-        def vertcat_list(l: List):
-            return cs.vertcat(*l)
 
         self._set_fun_k(k, 
                 container=self.prb.function_container.getCnstr(),
                 set_to_ilqr=self.ilqr.setIntermediateConstraint,
-                combine_elements=vertcat_list,
                 outname='h')
     
     
-    def _set_fun_k(self, k, container, set_to_ilqr, combine_elements, outname):
-
-        value_list = list()
+    def _set_fun_k(self, k, container, set_to_ilqr, outname):
 
         # check state and input bounds
         if outname == 'h':
@@ -123,16 +116,20 @@ class SolverILQR(Solver):
             # state
             xlb, xub = self.prb.getState().getBounds(node=k)
             if np.all(xlb == xub) and k > 0:  # note: skip initial condition
-                value_list.append(self.x - xlb)
+                l = cs.Function(f'xc_{k}', [self.x, self.u], [self.x - xlb], 
+                                ['x', 'u'], [outname])
+                set_to_ilqr(k, l)
 
             # input
             if k < self.N:
                 ulb, uub = self.prb.getInput().getBounds(node=k)
                 if np.all(ulb == uub):
-                    value_list.append(self.u - ulb)
+                    l = cs.Function(f'uc_{k}', [self.x, self.u], [self.u - ulb], 
+                                ['x', 'u'], [outname])
+                    set_to_ilqr(k, l)
 
         
-        # check constraints    
+        # check fn in container    
         for fname, f in container.items():
             
             # give a type to f
@@ -155,22 +152,13 @@ class SolverILQR(Solver):
                     raise ValueError(f'[ilqr] constraint {fname} not an equality constraint')
                 value -= lb
 
-            value_list.append(value)
-        
-        # if empty, skip
-        if len(value_list) == 0:
-            return 
-        
-        # compute overall value
-        total_value = combine_elements(value_list)
-    
-        # wrap function
-        l = cs.Function(f'{outname}_{k}', [self.x, self.u], [total_value], 
-                            ['x', 'u'], [outname])
+            # wrap function
+            l = cs.Function(f'{fname}_{k}', [self.x, self.u], [value], 
+                                ['x', 'u'], [outname])
 
-        # set it to solver
-        set_to_ilqr(k, l)
-
+            # set it to solver
+            set_to_ilqr(k, l)
+        
 
     
     def _iter_callback(self, fpres):

@@ -45,6 +45,41 @@ public:
 
 struct IterativeLQR::Constraint
 {
+    std::list<ConstraintEntity> items;
+
+    // dh/dx
+    const Eigen::MatrixXd& C() const;
+
+    // dh/du
+    const Eigen::MatrixXd& D() const;
+
+    // constraint violation f(x, u)
+    VecConstRef h() const;
+
+    // size getter
+    int size() const;
+
+    // valid flag
+    bool is_valid() const;
+
+    Constraint(int nx, int nu);
+
+    void linearize(VecConstRef x, VecConstRef u);
+
+    void evaluate(VecConstRef x, VecConstRef u);
+
+    void addConstraint(casadi::Function h);
+
+private:
+
+    Eigen::MatrixXd _C;
+    Eigen::MatrixXd _D;
+    Eigen::VectorXd _h;
+
+};
+
+struct IterativeLQR::ConstraintEntity
+{
     // constraint function
     casadi_utils::WrappedFunction f;
 
@@ -63,7 +98,7 @@ struct IterativeLQR::Constraint
     // valid flag
     bool is_valid() const;
 
-    Constraint();
+    ConstraintEntity();
 
     void linearize(VecConstRef x, VecConstRef u);
 
@@ -73,7 +108,7 @@ struct IterativeLQR::Constraint
 
 };
 
-struct IterativeLQR::IntermediateCost
+struct IterativeLQR::IntermediateCostEntity
 {
     // original cost
     casadi_utils::WrappedFunction l;
@@ -91,12 +126,34 @@ struct IterativeLQR::IntermediateCost
     VecConstRef r() const;
     const Eigen::MatrixXd& P() const;
 
-    IntermediateCost(int nx, int nu);
-
     void setCost(const casadi::Function& cost);
 
     double evaluate(VecConstRef x, VecConstRef u);
     void quadratize(VecConstRef x, VecConstRef u);
+};
+
+struct IterativeLQR::IntermediateCost
+{
+    std::list<IntermediateCostEntity> items;
+
+    /* Quadratized cost */
+    const Eigen::MatrixXd& Q() const;
+    VecConstRef q() const;
+    const Eigen::MatrixXd& R() const;
+    VecConstRef r() const;
+    const Eigen::MatrixXd& P() const;
+
+    IntermediateCost(int nx, int nu);
+
+    void addCost(const casadi::Function& cost);
+
+    double evaluate(VecConstRef x, VecConstRef u);
+    void quadratize(VecConstRef x, VecConstRef u);
+
+private:
+
+    Eigen::MatrixXd _Q, _R, _P;
+    Eigen::VectorXd _q, _r;
 };
 
 struct IterativeLQR::Temporaries

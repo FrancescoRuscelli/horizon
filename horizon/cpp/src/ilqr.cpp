@@ -34,7 +34,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _hxx_reg(0.0),
     _hxx_reg_growth_factor(1e3),
     _cost(N+1, IntermediateCost(_nx, _nu)),
-    _constraint(N+1),
+    _constraint(N+1, Constraint(_nx, _nu)),
     _value(N+1, ValueFunction(_nx)),
     _dyn(N, Dynamics(_nx, _nu)),
     _bp_res(N, BackwardPassResult(_nx, _nu)),
@@ -87,7 +87,7 @@ void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inte
 
     for(int i = 0; i < _N; i++)
     {
-        _cost[i].setCost(inter_cost[i]);
+        _cost[i].addCost(inter_cost[i]);
     }
 }
 
@@ -98,12 +98,12 @@ void IterativeLQR::setIntermediateCost(int k, const casadi::Function &inter_cost
         throw std::invalid_argument("wrong intermediate cost node index");
     }
 
-    _cost[k].setCost(inter_cost);
+    _cost[k].addCost(inter_cost);
 }
 
 void IterativeLQR::setFinalCost(const casadi::Function &final_cost)
 {
-    _cost.back().setCost(final_cost);
+    _cost.back().addCost(final_cost);
 }
 
 void IterativeLQR::setIntermediateConstraint(int k, const casadi::Function &inter_constraint)
@@ -113,7 +113,7 @@ void IterativeLQR::setIntermediateConstraint(int k, const casadi::Function &inte
         throw std::invalid_argument("wrong intermediate constraint node index");
     }
 
-    _constraint[k].setConstraint(inter_constraint);
+    _constraint[k].addConstraint(inter_constraint);
 }
 
 void IterativeLQR::setIntermediateConstraint(const std::vector<casadi::Function> &inter_constraint)
@@ -125,13 +125,13 @@ void IterativeLQR::setIntermediateConstraint(const std::vector<casadi::Function>
 
     for(int i = 0; i < _N; i++)
     {
-        _constraint[i].setConstraint(inter_constraint[i]);
+        _constraint[i].addConstraint(inter_constraint[i]);
     }
 }
 
 void IterativeLQR::setFinalConstraint(const casadi::Function &final_constraint)
 {
-    _constraint.back().setConstraint(final_constraint);
+    _constraint.back().addConstraint(final_constraint);
 }
 
 void IterativeLQR::setInitialState(const Eigen::VectorXd &x0)
@@ -332,36 +332,32 @@ void IterativeLQR::Dynamics::setDynamics(casadi::Function _f)
     df = _f.factory("df", {"x", "u"}, {"jac:f:x", "jac:f:u"});
 }
 
-const Eigen::MatrixXd& IterativeLQR::IntermediateCost::Q() const
+const Eigen::MatrixXd& IterativeLQR::IntermediateCostEntity::Q() const
 {
     return ddl.getOutput(0);
 }
 
-Eigen::Ref<const Eigen::VectorXd> IterativeLQR::IntermediateCost::q() const
+Eigen::Ref<const Eigen::VectorXd> IterativeLQR::IntermediateCostEntity::q() const
 {
     return dl.getOutput(0).col(0);
 }
 
-const Eigen::MatrixXd& IterativeLQR::IntermediateCost::R() const
+const Eigen::MatrixXd& IterativeLQR::IntermediateCostEntity::R() const
 {
     return ddl.getOutput(1);
 }
 
-Eigen::Ref<const Eigen::VectorXd> IterativeLQR::IntermediateCost::r() const
+Eigen::Ref<const Eigen::VectorXd> IterativeLQR::IntermediateCostEntity::r() const
 {
     return dl.getOutput(1).col(0);
 }
 
-const Eigen::MatrixXd& IterativeLQR::IntermediateCost::P() const
+const Eigen::MatrixXd& IterativeLQR::IntermediateCostEntity::P() const
 {
     return ddl.getOutput(2);
 }
 
-IterativeLQR::IntermediateCost::IntermediateCost(int, int)
-{
-}
-
-void IterativeLQR::IntermediateCost::setCost(const casadi::Function &cost)
+void IterativeLQR::IntermediateCostEntity::setCost(const casadi::Function &cost)
 {
     l = cost;
 
@@ -374,7 +370,7 @@ void IterativeLQR::IntermediateCost::setCost(const casadi::Function &cost)
     static_cast<void>(is_quadratic);
 }
 
-double IterativeLQR::IntermediateCost::evaluate(VecConstRef x, VecConstRef u)
+double IterativeLQR::IntermediateCostEntity::evaluate(VecConstRef x, VecConstRef u)
 {
     // compute cost value
     l.setInput(0, x);
@@ -384,10 +380,8 @@ double IterativeLQR::IntermediateCost::evaluate(VecConstRef x, VecConstRef u)
     return l.getOutput(0).value();
 }
 
-void IterativeLQR::IntermediateCost::quadratize(VecConstRef x, VecConstRef u)
+void IterativeLQR::IntermediateCostEntity::quadratize(VecConstRef x, VecConstRef u)
 {
-    TIC(quadratize_inner)
-
     // compute cost gradient
     dl.setInput(0, x);
     dl.setInput(1, u);
@@ -398,6 +392,84 @@ void IterativeLQR::IntermediateCost::quadratize(VecConstRef x, VecConstRef u)
     ddl.setInput(1, u);
     ddl.call();
 
+}
+
+const Eigen::MatrixXd& IterativeLQR::IntermediateCost::Q() const
+{
+    return _Q;
+}
+
+const Eigen::MatrixXd& IterativeLQR::IntermediateCost::R() const
+{
+    return _R;
+}
+
+const Eigen::MatrixXd& IterativeLQR::IntermediateCost::P() const
+{
+    return _P;
+}
+
+VecConstRef IterativeLQR::IntermediateCost::q() const
+{
+    return _q;
+}
+
+VecConstRef IterativeLQR::IntermediateCost::r() const
+{
+    return _r;
+}
+
+IterativeLQR::IntermediateCost::IntermediateCost(int nx, int nu)
+{
+    _Q.setZero(nx, nx);
+    _R.setZero(nu, nu);
+    _P.setZero(nu, nx);
+    _q.setZero(nx);
+    _r.setZero(nu);
+}
+
+void IterativeLQR::IntermediateCost::addCost(const casadi::Function &cost)
+{
+    items.emplace_back();
+    items.back().setCost(cost);
+}
+
+double IterativeLQR::IntermediateCost::evaluate(VecConstRef x, VecConstRef u)
+{
+    double cost = 0.0;
+
+    for(auto& it : items)
+    {
+        cost += it.evaluate(x, u);
+    }
+
+    return cost;
+}
+
+void IterativeLQR::IntermediateCost::quadratize(VecConstRef x, VecConstRef u)
+{
+    TIC(quadratize_inner)
+
+    const int nx = _Q.rows();
+    const int nu = _R.rows();
+
+    _Q.setZero(nx, nx);
+    _R.setZero(nu, nu);
+    _P.setZero(nu, nx);
+    _q.setZero(nx);
+    _r.setZero(nu);
+
+    // todo: can optimize the first sum
+
+    for(auto& it : items)
+    {
+        it.quadratize(x, u);
+        _Q += it.Q();
+        _R += it.R();
+        _P += it.P();
+        _q += it.q();
+        _r += it.r();
+    }
 }
 
 IterativeLQR::ValueFunction::ValueFunction(int nx)
@@ -413,8 +485,8 @@ IterativeLQR::BackwardPassResult::BackwardPassResult(int nx, int nu)
 }
 
 IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N):
-    alpha(0),
     hxx_reg(0),
+    alpha(0),
     accepted(false)
 {
     xtrj.setZero(nx, N+1);
@@ -504,38 +576,36 @@ Eigen::Ref<const Eigen::VectorXd> IterativeLQR::ConstraintToGo::h() const
     return _h.head(_dim);
 }
 
-const Eigen::MatrixXd &IterativeLQR::Constraint::C() const
+const Eigen::MatrixXd &IterativeLQR::ConstraintEntity::C() const
 {
     return df.getOutput(0);
 }
 
-const Eigen::MatrixXd &IterativeLQR::Constraint::D() const
+const Eigen::MatrixXd &IterativeLQR::ConstraintEntity::D() const
 {
     return df.getOutput(1);
 }
 
-Eigen::Ref<const Eigen::VectorXd> IterativeLQR::Constraint::h() const
+Eigen::Ref<const Eigen::VectorXd> IterativeLQR::ConstraintEntity::h() const
 {
     return f.getOutput(0).col(0);
 }
 
-bool IterativeLQR::Constraint::is_valid() const
+bool IterativeLQR::ConstraintEntity::is_valid() const
 {
     return f.is_valid();
 }
 
-IterativeLQR::Constraint::Constraint()
+IterativeLQR::ConstraintEntity::ConstraintEntity()
 {
 }
 
-void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u)
+void IterativeLQR::ConstraintEntity::linearize(VecConstRef x, VecConstRef u)
 {
     if(!is_valid())
     {
         return;
     }
-
-    TIC(linearize_constraint_inner)
 
     // compute constraint value
     f.setInput(0, x);
@@ -548,14 +618,12 @@ void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u)
     df.call();
 }
 
-void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
+void IterativeLQR::ConstraintEntity::evaluate(VecConstRef x, VecConstRef u)
 {
     if(!is_valid())
     {
         return;
     }
-
-    TIC(evaluate_constraint_inner)
 
     // compute constraint value
     f.setInput(0, x);
@@ -563,10 +631,83 @@ void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
     f.call();
 }
 
-void IterativeLQR::Constraint::setConstraint(casadi::Function h)
+void IterativeLQR::ConstraintEntity::setConstraint(casadi::Function h)
 {
     f = h;
     df = h.factory("dh", {"x", "u"}, {"jac:h:x", "jac:h:u"});
+}
+
+const Eigen::MatrixXd &IterativeLQR::Constraint::C() const
+{
+    return _C;
+}
+
+const Eigen::MatrixXd &IterativeLQR::Constraint::D() const
+{
+    return _D;
+}
+
+VecConstRef IterativeLQR::Constraint::h() const
+{
+    return _h;
+}
+
+int IterativeLQR::Constraint::size() const
+{
+    return _C.rows();
+}
+
+bool IterativeLQR::Constraint::is_valid() const
+{
+    return !items.empty();
+}
+
+IterativeLQR::Constraint::Constraint(int nx, int nu)
+{
+    _C.setZero(0, nx);
+    _D.setZero(0, nu);
+}
+
+void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u)
+{
+    TIC(linearize_constraint_inner)
+
+    int i = 0;
+    for(auto& it : items)
+    {
+        int nc = it.C().rows();
+        it.linearize(x, u);
+        _C.middleRows(i, nc) = it.C();
+        _D.middleRows(i, nc) = it.D();
+        i += nc;
+    }
+}
+
+void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
+{
+    TIC(evaluate_constraint_inner)
+
+    int i = 0;
+    for(auto& it : items)
+    {
+        int nc = it.C().rows();
+        it.evaluate(x, u);
+        _h.segment(i, nc) = it.h();
+        i += nc;
+    }
+}
+
+void IterativeLQR::Constraint::addConstraint(casadi::Function h)
+{
+    items.emplace_back();
+    items.back().setConstraint(h);
+
+    int total_size = size();
+    total_size += h.size1_out(0);
+
+    _C.setZero(total_size, _C.cols());
+    _D.setZero(total_size, _D.cols());
+    _h.setZero(total_size);
 }
 
 IterativeLQR::~IterativeLQR() = default;

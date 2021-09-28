@@ -148,6 +148,8 @@ private:
     struct Dynamics;
     struct Constraint;
     struct IntermediateCost;
+    struct ConstraintEntity;
+    struct IntermediateCostEntity;
     struct Temporaries;
     struct ConstraintToGo;
     struct BackwardPassResult;

@@ -192,21 +192,6 @@ class NlpsolSolver(Solver):
             ubg_list.append(fun.getUpperBounds())
         ubg = cs.vertcat(*ubg_list)
 
-        # print(f'lbw ({lbw.shape[0]}): {lbw}')
-        # print(f'ubw ({ubw.shape[0]}): {ubw}')
-        # print(f'w0 ({w0.shape[0]}): {w0}')
-        # print(f'p ({p.shape[0]}): {p}')
-        # print(f'lbg ({lbg.shape[0]}): {lbg}')
-        # print(f'ubg ({ubg.shape[0]}): {ubg}')
-
-        # getlowerboundList(node):  to be defined in variables.py....
-        #     ublist = list()
-        #     for var in self.vars.values():
-        #          ublist.append(var.getLowerBounds(node))
-        #     return ublist
-        # todo careful about ordering!
-        #   this list should be ordered as the var_impl_list. Both comes from the same vars?
-
         # solve
         sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
