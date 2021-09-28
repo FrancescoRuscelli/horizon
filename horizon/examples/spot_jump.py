@@ -32,7 +32,7 @@ def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_le
 # exit()
 
 # =========================================
-ms = mat_storer.matStorer('spot_walk.mat')
+ms = mat_storer.matStorer('spot_jump.mat')
 
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
@@ -47,9 +47,9 @@ if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 
-tot_time = 1.5
+tot_time = 1
 dt_hint = 0.02
-duration_step = 0.8
+duration_step = 0.5
 
 n_nodes = int(tot_time / dt_hint)
 n_nodes_step = int(duration_step / dt_hint)
@@ -93,6 +93,8 @@ if load_initial_guess:
     f_ig_list = list()
     for f in f_list:
         f_ig_list.append(prev_solution[f'f{i}'])
+
+    dt_ig = prev_solution['dt']
 
 # SET DYNAMICS
 dt = prb.createInputVariable("dt", 1)  # variable dt as input
@@ -156,10 +158,16 @@ if load_initial_guess:
     for f, f_ig in zip(f_list, f_ig_list):
         for node in range(f_ig.shape[1]):
             f.setInitialGuess(f_ig[:, node], node)
+
+    for node in range(dt_ig.shape[1]):
+        dt.setInitialGuess(dt_ig[:, node], node)
+
 else:
     q.setInitialGuess(q_init)
+    dt.setInitialGuess(dt_min)
 
-dt.setInitialGuess(dt_min)
+
+
 # SET TRANSCRIPTION METHOD
 th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
 
@@ -181,9 +189,9 @@ prb.createFinalConstraint('final_velocity', q_dot)
 # SET CONTACT POSITION CONSTRAINTS
 active_leg = list()
 # active_leg = next(iter(contact_map))
-# active_leg = ['lf_foot', 'rf_foot']
+active_leg = ['lh_foot', 'rh_foot']
 # active_leg = ['lf_foot', 'rf_foot', 'lh_foot']
-active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
+# active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
 mu = 0.8
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
@@ -200,7 +208,9 @@ R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 # 2. velocity of each base_link must be zero
 # prb.createConstraint(f"base_link_vel_before_step", v_base, nodes=range(0, node_start_step))
 # prb.createConstraint(f"base_link_vel_after_step", v_base, nodes=range(node_end_step, n_nodes + 1))
-
+# COM = cs.Function.deserialize(kindyn.centerOfMass())
+# p_com = COM(q=q_init)['com']
+# exit()
 for frame, f in contact_map.items():
     FK = cs.Function.deserialize(kindyn.fk(frame))
     p = FK(q=q)['ee_pos']
@@ -209,55 +219,57 @@ for frame, f in contact_map.items():
     p_goal = p_start + [0., 0., jump_height]
 
 
-    # 1. position of each end effector and its initial position must be the same
+    # # 1. position of each end effector and its initial position must be the same
     # if frame != active_leg:
     #     prb.createConstraint(f"{frame}_fixed", p - p_start)
     # else:
     #     prb.createConstraint(f"{frame}_before_step", p - p_start, nodes=range(0, node_start_step))
     #     prb.createConstraint(f"{frame}_after_step", p - p_goal, nodes=range(node_end_step, n_nodes+1))
+
     # orientation end effector
 
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
     # 2. velocity of each end effector must be zero
     if frame not in active_leg:
-        prb.createConstraint(f"{frame}_vel_before_step", v)
+        prb.createConstraint(f"{frame}_vel", v)
     else:
-        prb.createConstraint(f"{frame}_vel_before_step", v, nodes=range(0, node_start_step))
-        prb.createConstraint(f"{frame}_vel_after_step", v, nodes=range(node_end_step, n_nodes + 1))
+        prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
+        prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
     if frame != active_leg:
-        prb.createIntermediateConstraint(f"{frame}_friction_cone", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
+        prb.createIntermediateConstraint(f"{frame}_fc", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
     else:
-        prb.createIntermediateConstraint(f"{frame}_friction_cone_before_step", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
-        prb.createIntermediateConstraint(f"{frame}_friction_cone_after_step", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
+        prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
+        prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
     if frame in active_leg:
         prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
-        prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes= 40)
-        prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step + 2)
+        prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=25)
+        prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step+1)
 
-        # prb.createCostFunction(f"lift_{frame}_leg", 100000 * cs.sumsqr(p - p_goal), nodes=range(node_start_step, node_end_step))
-        # prb.createCostFunction(f"land_{frame}_leg", 10000000 * cs.sumsqr(p - p_start), nodes=range(node_end_step, n_nodes+1))
+        # prb.createCostFunction(f"lift_{frame}", 100 * cs.sumsqr(p - p_goal), nodes=range(node_start_step, node_end_step))
+        # prb.createCostFunction(f"{frame}_before_jump", 100 * cs.sumsqr(p - p_start), nodes=range(0, node_start_step))
+        # prb.createCostFunction(f"{frame}_after_jump", 100 * cs.sumsqr(p - p_start), nodes=range(node_end_step, n_nodes+1))
 
 # SET COST FUNCTIONS
 prb.createCostFunction("min_q_dot", 1000. * cs.sumsqr(q_dot))
 # prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
 
 for f in f_list:
-    prb.createIntermediateCost(f"min_{f.getName()}", 0.001 * cs.sumsqr(f))
+    prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
 # floating base position
-q_fb_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
-q_fb_init = np.array([q_init[0], q_init[1], q_init[2], 0.0, 0.0, 0.0, 1.0])
+# q_fb_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
+# q_fb_init = np.array([q_init[0], q_init[1], q_init[2], 0.0, 0.0, 0.0, 1.0])
 # prb.createCostFunction("fb_pos_pos", 1000000.*cs.sumsqr(q[0:3] - q_fb_jump[0:3]), nodes=list(range(node_start_step, node_end_step)))
 # prb.createCostFunction("fb_pos_before", 100.*cs.sumsqr(q[0:3] - q_fb_init[0:3]),  nodes=range(0, node_start_step))
 # prb.createCostFunction("fb_pos", 100.*cs.sumsqr(q[0:3] - q_fb_init[0:3]), nodes=range(node_end_step, n_nodes))
-prb.createCostFunction("fb_pos", 100.*cs.sumsqr(q[0:2] - q_fb_init[0:2]))
-prb.createCostFunction("fb_rot", 100.*cs.sumsqr(q[3:7] - q_fb_init[3:7]))
+# prb.createCostFunction("fb_pos", 10000.*cs.sumsqr(q[0:2] - q_fb_init[0:2]))
+# prb.createCostFunction("fb_rot", 100.*cs.sumsqr(q[3:7] - q_fb_init[3:7]))
 
 # prb.createCostFunction("floating_base_orientation", 1000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]), nodes=list(range(node_start_step, node_end_step)))
 # prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[0:7] - q_fb_trg))
@@ -278,7 +290,7 @@ solution = solver.getSolutionDict()
 ms.store(solution)
 
 # ========================================================
-plot_all = False
+plot_all = True
 if plot_all:
     hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables(show_bounds=False, legend=True)
