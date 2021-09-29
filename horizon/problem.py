@@ -37,9 +37,6 @@ class Problem:
             logging_level: accepts the level of logging from package logging (INFO, DEBUG, ...)
         """
         self.opts = None
-        self.solver = None
-        self.__solution = None
-        self.sol = None  # store solution from solver
         self.default_solver = cs.nlpsol
         self.default_solver_plugin = 'ipopt'
 
@@ -55,7 +52,6 @@ class Problem:
         # state variable to optimize
         self.var_container = sv.VariablesContainer(self.logger)
         self.function_container = fc.FunctionsContainer(self.logger)
-        self.prob = None
 
         self.state_aggr = sv.StateAggregate()
         self.input_aggr = sv.InputAggregate()
@@ -593,23 +589,9 @@ class Problem:
         Returns:
             instance of the serialized class "Problem"
         """
-        raise Exception('serialize yet to be re-implemented')
-        self.var_container.serialize()
         self.function_container.serialize()
-
-        if self.prob:
-            # self.prob.clear()
-            # print('serializing f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
-            # print('serializing x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
-            # print('serializing g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
-
-            self.prob['f'] = self.prob['f'].serialize()
-            self.prob['x'] = self.prob['x'].serialize()
-            self.prob['g'] = self.prob['g'].serialize()
-
-            # print('serialized f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
-            # print('serialized x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
-            # print('serialized g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
+        if self.state_der:
+            self.state_der = self.state_der.serialize()
 
         return self
 
@@ -620,29 +602,59 @@ class Problem:
         Returns:
             instance of the deserialized class "Problem"
         """
-        raise Exception('deserialize yet to be re-implemented')
-        self.var_container.deserialize()
         self.function_container.deserialize()
-
-        if self.prob:
-            self.prob['f'] = cs.Sparsity.deserialize(
-                self.prob['f']) if self.function_container.getNCostFun() == 0 else cs.SX.deserialize(self.prob['f'])
-            self.prob['x'] = cs.SX.deserialize(self.prob['x'])
-            self.prob['g'] = cs.Sparsity.deserialize(
-                self.prob['g']) if self.function_container.getNCnstrFun() == 0 else cs.SX.deserialize(self.prob['g'])
-
-            # print('deserializing f', self.prob['f'])
-            # print('deserializing x', self.prob['x'])
-            # print('deserializing g', self.prob['g'])
+        if self.state_der:
+            self.state_der = cs.SX.deserialize(self.state_der)
 
         return self
 
 
-if __name__ == '__main__':
+def pickleable(obj):
+    try:
+        pickle.dumps(obj)
+    except pickle.PicklingError:
+        return False
+    return True
 
-    prob = Problem(5)
-    dan = prob.createVariable('dan', 3)
-    print(dan.getNodes())
+if __name__ == '__main__':
+    N = 15
+
+    prob = Problem(N)
+    x = prob.createStateVariable('x', 8)
+    y = prob.createInputVariable('y', 8)
+    x_prev = x.getVarOffset(-1)
+
+    cnsrt = prob.createConstraint('cnsrt', x_prev + y, nodes=range(5, 11), bounds=dict(lb=[0, 0, 0, 0, 0, 0, 0, 0], ub=[10, 10, 10, 10, 10, 10, 10, 10]))
+    cost = prob.createIntermediateCost('cost', x*y)
+
+    print('before', prob.var_container._vars)
+    print('before', prob.var_container._pars)
+    print('before:', [elem.getFunction() for elem in prob.function_container._cnstr_container.values()])
+    print('before:', [elem.getFunction() for elem in prob.function_container._costfun_container.values()])
+
+    import pickle
+
+    prob.serialize()
+
+
+    print('===PICKLING===')
+    prob_serialized = pickle.dumps(prob)
+    print('===DEPICKLING===')
+    prob_new = pickle.loads(prob_serialized)
+
+    prb = prob_new.deserialize()
+    # print(prb.getConstraints())
+    # print(prb.getVariables())
+    prb : Problem
+
+    # prob.deserialize()
+
+    print('after', prb.var_container._vars)
+    print('after', prb.var_container._pars)
+    print('after:', [elem.getFunction() for elem in prb.function_container._cnstr_container.values()])
+    print('after:', [elem.getFunction() for elem in prb.function_container._costfun_container.values()])
+
+
 
     exit()
     prob = Problem(2)
