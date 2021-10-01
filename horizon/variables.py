@@ -1665,46 +1665,33 @@ class VariablesContainer:
             elif isinstance(par, Parameter):
                 par._setNNodes([node for node in par.getNodes() if node in list(range(self._nodes))])
 
-    # def serialize(self):
-    #     """
-    #     Serialize the Variable Container. Used to save it.
-    #
-    #     Returns:
-    #        instance of serialized Variable Container
-    #     """
-    #
-    #     # todo how to do? I may use __reduce__ but I don't know how
-    #     # for name, value in self.state_var.items():
-    #     #     print('state_var', type(value))
-    #     #     self.state_var[name] = value.serialize()
-    #
-    #     # for name, value in self.state_var_prev.items():
-    #     #     print('state_var_prev', type(value))
-    #     #     self.state_var_prev[name] = value.serialize()
-    #     for name, var in self._vars.items():
-    #         self._vars[name] = var.serialize()
-    #
-    #     for name, par in self._pars.items():
-    #         self._pars[name] = par.serialize()
-    #
-    # def deserialize(self):
-    #     """
-    #     Deserialize the Variable Container. Used to load it.
-    #
-    #     Returns:
-    #        instance of deserialized Variable Container
-    #     """
-    #     # for name, value in self.state_var.items():
-    #     #     self.state_var[name] = cs.SX.deserialize(value)
-    #     #
-    #     # for name, value in self.state_var_prev.items():
-    #     #     self.state_var_prev[name] = cs.SX.deserialize(value)
-    #
-    #     for name, var in self._vars.items():
-    #         self._vars[name] = cs.SX.deserialize(var)
-    #
-    #     for name, par in self._pars.items():
-    #         self._pars[name] = cs.SX.deserialize(par)
+    def serialize(self):
+        """
+        Serialize the Variable Container. Used to save it.
+
+        Returns:
+           instance of serialized Variable Container
+        """
+
+        # todo how to do? I may use __reduce__ but I don't know how
+        for name, var in self._vars.items():
+            self._vars[name] = var.serialize()
+
+        for name, par in self._pars.items():
+            self._pars[name] = par.serialize()
+
+    def deserialize(self):
+        """
+        Deserialize the Variable Container. Used to load it.
+
+        Returns:
+           instance of deserialized Variable Container
+        """
+        for name, var in self._vars.items():
+            self._vars[name] = cs.SX.deserialize(var)
+
+        for name, par in self._pars.items():
+            self._pars[name] = cs.SX.deserialize(par)
 
     # def __reduce__(self):
     #     return (self.__class__, (self.nodes, self.logger, ))
