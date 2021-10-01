@@ -31,16 +31,7 @@ def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_le
 # exit()
 
 # =========================================
-
-
-def pickleable(obj):
-    try:
-        pickle.dumps(obj)
-    except pickle.PicklingError:
-        return False
-    return True
-
-ms = mat_storer.matStorer('spot_jump.mat')
+ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
@@ -55,25 +46,19 @@ if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 
-tot_time = 1
-dt_hint = 0.02
-duration_step = 0.5
 
-n_nodes = int(tot_time / dt_hint)
-n_nodes_step = int(duration_step / dt_hint)
+n_nodes = 50
+
+node_start_step = 20
+node_end_step = 40
+node_peak = 30
+jump_height = 0.2
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-jump_height = 0.02
-node_start_step = 15
-node_end_step = node_start_step + n_nodes_step
-
-print('total nodes:', n_nodes)
-print('starting node of step:', node_start_step)
-print('last node of step:', node_end_step)
 
 
 # SET PROBLEM STATE AND INPUT VARIABLES
@@ -150,7 +135,7 @@ q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
 # for f in f_list:
 #     f.setBounds(-f_lim, f_lim)
 
-f_min = [-10000., -10000., 10.]
+f_min = [-10000., -10000., -10.]
 f_max = [10000., 10000., 10000.]
 for f in f_list:
     f.setBounds(f_min, f_max)
@@ -224,53 +209,42 @@ R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 # COM = cs.Function.deserialize(kindyn.centerOfMass())
 # p_com = COM(q=q_init)['com']
 # exit()
+fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
+q_final = q_init
 
 for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
+    FK = cs.Function.deserialize(kindyn.fk(frame))
+    p = FK(q=q)['ee_pos']
+    p_start = FK(q=q_init)['ee_pos']
+    p_goal = p_start + [0., 0., jump_height]
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
+    DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
+    a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
     prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
     prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-
     prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
     prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
-    FK = cs.Function.deserialize(kindyn.fk(frame))
-    p = FK(q=q)['ee_pos']
-    p_start = FK(q=q_init)['ee_pos']
-    p_goal = p_start + [0., 0., jump_height]
-
-
     prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
-    prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=15)
+    prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
     prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
 
 
 # SET COST FUNCTIONS
+# prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
 prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-# prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
+prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
+for f in f_list:
+    prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
-# for f in f_list:
-#     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
-
-# prb.createIntermediateCost('min_dt', 1 * cs.sumsqr(dt))
-import pickle
-
-prb_serialized = prb.serialize()
-
-
-
-print('===PICKLING===')
-prb_serialized = pickle.dumps(prb_serialized)
-
-print('===DEPICKLING===')
-prb = pickle.loads(prb_serialized)
-prb.deserialize()
+# prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
 
 # =============
 # SOLVE PROBLEM
@@ -284,11 +258,25 @@ solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
 solver.solve()
 
 solution = solver.getSolutionDict()
-ms.store(solution)
+solution_constraints = solver.getConstraintSolutionDict()
+
+solution_constraints_dict = dict()
+for name, item in prb.getConstraints().items():
+    lb, ub = item.getBounds()
+    lb_mat = np.reshape(lb, (item.getDim(), len(item.getNodes())), order='F')
+    ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
+    solution_constraints_dict[name] = dict(val=solution_constraints[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
+
+if isinstance(dt, cs.SX):
+    ms.store({**solution, **solution_constraints_dict})
+else:
+    dt_dict = dict(dt=dt)
+    ms.store({**solution, **solution_constraints_dict, **dt_dict})
+
 
 # ========================================================
 plot_all = False
-plot_fun = True
+plot_fun = False
 plot_forces = False
 
 if plot_forces:
