@@ -589,8 +589,10 @@ class Problem:
         Returns:
             instance of the serialized class "Problem"
         """
+        raise Exception('serialize yet to implement')
+        # self.var_container.serialize()
         self.function_container.serialize()
-        if self.state_der:
+        if self.state_der is not None:
             self.state_der = self.state_der.serialize()
 
         return self
@@ -602,8 +604,10 @@ class Problem:
         Returns:
             instance of the deserialized class "Problem"
         """
+        raise Exception('serialize yet to implement')
+        # self.var_container.deserialize()
         self.function_container.deserialize()
-        if self.state_der:
+        if self.state_der is not None:
             self.state_der = cs.SX.deserialize(self.state_der)
 
         return self
@@ -617,94 +621,49 @@ def pickleable(obj):
     return True
 
 if __name__ == '__main__':
-    N = 15
-
-    prob = Problem(N)
-    x = prob.createStateVariable('x', 8)
-    y = prob.createInputVariable('y', 8)
-    x_prev = x.getVarOffset(-1)
-
-    cnsrt = prob.createConstraint('cnsrt', x_prev + y, nodes=range(5, 11), bounds=dict(lb=[0, 0, 0, 0, 0, 0, 0, 0], ub=[10, 10, 10, 10, 10, 10, 10, 10]))
-    cost = prob.createIntermediateCost('cost', x*y)
-
-    print('before', prob.var_container._vars)
-    print('before', prob.var_container._pars)
-    print('before:', [elem.getFunction() for elem in prob.function_container._cnstr_container.values()])
-    print('before:', [elem.getFunction() for elem in prob.function_container._costfun_container.values()])
 
     import pickle
+    from transcriptions import transcriptor
+    from horizon.solvers import Solver
+    from horizon.utils import plotter
+    import matplotlib.pyplot as plt
+
+
+    N = 2
+    dt = 0.01
+    prob = Problem(N)
+    x = prob.createStateVariable('x', 2)
+    y = prob.createInputVariable('y', 2)
+    x_prev = x.getVarOffset(-1)
+
+    xdot = cs.vertcat(x)
+    prob.setDynamics(xdot)
+
+    cnsrt = prob.createConstraint('cnsrt', x_prev + y, nodes=range(5, 11), bounds=dict(lb=[0, 0], ub=[10, 10]))
+    cost = prob.createIntermediateCost('cost', x*y)
+
+    # print('before', prob.var_container._vars)
+    # print('before', prob.var_container._pars)
+    # print('before:', [elem.getFunction() for elem in prob.function_container._cnstr_container.values()])
+    # print('before:', [elem.getFunction() for elem in prob.function_container._costfun_container.values()])
+
+    for fun in prob.function_container._cnstr_container.values():
+        print(f"does {fun._f} depends on {prob.var_container._vars['y']}: {cs.depends_on(fun._f, prob.var_container._vars['y'])}")
 
     prob.serialize()
-
-
     print('===PICKLING===')
     prob_serialized = pickle.dumps(prob)
     print('===DEPICKLING===')
     prob_new = pickle.loads(prob_serialized)
-
     prb = prob_new.deserialize()
-    # print(prb.getConstraints())
-    # print(prb.getVariables())
-    prb : Problem
 
-    # prob.deserialize()
-
-    print('after', prb.var_container._vars)
-    print('after', prb.var_container._pars)
-    print('after:', [elem.getFunction() for elem in prb.function_container._cnstr_container.values()])
-    print('after:', [elem.getFunction() for elem in prb.function_container._costfun_container.values()])
-
-
+    for fun in prb.function_container._cnstr_container.values():
+        print(f"does {fun._f} depends on {prb.var_container._vars['y']}: {cs.depends_on(fun._f, prb.var_container._vars['y'])}")
 
     exit()
-    prob = Problem(2)
-    dan = prob.createStateVariable('dan', 3)
-    print(prob.getVariables())
-    prob.removeVariable('dan')
 
-    print(prob.getVariables())
-
-    exit()
-    from horizon.transcriptions import transcriptor
-    N = 3
-    dt = 0.01
-    prob = Problem(N)
-    x = prob.createStateVariable('x', 1)
-    prob.setDynamics(x)
-    transcriptor.Transcriptor.make_method('multiple_shooting', prob, dt)
-    x_prev = x.getVarOffset(-1)
-
-    print('==============================')
-    prob.setNNodes(10)
-
-    prob.removeConstraint('multiple_shooting')
-    transcriptor.Transcriptor.make_method('multiple_shooting', prob, dt)
-
-    print(prob.getConstraints('multiple_shooting').getNodes())
-    exit()
-
-    from horizon.solvers import Solver
-    from horizon.utils import plotter
-    import matplotlib.pyplot as plt
-    N = 10
-    dt = 0.01
-    prob = Problem(10)
-    x = prob.createStateVariable('x', 1)
-    y = prob.createInputVariable('y', 1)
-    # z = prob.createVariable('z', 1, nodes=[0, 1, 2, 3, 4, 5])
-
-    cnsrt = prob.createIntermediateConstraint('cnsrt', x+y)
-    # cnsrt = prob.createIntermediateConstraint('cnsrt', x + z, nodes=[0, 1, 2, 3, 4, 5])
-    xdot = cs.vertcat(x)
-    prob.setDynamics(xdot)
-
-    print('changing nodes to 1!')
-    prob.setNNodes(1)
-    print('changing nodes to 12!')
-    prob.setNNodes(12)
-
-    cnsrt.setNodes(range(1, 10))
-    sol = Solver.make_solver('ipopt', prob, dt)
+    transcriptor.Transcriptor.make_method('multiple_shooting', prb, dt)
+    sol = Solver.make_solver('ipopt', prb, dt)
     sol.solve()
     solution = sol.getSolutionDict()
 
