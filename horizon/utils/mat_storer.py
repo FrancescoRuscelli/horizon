@@ -12,8 +12,8 @@ class matStorer:
     def store(self, dict_values):
         savemat(self.file_name, dict_values)  # write
 
-    def load(self):
-        return loadmat(self.file_name)
+    def load(self, squeeze_me=False):
+        return loadmat(self.file_name, squeeze_me=squeeze_me)
 
 if __name__ == '__main__':
     a = np.ones([1,5])

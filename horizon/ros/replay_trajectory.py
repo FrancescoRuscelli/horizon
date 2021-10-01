@@ -41,7 +41,7 @@ class replay_trajectory:
         self.dt = dt
         self.joint_list = joint_list
         self.q_replay = q_replay
-        self.__sleep = 0.0
+        self.__sleep = 0.
         self.force_pub = []
         self.frame_force_mapping = {}
 
