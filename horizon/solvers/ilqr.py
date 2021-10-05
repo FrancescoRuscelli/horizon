@@ -74,11 +74,13 @@ class SolverILQR(Solver):
         self.ilqr.setStateInitialGuess(xinit)
         self.ilqr.setInputInitialGuess(uinit)
         self.ilqr.setIterationCallback(self._iter_callback)
-        self.ilqr.solve(self.max_iter)
+        ret = self.ilqr.solve(self.max_iter)
 
         # get solution
         self.x_opt = self.ilqr.getStateTrajectory()
         self.u_opt = self.ilqr.getInputTrajectory()
+
+        return ret
         
 
     def print_timings(self):

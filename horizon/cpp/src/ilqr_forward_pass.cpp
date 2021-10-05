@@ -92,8 +92,8 @@ double IterativeLQR::compute_merit_slope(double mu_f, double mu_c,
 
     for(int i = 0; i < _N; i++)
     {
-        auto& hu = _tmp[i].hu;
-        auto& lu = _bp_res[i].lz;
+        auto& hu = _tmp[i].huf;
+        auto& lu = _bp_res[i].lu;
 
         der += lu.dot(hu);
     }
