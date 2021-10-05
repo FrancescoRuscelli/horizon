@@ -25,8 +25,8 @@ nv = kindyn.nv()
 ns = 100  # number of shooting nodes
 tf = 1.0  # [s]
 dt = tf/ns
-transcription = 'multiple_shooting'
-solver_type = 'ipopt'
+transcription = 'direct_collocation'
+solver_type = 'ilqr'
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -55,7 +55,7 @@ qdot.setBounds(qdot_init, qdot_init, nodes=0)
 q.setInitialGuess(q_init)
 
 # Cost function (min velocity)
-prb.createIntermediateCost("qdot", 1e-1*cs.sumsqr(qdot))
+prb.createIntermediateCost("qdot", 1e-3*cs.sumsqr(qdot))
 
 # Cost function (min effort)
 id = cs.Function.deserialize(kindyn.rnea())
@@ -76,7 +76,7 @@ if solver_type != 'ilqr':
 prb.createFinalConstraint("goal", pos - pos_des)
 
 # Creates problem
-solver = Solver.make_solver(solver_type, prb, dt)  #, opts={'max_iter': 10})
+solver = Solver.make_solver(solver_type, prb, dt, opts={'hxx_reg_growth_factor': 10.0})  #, opts={'max_iter': 10})
 
 if solver_type == 'ilqr':
     solver.plot_iter = True
