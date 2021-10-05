@@ -7,6 +7,12 @@ from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
 import os
+import time
+from horizon.ros import utils as horizon_ros_utils
+
+horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
+time.sleep(3.)
+
 # Switch between suspended and free fall
 FREE_FALL = True
 

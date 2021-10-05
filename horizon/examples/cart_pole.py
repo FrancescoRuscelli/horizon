@@ -10,12 +10,18 @@ from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
+import time
+from horizon.ros import utils as horizon_ros_utils
 
 try:
     from horizon.ros.replay_trajectory import *
     do_replay = True
 except ImportError:
     do_replay = False
+
+
+horizon_ros_utils.roslaunch("horizon_examples", "cart_pole.launch")
+time.sleep(3.)
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')

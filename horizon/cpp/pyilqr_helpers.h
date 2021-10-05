@@ -19,6 +19,7 @@ casadi::Function to_cpp(py::object pyfn)
     #else
         auto cs = py::module::import("casadi");
     #endif
+
     auto Function = cs.attr("Function");
     auto serialize = Function.attr("serialize");
     auto fstr = serialize(pyfn).cast<std::string>();
