@@ -1357,7 +1357,16 @@ class Aggregate(AbstractAggregate):
         Returns:
             [type]: [description]
         """
-        return np.vstack([var.getInitialGuess(node) for var in self])
+
+        ig_list = list()
+
+        for var in self:
+            num_nodes = len(var.getNodes()) if node is None else len(node)
+            ig = var.getInitialGuess(node)
+            ig = ig.reshape((var.getDim(), num_nodes), order='F')
+            ig_list.append(ig)
+
+        return np.vstack(ig_list)
 
 class StateAggregate(Aggregate):
     """
