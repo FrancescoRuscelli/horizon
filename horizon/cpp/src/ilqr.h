@@ -61,18 +61,19 @@ public:
     void setStepLength(double alpha);
 
     /**
+     * @brief set an intermediate cost term for the k-th intermediate state,
+     * as specificed by a vector of indices
+     * @param indices: the nodes that the cost refers to
+     * @param inter_cost: a function with required signature (x, u) -> (l)
+     */
+    void setCost(std::vector<int> indices, const casadi::Function& inter_cost);
+
+    /**
      * @brief set an intermediate cost term for each intermediate state
      * @param inter_cost: a vector of N entries, each of which is a function with
      * required signature (x, u) -> (l)
      */
     void setIntermediateCost(const std::vector<casadi::Function>& inter_cost);
-
-    /**
-     * @brief set an intermediate cost term for the k-th intermediate state
-     * @param k: the node that the cost refers to
-     * @param inter_cost: a function with required signature (x, u) -> (l)
-     */
-    void setIntermediateCost(int k, const casadi::Function& inter_cost);
 
     /**
      * @brief set the final cost
@@ -82,12 +83,13 @@ public:
     void setFinalCost(const casadi::Function& final_cost);
 
     /**
-     * @brief  set an intermediate constraint term for the k-th intermediate state
-     * @param k: the node that the cost refers to
+     * @brief  set an intermediate constraint term for the k-th intermediate state,
+     * as specificed by a vector of indices
+     * @param indices: the nodes that the cost refers to
      * @param inter_constraint: a function with required signature (x, u) -> (h),
      * where the constraint is h(x, u) = 0
      */
-    void setIntermediateConstraint(int k, const casadi::Function& inter_constraint);
+    void setConstraint(std::vector<int> indices, const casadi::Function& inter_constraint);
 
     void setIntermediateConstraint(const std::vector<casadi::Function>& inter_constraint);
 
@@ -184,6 +186,8 @@ private:
     double _step_length;
     double _hxx_reg;
     double _hxx_reg_growth_factor;
+    double _line_search_accept_ratio;
+    double _alpha_min;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;

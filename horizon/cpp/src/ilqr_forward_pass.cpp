@@ -189,6 +189,8 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
 
         _constraint[i].evaluate(xtrj.col(i), utrj.col(i));
         constr += _constraint[i].h().cwiseAbs().sum();
+
+        std::cout << _constraint[i].h().transpose() << std::endl;
     }
 
     // add final constraint violation
@@ -226,9 +228,9 @@ void IterativeLQR::line_search(int iter)
     TIC(line_search);
 
     const double step_reduction_factor = 0.5;
-    const double alpha_min = 0.001;
+    const double alpha_min = _alpha_min;
     double alpha = _step_length;
-    const double eta = 1e-4;
+    const double eta = _line_search_accept_ratio;
 
     // compute merit function weights
     auto [mu_f, mu_c] = compute_merit_weights();

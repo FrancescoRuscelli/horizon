@@ -33,6 +33,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _step_length(1.0),
     _hxx_reg(0.0),
     _hxx_reg_growth_factor(1e3),
+    _line_search_accept_ratio(1e-4),
+    _alpha_min(1e-3),
     _cost(N+1, IntermediateCost(_nx, _nu)),
     _constraint(N+1, Constraint(_nx, _nu)),
     _value(N+1, ValueFunction(_nx)),
@@ -44,9 +46,11 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _tmp(_N)
 {
     // set options
-    _step_length = value_or(opt, "step_length", 1.0);
-    _hxx_reg = value_or(opt, "hxx_reg", 0.0);
-    _hxx_reg_growth_factor = value_or(opt, "hxx_reg_growth_factor", 1e3);
+    _step_length = value_or(opt, "ilqr.step_length", 1.0);
+    _hxx_reg = value_or(opt, "ilqr.hxx_reg", 0.0);
+    _hxx_reg_growth_factor = value_or(opt, "ilqr.hxx_reg_growth_factor", 1e3);
+    _line_search_accept_ratio = value_or(opt, "ilqr.line_search_accept_ratio", 1e-4);
+    _alpha_min = value_or(opt, "ilqr.alpha_min", 1e-3);
 
     // set timer callback
     on_timer_toc = [this](const char * name, double usec)
@@ -91,14 +95,17 @@ void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inte
     }
 }
 
-void IterativeLQR::setIntermediateCost(int k, const casadi::Function &inter_cost)
+void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& inter_cost)
 {
-    if(k > _N || k < 0)
+    for(int k : indices)
     {
-        throw std::invalid_argument("wrong intermediate cost node index");
-    }
+        if(k > _N || k < 0)
+        {
+            throw std::invalid_argument("wrong intermediate cost node index");
+        }
 
-    _cost[k].addCost(inter_cost);
+        _cost[k].addCost(inter_cost);
+    }
 }
 
 void IterativeLQR::setFinalCost(const casadi::Function &final_cost)
@@ -106,14 +113,17 @@ void IterativeLQR::setFinalCost(const casadi::Function &final_cost)
     _cost.back().addCost(final_cost);
 }
 
-void IterativeLQR::setIntermediateConstraint(int k, const casadi::Function &inter_constraint)
+void IterativeLQR::setConstraint(std::vector<int> indices, const casadi::Function &inter_constraint)
 {
-    if(k > _N || k < 0)
+    for(int k : indices)
     {
-        throw std::invalid_argument("wrong intermediate constraint node index");
-    }
+        if(k > _N || k < 0)
+        {
+            throw std::invalid_argument("wrong intermediate constraint node index");
+        }
 
-    _constraint[k].addConstraint(inter_constraint);
+        _constraint[k].addConstraint(inter_constraint);
+    }
 }
 
 void IterativeLQR::setIntermediateConstraint(const std::vector<casadi::Function> &inter_constraint)
@@ -258,7 +268,7 @@ void IterativeLQR::report_result(const IterativeLQR::ForwardPassResult& fpres)
 
 void IterativeLQR::set_default_cost()
 {
-    const double dfl_cost_weight = 1e-6;
+    const double dfl_cost_weight = 1e-160;
     auto x = cs::SX::sym("x", _nx);
     auto u = cs::SX::sym("u", _nu);
     auto l = cs::Function("dfl_cost", {x, u},
