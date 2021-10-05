@@ -20,17 +20,21 @@ class SolverILQR(Solver):
                  dt: float, 
                  opts: Dict = None) -> None:
 
+        filtered_opts = None 
+        if opts is not None:
+            filtered_opts = {k: opts[k] for k in opts.keys() if k.startswith('ilqr.')}
+
         # init base class
-        super().__init__(prb, dt, opts)
+        super().__init__(prb, dt, filtered_opts)
 
         # save max iter if any
-        self.max_iter = self.opts.get('max_iter', 100)
+        self.max_iter = self.opts.get('ilqr.max_iter', 100)
         
         # num shooting interval
         self.N = prb.getNNodes() - 1  
 
         # get integrator and compute discrete dynamics in the form (x, u) -> f
-        integrator_name = self.opts.get('ilqr.integrator', 'EULER')
+        integrator_name = self.opts.get('ilqr.integrator', 'RK4')
         dae = {'ode': self.xdot, 'x': self.x, 'p': self.u, 'quad': 0}
         self.int = integrators.__dict__[integrator_name](dae, {'tf': dt})
         self.dyn = cs.Function('f', {'x': self.x, 'u': self.u, 'f': self.int(self.x, self.u)[0]},
@@ -61,9 +65,14 @@ class SolverILQR(Solver):
         self.opts['max_iter'] = 1
     
     def solve(self):
-        x0 = self.prb.getInitialState().reshape((self.nx, 1))
-        self.x_opt = np.hstack(([x0]*(self.N+1)))
-        self.ilqr.setStateInitialGuess(self.x_opt)
+        
+        x0 = self.prb.getInitialState()
+        xinit = self.prb.getState().getInitialGuess()
+        uinit = self.prb.getInput().getInitialGuess()
+        xinit[:, 0] = x0.flatten()
+
+        self.ilqr.setStateInitialGuess(xinit)
+        self.ilqr.setInputInitialGuess(uinit)
         self.ilqr.setIterationCallback(self._iter_callback)
         self.ilqr.solve(self.max_iter)
 
@@ -110,6 +119,8 @@ class SolverILQR(Solver):
     
     def _set_fun_k(self, k, container, set_to_ilqr, outname):
 
+        print(f'{outname}_{k}')
+
         # check state and input bounds
         if outname == 'h':
 
@@ -118,7 +129,7 @@ class SolverILQR(Solver):
             if np.all(xlb == xub) and k > 0:  # note: skip initial condition
                 l = cs.Function(f'xc_{k}', [self.x, self.u], [self.x - xlb], 
                                 ['x', 'u'], [outname])
-                set_to_ilqr(k, l)
+                set_to_ilqr([k], l)
 
             # input
             if k < self.N:
@@ -126,11 +137,13 @@ class SolverILQR(Solver):
                 if np.all(ulb == uub):
                     l = cs.Function(f'uc_{k}', [self.x, self.u], [self.u - ulb], 
                                 ['x', 'u'], [outname])
-                    set_to_ilqr(k, l)
+                    set_to_ilqr([k], l)
 
         
         # check fn in container    
         for fname, f in container.items():
+
+            print(f'..{fname}_{k}')
             
             # give a type to f
             f: Function = f
@@ -153,19 +166,21 @@ class SolverILQR(Solver):
                 value -= lb
 
             # wrap function
+            print(f'..{fname}_{k} wrap')
             l = cs.Function(f'{fname}_{k}', [self.x, self.u], [value], 
                                 ['x', 'u'], [outname])
 
             # set it to solver
-            set_to_ilqr(k, l)
+            print(f'..{fname}_{k} set_to_ilqr')
+            set_to_ilqr([k], l)
         
 
     
     def _iter_callback(self, fpres):
         # if not fpres.accepted:
         #     return
-        fmt = ' <#010.3e'
-        fmtf = ' <#06.3f'
+        fmt = ' <#09.3e'
+        fmtf = ' <#04.2f'
         star = '*' if fpres.accepted else ' '
         print(f'{star}\
 alpha={fpres.alpha:{fmtf}}  \
