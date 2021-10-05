@@ -190,7 +190,6 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         _constraint[i].evaluate(xtrj.col(i), utrj.col(i));
         constr += _constraint[i].h().cwiseAbs().sum();
 
-        std::cout << _constraint[i].h().transpose() << std::endl;
     }
 
     // add final constraint violation
@@ -296,6 +295,8 @@ void IterativeLQR::line_search(int iter)
 
 bool IterativeLQR::should_stop()
 {
+    TIC(should_stop);
+
     // first, evaluate feasibility
     if(_fp_res->constraint_violation > 1e-6)
     {

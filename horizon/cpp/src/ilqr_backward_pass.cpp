@@ -255,7 +255,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     res.nc = nc;
 
     // svd of input matrix
-    const double sv_ratio_thr = 1e-3;
+    const double sv_ratio_thr = _svd_threshold;
     svd.compute(D, Eigen::ComputeFullU|Eigen::ComputeFullV);
     const auto& U = svd.matrixU();
     const auto& V = svd.matrixV();

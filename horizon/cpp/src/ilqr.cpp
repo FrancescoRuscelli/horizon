@@ -35,6 +35,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _hxx_reg_growth_factor(1e3),
     _line_search_accept_ratio(1e-4),
     _alpha_min(1e-3),
+    _svd_threshold(1e-6),
     _cost(N+1, IntermediateCost(_nx, _nu)),
     _constraint(N+1, Constraint(_nx, _nu)),
     _value(N+1, ValueFunction(_nx)),
@@ -51,6 +52,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _hxx_reg_growth_factor = value_or(opt, "ilqr.hxx_reg_growth_factor", 1e3);
     _line_search_accept_ratio = value_or(opt, "ilqr.line_search_accept_ratio", 1e-4);
     _alpha_min = value_or(opt, "ilqr.alpha_min", 1e-3);
+    _svd_threshold = value_or(opt, "ilqr.svd_threshold", 1e-6);
 
     // set timer callback
     on_timer_toc = [this](const char * name, double usec)
@@ -555,6 +557,13 @@ void IterativeLQR::ConstraintToGo::add(const Constraint &constr)
     }
 
     const int constr_size = constr.h().size();
+
+    if(_dim + constr_size >= _h.size())
+    {
+        throw std::runtime_error("maximum constraint-to-go dimension "
+            "exceeded: try reducing the svd_threshold parameter");
+    }
+
     _C.middleRows(_dim, constr_size) = constr.C();
     _D.middleRows(_dim, constr_size) = constr.D();
     _h.segment(_dim, constr_size) = constr.h();

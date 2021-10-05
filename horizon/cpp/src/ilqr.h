@@ -188,6 +188,7 @@ private:
     double _hxx_reg_growth_factor;
     double _line_search_accept_ratio;
     double _alpha_min;
+    double _svd_threshold;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;
