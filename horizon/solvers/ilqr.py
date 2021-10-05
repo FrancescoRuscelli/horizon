@@ -30,7 +30,7 @@ class SolverILQR(Solver):
         self.N = prb.getNNodes() - 1  
 
         # get integrator and compute discrete dynamics in the form (x, u) -> f
-        integrator_name = self.opts.get('ilqr.integrator', 'EULER')
+        integrator_name = self.opts.get('ilqr.integrator', 'RK4')
         dae = {'ode': self.xdot, 'x': self.x, 'p': self.u, 'quad': 0}
         self.int = integrators.__dict__[integrator_name](dae, {'tf': dt})
         self.dyn = cs.Function('f', {'x': self.x, 'u': self.u, 'f': self.int(self.x, self.u)[0]},
@@ -65,11 +65,13 @@ class SolverILQR(Solver):
         self.x_opt = np.hstack(([x0]*(self.N+1)))
         self.ilqr.setStateInitialGuess(self.x_opt)
         self.ilqr.setIterationCallback(self._iter_callback)
-        self.ilqr.solve(self.max_iter)
+        ret = self.ilqr.solve(self.max_iter)
 
         # get solution
         self.x_opt = self.ilqr.getStateTrajectory()
         self.u_opt = self.ilqr.getInputTrajectory()
+
+        return ret
         
 
     def print_timings(self):
