@@ -3,9 +3,20 @@
 using namespace casadi_utils;
 
 
-WrappedFunction::WrappedFunction(casadi::Function f):
-    _f(f)
+WrappedFunction::WrappedFunction(casadi::Function f)
 {
+    *this = f;
+}
+
+WrappedFunction &WrappedFunction::operator=(casadi::Function f)
+{
+    if(f.is_null())
+    {
+        return *this;
+    }
+
+    _f = f;
+
     if(f.sz_arg() != f.n_in() ||
             f.sz_res() != f.n_out())
     {
@@ -40,7 +51,12 @@ WrappedFunction::WrappedFunction(casadi::Function f):
         _cols.push_back(cols);
     }
 
+    return *this;
+}
 
+WrappedFunction::WrappedFunction(const WrappedFunction & other)
+{
+    *this = other._f;
 }
 
 void WrappedFunction::setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi)

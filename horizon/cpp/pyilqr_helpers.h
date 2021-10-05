@@ -38,9 +38,9 @@ auto set_inter_cost_wrapper(IterativeLQR& self, std::vector<py::object> flist)
     self.setIntermediateCost(flist_cpp);
 }
 
-auto set_inter_cost_wrapper_single(IterativeLQR& self, int k, py::object f)
+auto set_inter_cost_wrapper_single(IterativeLQR& self, std::vector<int> k, py::object f)
 {
-    self.setIntermediateCost(k, to_cpp(f));
+    self.setCost(k, to_cpp(f));
 }
 
 auto set_final_cost_wrapper(IterativeLQR& self, py::object pyfn)
@@ -64,9 +64,9 @@ auto set_inter_constraint_wrapper(IterativeLQR& self, std::vector<py::object> fl
     self.setIntermediateConstraint(flist_cpp);
 }
 
-auto set_inter_constraint_wrapper_single(IterativeLQR& self, int k, py::object f)
+auto set_inter_constraint_wrapper_single(IterativeLQR& self, std::vector<int> k, py::object f)
 {
-    self.setIntermediateConstraint(k, to_cpp(f));
+    self.setConstraint(k, to_cpp(f));
 }
 
 #endif // PYILQR_HELPERS_H

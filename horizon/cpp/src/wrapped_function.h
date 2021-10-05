@@ -14,6 +14,10 @@ public:
 
     WrappedFunction() = default;
     WrappedFunction(casadi::Function f);
+    WrappedFunction& operator=(casadi::Function f);
+
+    WrappedFunction(const WrappedFunction&);
+    WrappedFunction& operator=(const WrappedFunction&);
 
     void setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi);
     void call();
