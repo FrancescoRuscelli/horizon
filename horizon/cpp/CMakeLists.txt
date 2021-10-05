@@ -19,6 +19,8 @@ set(CMAKE_CXX_STANDARD 17)
 # ilqr library
 add_library(ilqr STATIC
     src/ilqr.cpp
+    src/ilqr_forward_pass.cpp
+    src/ilqr_backward_pass.cpp
     src/wrapped_function.cpp
     src/profiling.cpp
 )

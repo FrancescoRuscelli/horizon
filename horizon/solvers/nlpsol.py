@@ -14,7 +14,7 @@ class NlpsolSolver(Solver):
         self.var_solution: Dict[str:np.array] = None
         self.cnstr_solution: Dict[str:np.array] = None
         
-        # generate problem to be solver
+        # generate problem to be solved
         self.var_container = self.prb.var_container
         self.fun_container = self.prb.function_container
 
