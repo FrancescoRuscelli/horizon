@@ -21,6 +21,15 @@ void IterativeLQR::backward_pass()
     int i = _N - 1;
     while(i >= 0)
     {
+        if(i == _N)
+        {
+            // if we got here (because of an HessianIndefinite exception),
+            // we need to regularize the final cost!
+            _value.back().S.diagonal().array() += _hxx_reg;
+            --i;
+            continue;
+        }
+
         try
         {
             backward_pass_iter(i);
