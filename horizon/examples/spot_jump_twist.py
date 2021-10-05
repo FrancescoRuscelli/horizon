@@ -8,27 +8,6 @@ from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
-from scipy.io import loadmat
-
-def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
-    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
-    traj_z = np.full(traj_len_before, 0.)
-    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
-    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
-    return traj_z
-
-# ========================================
-# traj = trajectoryInitializer(100, 10, 60, 10)
-# initial_q = -0.5
-# mod_q = initial_q + traj
-#
-# FK = cs.Function.deserialize(kindyn.ik(frame))
-# p = FK(q=q)['ee_pos']
-# p_start = FK(q=q_init)['ee_pos']
-
-# plt.scatter(range(mod_q.shape[0]), mod_q)
-# plt.show()
-# exit()
 
 # =========================================
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
@@ -46,7 +25,6 @@ if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 
-
 n_nodes = 50
 
 node_start_step = 20
@@ -58,7 +36,6 @@ n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
-
 
 
 # SET PROBLEM STATE AND INPUT VARIABLES
@@ -148,19 +125,19 @@ if load_initial_guess:
     for node in range(q_ig.shape[1]):
         q.setInitialGuess(q_ig[:, node], node)
 
-    # for node in range(q_dot_ig.shape[1]):
-    #     q_dot.setInitialGuess(q_dot_ig[:, node], node)
-    #
-    # for node in range(q_ddot_ig.shape[1]):
-    #     q_ddot.setInitialGuess(q_ddot_ig[:, node], node)
-    #
-    # for f, f_ig in zip(f_list, f_ig_list):
-    #     for node in range(f_ig.shape[1]):
-    #         f.setInitialGuess(f_ig[:, node], node)
-    #
-    # if isinstance(dt, cs.SX):
-    #     for node in range(dt_ig.shape[1]):
-    #         dt.setInitialGuess(dt_ig[:, node], node)
+    for node in range(q_dot_ig.shape[1]):
+        q_dot.setInitialGuess(q_dot_ig[:, node], node)
+
+    for node in range(q_ddot_ig.shape[1]):
+        q_ddot.setInitialGuess(q_ddot_ig[:, node], node)
+
+    for f, f_ig in zip(f_list, f_ig_list):
+        for node in range(f_ig.shape[1]):
+            f.setInitialGuess(f_ig[:, node], node)
+
+    if isinstance(dt, cs.SX):
+        for node in range(dt_ig.shape[1]):
+            dt.setInitialGuess(dt_ig[:, node], node)
 
 else:
     q.setInitialGuess(q_init)

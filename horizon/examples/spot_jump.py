@@ -188,7 +188,6 @@ prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_li
 prb.createFinalConstraint('final_velocity', q_dot)
 
 # SET CONTACT POSITION CONSTRAINTS
-active_leg = list()
 active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
 mu = 1
