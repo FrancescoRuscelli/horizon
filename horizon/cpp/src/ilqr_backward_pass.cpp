@@ -106,7 +106,6 @@ void IterativeLQR::backward_pass_iter(int i)
 
         // save multipliers
 
-
         // save optimal value function
         auto& value = _value[i];
         auto& S = value.S;
@@ -166,6 +165,7 @@ void IterativeLQR::backward_pass_iter(int i)
     {
         res.lu = lz;
         res.Lu = Lz;
+        tmp.huf = tmp.hu;
     }
 
 }
