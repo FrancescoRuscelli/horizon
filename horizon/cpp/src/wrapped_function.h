@@ -24,6 +24,7 @@ public:
     const Eigen::MatrixXd& getOutput(int i) const;
     Eigen::MatrixXd& out(int i);
     casadi::Function& function();
+    const casadi::Function& function() const;
 
     bool is_valid() const;
 

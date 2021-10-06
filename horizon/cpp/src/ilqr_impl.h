@@ -70,6 +70,8 @@ struct IterativeLQR::Constraint
 
     void addConstraint(casadi::Function h);
 
+    void addConstraint(const ConstraintEntity& h);
+
 private:
 
     Eigen::MatrixXd _C;
@@ -86,13 +88,15 @@ struct IterativeLQR::ConstraintEntity
     // constraint jacobian
     casadi_utils::WrappedFunction df;
 
+
+
     // dh/dx
     const Eigen::MatrixXd& C() const;
 
     // dh/du
     const Eigen::MatrixXd& D() const;
 
-    // constraint violation f(x, u)
+    // constraint violation h(x, u) - hdes
     VecConstRef h() const;
 
     // valid flag
@@ -105,6 +109,20 @@ struct IterativeLQR::ConstraintEntity
     void evaluate(VecConstRef x, VecConstRef u);
 
     void setConstraint(casadi::Function h);
+
+    void setConstraint(casadi::Function h, casadi::Function dh);
+
+    void setTargetValue(const Eigen::VectorXd& hdes);
+
+    static casadi::Function Jacobian(const casadi::Function& h);
+
+private:
+
+    // desired value
+    Eigen::VectorXd _hdes;
+
+    // computed value
+    Eigen::VectorXd _hvalue;
 
 };
 
@@ -128,8 +146,15 @@ struct IterativeLQR::IntermediateCostEntity
 
     void setCost(const casadi::Function& cost);
 
+    void setCost(const casadi::Function& f,
+                 const casadi::Function& df,
+                 const casadi::Function& ddf);
+
     double evaluate(VecConstRef x, VecConstRef u);
     void quadratize(VecConstRef x, VecConstRef u);
+
+    static casadi::Function Gradient(const casadi::Function& f);
+    static casadi::Function Hessian(const casadi::Function& df);
 };
 
 struct IterativeLQR::IntermediateCost
@@ -146,6 +171,7 @@ struct IterativeLQR::IntermediateCost
     IntermediateCost(int nx, int nu);
 
     void addCost(const casadi::Function& cost);
+    void addCost(const IntermediateCostEntity& cost);
 
     double evaluate(VecConstRef x, VecConstRef u);
     void quadratize(VecConstRef x, VecConstRef u);

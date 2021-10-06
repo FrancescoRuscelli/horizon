@@ -45,8 +45,10 @@ class SolverILQR(Solver):
 
         # set costs and constraints
         for k in range(self.N + 1):
-            self._set_cost_k(k)
-            self._set_constraint_k(k)
+            self._set_bounds_k(k)
+
+        self._set_constraint()
+        self._set_cost()
 
         # set a default iteration callback
         self.plot_iter = False
@@ -103,78 +105,77 @@ class SolverILQR(Solver):
             print(f'{k:30}{np.mean(v)} us')
     
     
-    def _set_cost_k(self, k):
+    def _set_cost(self):
         
-        self._set_fun_k(k, 
-                container=self.prb.function_container.getCost(),
+        self._set_fun(container=self.prb.function_container.getCost(),
                 set_to_ilqr=self.ilqr.setIntermediateCost, 
                 outname='l')
 
     
-    def _set_constraint_k(self, k):
+    def _set_constraint(self):
 
-        self._set_fun_k(k, 
-                container=self.prb.function_container.getCnstr(),
+        self._set_fun(container=self.prb.function_container.getCnstr(),
                 set_to_ilqr=self.ilqr.setIntermediateConstraint,
                 outname='h')
     
-    
-    def _set_fun_k(self, k, container, set_to_ilqr, outname):
+    def _set_bounds_k(self, k):
 
-        print(f'{outname}_{k}')
+        outname = 'h'
+        set_to_ilqr = self.ilqr.setIntermediateConstraint
+        
+        # state
+        xlb, xub = self.prb.getState().getBounds(node=k)
+        eq_indices = np.array(np.nonzero(xlb == xub)).flatten().tolist()
+        if k > 0 and len(eq_indices) > 0:  # note: skip initial condition
+            l = cs.Function(f'xc_{k}', [self.x, self.u], [self.x[eq_indices] - xlb[eq_indices]], 
+                            ['x', 'u'], [outname])
+            set_to_ilqr([k], l)
 
-        # check state and input bounds
-        if outname == 'h':
-
-            # state
-            xlb, xub = self.prb.getState().getBounds(node=k)
-            if np.all(xlb == xub) and k > 0:  # note: skip initial condition
-                l = cs.Function(f'xc_{k}', [self.x, self.u], [self.x - xlb], 
+        # input
+        if k < self.N:
+            ulb, uub = self.prb.getInput().getBounds(node=k)
+            eq_indices = np.array(np.nonzero(ulb == uub)).flatten().tolist()
+            if len(eq_indices) > 0:
+                l = cs.Function(f'uc_{k}', [self.x, self.u], [self.u[eq_indices] - ulb[eq_indices]], 
                                 ['x', 'u'], [outname])
                 set_to_ilqr([k], l)
 
-            # input
-            if k < self.N:
-                ulb, uub = self.prb.getInput().getBounds(node=k)
-                if np.all(ulb == uub):
-                    l = cs.Function(f'uc_{k}', [self.x, self.u], [self.u - ulb], 
-                                ['x', 'u'], [outname])
-                    set_to_ilqr([k], l)
 
-        
+    def _set_fun(self, container, set_to_ilqr, outname):
+
         # check fn in container    
         for fname, f in container.items():
-
-            print(f'..{fname}_{k}')
             
             # give a type to f
             f: Function = f
 
-            # if f does not act on node k, skip
-            if k not in f.getNodes():
-                continue
-                
             # get input variables for this function
             input_list = f.getVariables()
 
-            # save function value to list
+            # save function value
             value = f.getFunction()(*input_list)
+
+            # active nodes
+            nodes = f.getNodes()
+
+            tgt_values = list()
 
             # in the case of constraints, check bound values
             if isinstance(f, Constraint):
-                lb, ub = Constraint.getBounds(f, nodes=k)
+                lb, ub = Constraint.getBounds(f)
                 if np.any(lb != ub):
                     raise ValueError(f'[ilqr] constraint {fname} not an equality constraint')
-                value -= lb
+                tgt_values = np.hsplit(lb, len(nodes))
 
             # wrap function
-            print(f'..{fname}_{k} wrap')
-            l = cs.Function(f'{fname}_{k}', [self.x, self.u], [value], 
+            l = cs.Function(fname, [self.x, self.u], [value], 
                                 ['x', 'u'], [outname])
 
             # set it to solver
-            print(f'..{fname}_{k} set_to_ilqr')
-            set_to_ilqr([k], l)
+            if isinstance(f, Constraint):
+                set_to_ilqr(nodes, l, tgt_values)
+            else:
+                set_to_ilqr(nodes, l)
         
 
     

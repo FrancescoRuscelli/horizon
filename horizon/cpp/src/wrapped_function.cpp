@@ -103,6 +103,11 @@ casadi::Function& WrappedFunction::function()
     return _f;
 }
 
+const casadi::Function &WrappedFunction::function() const
+{
+    return _f;
+}
+
 bool WrappedFunction::is_valid() const
 {
     return !_f.is_null();

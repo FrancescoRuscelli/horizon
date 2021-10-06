@@ -88,8 +88,12 @@ public:
      * @param indices: the nodes that the cost refers to
      * @param inter_constraint: a function with required signature (x, u) -> (h),
      * where the constraint is h(x, u) = 0
+     * @param target_values: if specified, the i-th entry is used as target value
+     * for the constraint function at the indices[i]
      */
-    void setConstraint(std::vector<int> indices, const casadi::Function& inter_constraint);
+    void setConstraint(std::vector<int> indices,
+                       const casadi::Function& inter_constraint,
+                       std::vector<Eigen::VectorXd> target_values = std::vector<Eigen::VectorXd>());
 
     void setIntermediateConstraint(const std::vector<casadi::Function>& inter_constraint);
 

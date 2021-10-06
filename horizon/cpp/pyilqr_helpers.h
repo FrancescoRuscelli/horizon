@@ -64,9 +64,12 @@ auto set_inter_constraint_wrapper(IterativeLQR& self, std::vector<py::object> fl
     self.setIntermediateConstraint(flist_cpp);
 }
 
-auto set_inter_constraint_wrapper_single(IterativeLQR& self, std::vector<int> k, py::object f)
+auto set_inter_constraint_wrapper_single(IterativeLQR& self,
+                                         std::vector<int> k,
+                                         py::object f,
+                                         std::vector<Eigen::VectorXd> tgt)
 {
-    self.setConstraint(k, to_cpp(f));
+    self.setConstraint(k, to_cpp(f), tgt);
 }
 
 #endif // PYILQR_HELPERS_H
