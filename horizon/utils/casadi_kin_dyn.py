@@ -137,7 +137,7 @@ class InverseDynamics():
         for frame in contact_frames:
             self.contact_jacobians[frame] = cs.Function.deserialize(kindyn.jacobian(frame, force_reference_frame))
 
-    def call(self, q, qdot, qddot, frame_force_mapping = dict()):
+    def call(self, q, qdot, qddot, frame_force_mapping = dict(), tau_ext = 0):
         """
         Computes generalized torques:
         Args:
@@ -159,7 +159,7 @@ class InverseDynamics():
                 JtF = cs.mtimes(J.T, wrench)
             JtF_sum += JtF
 
-        tau = self.id(q=q, v=qdot, a=qddot)['tau'] - JtF_sum
+        tau = self.id(q=q, v=qdot, a=qddot)['tau'] - JtF_sum - tau_ext
         return tau
 
 
