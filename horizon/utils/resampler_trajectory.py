@@ -166,7 +166,7 @@ def second_order_resample_integrator(p, v, u, node_time, dt, dae):
     return p_res, v_res, u_res
 
 
-def resampler(state_vec, input_vec, nodes_dt, desired_dt):
+def resampler(state_vec, input_vec, nodes_dt, desired_dt, dae):
 
     # convert to np if not np already
     states = np.array(state_vec)
@@ -175,8 +175,6 @@ def resampler(state_vec, input_vec, nodes_dt, desired_dt):
     state_dim = states.shape[0]
     input_dim = inputs.shape[0]
     n_nodes = states.shape[1]
-
-
 
     # construct array of times for each node (nodes could be of different time lenght)
     node_time_array = np.zeros([n_nodes])
@@ -193,14 +191,11 @@ def resampler(state_vec, input_vec, nodes_dt, desired_dt):
     # number of nodes in resampled trajectory
     n_nodes_res = int(round(node_time_array[-1] / desired_dt)) + 1
 
-    var_dim = 2
+    # state_abst = cs.SX.sym('state_abst', state_dim)
+    # input_abst = cs.SX.sym('input_abst', input_dim)
 
-    state_abst = cs.SX.sym('state_abst', state_dim)
-    input_abst = cs.SX.sym('input_abst', input_dim)
-    state_dot = cs.vertcat(state_abst[var_dim:], input_abst)
-
-    L = 1
-    dae = {'x': state_abst, 'p': input_abst, 'ode': state_dot, 'quad': L}
+    # L = 1
+    # dae = {'x': state_abst, 'p': input_abst, 'ode': state_dot, 'quad': L}
     opts = {'tf': desired_dt}
 
     F_integrator = integrators.RK4(dae, opts, cs.SX)
@@ -216,6 +211,7 @@ def resampler(state_vec, input_vec, nodes_dt, desired_dt):
     i = 0
     node = 0
     while i < input_res.shape[1] - 1:
+        # integrate the state using the input at the desired node
         state_res_i = F_integrator(x0=state_res[:, i], p=inputs[:, node])['xf'].toarray().flatten()
 
         t += desired_dt

@@ -71,7 +71,6 @@ class replay_trajectory:
         for frame in self.frame_force_mapping:
             f_msg = geometry_msgs.msg.WrenchStamped()
             f_msg.header.stamp = time
-            f_msg.header.frame_id = frame
 
             f = self.frame_force_mapping[frame][:, k]
 
@@ -153,3 +152,4 @@ class replay_trajectory:
                 k += 1
             if self.__sleep > 0.:
                 time.sleep(self.__sleep)
+                print('replaying traj ...')

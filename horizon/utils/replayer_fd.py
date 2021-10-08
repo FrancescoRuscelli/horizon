@@ -89,7 +89,7 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot_direct_collo.mat')
+ms = mat_storer.matStorer('../examples/spot_step_fd.mat')
 solution = ms.load()
 
 # print([name for name in solution])
@@ -98,41 +98,87 @@ contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 replay_traj = False
+resample = False
 plotting = True
 check_bounds = False
+joint_names = kindyn.joint_names()
+if 'universe' in joint_names: joint_names.remove('universe')
+if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
+q = cs.SX.sym('q', n_q)
+q_dot = cs.SX.sym('q_dot', n_v)
+
+u = cs.SX.sym("actuated_torques", n_v - 6)
+tau = cs.vertcat(cs.SX.zeros(6, 1), u)
+
+f_list = list()
+for i in range(n_c):
+    f_list.append(cs.SX.sym(f'f{i}', n_f))
+
+# ============================== compute qddot ===================================================
+# SET CONTACTS MAP
+contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contact_map = dict(zip(contacts_name, f_list))
+fd = kin_dyn.ForwardDynamics(kindyn, contacts_name, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+q_ddot = fd.call(q, q_dot, tau, contact_map)
+
+x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
+
+tau_hist = np.zeros((solution["q_dot"].shape[0], solution["q_dot"].shape[1] - 1))
+for i in range(tau_hist.shape[1]):
+    tau_hist[6:, i] = solution["actuated_torques"][:, i]
+
+qddot_hist = np.zeros(tau_hist.shape)
+FD = kin_dyn.ForwardDynamics(kindyn, contacts_name, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+
+for i in range(solution['q'].shape[1] - 1):
+    contact_map_i = dict(
+        zip(contacts_name, [solution['f0'][:, i], solution['f1'][:, i], solution['f2'][:, i], solution['f3'][:, i]]))
+    qddot_hist[:, i] = FD.call(solution["q"][:, i], solution["q_dot"][:, i], tau_hist[:, i],
+                               contact_map_i).toarray().flatten()
+
+# ================================================================================================
 if replay_traj:
-    joint_names = kindyn.joint_names()
-    if 'universe' in joint_names: joint_names.remove('universe')
-    if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
+    if resample:
 
-    if 'dt' in solution:
-        dt_before_res = solution['dt'].flatten()
+        if 'dt' in solution:
+            dt_before_res = solution['dt'].flatten()
+        else:
+            dt_before_res = solution['constant_dt'].flatten()[0]
+
+        dt_res = 0.001
+        dae = {'x': x, 'p': cs.vertcat(u, f_list[0], f_list[1], f_list[2], f_list[3]), 'ode': x_dot, 'quad': 1}
+
+        input = np.array(cs.vertcat(solution["actuated_torques"], solution["f0"], solution["f1"], solution["f2"], solution["f3"]))
+        # q_res, qdot_res, input_res = resampler_trajectory.second_order_resample_integrator(solution["q"], solution["q_dot"], input, dt_before_res, dt_res, dae)
+
+        state = cs.vertcat(solution["q"], solution["q_dot"])
+        state_res = resampler_trajectory.resampler(state, input, dt_before_res, dt_res, dae)
+
+        q_res = state_res[n_q:, :]
+        qdot_res = state_res[:n_v, :]
+
+        tau_res = resampler_trajectory.resample_input(solution["actuated_torques"], dt_before_res, dt_res)
+        f1_res = resampler_trajectory.resample_input(solution["f0"], dt_before_res, dt_res)
+        f2_res = resampler_trajectory.resample_input(solution["f1"], dt_before_res, dt_res)
+        f3_res = resampler_trajectory.resample_input(solution["f2"], dt_before_res, dt_res)
+        f4_res = resampler_trajectory.resample_input(solution["f3"], dt_before_res, dt_res)
+
+        contact_map = dict(zip(contacts_name, [f1_res, f2_res, f3_res, f4_res]))
+
+        repl = replay_trajectory(dt_res, joint_names, q_res, contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+
+        repl.sleep(1.)
+        repl.replay(is_floating_base=True)
     else:
-        dt_before_res = solution['constant_dt'].flatten()[0]
+        repl = replay_trajectory(solution['constant_dt'], joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
 
-    dt_res = 0.001
-
-    q = cs.SX.sym('q', n_q)
-    q_dot = cs.SX.sym('q_dot', n_v)
-    q_ddot = cs.SX.sym('q_ddot', n_v)
-    x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
-
-    dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
-    q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
-        solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
-        kindyn,
-        cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
-
-    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
     repl.sleep(1.)
     repl.replay(is_floating_base=True)
-# plotting
 
 if plotting:
 
-    constraint_names = ['multiple_shooting', 'inverse_dynamics', 'final_velocity', 'final_acceleration', 'rh_foot_vel_wheelie', 'rh_foot_fc', 'lf_foot_vel_before_wheelie', 'lf_foot_fc_before_wheelie', 'lf_foot_no_force_after_lift', 'subterrain_lf_foot_leg', 'lh_foot_vel_wheelie', 'lh_foot_fc', 'rf_foot_vel_before_wheelie', 'rf_foot_fc_before_wheelie', 'rf_foot_no_force_after_lift', 'subterrain_rf_foot_leg']
-
+    constraint_names = ['collo_x_0', 'collo_x_1', 'collo_x_2', 'collo_continuity', 'collo_dyn_0', 'collo_dyn_1', 'collo_dyn_2', 'final_velocity', 'lf_foot_vel', 'lf_foot_fc', 'lh_foot_vel', 'lh_foot_fc', 'rf_foot_vel', 'rf_foot_fc', 'rh_foot_vel', 'rh_foot_fc', 'constant_dt']
     plt.figure()
     for dim in range(solution['q'].shape[0]):
         plt.plot(range(solution['q'].shape[1]), np.array(solution['q'][dim, :]))
@@ -144,10 +190,9 @@ if plotting:
     plt.title('q_dot')
 
     plt.figure()
-    for dim in range(solution['q_ddot'].shape[0]):
-        plt.plot(range(solution['q_ddot'].shape[1]), np.array(solution['q_ddot'][dim, :]))
+    for dim in range(qddot_hist.shape[0]):
+        plt.plot(range(qddot_hist.shape[1]), np.array(qddot_hist[dim, :]))
     plt.title('q_ddot')
-
 
     pos_contact_list = list()
     for contact in contacts_name:
@@ -186,7 +231,7 @@ if plotting:
 
         plt.title(f'force {f}')
 
-    plotFunction('inverse_dynamics')
+    # plotFunction('inverse_dynamics')
 
     # dt
     if 'dt' in solution:
@@ -219,17 +264,3 @@ if plotting:
 
 
     plt.show()
-
-
-if check_bounds:
-# checking bounds
-    constraint_names = ['multiple_shooting', 'inverse_dynamics', 'final_velocity', 'final_acceleration',
-                        'rh_foot_vel_wheelie', 'rh_foot_fc', 'lf_foot_vel_before_wheelie', 'lf_foot_fc_before_wheelie',
-                        'lf_foot_no_force_after_lift', 'subterrain_lf_foot_leg', 'lh_foot_vel_wheelie', 'lh_foot_fc',
-                        'rf_foot_vel_before_wheelie', 'rf_foot_fc_before_wheelie', 'rf_foot_no_force_after_lift',
-                        'subterrain_rf_foot_leg']
-
-    for cnsrt in constraint_names:
-        checkBounds(cnsrt, tol=0.01)
-# print(solution['rh_foot_no_force_during_lift']['val'][0][0][2, :])
-# ======================================================
