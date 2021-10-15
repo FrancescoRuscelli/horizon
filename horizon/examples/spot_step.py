@@ -232,7 +232,7 @@ prb.createCostFunction("min_q_dot", 1000. * cs.sumsqr(q_dot))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
-q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.1, 0.0, 0.0, 0.0, 1.0])
+# q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.1, 0.0, 0.0, 0.0, 1.0])
 # prb.createCostFunction("floating_base_orientation", 1000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]), nodes=list(range(node_start_step, node_end_step)))
 # prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[0:7] - q_fb_trg))
 # prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]))
@@ -244,7 +244,10 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.max_iter': 5000}
 # 'ipopt.linear_solver': 'ma57'}
 
+tic = time.time()
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+toc = time.time()
+print('time elapsed:', toc - tic)
 solver.solve()
 
 solution = solver.getSolutionDict()
