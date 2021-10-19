@@ -193,6 +193,7 @@ private:
     double _line_search_accept_ratio;
     double _alpha_min;
     double _svd_threshold;
+    bool _closed_loop_forward_pass;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;

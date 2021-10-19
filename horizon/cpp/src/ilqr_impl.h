@@ -247,6 +247,7 @@ struct IterativeLQR::Temporaries
 
     /* Forward pass */
     Eigen::VectorXd dx;
+    Eigen::VectorXd du;
     Eigen::VectorXd defect;
 
 };

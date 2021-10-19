@@ -53,14 +53,19 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
     // backward pass solution
     const auto& res = _bp_res[i];
     const auto& L = res.Lu;
-    auto l = alpha * res.lu;
 
     // update control
-    auto ui_upd = ui + l + L*tmp.dx;
-    _fp_res->utrj.col(i) = ui_upd;
+    tmp.du = alpha * res.lu;
+
+    if(_closed_loop_forward_pass)
+    {
+        tmp.du += L * tmp.dx;
+    }
+
+    _fp_res->utrj.col(i) = ui + tmp.du;
 
     // update next state
-    auto xnext_upd = xnext + (A + B*L)*tmp.dx + B*l + alpha*d;
+    auto xnext_upd = xnext + A*tmp.dx + B*tmp.du + alpha*d;
     _fp_res->xtrj.col(i+1) = xnext_upd;
 
 #if false
@@ -78,7 +83,7 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
 #endif
 
     // compute step length
-    _fp_res->step_length += l.cwiseAbs().sum();
+    _fp_res->step_length += tmp.du.cwiseAbs().sum();
 
 }
 

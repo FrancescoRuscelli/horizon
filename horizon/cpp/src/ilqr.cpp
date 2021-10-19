@@ -3,6 +3,11 @@
 
 utils::Timer::TocCallback on_timer_toc;
 
+template<class V>
+std::type_info const& var_type(V const& v){
+  return std::visit( [](auto&&x)->decltype(auto){ return typeid(x); }, v );
+}
+
 template <typename T>
 T value_or(const IterativeLQR::OptionDict& opt, std::string key, T dfl)
 {
@@ -19,8 +24,12 @@ T value_or(const IterativeLQR::OptionDict& opt, std::string key, T dfl)
     }
     catch(std::bad_variant_access& e)
     {
-        throw std::runtime_error("bad type for parameter '" + key + "': expected " +
-                                 abi::__cxa_demangle(typeid(T).name(), 0, 0, 0));
+        throw std::runtime_error(
+                    std::string("bad type '") +
+                    abi::__cxa_demangle(var_type(it->second).name(), 0, 0, 0) +
+                    "' for parameter '" + key + "': expected " +
+                    abi::__cxa_demangle(typeid(T).name(), 0, 0, 0)
+                    );
     }
 }
 
@@ -53,6 +62,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _line_search_accept_ratio = value_or(opt, "ilqr.line_search_accept_ratio", 1e-4);
     _alpha_min = value_or(opt, "ilqr.alpha_min", 1e-3);
     _svd_threshold = value_or(opt, "ilqr.svd_threshold", 1e-6);
+    _closed_loop_forward_pass = value_or(opt, "ilqr.closed_loop_forward_pass", 1);
 
     // set timer callback
     on_timer_toc = [this](const char * name, double usec)
