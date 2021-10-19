@@ -180,8 +180,8 @@ class SolverILQR(Solver):
 
     
     def _iter_callback(self, fpres):
-        # if not fpres.accepted:
-        #     return
+        if not fpres.accepted:
+            return
         fmt = ' <#09.3e'
         fmtf = ' <#04.2f'
         star = '*' if fpres.accepted else ' '
