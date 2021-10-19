@@ -14,8 +14,9 @@ class EqualityConstrained(unittest.TestCase):
         # and constrained to a x2 = x1^2 parabola
         # m*ddx + m*g = [tau, 0] + Jc'*f
         
-        N = 10
-        dt = 0.1
+        N = 1000
+        tf = 1.0
+        dt = tf/N
         prb = Problem(N)
         x = prb.createStateVariable('x', 2)
         v = prb.createStateVariable('v', 2)
@@ -44,7 +45,9 @@ class EqualityConstrained(unittest.TestCase):
             prb, 
             dt, 
             opts={
-                'ilqr.integrator': 'RK4'
+                'ilqr.integrator': 'RK4',
+                'ilqr.line_search_accept_ratio': 1e-9,
+                'ilqr.svd_threshold': 1e-9,
             })
 
         self.solver = solver
@@ -53,7 +56,7 @@ class EqualityConstrained(unittest.TestCase):
         
 
     def test_simple_constrained(self):
-        # self.solver.plot_iter = True
+        self.solver.plot_iter = True
         self.solver.set_iteration_callback()
         ret = self.solver.solve()
         self.assertTrue(ret)
