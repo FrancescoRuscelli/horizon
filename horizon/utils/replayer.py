@@ -89,7 +89,7 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot_direct_collo.mat')
+ms = mat_storer.matStorer('../examples/spot_leg_raise.mat')
 solution = ms.load()
 
 # print([name for name in solution])
@@ -169,6 +169,12 @@ if plotting:
         plt.title(f'plane_xy')
         plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
 
+    FK = cs.Function.deserialize(kindyn.centerOfMass())
+    pos_com = FK(q=solution['q'])['com']
+    plt.scatter(np.array(pos_com[0, :]), np.array(pos_com[1, :]), marker='x')
+    plt.scatter(np.array(pos_com[0, 0]), np.array(pos_com[1, 0]), marker='x', c='blue')
+    plt.scatter(np.array(pos_com[0, -1]), np.array(pos_com[1, -1]), marker='x', c='green')
+
     # plane_xz
     plt.figure()
     for contact in contacts_name:
@@ -186,7 +192,12 @@ if plotting:
 
         plt.title(f'force {f}')
 
-    plotFunction('inverse_dynamics')
+    plt.figure()
+    for f in [f'f{i}' for i in range(len(contacts_name))]:
+        plt.plot(np.array(range(solution[f].shape[1])), solution[f][2, :])
+        plt.title(f'forces_z')
+
+    # plotFunction('inverse_dynamics')
 
     # dt
     if 'dt' in solution:
