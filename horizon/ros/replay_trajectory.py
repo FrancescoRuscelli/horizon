@@ -11,7 +11,9 @@ from copy import deepcopy
 try:
     import tf as ros_tf
 except ImportError:
+    from . import tf_broadcaster_simple as ros_tf
     print('will not use tf publisher')
+        
 
 def normalize_quaternion(q):
 
@@ -71,6 +73,7 @@ class replay_trajectory:
         for frame in self.frame_force_mapping:
             f_msg = geometry_msgs.msg.WrenchStamped()
             f_msg.header.stamp = time
+            f_msg.header.frame_id = frame
 
             f = self.frame_force_mapping[frame][:, k]
 
@@ -108,7 +111,7 @@ class replay_trajectory:
 
         if self.frame_force_mapping:
             for key in self.frame_force_mapping:
-                self.force_pub.append(rospy.Publisher(key+'_forces', geometry_msgs.msg.WrenchStamped, queue_size=1))
+                self.force_pub.append(rospy.Publisher(key+'_forces', geometry_msgs.msg.WrenchStamped, queue_size=10))
 
         if is_floating_base:
             br = ros_tf.TransformBroadcaster()
@@ -122,6 +125,8 @@ class replay_trajectory:
         while not rospy.is_shutdown():
             k = 0
             for qk in self.q_replay.T:
+
+                t = rospy.Time.now()
 
                 if is_floating_base:
                     qk = normalize_quaternion(qk)
@@ -137,9 +142,9 @@ class replay_trajectory:
                     br.sendTransform((m.transform.translation.x, m.transform.translation.y, m.transform.translation.z),
                                      (m.transform.rotation.x, m.transform.rotation.y, m.transform.rotation.z,
                                       m.transform.rotation.w),
-                                     rospy.Time.now(), m.child_frame_id, m.header.frame_id)
+                                      t, m.child_frame_id, m.header.frame_id)
 
-                t = rospy.Time.now()
+                
                 joint_state_pub.header.stamp = t
                 joint_state_pub.position = qk[7:nq] if is_floating_base else qk
                 joint_state_pub.velocity = []
