@@ -61,8 +61,6 @@ void IterativeLQR::backward_pass_iter(int i)
     // note: after handling constraints, we're actually optimizing an
     // auxiliary input z, where the original input u = lc + Lc*x + Lz*z
 
-
-
     // intermediate cost
     const auto r = ccost.r;
     const auto q = ccost.q;
@@ -79,6 +77,9 @@ void IterativeLQR::backward_pass_iter(int i)
     const auto& value_next = _value[i+1];
     const auto& Snext = value_next.S;
     const auto& snext = value_next.s;
+
+    THROW_NAN(Snext);
+    THROW_NAN(snext);
 
     // ..workspace
     auto& tmp = _tmp[i];
@@ -99,8 +100,8 @@ void IterativeLQR::backward_pass_iter(int i)
     tmp.Hxx.noalias() = Q + A.transpose()*tmp.S_A;
     tmp.Hxx.diagonal().array() += _hxx_reg;
 
-    //    double eig_min_Q = Q.eigenvalues().real().minCoeff();
-    //    tmp.Hxx.diagonal().array() -= std::min(eig_min_Q, 0.0)*2.0;
+//    double eig_min_Q = Q.eigenvalues().real().minCoeff();
+//    tmp.Hxx.diagonal().array() -= std::min(eig_min_Q, 0.0)*2.0;
 
 
     // handle case where nz = 0, i.e. no nullspace left after constraints
@@ -139,14 +140,16 @@ void IterativeLQR::backward_pass_iter(int i)
 
     // solve linear system to get ff and fb terms
     // after solveInPlace we will have huHux = [-l, -L]
+    TIC(llt_inner);
     tmp.llt.compute(tmp.Huu);
     tmp.llt.solveInPlace(tmp.huHux);
     if(tmp.llt.info() != Eigen::ComputationInfo::Success)
     {
         throw HessianIndefinite("backward pass error: hessian not positive");
     }
+    TOC(llt_inner);
 
-    // todo: check solution for nan, unable to solve, etc
+    THROW_NAN(tmp.huHux);
 
     // save solution
     auto& res = _bp_res[i];
@@ -187,6 +190,11 @@ void IterativeLQR::increase_regularization()
     }
 
     _hxx_reg *= _hxx_reg_growth_factor;
+
+    if(_hxx_reg > 1e12)
+    {
+        throw std::runtime_error("maximum regularization exceeded");
+    }
 }
 
 void IterativeLQR::reduce_regularization()
@@ -256,10 +264,16 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 
     // svd of input matrix
     const double sv_ratio_thr = _svd_threshold;
+    THROW_NAN(D);
+    TIC(svd_inner);
     svd.compute(D, Eigen::ComputeFullU|Eigen::ComputeFullV);
+    TOC(svd_inner);
     const auto& U = svd.matrixU();
     const auto& V = svd.matrixV();
     const auto& sv = svd.singularValues();
+    THROW_NAN(svd.singularValues());
+    THROW_NAN(svd.matrixU());
+    THROW_NAN(svd.matrixV());
     svd.setThreshold(sv[0]*sv_ratio_thr);
     int rank = svd.rank();
     int ns_dim = _nu - rank;
@@ -307,6 +321,7 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     tmp.qc.noalias() = q + Lc.transpose()*(r + R*lc) + P.transpose()*lc;
     tmp.rc.noalias() = Bz.transpose()*(r + R*lc);
     tmp.Qc.noalias() = Q + Lc.transpose()*R*Lc + Lc.transpose()*P + P.transpose()*Lc;
+    tmp.Qc = 0.5*(tmp.Qc + tmp.Qc.transpose());
     tmp.Rc.noalias() = Bz.transpose()*R*Bz;
     tmp.Pc.noalias() = Bz.transpose()*(P + R*Lc);
 
