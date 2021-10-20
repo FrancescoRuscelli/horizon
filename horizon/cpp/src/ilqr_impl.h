@@ -219,7 +219,7 @@ struct IterativeLQR::Temporaries
     Eigen::VectorXd h;
 
     // svd of D
-    Eigen::BDCSVD<Eigen::MatrixXd> svd;
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd;
 
     // rotated constraint according to left singular vectors of D
     Eigen::MatrixXd rotC;
@@ -328,5 +328,16 @@ struct IterativeLQR::ConstrainedCost
     VecConstRef q;
     VecConstRef r;
 };
+
+#define THROW_NAN(mat) \
+    if((mat).hasNaN()) \
+    { \
+        throw std::runtime_error("NaN value detected in " #mat); \
+    } \
+    if(!mat.allFinite()) \
+    { \
+        throw std::runtime_error("Inf value detected in " #mat); \
+    }
+
 
 #endif // ILQR_IMPL_H
