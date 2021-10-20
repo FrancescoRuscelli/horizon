@@ -55,6 +55,9 @@ class SolverILQR(Solver):
         self.xax = None 
         self.uax = None
 
+        # empty solution dict
+        self.solution_dict = dict()
+
     
     def set_iteration_callback(self, cb=None):
         if cb is None:
@@ -82,8 +85,21 @@ class SolverILQR(Solver):
         self.x_opt = self.ilqr.getStateTrajectory()
         self.u_opt = self.ilqr.getInputTrajectory()
 
+        # populate solution dict
+        for var in self.prb.getState().var_list:
+            vname = var.getName()
+            off, dim = self.prb.getState().getVarIndex(vname)
+            self.solution_dict[vname] = self.x_opt[off:off+dim, :]
+            
+        for var in self.prb.getInput().var_list:
+            vname = var.getName()
+            off, dim = self.prb.getInput().getVarIndex(vname)
+            self.solution_dict[vname] = self.u_opt[off:off+dim, :]
+
         return ret
-        
+    
+    def getSolutionDict(self):
+        return self.solution_dict
 
     def print_timings(self):
 
