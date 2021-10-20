@@ -14,7 +14,12 @@ using namespace horizon;
 casadi::Function to_cpp(py::object pyfn)
 {
     // convert python's casadi.Function to cpp's casadi::Function
-    auto cs = py::module_::import("casadi");
+    #if PYBIND11_VERSION_MINOR > 6
+        auto cs = py::module_::import("casadi");
+    #else
+        auto cs = py::module::import("casadi");
+    #endif
+
     auto Function = cs.attr("Function");
     auto serialize = Function.attr("serialize");
     auto fstr = serialize(pyfn).cast<std::string>();

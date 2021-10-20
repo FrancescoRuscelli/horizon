@@ -12,7 +12,7 @@ find_package(Eigen3 REQUIRED)
 find_package(casadi 3.5.5 REQUIRED)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 
 
@@ -25,8 +25,15 @@ add_library(ilqr STATIC
     src/profiling.cpp
 )
 
-target_link_libraries(ilqr Eigen3::Eigen casadi)
+# sqp library
+add_library(sqp STATIC
+    src/wrapped_function.cpp
+    src/profiling.cpp
+)
 
+
+target_link_libraries(ilqr Eigen3::Eigen casadi)
+target_link_libraries(sqp Eigen3::Eigen casadi)
 
 # python binding
 set(PYBIND11_PYTHON_VERSION 3)
@@ -35,10 +42,21 @@ find_package(pybind11 REQUIRED)
 pybind11_add_module(pyilqr pyilqr.cpp)
 target_link_libraries(pyilqr PUBLIC ilqr)
 
+pybind11_add_module(pysqp pysqp.cpp)
+target_link_libraries(pysqp PUBLIC sqp Eigen3::Eigen casadi)
+
 install(TARGETS pyilqr
+    DESTINATION horizon/solvers)
+
+install(TARGETS pysqp
     DESTINATION horizon/solvers)
 
 
 # test executable
 add_executable(ilqr_test src/ilqr_test.cpp)
 target_link_libraries(ilqr_test ilqr)
+
+add_executable(sqp_test src/sqp_test.cpp)
+target_link_libraries(sqp_test sqp)
+
+add_subdirectory(tests)

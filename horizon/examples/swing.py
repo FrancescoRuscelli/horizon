@@ -3,11 +3,15 @@ import logging
 
 import os
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter
 from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
+from horizon.ros import utils as horizon_ros_utils
+
+horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
+time.sleep(3.)
 
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')
 urdf = open(urdffile, 'r').read()
@@ -128,10 +132,10 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
            0.0]  # rope
 
 frame_force_mapping = {'rope_anchor2': frope}
-tau = casadi_kin_dyn.InverseDynamics(kindyn, ['rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q,
-                                                                                                                  qdot,
-                                                                                                                  qddot,
-                                                                                                                  frame_force_mapping)
+tau = kin_dyn.InverseDynamics(kindyn, ['rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q,
+                                                                                                           qdot,
+                                                                                                           qddot,
+                                                                                                           frame_force_mapping)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
 
 # ROPE CONTACT CONSTRAINT
@@ -157,7 +161,7 @@ f2_hist = solution["f2"]
 frope_hist = solution["frope"]
 
 tau_hist = np.zeros(qddot_hist.shape)
-ID = casadi_kin_dyn.InverseDynamics(kindyn, ['rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+ID = kin_dyn.InverseDynamics(kindyn, ['rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 for i in range(ns):
     frame_force_mapping_i = {'rope_anchor2': frope_hist[:, i]}
     tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()
@@ -227,7 +231,7 @@ if PRINT:
 
     plt.show()
 
-inbuild_plot = True
+inbuild_plot = False
 if inbuild_plot:
     hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables()

@@ -1,5 +1,6 @@
 import casadi as cs
 import horizon.problem as prb
+from horizon.variables import AbstractVariable
 import numpy as np
 from horizon.transcriptions.transcriptor import Transcriptor
 import horizon.transcriptions.integrators as integ
@@ -15,7 +16,7 @@ class DirectCollocation(Transcriptor):
     def __init__(self,
                  prob: prb.Problem,
                  degree: int,
-                 dt: float) -> None:
+                 dt) -> None:
 
         """
         Initialize the direct collocation method.
@@ -23,7 +24,7 @@ class DirectCollocation(Transcriptor):
         Parameters:
             prob (prb.Problem): the horizon problem
             degree (int): degree of approximating polynomial
-            dt (float|StateVariable): discretization interval (cal be a control input)
+            dt (float|StateVariable): discretization interval (can be a control input)
         """
 
         super().__init__(prob, dt)
@@ -114,7 +115,7 @@ class MultipleShooting(Transcriptor):
     def __init__(self,
                  prob: prb.Problem,
                  integrator,
-                 dt: float):
+                 dt):
         """
         Initialize the multiple shooting method.
 
@@ -134,13 +135,21 @@ class MultipleShooting(Transcriptor):
         else:
             self.integrator = integrator
 
-        state_int = self.__integrate(self.state_prev, self.input_prev)
+        # todo if the dt is a variable, the integrator requires it (its offset)
+        if isinstance(dt, AbstractVariable):
+            state_int = self.__integrate(self.state_prev, self.input_prev, self.dt_prev)
+        else:
+            state_int = self.__integrate(self.state_prev, self.input_prev)
+
         ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
 
-    def setDefaultIntegrator(self, type):
+    def setDefaultIntegrator(self, integrator_type):
 
+        # todo if the dt is not a abstract value, add option['tf']
+        #  the integrator should be refactored a bit
         opts = dict()
-        opts['tf'] = self.dt
+        if not isinstance(self.dt, AbstractVariable):
+            opts['tf'] = self.dt
 
         dae = dict()
         dae['x'] = self.state
@@ -148,14 +157,18 @@ class MultipleShooting(Transcriptor):
         dae['ode'] = self.state_dot
         dae['quad'] = 0  # note: we don't use the quadrature fn here
 
-        self.integrator = integ.__dict__[type](dae=dae, opts=opts, casadi_type=cs.SX)
+        self.integrator = integ.__dict__[integrator_type](dae=dae, opts=opts, casadi_type=cs.SX)
 
-    def __integrate(self, state, input):
+    def __integrate(self, state, input, dt=None):
 
         if self.state_dot is None:
             raise Exception('Dynamics of the system is not specified. Missing "state_dot"')
 
-        state_int = self.integrator(state, input)[0]
+        # todo if dt is none, it means that dt is constant (float) and not a variable of the problem
+        if dt is None:
+            state_int = self.integrator(state, input)[0]
+        else:
+            state_int = self.integrator(state, input, dt)[0]
         return state_int
 
 

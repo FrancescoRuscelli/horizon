@@ -4,7 +4,7 @@ from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn
+from horizon.utils import utils, kin_dyn
 from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver
@@ -17,6 +17,13 @@ try:
     do_replay = True
 except ImportError:
     do_replay = False
+
+import os
+import time
+from horizon.ros import utils as horizon_ros_utils
+
+horizon_ros_utils.roslaunch("horizon_examples", "cart_pole_xy.launch")
+time.sleep(3.)
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole_xy.urdf')
@@ -89,7 +96,7 @@ cnrst_ref = prb.createConstraint('sinusoidal_ref', q[1] - q_ref, range(10, ns+1)
 
 # setting underactuation
 tau_lims = np.array([1000., 1000., 0.])
-tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
+tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem

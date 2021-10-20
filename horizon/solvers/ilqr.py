@@ -220,6 +220,7 @@ gap={fpres.defect_norm:{fmt}}')
             plt.ylabel('Input')
             plt.legend([f'u{i}' for i in range(self.nu)])
             plt.draw()
+            print("Press a button!")
             plt.waitforbuttonpress()
 
 

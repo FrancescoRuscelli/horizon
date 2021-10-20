@@ -7,6 +7,7 @@ import time
 from typing import Union, Iterable
 # from horizon.type_doc import BoundsDict
 
+
 class Function:
 
     """
@@ -36,7 +37,6 @@ class Function:
         self.vars = used_vars
         self.pars = used_pars
 
-        # todo since i have the variables, I can reproject here!!!!!!!!!!
         # create function of CASADI, dependent on (in order) [all_vars, all_pars]
         self._fun = cs.Function(name, self.vars + self.pars, [self._f])
         self._fun_impl = dict()
@@ -200,6 +200,15 @@ class Function:
         """
         return 'generic'
 
+    # def __reduce__(self):
+    #     """
+    #     Experimental function to serialize this element.
+    #
+    #     Returns:
+    #         instance of this element serialized
+    #     """
+    #     return (self.__class__, (self._name, self._f, self.vars, self.pars, self._nodes, ))
+
     def serialize(self):
         """
         Serialize the Function. Used to save it.
@@ -207,15 +216,16 @@ class Function:
         Returns:
             serialized instance of Function
         """
+
         self._f = self._f.serialize()
 
-        for name, data in self.vars.items():
-            self.vars[name] = data.serialize()
+        for i in range(len(self.vars)):
+            self.vars[i] = self.vars[i].serialize()
 
         for node, item in self._fun_impl.items():
             self._fun_impl[node] = item.serialize()
 
-        self._fun = self.fun.serialize()
+        # self._fun = self._fun.serialize()
 
         return self
 
@@ -226,15 +236,16 @@ class Function:
         Returns:
             deserialized instance of Function
         """
+
         self._f = cs.SX.deserialize(self._f)
 
-        for name, data in self.vars.items():
-            self.vars[name] = cs.SX.deserialize(data)
+        for i in range(len(self.vars)):
+            self.vars[i] = cs.SX.deserialize(self.vars[i])
 
         for node, item in self._fun_impl.items():
-            self._fun_impl[node] = cs.Function.deserialize(item)
+            self._fun_impl[node] = cs.SX.deserialize(item)
 
-        self._fun = cs.Function.deserialize(self._fun)
+        # self._fun = cs.Function.deserialize(self._fun)
 
         return self
 
@@ -617,9 +628,10 @@ class FunctionsContainer:
             instance of serialized Function Container
 
         """
-        raise Exception('serialize yet to be re-implemented')
+        raise Exception('serialize yet to implement')
         for name, item in self._cnstr_container.items():
             self._cnstr_container[name] = item.serialize()
+
 
         for name, item in self._costfun_container.items():
             self._costfun_container[name] = item.serialize()
@@ -634,9 +646,20 @@ class FunctionsContainer:
             instance of deserialized Function Container
 
         """
-        raise Exception('deserialize yet to be re-implemented')
+        raise Exception('serialize yet to implement')
+        for name, item in self._cnstr_container.items():
+            item.deserialize()
+            new_vars = item.getVariables()
+            for var in new_vars:
+                print(var.getName(), var.getOffset())
+                print(f'{item._f} depends on {var}?', cs.depends_on(item._f, var))
+
+        exit()
+
+
         for name, item in self._cnstr_container.items():
             self._cnstr_container[name] = item.deserialize()
+
 
         # these are CASADI functions
         for name, item in self._costfun_container.items():

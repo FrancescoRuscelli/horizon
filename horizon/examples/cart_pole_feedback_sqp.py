@@ -5,9 +5,9 @@ import casadi as cs
 import numpy as np
 import time
 from horizon import problem
+from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.transcriptions import integrators
-from horizon.solvers import sqp
-
+from horizon.solvers import solver, pysqp
 import matplotlib.pyplot as plt
 import os
 
@@ -40,6 +40,7 @@ tau = cs.vertcat(u, 0)
 fd = kindyn.aba()  # this is the forward dynamics function
 x = cs.vertcat(q, qdot)
 xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
+prb.setDynamics(xdot)
 
 # Quantities at previous time step (to be removed!)
 q_prev = q.getVarOffset(-1)
@@ -55,9 +56,9 @@ opts = {'tf': dt}
 F_integrator = integrators.EULER(dae, opts)
 
 # Limits
-q_min = np.array([-0.5, -2. * np.pi])
-q_max = np.array([0.5, 2. * np.pi])
-q_init = np.array([0., np.pi - 0.01])
+q_min = np.array([-1, -2.*np.pi])
+q_max = -q_min
+q_init = np.array([0., np.pi])
 
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
@@ -71,32 +72,53 @@ q.setInitialGuess(q_init)
 qdot.setBounds(qdot_init, qdot_init, nodes=0)
 u.setBounds(-tau_lims, tau_lims)
 
+q_tgt = np.array([0.5, np.pi])  # forward 0.5m, and stay up!
+
 # Cost function
-prb.createCostFunction("track", 10.*(q - q_init), nodes=range(ns + 1))
-prb.createCostFunction("damp", 10. * qdot, nodes=range(ns + 1))
-prb.createCostFunction("reg", 0.02 * u, nodes=range(ns))
+prb.createIntermediateCost("tau", 1e-2*u)
+prb.createIntermediateCost("qdot", 2.*qdot)
+prb.createIntermediateCost("qfinal", 1e-3*(q - q_tgt))
+prb.createFinalCost("qdot_f", 0.1*qdot)
+prb.createFinalCost("qfinal_f", 1.*(q - q_tgt))
 
 # Final constraint
-prb.createConstraint("qfinal", q - q_init, nodes=ns)
-prb.createConstraint("qdotfinal", qdot, nodes=ns)
+prb.createFinalConstraint("up", q[1] - q_tgt[1])
+prb.createFinalConstraint("center", q[0] - q_tgt[0])
+prb.createFinalConstraint("final_qdot", qdot)
 
 # Dynamics
 if use_ms:
     x_int = F_integrator(x0=x_prev, p=u_prev)
     prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns + 1))
 else:
-    integrators.make_direct_collocation(prob=prb, x=x, x_prev=x_prev, xdot=xdot, degree=3, dt=tf / ns)
+    prb.setDynamics(xdot)
+    integrators.make_direct_collocation(prob=prb, degree=3, dt=tf / ns)
 
 # Creates problem
-prb.createProblem()
 
-problem_dict = prb.getProblem()
-problem_dict['f'] = prb.function_container.getCostFList()
-d = {'verbose': False}
-opts = {'max_iter': 1,
-        'osqp.osqp': d}
-solver = sqp.sqp('solver', 'osqp', problem_dict, opts)
-prb.setSolver(solver)
+
+opts = dict()
+qp_solver = "qpoases"
+
+opts['gnsqp.qp_solver'] = qp_solver
+
+if qp_solver == "qpoases":
+    opts = pysqp.SQPGaussNewtonSX.getQPOasesOptionsMPC()
+    opts['sparse'] = True
+    opts['hessian_type'] = 'posdef'
+    opts['printLevel'] = 'none'
+
+if qp_solver == "osqp":
+    opts['warm_start_primal'] = True
+    opts['warm_start_dual'] = True
+    opts['osqp.polish'] = False
+    opts['osqp.verbose'] = False
+
+opts['max_iter'] = 1
+
+
+solver = solver.Solver.make_solver('gnsqp', prb, None, opts)
+
 
 class RealTimeIteration:
 
@@ -111,7 +133,8 @@ class RealTimeIteration:
         qdot.setBounds(lb=qdotread, ub=qdotread, nodes=0)
 
         # solve
-        solution = prb.solveProblem()
+        solver.solve()
+        solution = solver.getSolutionDict()
 
         # get control input to apply
         u_opt = solution['u'][:, 0]
@@ -123,10 +146,12 @@ class RealTimeIteration:
 
 # the rti loop
 rti = RealTimeIteration(dt=0.01)
-stateread = np.array([0, np.pi - 0.30, 0.0, 0.0])
+stateread = np.array([0.0, np.pi-0.5, 0.0, 0.0])
 states = []
 inputs = []
 times = []
+time_qp = []
+time_hessian = []
 for i in range(300):
     states.append(stateread.copy())
     tic = time.time()
@@ -134,6 +159,8 @@ for i in range(300):
     toc = time.time()
     inputs.append(input)
     times.append(toc - tic)
+    time_qp.append(solver.getQPComputationTime())
+    time_hessian.append(solver.getHessianComputationTime())
 
 plt.figure()
 plt.title('state trajectory')
@@ -146,5 +173,11 @@ plt.plot(inputs)
 plt.figure()
 plt.title('cpu time')
 plt.plot(times)
+
+plt.figure()
+plt.title('qp vs Hessian time')
+plt.plot(time_qp, label='QP')
+plt.plot(time_hessian, label='Hessian')
+plt.legend()
 
 plt.show()

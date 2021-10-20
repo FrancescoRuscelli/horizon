@@ -44,6 +44,9 @@ WrappedFunction &WrappedFunction::operator=(casadi::Function f)
         // allocate a zero dense matrix to store the output
         _out_matrix.emplace_back(Eigen::MatrixXd::Zero(sp.size1(), sp.size2()));
 
+        //allocate a zero sparse matrix to store the output
+        _out_matrix_sparse.emplace_back(Eigen::SparseMatrix<double>(sp.size1(), sp.size2()));
+
         // save sparsity pattern for i-th output
         std::vector<casadi_int> rows, cols;
         sp.get_triplet(rows, cols);
@@ -69,19 +72,31 @@ void WrappedFunction::setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi)
     _in_buf[i] = xi.data();
 }
 
-void WrappedFunction::call()
+void WrappedFunction::call(bool sparse)
 {
     // call function (allocation-free)
     casadi_int mem = _f.checkout();
     _f(_in_buf.data(), _out_buf.data(), _iw.data(), _dw.data(), mem);
 
     // copy all outputs to dense matrices
-    for(int i = 0; i < _f.n_out(); i++)
+    for(int i = 0; i < _f.n_out(); ++i)
     {
-        csc_to_matrix(_f.sparsity_out(i),
-                      _rows[i], _cols[i],
-                      _out_data[i],
-                      _out_matrix[i]);
+
+        if(sparse)
+        {
+            csc_to_sparse_matrix(_f.sparsity_out(i),
+                                 _rows[i], _cols[i],
+                                         _out_data[i],
+                                         _out_matrix_sparse[i]);
+        }
+        else
+        {
+            csc_to_matrix(_f.sparsity_out(i),
+                          _rows[i], _cols[i],
+                          _out_data[i],
+                          _out_matrix[i]);
+        }
+
     }
 
     // release mem (?)
@@ -91,6 +106,11 @@ void WrappedFunction::call()
 const Eigen::MatrixXd& WrappedFunction::getOutput(int i) const
 {
     return _out_matrix[i];
+}
+
+const Eigen::SparseMatrix<double>& WrappedFunction::getSparseOutput(int i) const
+{
+    return _out_matrix_sparse[i];
 }
 
 Eigen::MatrixXd& WrappedFunction::out(int i)
@@ -111,6 +131,20 @@ const casadi::Function &WrappedFunction::function() const
 bool WrappedFunction::is_valid() const
 {
     return !_f.is_null();
+}
+
+void WrappedFunction::csc_to_sparse_matrix(const casadi::Sparsity& sp,
+                                           const std::vector<casadi_int>&  sp_rows,
+                                           const std::vector<casadi_int>&  sp_cols,
+                                           const std::vector<double>& data,
+                                           Eigen::SparseMatrix<double>& matrix)
+{
+    std::vector<Eigen::Triplet<double>> triplet_list;
+    triplet_list.reserve(data.size());
+    for(unsigned int i = 0; i < data.size(); ++i)
+        triplet_list.push_back(Eigen::Triplet<double>(sp_rows[i], sp_cols[i], data[i]));
+
+    matrix.setFromTriplets(triplet_list.begin(), triplet_list.end());
 }
 
 void WrappedFunction::csc_to_matrix(const casadi::Sparsity& sp,

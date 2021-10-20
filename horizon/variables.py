@@ -57,23 +57,51 @@ class AbstractVariable(ABC, cs.SX):
         return self._offset
 
     def __getitem__(self, item):
-        view = AbstractVariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = AbstractVariableView(self, var_slice, item)
         return view
 
+    # todo old stuff
+    # def __getitem__(self, item):
+    #     view = AbstractVariableView(self, item)
+    #     return view
+
 class AbstractVariableView(cs.SX):
-    def __init__(self, parent: AbstractVariable, indices):
-        elems = parent.elements()
-        sx = cs.vertcat(*elems[indices]) if isinstance(indices, slice) else elems[indices]
-        super().__init__(sx)
+    def __init__(self, parent: AbstractVariable, var_slice, indices):
+        super().__init__(var_slice)
         self._parent = parent
         self._indices = indices
-        self._dim = len(range(*self._indices.indices(self._parent.getDim()))) if isinstance(self._indices, slice) else 1
+        self._dim = len(range(*self._indices.indices(self._parent.shape[0]))) if isinstance(self._indices, slice) else 1
 
     def getName(self):
         return self._parent.getName()
 
     def __getitem__(self, item):
-        return self._parent[item]
+        var_slice = super().__getitem__(item)
+        view = self.__class__(self._parent, var_slice, item)
+        return view
+
+    # todo old stuff
+# class AbstractVariableView(cs.SX):
+#     def __init__(self, parent: AbstractVariable, indices):
+#         elems = parent.elements()
+#         sx = cs.vertcat(*elems[indices]) if isinstance(indices, slice) else elems[indices]
+#         super().__init__(sx)
+#         self._parent = parent
+#         self._indices = indices
+#         self._dim = len(range(*self._indices.indices(self._parent.shape[0]))) if isinstance(self._indices, slice) else 1
+#
+#     def getName(self):
+#         return self._parent.getName()
+#
+#     def __getitem__(self, item):
+#         print(f'getitem of {type(self)} called with indices {item}')
+        # todo this is wrong, since getitem will return an AbstractVariableView initialized with the whole parent.
+        #  basically, if if I do x_slice = x[0:2] (where x is 6-dimensional), with this formulation I could get x_slice[3], since
+        #  i am plucking the values from the original parent. I should only be able to do x_slice[0] and x_slice[1]!!!
+        #  IMPORTANT: also it was fucking up the ipopt solver
+#         view = self.__class__(self._parent, item)
+#         return view
 
 class OffsetVariable(AbstractVariable):
     def __init__(self, parent_name, tag, dim, offset, var_impl):
@@ -87,6 +115,8 @@ class OffsetVariable(AbstractVariable):
             offset: offset of the variable (which (previous/next) node it refers to
             var_impl: implemented variables it refers to (of base class Variable)
         """
+        self._tag = tag
+        self._dim = dim
         super(OffsetVariable, self).__init__(tag, dim)
 
         self.parent_name = parent_name
@@ -143,6 +173,13 @@ class OffsetVariable(AbstractVariable):
             list of active nodes
         """
         return self._nodes
+
+    def __reduce__(self):
+
+        for node in self._var_impl.keys():
+            self._var_impl[node]['var'] = self._var_impl[node]['var'].serialize()
+
+        return (self.__class__, (self.parent_name, self._tag, self._dim, self._offset, self._var_impl, ))
 
 class SingleParameter(AbstractVariable):
     """
@@ -237,12 +274,13 @@ class SingleParameter(AbstractVariable):
         return self._tag
 
     def __getitem__(self, item):
-        view = SingleParameterView(self, item)
+        par_slice = super().__getitem__(item)
+        view = SingleParameterView(self, par_slice, item)
         return view
 
 class SingleParameterView(AbstractVariableView):
-    def __init__(self, parent: SingleParameter, indices):
-        super().__init__(parent, indices)
+    def __init__(self, parent: SingleParameter, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
 
     def assign(self, vals):
         """
@@ -383,7 +421,8 @@ class Parameter(AbstractVariable):
         return self._tag
 
     def __getitem__(self, item):
-        view = ParameterView(self, item)
+        par_slice = super().__getitem__(item)
+        view = ParameterView(self, par_slice, item)
         return view
 
     def __reduce__(self):
@@ -396,8 +435,8 @@ class Parameter(AbstractVariable):
         return (self.__class__, (self._tag, self._dim, self._nodes,))
 
 class ParameterView(AbstractVariableView):
-    def __init__(self, parent: SingleParameter, indices):
-        super().__init__(parent, indices)
+    def __init__(self, parent: SingleParameter, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
 
     def assign(self, vals, nodes=None):
         """
@@ -624,12 +663,13 @@ class SingleVariable(AbstractVariable):
         return self._tag
 
     def __getitem__(self, item):
-        view = SingleVariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = SingleVariableView(self, var_slice, item)
         return view
 
 class SingleVariableView(AbstractVariableView):
-    def __init__(self, parent: SingleVariable, indices):
-        super().__init__(parent, indices)
+    def __init__(self, parent: SingleVariable, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
 
     def setLowerBounds(self, bounds):
         """
@@ -983,7 +1023,8 @@ class Variable(AbstractVariable):
         return self._tag
 
     def __getitem__(self, item):
-        view = VariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
         return view
 
     def __reduce__(self):
@@ -996,8 +1037,8 @@ class Variable(AbstractVariable):
         return (self.__class__, (self._tag, self._dim, self._nodes, ))
 
 class VariableView(AbstractVariableView):
-    def __init__(self, parent: Variable, indices):
-        super().__init__(parent, indices)
+    def __init__(self, parent: Variable, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
 
     def setLowerBounds(self, bounds, nodes=None):
         """
@@ -1095,7 +1136,8 @@ class InputVariable(Variable):
         super(InputVariable, self).__init__(tag, dim, nodes)
 
     def __getitem__(self, item):
-        view = VariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
         return view
 
 class StateVariable(Variable):
@@ -1121,7 +1163,8 @@ class StateVariable(Variable):
         super(StateVariable, self).__init__(tag, dim, nodes)
 
     def __getitem__(self, item):
-        view = VariableView(self, item)
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
         return view
 
 class AbstractAggregate(ABC):
@@ -1664,19 +1707,13 @@ class VariablesContainer:
         Returns:
            instance of serialized Variable Container
         """
-        raise Exception('serialize yet to be re-implemented')
+
         # todo how to do? I may use __reduce__ but I don't know how
-        # for name, value in self.state_var.items():
-        #     print('state_var', type(value))
-        #     self.state_var[name] = value.serialize()
+        for name, var in self._vars.items():
+            self._vars[name] = var.serialize()
 
-        # for name, value in self.state_var_prev.items():
-        #     print('state_var_prev', type(value))
-        #     self.state_var_prev[name] = value.serialize()
-
-        for node, item in self._vars_impl.items():
-            for name, elem in item.items():
-                self._vars_impl[node][name]['var'] = elem['var'].serialize()
+        for name, par in self._pars.items():
+            self._pars[name] = par.serialize()
 
     def deserialize(self):
         """
@@ -1685,45 +1722,47 @@ class VariablesContainer:
         Returns:
            instance of deserialized Variable Container
         """
-        raise Exception('deserialize yet to be re-implemented')
-        # for name, value in self.state_var.items():
-        #     self.state_var[name] = cs.SX.deserialize(value)
-        #
-        # for name, value in self.state_var_prev.items():
-        #     self.state_var_prev[name] = cs.SX.deserialize(value)
+        for name, var in self._vars.items():
+            self._vars[name] = cs.SX.deserialize(var)
 
-        for node, item in self._vars_impl.items():
-            for name, elem in item.items():
-                self._vars_impl[node][name]['var'] = cs.SX.deserialize(elem['var'])
+        for name, par in self._pars.items():
+            self._pars[name] = cs.SX.deserialize(par)
 
     # def __reduce__(self):
     #     return (self.__class__, (self.nodes, self.logger, ))
 
 if __name__ == '__main__':
-
-    # PARAMETER
+    pass
+    ## PARAMETER
     # a = Parameter('p', 6, [0, 1, 2, 3, 4, 5])
     # print(a[2:4], f'type: {type(a[2:4])}')
     # a.assign([1, 1, 1, 1, 1, 1])
     # a[1:3].assign([2, 3])
     # print(a.getValues())
-    # INPUT
+    # exit()
+    ## INPUT
     # i = InputVariable('u', 6, [0, 1, 2, 3, 4, 5])
     # print(i[2:4], f'type: {type(i[2:4])}')
     # i[2:4].setLowerBounds([1, 1])
     # print(i.getLowerBounds())
     # exit()
     # STATE VARIABLE
-    p = StateVariable('x', 6, [0, 1, 2, 3, 4, 5])
+    # p = StateVariable('x', 6, [0, 1, 2, 3, 4, 5])
     # print(p, f'type: {type(p)}')
     # print(p[0:2], f'type: {type(p[0:2])}')
     # print(p[0:2]+2)
     # p_sliced = p[0:2]
+    # print(p_sliced[1])
+    # print(p_sliced[0], f'type: {type(p_sliced[0])}')
+
     # p_sliced[0].setLowerBounds(5)
+
+    # exit()
+
     # p[-1].setLowerBounds(0)
     # print(p.getLowerBounds())
-    print(p[0].setInitialGuess(10, [1]))
-    print(p.getInitialGuess())
+    # print(p[0].setInitialGuess(10, [1]))
+    # print(p.getInitialGuess())
     # SINGLE VARIABLE
     # p = SingleVariable('x', 6, [0, 1, 2])
     # print(p, f'type: {type(p)}')
@@ -1732,93 +1771,3 @@ if __name__ == '__main__':
     # print(f'type: {type(p[-1])}')
     # p[-1].setLowerBounds(0)
     # print(p.getLowerBounds())
-
-
-
-
-
-    exit()
-    n_nodes = 10
-    sv = VariablesContainer(n_nodes)
-    x = sv.setStateVar('x', 2)
-
-    exit()
-    x = StateVariable('x', 2, 4)
-    u = InputVariable('u', 2, 4)
-    print(isinstance(u, StateVariable))
-
-
-    exit()
-    # x._project()
-    # print('before serialization:', x)
-    # print('bounds:', x.getBounds(2))
-    # x.setBounds(2,2)
-    # print('bounds:', x.getBounds(2))
-    # print('===PICKLING===')
-    # a = pickle.dumps(x)
-    # print(a)
-    # print('===DEPICKLING===')
-    # x_new = pickle.loads(a)
-    #
-    # print(type(x_new))
-    # print(x_new)
-    # print(x_new.tag)
-    #
-    # print('bounds:', x.getBounds(2))
-    # print(x.var_impl)
-    # exit()
-
-    # x = StateVariable('x', 2, 15)
-    # print([id(val['var']) for val in x.var_impl.values()])
-    # x._setNNodes(20)
-    # print([id(val['var']) for val in x.var_impl.values()])
-
-    n_nodes = 10
-    sv = VariablesContainer(n_nodes)
-    x = sv.setStateVar('x', 2)
-    x_prev = x.createAbstrNode(-1)
-
-    print(x_prev)
-    print(type(x_prev))
-    print(type(x))
-
-    exit()
-    sv.setStateVar('x', 2, -1)
-    sv.setStateVar('y', 2)
-
-    for k in range(n_nodes):
-        sv.update(k)
-
-    # print(sv.state_var)
-    # print(sv.state_var_prev)
-    pprint.pprint(sv.vars_impl)
-    # pprint.pprint(sv.getVarAbstrDict())
-    # pprint.pprint(sv.getVarImplDict())
-    # pprint.pprint(sv.getVarImpl('x-1', 1))
-
-
-    exit()
-    # x_prev = sv.setVar('x', 2, -2)
-    #
-    # for i in range(4):
-    #     sv.update(i)
-    #
-    # print('state_var_prev', sv.state_var_prev)
-    # print('state_var_impl', sv.state_var_impl)
-    #
-    # print('sv.getVarAbstrDict()', sv.getVarAbstrDict())
-    # print('sv.getVarAbstrList()', sv.getVarAbstrList())
-    # print('sv.getVarImplList()', sv.getVarImplList())
-    # print('sv.getVarImpl()', sv.getVarImpl('x-2', 0))
-
-    print('===PICKLING===')
-    sv_serialized = pickle.dumps(sv)
-    print(sv_serialized)
-    print('===DEPICKLING===')
-    sv_new = pickle.loads(sv_serialized)
-
-    print(sv_new.vars)
-    print(sv_new.state_var_prev)
-    print(sv_new.vars_impl)
-    print(sv_new.getVarAbstrDict())
-    print(sv_new.getVarImplDict())

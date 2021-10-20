@@ -11,7 +11,8 @@ class NlpsolSolver(Solver):
         
         super().__init__(prb, dt, opts=opts)
         
-        self.solution: Dict[str:np.array] = None 
+        self.var_solution: Dict[str:np.array] = None
+        self.cnstr_solution: Dict[str:np.array] = None
         
         # generate problem to be solved
         self.var_container = self.prb.var_container
@@ -145,7 +146,7 @@ class NlpsolSolver(Solver):
             fun_list.append(fun.getImpl())
         g = cs.vertcat(*fun_list)
 
-        # build cost functions list
+               # build cost functions list
         fun_list = list()
         for fun in self.fun_container.getCost().values():
             fun_list.append(fun.getImpl())
@@ -195,21 +196,31 @@ class NlpsolSolver(Solver):
         # solve
         sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
+        fun_sol_dict = dict()
+        pos = 0
+        for name, fun in self.fun_container.getCnstr().items():
+            val_sol = sol['g'][pos:pos + fun.getDim() * len(fun.getNodes())]
+            fun_sol_matrix = np.reshape(val_sol, (fun.getDim(), len(fun.getNodes())), order='F')
+            fun_sol_dict[name] = fun_sol_matrix
+            pos = pos + fun.getDim() * len(fun.getNodes())
+
+        self.cnstr_solution = fun_sol_dict
+
         # retrieve state and input trajector
         input_vars = [v.getName() for v in self.prb.getInput().var_list]
         state_vars = [v.getName() for v in self.prb.getState().var_list]
 
         # get solution dict
         pos = 0
-        solution_dict = dict()
+        var_sol_dict = dict()
         for var in self.var_container.getVarList(offset=False):
             val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
             # this is to divide in rows the each dim of the var
             val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
-            solution_dict[var.getName()] = val_sol_matrix
+            var_sol_dict[var.getName()] = val_sol_matrix
             pos = pos + var.shape[0] * len(var.getNodes())
 
-        self.solution = solution_dict
+        self.var_solution = var_sol_dict
 
         # get solution as state/input
         pos = 0
@@ -233,7 +244,10 @@ class NlpsolSolver(Solver):
         return True
 
     def getSolutionDict(self):
-        return self.solution
+        return self.var_solution
+
+    def getConstraintSolutionDict(self):
+        return self.cnstr_solution
 
 if __name__ == '__main__':
 

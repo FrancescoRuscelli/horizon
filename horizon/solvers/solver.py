@@ -29,7 +29,7 @@ class Solver(ABC):
         Args:
             type (str): a string indicating the solver type (e.g., blocksqp, ipopt, ilqr)
             prb (Problem): the horizon's problem instance to be solved
-            dt (float): the discretization step
+            dt (float): the discretization step, None if not needed
             opts (Dict, optional): A solver-dependent Dict of options. Defaults to None.
         """
 
@@ -42,6 +42,14 @@ class Solver(ABC):
         elif type == 'ilqr':
             from . import ilqr
             return ilqr.SolverILQR(prb, dt, opts)
+        elif type == 'gnsqp':
+            from . import sqp
+            qp_solver = 'qpoases'
+            if opts is not None:
+                if 'gnsqp.qp_solver' in opts:
+                    qp_solver = opts['gnsqp.qp_solver']
+                    del opts['gnsqp.qp_solver']
+            return sqp.GNSQPSolver(prb, dt, opts, qp_solver)
         else:
             raise KeyError(f'unsupperted solver type "{type}"')
 
@@ -54,7 +62,7 @@ class Solver(ABC):
 
         Args:
             prb (Problem): the horizon's problem instance to be solved
-            dt (float): the discretization step
+            dt (float): the discretization step, None if not needed
             opts (Dict, optional): A solver-dependent Dict of options. Defaults to None.
         """
         

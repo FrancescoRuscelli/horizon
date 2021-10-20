@@ -4,18 +4,24 @@ from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn
+from horizon.utils import utils, kin_dyn, mat_storer
 from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
+import time
+from horizon.ros import utils as horizon_ros_utils
 
 try:
     from horizon.ros.replay_trajectory import *
     do_replay = True
 except ImportError:
     do_replay = False
+
+
+horizon_ros_utils.roslaunch("horizon_examples", "cart_pole.launch")
+time.sleep(3.)
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
@@ -83,8 +89,8 @@ prb.createFinalConstraint("final_qdot", qdot)
 
 
 tau_lims = np.array([1000., 0.])
-tau = casadi_kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
+tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
+iv = prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
@@ -103,8 +109,8 @@ plt.ylabel('$\mathrm{[m]}$', size = 20)
 plot_all = True
 if plot_all:
     hplt = PlotterHorizon(prb, solution)
-    hplt.plotVariables()
-    hplt.plotFunctions()
+    # hplt.plotVariables()
+    hplt.plotFunction('inverse_dynamics', dim=[1], show_bounds=True)
     plt.show()
 
 if do_replay:
