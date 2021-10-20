@@ -22,9 +22,9 @@ transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
 tf = 2.5
-n_nodes = 50
+n_nodes = 100
 ilqr_plot_iter = False
-t_jump = (1.0, tf)
+t_jump = (1.0, 2.0)
 
 # load urdf
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
@@ -95,14 +95,18 @@ prb.createFinalConstraint('final_velocity', q_dot)
 
 # final pose
 q_tgt = q_init.copy()
-q_tgt[0] = 0.1
-# prb.createFinalConstraint('q_f', q[0] - q_tgt[0])
+q_tgt[0] = 0.0
+prb.createFinalConstraint('q_fb', q[:6] - q_tgt[:6])
+# prb.createFinalConstraint('q_f', q[7:] - q_tgt[7:])
+
+prb.createFinalCost('q_f', 100*cs.sumsqr(q[7:] - q_tgt[7:]))
+# prb.createFinalCost('q_dot_f', 100*cs.sumsqr(q_dot))
 
 # contact handling
 k_all = range(1, n_nodes+1)
 k_swing = list(range(*[int(t/dt) for t in t_jump]))
 k_stance = list(filterfalse(lambda k: k in k_swing, k_all))
-lifted_legs = ['lf_foot', 'rf_foot']
+lifted_legs = contacts_name.copy()
 
 def barrier(x):
     return cs.if_else(x > 0, 0, x**2)
@@ -121,7 +125,7 @@ for frame, f in contact_map.items():
     a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
     prb.createConstraint(f"{frame}_vel", v, nodes=list(nodes))
-    prb.createIntermediateCost(f'{frame}_fn', barrier(f[2] - 25.0)) #, nodes=nodes)
+    # prb.createIntermediateCost(f'{frame}_fn', barrier(f[2] - 25.0)) #, nodes=nodes)
 
 # swing force is zero
 for leg in lifted_legs:
@@ -129,7 +133,11 @@ for leg in lifted_legs:
     contact_map[leg].setBounds(fzero, fzero, nodes=k_swing)
 
 # cost
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+prb.createCostFunction("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
+prb.createCostFunction("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
+prb.createCostFunction("min_q", 1e-2 * cs.sumsqr(q[7:] - q_init[7:]))
+# prb.createCostFunction("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
+prb.createIntermediateCost("min_q_ddot", 1e-6 * cs.sumsqr(q_ddot))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 1e-6 * cs.sumsqr(f))
 
@@ -141,6 +149,7 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
         'ipopt.max_iter': 2000,
         # 'ipopt.linear_solver': 'ma57',
+        'ilqr.max_iter': 1000,
         'ilqr.integrator': 'RK4', 
         'ilqr.closed_loop_forward_pass': True,
         'ilqr.line_search_accept_ratio': 1e-9,
@@ -156,7 +165,10 @@ try:
 except:
     pass
 
+t = time.time()
 solver.solve()
+elapsed = time.time() - t
+print(f'solved in {elapsed} s')
 solver.print_timings()
 
 solution = solver.getSolutionDict()
