@@ -67,7 +67,7 @@ print('total nodes:', n_nodes)
 print('starting node of step:', node_start_step)
 print('last node of step:', node_end_step)
 
-load_initial_guess = True
+load_initial_guess = False
 
 # SET PROBLEM STATE AND INPUT VARIABLES
 prb = problem.Problem(n_nodes)

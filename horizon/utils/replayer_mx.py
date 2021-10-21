@@ -26,9 +26,9 @@ N = 100
 N_states = N + 1
 N_control = N
 
-dt = 0.01
+dt = 0.02
 
-ms = mat_storer.matStorer('../examples/spot_step_manual.mat')
+ms = mat_storer.matStorer('../examples/spot_backflip_manual.mat')
 solution = ms.load()
 
 sol = solution['a']
@@ -55,7 +55,7 @@ q = np.reshape(q_sol, [n_q, N_states], order='F')
 q_dot = np.reshape(q_dot_sol, [n_v, N_states], order='F')
 q_ddot = np.reshape(q_ddot_sol, [n_v, N_control], order='F')
 f = np.reshape(f_sol, [n_c * n_f, N_control], order='F')
-
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 f1 = f[0 * n_f:1 * n_f, :]
 f2 = f[1 * n_f:2 * n_f, :]
 f3 = f[2 * n_f:3 * n_f, :]
@@ -63,22 +63,24 @@ f4 = f[3 * n_f:4 * n_f, :]
 
 f_list = [f1, f2, f3, f4]
 
+contact_map = dict(zip(contacts_name, f_list))
+
 # ========
 # replaying
 # ========
-replay_traj = False
+replay_traj = True
 if replay_traj:
     joint_names = kindyn.joint_names()
     if 'universe' in joint_names: joint_names.remove('universe')
     if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
-    repl = replay_trajectory(dt, joint_names, q, None, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    repl = replay_trajectory(dt, joint_names, q, contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
 
     repl.sleep(1.)
     repl.replay(is_floating_base=True)
 # ========
 # plotting
 # ========
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
 import matplotlib.pyplot as plt
 

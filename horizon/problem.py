@@ -1,5 +1,4 @@
 import time
-
 import casadi as cs
 from horizon import functions as fc
 from horizon import variables as sv

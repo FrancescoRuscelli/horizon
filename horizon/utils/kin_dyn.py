@@ -107,8 +107,8 @@ def linearized_friction_cone_map(f, mu, R, N):
     A_fr_R = cs.mtimes(A_fr, R.T)
     res = fc(A_fr_R, f)
 
-    lb = np.array([-np.inf, -np.inf, -np.inf, -np.inf, -np.inf])
-    ub = np.array([0., 0., 0., 0., 0.])
+    # lb = np.array([-np.inf, -np.inf, -np.inf, -np.inf, -np.inf])
+    # ub = np.array([0., 0., 0., 0., 0.])
 
     return res #, lb, ub
 
