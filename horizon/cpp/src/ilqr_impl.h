@@ -228,6 +228,9 @@ struct IterativeLQR::Temporaries
     // temporary that is used to compute lagrange multipliers
     Eigen::MatrixXd UrSinvVrT;
 
+    // qr of D
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr;
+
     // input component due to constraint (u = lc + Lc*x + Bz*z)
     Eigen::MatrixXd Lc;
     Eigen::VectorXd lc;

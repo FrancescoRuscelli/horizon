@@ -170,6 +170,9 @@ private:
     void increase_regularization();
     void reduce_regularization();
     HandleConstraintsRetType handle_constraints(int i);
+    void compute_constrained_input(Temporaries& tmp, BackwardPassResult& res);
+    void compute_constrained_input_svd(Temporaries& tmp, BackwardPassResult& res);
+    void compute_constrained_input_qr(Temporaries& tmp, BackwardPassResult& res);
     double compute_merit_value(double mu_f, double mu_c, double cost, double defect_norm, double constr_viol);
     double compute_merit_slope(double mu_f, double mu_c, double defect_norm, double constr_viol);
     std::pair<double, double> compute_merit_weights();
@@ -183,6 +186,11 @@ private:
 
     void set_default_cost();
 
+    enum DecompositionType
+    {
+        Svd, Qr
+    };
+
     const int _nx;
     const int _nu;
     const int _N;
@@ -194,6 +202,7 @@ private:
     double _alpha_min;
     double _svd_threshold;
     bool _closed_loop_forward_pass;
+    DecompositionType _decomp_type;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;
@@ -208,7 +217,6 @@ private:
     Eigen::MatrixXd _utrj;
     std::vector<Eigen::VectorXd> _lam_g;
     Eigen::MatrixXd _lam_x;
-
 
     std::vector<Temporaries> _tmp;
 

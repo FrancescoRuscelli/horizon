@@ -64,6 +64,20 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _svd_threshold = value_or(opt, "ilqr.svd_threshold", 1e-6);
     _closed_loop_forward_pass = value_or(opt, "ilqr.closed_loop_forward_pass", 1);
 
+    auto decomp_type_str = value_or<std::string>(opt, "ilqr.decomp_type", "svd");
+    if(decomp_type_str == "svd")
+    {
+        _decomp_type = Svd;
+    }
+    else if (decomp_type_str == "qr")
+    {
+        _decomp_type = Qr;
+    }
+    else
+    {
+        throw std::invalid_argument("invalid value for option ilqr.decomp_type: 'svd' or 'qr'");
+    }
+
     // set timer callback
     on_timer_toc = [this](const char * name, double usec)
     {

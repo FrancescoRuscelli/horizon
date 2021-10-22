@@ -37,4 +37,8 @@ set(HORIZON_CPP_TESTS
 ADD_EXECUTABLE(testCasadiUtils testCasadiUtils.cpp)
 TARGET_LINK_LIBRARIES(testCasadiUtils ${TestLibs})
 add_dependencies(testCasadiUtils ilqr)
-add_test(NAME horizon_casadi_utils COMMAND testCasadiUtils)
+add_test(NAME testCasadiUtils COMMAND testCasadiUtils)
+
+ADD_EXECUTABLE(testQr testQr.cpp)
+TARGET_LINK_LIBRARIES(testQr ${TestLibs})
+add_test(NAME testQr COMMAND testQr)
