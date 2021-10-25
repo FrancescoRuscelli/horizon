@@ -17,18 +17,18 @@ WrappedFunction &WrappedFunction::operator=(casadi::Function f)
 
     _f = f;
 
-    if(f.sz_arg() != f.n_in() ||
-            f.sz_res() != f.n_out())
-    {
-        throw std::runtime_error("f.sz_arg() != f.n_in() || f.sz_res() != f.n_out() => contact the developers!!!");
-    }
+//    if(f.sz_arg() != f.n_in() ||
+//            f.sz_res() != f.n_out())
+//    {
+//        throw std::runtime_error("f.sz_arg() != f.n_in() || f.sz_res() != f.n_out() => contact the developers!!!");
+//    }
 
     // resize work vectors
     _iw.assign(_f.sz_iw(), 0);
     _dw.assign(_f.sz_w(), 0.);
 
     // resize input buffers (note: sz_arg might be > n_in!!)
-    _in_buf.assign(_f.n_in(), nullptr);
+    _in_buf.assign(_f.sz_arg(), nullptr);
 
     // create memory for output data
     for(int i = 0; i < _f.n_out(); i++)
@@ -52,6 +52,11 @@ WrappedFunction &WrappedFunction::operator=(casadi::Function f)
         sp.get_triplet(rows, cols);
         _rows.push_back(rows);
         _cols.push_back(cols);
+    }
+
+    for(int i = _f.n_out(); i < _f.sz_res(); i++)
+    {
+        _out_buf.push_back(nullptr);
     }
 
     return *this;
