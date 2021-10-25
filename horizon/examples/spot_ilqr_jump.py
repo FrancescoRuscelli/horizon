@@ -21,10 +21,10 @@ solver_type = 'ilqr'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
-tf = 2.5
+tf = 2.0
 n_nodes = 100
 ilqr_plot_iter = False
-t_jump = (1.0, 2.0)
+t_jump = (1.0, 1.5)
 
 # load urdf
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
@@ -133,8 +133,8 @@ for leg in lifted_legs:
     contact_map[leg].setBounds(fzero, fzero, nodes=k_swing)
 
 # cost
-prb.createCostFunction("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
-prb.createCostFunction("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
+# prb.createCostFunction("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
+# prb.createCostFunction("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
 prb.createCostFunction("min_q", 1e-2 * cs.sumsqr(q[7:] - q_init[7:]))
 # prb.createCostFunction("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
 prb.createIntermediateCost("min_q_ddot", 1e-6 * cs.sumsqr(q_ddot))
@@ -149,11 +149,14 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
         'ipopt.max_iter': 2000,
         # 'ipopt.linear_solver': 'ma57',
-        'ilqr.max_iter': 1000,
+        'ilqr.max_iter': 10,
         'ilqr.integrator': 'RK4', 
         'ilqr.closed_loop_forward_pass': True,
         'ilqr.line_search_accept_ratio': 1e-9,
         'ilqr.svd_threshold': 1e-12,
+        'ilqr.decomp_type': 'qr',
+        'ilqr.codegen_enabled': False,
+        'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump'
         }
         
 
@@ -169,7 +172,11 @@ t = time.time()
 solver.solve()
 elapsed = time.time() - t
 print(f'solved in {elapsed} s')
-solver.print_timings()
+
+try:
+    solver.print_timings()
+except:
+    pass
 
 solution = solver.getSolutionDict()
 solution_constraints_dict = dict()
