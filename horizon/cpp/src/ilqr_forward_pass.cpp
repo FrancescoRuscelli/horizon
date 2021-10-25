@@ -90,6 +90,8 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
 double IterativeLQR::compute_merit_slope(double mu_f, double mu_c,
                                          double defect_norm, double constr_viol)
 {
+    TIC(compute_merit_slope);
+
     // see Nocedal and Wright, Theorem 18.2, pg. 541
     // available online http://www.apmath.spbu.ru/cnsa/pdf/monograf/Numerical_Optimization2006.pdf
 
@@ -129,6 +131,8 @@ double IterativeLQR::compute_merit_value(double mu_f,
 
 std::pair<double, double> IterativeLQR::compute_merit_weights()
 {
+    TIC(compute_merit_weights);
+
     // note: we here assume dx = 0, since this function runs before
     // the forward pass
 
@@ -164,6 +168,8 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
 
 double IterativeLQR::compute_cost(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj)
 {
+    TIC(compute_cost);
+
     double cost = 0.0;
 
     // intermediate cost
@@ -182,6 +188,8 @@ double IterativeLQR::compute_cost(const Eigen::MatrixXd& xtrj, const Eigen::Matr
 
 double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj)
 {
+    TIC(compute_constr);
+
     double constr = 0.0;
 
     // intermediate constraint violation
@@ -211,6 +219,8 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
 
 double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj)
 {
+    TIC(compute_defect);
+
     double defect = 0.0;
 
     // compute defects on given trajectory
@@ -250,6 +260,8 @@ void IterativeLQR::line_search(int iter)
 
     if(iter == 0)
     {
+        _fp_res->alpha = 0;
+        _fp_res->accepted = true;
         _fp_res->merit = merit;
         report_result(*_fp_res);
     }

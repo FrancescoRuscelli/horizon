@@ -38,6 +38,7 @@ void IterativeLQR::backward_pass()
         catch(HessianIndefinite&)
         {
             increase_regularization();
+            std::cout << "increasing reg at k = " << i << ", hxx_reg = " << _hxx_reg << "\n";
             reg_needed = true;
             ++i;
         }
@@ -159,6 +160,7 @@ void IterativeLQR::backward_pass_iter(int i)
     lz = -tmp.huHux.col(0);
 
     // save optimal value function
+    TIC(value_fn_inner);
     auto& value = _value[i];
     auto& S = value.S;
     auto& s = value.s;
@@ -166,6 +168,7 @@ void IterativeLQR::backward_pass_iter(int i)
     S.noalias() = tmp.Hxx + Lz.transpose()*(tmp.Huu*Lz + tmp.Hux) + tmp.Hux.transpose()*Lz;
     S = 0.5*(S + S.transpose());  // note: symmetrize
     s.noalias() = tmp.hx + tmp.Hux.transpose()*lz + Lz.transpose()*(tmp.hu + tmp.Huu*lz);
+    TOC(value_fn_inner);
 
     // map to original input u
     if(has_constraints)
@@ -268,8 +271,6 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     // nullspace left after constraints
     int ns_dim = Bz.cols();
 
-
-
     // modified cost and dynamics due to uc = uc(x, z)
     // note: our new control input will be z!
     TIC(constraint_modified_dynamics_inner);
@@ -296,10 +297,12 @@ void IterativeLQR::compute_constrained_input(Temporaries& tmp, BackwardPassResul
 {
     if(_decomp_type == Qr)
     {
+        TIC(compute_constrained_input_qr_inner);
         compute_constrained_input_qr(tmp, res);
     }
     else if(_decomp_type == Svd)
     {
+        TIC(compute_constrained_input_svd_inner);
         compute_constrained_input_svd(tmp, res);
     }
     else
@@ -384,10 +387,6 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
     THROW_NAN(D);
     THROW_NAN(h);
 
-    std::cout << "C= \n" << C << std::endl;
-    std::cout << "D= \n" << D << std::endl;
-    std::cout << "h= \n" << h << std::endl;
-
     auto& qr = tmp.qr;
     auto& lc = tmp.lc;
     auto& Lc = tmp.Lc;
@@ -398,7 +397,9 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
     if(D.rows() < D.cols())
     {
         // D' = QR
+        TIC(constraint_qr_inner);
         qr.compute(D.transpose());
+        TOC(constraint_qr_inner);
         Eigen::MatrixXd r = qr.matrixQR().triangularView<Eigen::Upper>();
         THROW_NAN(r);
 
@@ -429,7 +430,9 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
         Eigen::MatrixXd r12 = r1.rightCols(rank_def);
 
         // q = [q1, q2]
+        TIC(constraint_qr_get_q_inner);
         Eigen::MatrixXd q = qr.householderQ();
+        TOC(constraint_qr_get_q_inner);
         Eigen::MatrixXd q1 = q.leftCols(rank);
         Eigen::MatrixXd q2 = q.rightCols(ns_dim);
         THROW_NAN(q);
@@ -446,13 +449,16 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
         auto h2 = hp.tail(rank_def);
 
         // r11^-T
+        TIC(constraint_r11_inv_T_inner);
         Eigen::MatrixXd r11_t_inv;
         r11_t_inv.setIdentity(rank, rank);
         r11.triangularView<Eigen::Upper>().solveInPlace(r11_t_inv);
         r11_t_inv.transposeInPlace();
+        TOC(constraint_r11_inv_T_inner);
         THROW_NAN(r11_t_inv);
 
         // q1*r1^-T
+        TIC(constraint_input_inner);
         Eigen::MatrixXd q1_r11_t_inv;
         q1_r11_t_inv.noalias() = q1*r11_t_inv;
 
@@ -460,10 +466,13 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
         lc.noalias() = -q1_r11_t_inv*h1;
         Lc.noalias() = -q1_r11_t_inv*C1;
         Bz = q2;
+        TOC(constraint_input_inner);
 
         // compute lag mul
+        TIC(constraint_lagmul_inner);
         res.Gu.noalias() = -q1_r11_t_inv.transpose()*tmp.Huuf;
         res.glam.noalias() = -q1_r11_t_inv.transpose()*tmp.huf;
+        TOC(constraint_lagmul_inner);
 
         // compute unsatisfied constraint portion
         Eigen::MatrixXd Cu, r12_t_r11_t_inv;
@@ -480,7 +489,9 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
     else
     {
         // D = QR = Q1*R1
+        TIC(constraint_qr_inner);
         qr.compute(D);
+        TOC(constraint_qr_inner);
 
         // rank estimate
         int rank = D.cols();
@@ -511,18 +522,23 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
         Eigen::MatrixXd r12 = r1.rightCols(ns_dim);
 
         // q = [q1, q2]
+        TIC(constraint_qr_get_q_inner);
         Eigen::MatrixXd q = qr.householderQ();
+        TOC(constraint_qr_get_q_inner);
         Eigen::MatrixXd q1 = q.leftCols(rank);
         Eigen::MatrixXd q2 = q.rightCols(nc_left);
         THROW_NAN(q);
 
         // r1^-1
+        TIC(constraint_r11_inv_inner);
         Eigen::MatrixXd r11_inv;
         r11_inv.setIdentity(rank, rank);
         r11.triangularView<Eigen::Upper>().solveInPlace(r11_inv);
+        TOC(constraint_r11_inv_inner);
         THROW_NAN(r11_inv);
 
         // r1^-1*q1^T
+        TIC(constraint_input_inner);
         Eigen::MatrixXd r11_inv_q1_t;
         r11_inv_q1_t.noalias() = r11_inv*q1.transpose();
 
@@ -542,19 +558,18 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
         lc = qr.colsPermutation()*lc;
         Lc = qr.colsPermutation()*Lc;
         Bz = qr.colsPermutation()*Bz;
+        TOC(constraint_input_inner);
 
         // compute lagrangian multiplier
+        TIC(constraint_lagmul_inner);
         res.Gu.noalias() = -r11_inv.transpose()*tmp.Huuf.topRows(rank);
         res.glam.noalias() = -r11_inv.transpose()*tmp.huf.head(rank);
+        TOC(constraint_lagmul_inner);
 
         // set unsatisfied constraints to current constraint to go
         _constraint_to_go->set(q2.transpose()*C, q2.transpose()*h);
 
     }
-
-    std::cout << "C+DL= \n" << C + D*Lc << std::endl;
-    std::cout << "h+Dl= \n" << h + D*lc << std::endl;
-    std::cout << "DB  = \n" << D*Bz << std::endl;
 
 }
 
