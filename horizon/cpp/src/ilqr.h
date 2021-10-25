@@ -202,6 +202,8 @@ private:
     double _alpha_min;
     double _svd_threshold;
     bool _closed_loop_forward_pass;
+    std::string _codegen_workdir;
+    bool _codegen_enabled;
     DecompositionType _decomp_type;
 
     std::vector<IntermediateCost> _cost;

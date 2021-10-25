@@ -1,5 +1,8 @@
 #include "ilqr_impl.h"
+#include "codegen_function.h"
 #include <cxxabi.h>
+#include <cstdlib>
+
 
 utils::Timer::TocCallback on_timer_toc;
 
@@ -63,6 +66,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _alpha_min = value_or(opt, "ilqr.alpha_min", 1e-3);
     _svd_threshold = value_or(opt, "ilqr.svd_threshold", 1e-6);
     _closed_loop_forward_pass = value_or(opt, "ilqr.closed_loop_forward_pass", 1);
+    _codegen_workdir = value_or<std::string>(opt, "ilqr.codegen_workdir", "/tmp");
+    _codegen_enabled = value_or(opt, "ilqr.codegen_enabled", 0);
 
     auto decomp_type_str = value_or<std::string>(opt, "ilqr.decomp_type", "svd");
     if(decomp_type_str == "svd")
@@ -124,10 +129,21 @@ void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inte
 void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& inter_cost)
 {
     IntermediateCostEntity c;
+
+    auto cost = inter_cost;
     auto grad = c.Gradient(inter_cost);
-    c.setCost(inter_cost,
+    auto hess = c.Hessian(grad);
+
+    if(_codegen_enabled)
+    {
+        cost = utils::codegen(cost, _codegen_workdir);
+        grad = utils::codegen(grad, _codegen_workdir);
+        hess = utils::codegen(hess, _codegen_workdir);
+    }
+
+    c.setCost(cost,
               grad,
-              c.Hessian(grad));
+              hess);
 
     std::cout << "adding cost '" << inter_cost << "' at k = ";
 
@@ -155,9 +171,20 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
                                  const casadi::Function &inter_constraint,
                                  std::vector<Eigen::VectorXd> target_values)
 {
+
     ConstraintEntity c;
-    c.setConstraint(inter_constraint,
-                    c.Jacobian(inter_constraint));
+
+    auto ic_fn = inter_constraint;
+    auto ic_jac = c.Jacobian(inter_constraint);
+
+    if(_codegen_enabled)
+    {
+        ic_fn = utils::codegen(ic_fn, _codegen_workdir);
+        ic_jac = utils::codegen(ic_jac, _codegen_workdir);
+    }
+
+    c.setConstraint(ic_fn,
+                    ic_jac);
 
     std::cout << "adding constraint '" << inter_constraint << "' at k = ";
 
@@ -472,12 +499,16 @@ void IterativeLQR::IntermediateCostEntity::quadratize(VecConstRef x, VecConstRef
 
 casadi::Function IterativeLQR::IntermediateCostEntity::Gradient(const casadi::Function& f)
 {
-    return f.factory("dl", {"x", "u"}, {"grad:l:x", "grad:l:u"});
+    return f.factory(f.name() + "_grad",
+                     {"x", "u"},
+                     {"grad:l:x", "grad:l:u"});
 }
 
 casadi::Function IterativeLQR::IntermediateCostEntity::Hessian(const casadi::Function& df)
 {
-    return df.factory("ddl", {"x", "u"}, {"jac:grad_l_x:x", "jac:grad_l_u:u", "jac:grad_l_u:x"});
+    return df.factory(df.name() + "_hess",
+                      {"x", "u"},
+                      {"jac:grad_l_x:x", "jac:grad_l_u:u", "jac:grad_l_u:x"});
 }
 
 const Eigen::MatrixXd& IterativeLQR::IntermediateCost::Q() const
@@ -527,6 +558,8 @@ void IterativeLQR::IntermediateCost::addCost(const IntermediateCostEntity &cost)
 
 double IterativeLQR::IntermediateCost::evaluate(VecConstRef x, VecConstRef u)
 {
+    TIC(evaluate_cost_inner);
+
     double cost = 0.0;
 
     for(auto& it : items)
@@ -758,7 +791,7 @@ void IterativeLQR::ConstraintEntity::setTargetValue(const Eigen::VectorXd &hdes)
 
 casadi::Function IterativeLQR::ConstraintEntity::Jacobian(const casadi::Function& h)
 {
-    return h.factory("dh", {"x", "u"}, {"jac:h:x", "jac:h:u"});
+    return h.factory(h.name() + "_jac", {"x", "u"}, {"jac:h:x", "jac:h:u"});
 }
 
 const Eigen::MatrixXd &IterativeLQR::Constraint::C() const
