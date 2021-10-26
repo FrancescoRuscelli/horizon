@@ -147,11 +147,20 @@ def second_order_resample_integrator(p, v, u, node_time, dt, dae):
 
         if t > node_time_array[node+1]:
             new_dt = t - node_time_array[node+1]
+
+            # if t goes beyond the current node, first of all reset the state to the new one
             node += 1
+            x_res[:, i] = np.hstack((p[:, node], v[:, node]))
+            p_res[:, i] = x_resi[0:p.shape[0]]
+            v_res[:, i] = x_resi[p.shape[0]:]
+            u_res[:, i] = u[:, node]
+
+            # then, if the dt is big enough, recompute by using the new input starting from the state at the node
             if new_dt >= 1e-6:
                 opts = {'tf': new_dt}
                 new_F_integrator = integrators.RK4(dae, opts, cs.SX)
-                x_resi = new_F_integrator(x0=np.hstack((p[:,node], v[:,node])), p=u[:, node])['xf'].toarray().flatten()
+                x_resi = new_F_integrator(x0=x_res[:, i], p=u[:, node])['xf'].toarray().flatten()
+
                 x_res[:, i] = x_resi
                 p_res[:, i] = x_resi[0:p.shape[0]]
                 v_res[:, i] = x_resi[p.shape[0]:]
