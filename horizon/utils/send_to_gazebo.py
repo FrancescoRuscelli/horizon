@@ -1,4 +1,5 @@
 # /usr/bin/env python3
+import numpy
 import numpy as np
 
 ##### for robot and stuff
@@ -6,14 +7,15 @@ import xbot_interface.config_options as xbot_opt
 from cartesian_interface.pyci_all import *
 from xbot_interface import xbot_interface as xbot
 from moveit_commander.roscpp_initializer import roscpp_initialize
-from ci_solver import CartesianInterfaceSolver
+from ci_solver_spot import CartesianInterfaceSolver
 import rospy
 from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_storer
 
 from horizon.ros.replay_trajectory import *
 
+## ==================
 ## PREPARE TRAJECTORY
-
+## ==================
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
@@ -37,40 +39,91 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot_jump.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
 solution = ms.load()
 
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+tau = solution['inverse_dynamics']['val'][0][0]
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
-resample_traj = False
 
-if resample_traj:
-    joint_names = kindyn.joint_names()
-    if 'universe' in joint_names: joint_names.remove('universe')
-    if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
+joint_names = kindyn.joint_names()
+if 'universe' in joint_names: joint_names.remove('universe')
+if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
-    if 'dt' in solution:
-        dt_before_res = solution['dt'].flatten()
-    else:
-        dt_before_res = solution['constant_dt'].flatten()[0]
+if 'dt' in solution:
+    dt_before_res = solution['dt'].flatten()
+else:
+    dt_before_res = solution['constant_dt'].flatten()[0]
 
-    dt_res = 0.001
+dt_res = 0.001
 
-    q = cs.SX.sym('q', n_q)
-    q_dot = cs.SX.sym('q_dot', n_v)
-    q_ddot = cs.SX.sym('q_ddot', n_v)
-    x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
+q = cs.SX.sym('q', n_q)
+q_dot = cs.SX.sym('q_dot', n_v)
+q_ddot = cs.SX.sym('q_ddot', n_v)
+x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 
-    dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
-    q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
-        solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
-        kindyn,
-        cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
+q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
+    solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
+    kindyn,
+    cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
-## PREPARE ROBOT
-opt = xbot_opt.ConfigOptions()
+num_samples = tau_res.shape[1]
+
+import matplotlib.pyplot as plt
+
+node_vec = np.zeros([n_nodes+1])
+for i in range(1, n_nodes+1):
+    node_vec[i] = node_vec[i - 1] + solution['dt'][0][i - 1]
+
+node_vec_res = np.zeros([num_samples + 1])
+for i in range(1, num_samples+1):
+    node_vec_res[i] = node_vec_res[i - 1] + dt_res
+
+plt.figure()
+for dim in range(q_res.shape[0]):
+    plt.plot(node_vec_res, np.array(q_res[dim, :]))
+
+for dim in range(solution['q'].shape[0]):
+    plt.scatter(node_vec, np.array(solution['q'][dim, :]))
+plt.title('q')
+
+plt.figure()
+for dim in range(qdot_res.shape[0]):
+    plt.plot(node_vec_res, np.array(qdot_res[dim, :]))
+
+for dim in range(solution['q_dot'].shape[0]):
+    plt.scatter(node_vec, np.array(solution['q_dot'][dim, :]))
+plt.title('qdot')
+
+plt.figure()
+for dim in range(qddot_res.shape[0]):
+    plt.plot(node_vec_res[:-1], np.array(qddot_res[dim, :]))
+
+for dim in range(solution['q_ddot'].shape[0]):
+    plt.scatter(node_vec[:-1], np.array(solution['q_ddot'][dim, :]))
+plt.title('q_ddot')
+
+plt.figure()
+for dim in range(6):
+    plt.plot(node_vec_res[:-1], np.array(tau_res[dim, :]))
+for dim in range(6):
+    plt.scatter(node_vec[:-1], np.array(tau[dim, :]))
+plt.title('tau on base')
+
+plt.figure()
+for dim in range(tau_res.shape[0]-6):
+    plt.plot(node_vec_res[:-1], np.array(tau_res[6+dim, :]))
+for dim in range(tau.shape[0] - 6):
+    plt.scatter(node_vec[:-1], np.array(tau[6 + dim, :]))
+plt.title('tau')
+plt.show()
 exit()
+## PREPARE ROBOT
+
+rospy.init_node('spot')
+opt = xbot_opt.ConfigOptions()
 
 urdf = rospy.get_param('/xbotcore/robot_description')
 srdf = rospy.get_param('/xbotcore/robot_description_semantic')
@@ -84,154 +137,33 @@ opt.set_string_parameter('framework', 'ROS')
 model = xbot.ModelInterface(opt)
 robot = xbot.RobotInterface(opt)
 
-ci_solver = CartesianInterfaceSolver(model=model, robot=robot, ik_dt=1. / freq)
-print('Created cartesian interface.')
-ctrl_tasks = [None, None]
+robot_state = numpy.zeros( n_q-7)
+robot_state = robot.getJointPosition()
 
-ctrl_tasks[0], ctrl_tasks[1], l_arm_task, r_arm_task, com_task = ci_solver.getTasks()
 
-##### HOMING OF ROBOT #####
+q_robot = q_res[7:, :]
+q_dot_robot = qdot_res[6:, :]
+tau_robot = tau_res[6:, :]
 
-# robot.setPositionReference([0.,    -0.356,  0.,     0.75,  -0.34, 0.,     0.,    -0.356,  0.,     0.75,  -0.34,   0., -0.,    -0.,     1.017,
-# -0.008, -0.022 ,-1.934, -0.009, -0.571, -0.014,  1.017,  0.008,  0.022, -1.934, 0.009, -0.571,  0.014])
-# robot.move()
-# robot.sense()
-# model.syncFrom(robot)
-# model.update()
-homing.homing(ci_solver, model, ctrl_tasks[0], ctrl_tasks[1], com_task, 1.)
 
-print('l_foot_initial:', model.getPose(ctrl_tasks[0].getName()))
-print('r_foot_initial:', model.getPose(ctrl_tasks[1].getName()))
-print('com:', model.getCOM())
+q_homing = q_robot[:, 0]
 
-# set real floating base
-model.syncFrom(robot)
-model.setFloatingBaseState(fb.getFbPose(), fb.getFbTwist())
-model.update()
+robot.sense()
+rate = rospy.Rate(1/dt_res)
 
-print('l_foot_initial:', model.getPose(ctrl_tasks[0].getName()))
-print('r_foot_initial:', model.getPose(ctrl_tasks[1].getName()))
-print('com:', model.getCOM())
+for i in range(100):
+    robot.setPositionReference(q_homing)
+    robot.setStiffness(4 *[400, 400, 200])
+    robot.move()
+# crude homing
 
-ci_solver_fb = CartesianInterfaceSolver(model=model, robot=robot, ik_dt=1. / freq)
-print('Created feedback cartesian interface.')
+input('press a button to replay')
 
-ctrl_tasks[0], ctrl_tasks[1], l_arm_task, r_arm_task, com_task = ci_solver_fb.getTasks()
-# ctrl_tasks, com_task = ci_solver_fb.getTasks()
-
-height_com = model.getCOM()[2] - model.getPose(ctrl_tasks[0].getName()).translation[2]
-## CONSTRUCT OPTIMAL PROBLEM
-# run_model.tryWithoutRobot(ci_solver, model, ctrl_tasks[0], ctrl_tasks[1], com_task, n_duration, initial_ds_t, single_stance_t, final_ds_t, freq, plot=1, unroll=0)
-
-solver = ss.StepSolver(n_duration, initial_ds_t, single_stance_t, final_ds_t, height_com)
-solver.buildProblemStep()
-
-lfoot = Affine3()
-dlfoot = np.zeros([6, 1])
-#
-com = Affine3()
-com.translation = model.getCOM()
-dcom = np.zeros([6, 1])
-
-initial_t = 0
-t = 0
-i = 0
-rate = rospy.Rate(freq)
-
-i = 0
-threshold = 0.5
-flag_step = False
-
-t_start_step = None
-
-n_solve = 0
-max_solves = 1
-
-l_foot_initial = Affine3()
-r_foot_initial = Affine3()
-
-lfoot.linear = model.getPose(ctrl_tasks[0].getName()).linear
-
-com_task.setActivationState(pyci.ActivationState.Enabled)
-ctrl_tasks[0].setActivationState(pyci.ActivationState.Enabled)
-
-print('started spinning...')
-
-i = 0
-exit_loop = 1
-time_in_loop = 0
-force_flag = 1
-# interactive STEP
-while exit_loop:
-
-    if force_flag and time_in_loop > 3.:
-        print('PUSHED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        sfg.sendForceGazebo([500, 0., 0.], 0.1)
-        force_flag = 0
-
-    # model.syncFrom(robot) # todo remove or add?
-    model.setFloatingBaseState(fb.getFbPose(), fb.getFbTwist())
-    model.update()
-
-    if model.getCOMVelocity()[0] >= threshold and not flag_step and n_solve < max_solves:
-        initial_com = np.array([[model.getCOM()[0], model.getCOM()[1]], [threshold, 0], [0., 0.]])
-        # initial_com = np.array([[model.getCOM()[0], model.getCOM()[1]], [model.getCOMVelocity()[0], model.getCOMVelocity()[1]], [0., 0.]])
-
-        l_foot_initial.translation = model.getPose(ctrl_tasks[0].getName()).translation
-        l_foot_initial.linear = model.getPose(ctrl_tasks[0].getName()).linear
-
-        r_foot_initial.translation = model.getPose(ctrl_tasks[1].getName()).translation
-        r_foot_initial.linear = model.getPose(ctrl_tasks[1].getName()).linear
-
-        initial_l_foot = np.array([l_foot_initial.translation[0], l_foot_initial.translation[1], 0.])
-        initial_r_foot = np.array([r_foot_initial.translation[0], r_foot_initial.translation[1], 0.])
-
-        print('initial_l_foot:', initial_l_foot)
-        print('initial_r_foot:', initial_r_foot)
-        print('com pos sensed:', model.getCOM())
-        print('com vel sensed:', model.getCOMVelocity())
-        # solve problem with given constraints
-        opt_values = solver.solveProblemStep(initial_com, initial_l_foot, initial_r_foot)
-        # interpolate at right frequency
-
-        com_traj, l_foot_traj = solver.interpolateStep(initial_com, opt_values, initial_ds_t,
-                                                       initial_ds_t + single_stance_t, freq)
-
-        n_solve += 1
-        flag_step = True
-        t_start_step = t
-
-    if flag_step:
-
-        # set l_foot trajectory
-        lfoot.translation[0] = l_foot_traj['x'][i]
-        lfoot.translation[1] = l_foot_traj['y'][i]
-        lfoot.translation[2] = l_foot_traj['z'][i]
-
-        dlfoot[0] = l_foot_traj['dx'][i]
-        dlfoot[1] = l_foot_traj['dy'][i]
-        dlfoot[2] = l_foot_traj['dz'][i]
-
-        # set com trajectory
-        com.translation[0] = com_traj['x'][i]
-        com.translation[1] = com_traj['y'][i]
-
-        dcom[0] = com_traj['dx'][i]
-        dcom[1] = com_traj['dy'][i]
-
-        com_task.setPoseReference(com)
-        com_task.setVelocityReference(dcom)
-
-        ctrl_tasks[0].setPoseReference(lfoot)
-        ctrl_tasks[0].setVelocityReference(dlfoot)
-
-        i += 1
-        if i >= len(l_foot_traj['x']):
-            flag_step = False
-            exit_loop = 0
-
-        t += 1. / freq
-
-    ci_solver_fb.update(t, sim=True)
-    time_in_loop += 1. / freq
+for i in range(num_samples):
+    robot.setPositionReference(q_robot[:, i])
+    robot.setVelocityReference(q_dot_robot[:, i])
+    robot.setEffortReference(tau_robot[:, i])
+    robot.move()
     rate.sleep()
+
+print("done, if you didn't notice")
