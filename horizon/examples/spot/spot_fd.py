@@ -1,5 +1,4 @@
 import time
-
 from horizon import problem
 from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_storer
 from horizon.transcriptions import integrators
@@ -11,13 +10,12 @@ import os
 from scipy.io import loadmat
 from logging import DEBUG
 
-# =========================================
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
-transcription_method = 'direct_collocation'  # direct_collocation # multiple_shooting
-# transcription_opts = dict(integrator='RK4')
-transcription_opts = dict(degree=3)
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+transcription_method = 'direct_collocation'  # direct_collocation #multiple_shooting
+transcription_opts = dict(integrator='RK4')
+
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -27,26 +25,30 @@ if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 
-tot_time = 1
-dt_hint = 0.02
-duration_step = 0.5
+n_nodes = 50
 
-n_nodes = int(tot_time / dt_hint)
-n_nodes_step = int(duration_step / dt_hint)
+node_start_step = 15
+n_nodes_step = 30
+node_end_step = node_start_step + n_nodes_step
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-print('total nodes:', n_nodes)
+load_initial_guess = False
 
 # SET PROBLEM STATE AND INPUT VARIABLES
-prb = problem.Problem(n_nodes) # logging_level=DEBUG
+prb = problem.Problem(n_nodes) # , logging_level=DEBUG
+
+# state variables
 q = prb.createStateVariable('q', n_q)
 q_dot = prb.createStateVariable('q_dot', n_v)
-q_ddot = prb.createInputVariable('q_ddot', n_v)
 
+u = prb.createInputVariable("actuated_torques", n_v - 6)
+tau = cs.vertcat(cs.SX.zeros(6, 1), u)
+
+# forces
 f_list = list()
 for i in range(n_c):
     f_list.append(prb.createInputVariable(f'f{i}', n_f))
@@ -54,6 +56,24 @@ for i in range(n_c):
 # SET CONTACTS MAP
 contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
 contact_map = dict(zip(contacts_name, f_list))
+fd = kin_dyn.ForwardDynamics(kindyn, contacts_name, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+
+
+# jac = fd.fd.jacobian()
+# print(jac)
+# print(jac.jacobian())
+# exit()
+q_ddot = fd.call(q, q_dot, tau, contact_map)
+
+# import initial guess if present
+if load_initial_guess:
+    prev_solution = ms.load()
+    q_ig = prev_solution['q']
+    q_dot_ig = prev_solution['q_dot']
+    q_ddot_ig = prev_solution['q_ddot']
+    f_ig_list = list()
+    for f in f_list:
+        f_ig_list.append(prev_solution[f'f{i}'])
 
 # SET DYNAMICS
 # dt = prb.createInputVariable("dt", 1)  # variable dt as input
@@ -79,54 +99,38 @@ q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                    0.0, 0.9, -1.5253125])
 
 # q_dot bounds
-q_dot_lim = 100. * np.ones(n_v)
-# q_ddot bounds
-q_ddot_lim = 100. * np.ones(n_v)
+q_dot_lim = 200. * np.ones(n_v)
+
 # f bounds
 f_lim = 10000. * np.ones(n_f)
 
+# dt bounds
 dt_min = 0.01  # [s]
-dt_max = 0.1  # [s]
+dt_max = 0.15  # [s]
 
-# set bounds and of q
+# torques bounds
+u_lim = 1000.*np.ones(n_v-6)
+
+#  ==========================================
+# set bounds of q
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, 0)
 # set bounds of q_dot
 q_dot_init = np.zeros(n_v)
 q_dot.setBounds(-q_dot_lim, q_dot_lim)
 q_dot.setBounds(q_dot_init, q_dot_init, 0)
-# set bounds of q_ddot
-q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
 # set bounds of f
 for f in f_list:
     f.setBounds(-f_lim, f_lim)
-
-
-if isinstance(dt, cs.SX):
-    # set bounds of dt
-    dt.setBounds(dt_min, dt_max)
-    # set initial guess of dt
-    dt.setInitialGuess(dt_min)
-
-q.setInitialGuess(q_init)
-
-for f in f_list:
-    f.setInitialGuess([0., 0, 60.])
-
+# set bounds of u
+u.setBounds(-u_lim, u_lim)
+# set bounds of dt
+# dt.setBounds(dt_min, dt_max)
+# set initial guess of u
+u.setInitialGuess(np.zeros(n_v-6))
+# dt.setInitialGuess(dt_min)
 # SET TRANSCRIPTION METHOD
 th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
-
-# SET INVERSE DYNAMICS CONSTRAINTS
-tau_lim = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
-                    1000., 1000., 1000.,  # Contact 1
-                    1000., 1000., 1000.,  # Contact 2
-                    1000., 1000., 1000.,  # Contact 3
-                    1000., 1000., 1000.])  # Contact 4
-
-tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, q_dot,
-                                                                                                             q_ddot,
-                                                                                                             contact_map)
-prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
 
 # SET FINAL VELOCITY CONSTRAINT
 prb.createFinalConstraint('final_velocity', q_dot)
@@ -169,11 +173,14 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.linear_solver': 'ma57'}
 
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+exit()
 solver.solve()
+
 
 solution = solver.getSolutionDict()
 solution_constraints = solver.getConstraintSolutionDict()
 
+# print(solution['f0'])
 solution_constraints_dict = dict()
 for name, item in prb.getConstraints().items():
     lb, ub = item.getBounds()
@@ -188,62 +195,13 @@ else:
     ms.store({**solution, **solution_constraints_dict, **dt_dict})
 
 # ========================================================
-plot_all = False
-
-plot_forces = False
-
-if plot_forces:
-    for f in [f'f{i}' for i in range(len(contacts_name))]:
-        plt.figure()
-        for dim in range(solution[f].shape[0]):
-            plt.plot(np.array(range(solution[f].shape[1])), solution[f][dim, :])
-
-        plt.title(f'force {f}')
-
-    plt.show()
-
-if plot_all:
-    hplt = plotter.PlotterHorizon(prb, solution)
-    hplt.plotVariables(show_bounds=False, legend=True)
-    # hplt.plotFunctions(show_bounds=False)
-    # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
-
-    pos_contact_list = list()
-    for contact in contacts_name:
-        FK = cs.Function.deserialize(kindyn.fk(contact))
-        pos = FK(q=solution['q'])['ee_pos']
-        plt.figure()
-        plt.title(contact)
-        for dim in range(n_f):
-            plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3, linestyle='dotted')
-
-        # plt.vlines([node_start_step, node_end_step], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
-
-    plt.figure()
-    for contact in contacts_name:
-        FK = cs.Function.deserialize(kindyn.fk(contact))
-        pos = FK(q=solution['q'])['ee_pos']
-
-        plt.title(f'plane_xy')
-        plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
-
-    plt.figure()
-    for contact in contacts_name:
-        FK = cs.Function.deserialize(kindyn.fk(contact))
-        pos = FK(q=solution['q'])['ee_pos']
-
-        plt.title(f'plane_xz')
-        plt.scatter(np.array(pos[0, :]), np.array(pos[2, :]), linewidth=0.1)
-
-    plt.show()
-# ======================================================
 
 
 contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling
-resampling = True
+resampling = False
 if resampling:
 
     if isinstance(dt, cs.SX):
@@ -251,14 +209,39 @@ if resampling:
     else:
         dt_before_res = dt
 
-    dt_res = 0.001
-    dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
-    q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
-        solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
-        kindyn,
-        cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+    u_hist = solution["actuated_torques"]
+    tau = cs.vertcat(cs.SX.zeros(6, 1), u)
+    tau_hist = np.zeros((solution["q_dot"].shape[0], solution["q_dot"].shape[1] - 1))
+    for i in range(tau_hist.shape[1]):
+        tau_hist[6:, i] = solution["actuated_torques"][:, i]
 
-    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    f0_hist = solution["f0"]
+    f1_hist = solution["f1"]
+    f2_hist = solution["f2"]
+    f3_hist = solution["f3"]
+
+    qddot_hist = np.zeros(tau_hist.shape)
+    FD = kin_dyn.ForwardDynamics(kindyn, contacts_name, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+    for i in range(n_nodes):
+        contact_map_i = dict(zip(contacts_name, [solution['f0'][:, i], solution['f1'][:, i], solution['f2'][:, i], solution['f3'][:, i]]))
+        qddot_hist[:, i] = FD.call(solution["q"][:, i], solution["q_dot"][:, i], tau_hist[:, i], contact_map_i).toarray().flatten()
+
+    # resampling
+    dt_res = 0.001
+    dae = {'x': x, 'p': cs.vertcat(u, f_list[0], f_list[1], f_list[2], f_list[3]), 'ode': x_dot, 'quad': 1}
+
+    input = np.array(cs.vertcat(u_hist, solution["f0"], solution["f1"], solution["f2"], solution["f3"]))
+    q_res, qdot_res, input_res = resampler_trajectory.second_order_resample_integrator(solution["q"], solution["q_dot"], input, dt_before_res, dt_res, dae)
+
+    tau_res = resampler_trajectory.resample_input(tau_hist, dt_before_res, dt_res)
+    f1_res = resampler_trajectory.resample_input(f0_hist, dt_before_res, dt_res)
+    f2_res = resampler_trajectory.resample_input(f1_hist, dt_before_res, dt_res)
+    f3_res = resampler_trajectory.resample_input(f2_hist, dt_before_res, dt_res)
+    f4_res = resampler_trajectory.resample_input(f3_hist, dt_before_res, dt_res)
+
+    contact_map = dict(zip(contacts_name, [f1_res, f2_res, f3_res, f4_res]))
+
+    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
 else:
     # remember to run a robot_state_publisher
     repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)

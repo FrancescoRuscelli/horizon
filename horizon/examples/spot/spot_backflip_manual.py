@@ -7,7 +7,7 @@ from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import horizon.transcriptions.integrators as integ
 
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 

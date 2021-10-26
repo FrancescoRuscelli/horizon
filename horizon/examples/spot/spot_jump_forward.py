@@ -36,7 +36,7 @@ ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.ma
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -52,7 +52,7 @@ n_nodes = 50
 node_start_step = 20
 node_end_step = 40
 node_peak = 30
-jump_height = 0.2
+jump_height = 0.3
 
 n_c = 4
 n_q = kindyn.nq()
@@ -209,42 +209,57 @@ R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 # COM = cs.Function.deserialize(kindyn.centerOfMass())
 # p_com = COM(q=q_init)['com']
 # exit()
-fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
+fb_during_jump = np.array([q_init[0] + 0.5, q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
 q_final = q_init
+q_final[0] = q_final[0] + 0.2
 
 for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
-    FK = cs.Function.deserialize(kindyn.fk(frame))
-    p = FK(q=q)['ee_pos']
-    p_start = FK(q=q_init)['ee_pos']
-    p_goal = p_start + [0., 0., jump_height]
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-    DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
-    a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
     prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
     prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+
     prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
     prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
+    FK = cs.Function.deserialize(kindyn.fk(frame))
+    p = FK(q=q)['ee_pos']
+    p_start = FK(q=q_init)['ee_pos']
+    p_goal = p_start + [0., 0., jump_height]
+
+
     prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
-    # prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
+    # prb.createCostFunction(f"lift_{frame}_leg", 10000 * cs.sumsqr(p - p_goal), nodes=32)
+    # prb.createCostFunction(f"land_{frame}_leg", 10000 * cs.sumsqr(p - p_start), nodes=node_end_step)
+    prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
     prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
 
+prb.createCostFunction(f"jump_nominal_pos", 1000 * cs.sumsqr(q[0:3] - fb_during_jump[0:3]), nodes=range(node_start_step, node_end_step))
+prb.createCostFunction(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init), nodes=n_nodes-1)
 
 # SET COST FUNCTIONS
-prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
 prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
+# prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
+
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
 # prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
+
+# import pickle
+# prb_serialized = prb.serialize()
+# print('===PICKLING===')
+# prb_serialized = pickle.dumps(prb_serialized)
+# print('===DEPICKLING===')
+# prb = pickle.loads(prb_serialized)
+# prb.deserialize()
+
 
 # =============
 # SOLVE PROBLEM
@@ -270,7 +285,7 @@ for name, item in prb.getConstraints().items():
 if isinstance(dt, cs.SX):
     ms.store({**solution, **solution_constraints_dict})
 else:
-    dt_dict = dict(dt=dt)
+    dt_dict = dict(constant_dt=dt)
     ms.store({**solution, **solution_constraints_dict, **dt_dict})
 
 

@@ -32,12 +32,12 @@ def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_le
 # exit()
 
 # =========================================
-ms = mat_storer.matStorer('spot_on_box.mat')
+ms = mat_storer.matStorer('spot_step.mat')
 
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -48,9 +48,9 @@ if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint
 
 
 
-tot_time = 2
+tot_time = 1
 dt_hint = 0.02
-duration_step = 0.8
+duration_step = 0.5
 
 n_nodes = int(tot_time / dt_hint)
 n_nodes_step = int(duration_step / dt_hint)
@@ -60,14 +60,14 @@ n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-node_start_step = 50
+node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
+
 print('total nodes:', n_nodes)
 print('starting node of step:', node_start_step)
 print('last node of step:', node_end_step)
 
-
-load_initial_guess = True
+load_initial_guess = False
 
 # SET PROBLEM STATE AND INPUT VARIABLES
 prb = problem.Problem(n_nodes)
@@ -95,8 +95,7 @@ if load_initial_guess:
         f_ig_list.append(prev_solution[f'f{i}'])
 
 # SET DYNAMICS
-# dt = prb.createInputVariable("dt", 1)  # variable dt as input
-dt = 0.01
+dt = prb.createInputVariable("dt", 1)  # variable dt as input
 # Computing dynamics
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
@@ -141,7 +140,7 @@ for f in f_list:
     f.setBounds(-f_lim, f_lim)
 
 # set bounds of dt
-# dt.setBounds(dt_min, dt_max)
+dt.setBounds(dt_min, dt_max)
 
 # SET INITIAL GUESS
 if load_initial_guess:
@@ -160,7 +159,7 @@ if load_initial_guess:
 else:
     q.setInitialGuess(q_init)
 
-# dt.setInitialGuess(dt_min)
+dt.setInitialGuess(dt_min)
 # SET TRANSCRIPTION METHOD
 th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
 
@@ -178,8 +177,8 @@ prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_li
 
 # SET CONTACT POSITION CONSTRAINTS
 active_leg = list()
-# active_leg = next(iter(contact_map))
-active_leg = ['lf_foot', 'rf_foot']
+active_leg = next(iter(contact_map))
+# active_leg = ['lf_foot', 'rf_foot']
 # active_leg = ['lf_foot', 'rf_foot', 'lh_foot']
 # active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
@@ -191,7 +190,7 @@ for frame, f in contact_map.items():
     p = FK(q=q)['ee_pos']
     p_start = FK(q=q_init)['ee_pos']
 
-    p_goal = p_start + [0.2, 0., 0.2]
+    p_goal = p_start + [0.1, 0., 0.2]
     # 1. position of each end effector and its initial position must be the same
     # if frame != active_leg:
     #     prb.createConstraint(f"{frame}_fixed", p - p_start)
@@ -210,7 +209,7 @@ for frame, f in contact_map.items():
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-    if frame != active_leg:
+    if frame not in active_leg:
         prb.createIntermediateConstraint(f"{frame}_friction_cone", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
     else:
         prb.createIntermediateConstraint(f"{frame}_friction_cone_before_step", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
@@ -219,8 +218,8 @@ for frame, f in contact_map.items():
     if frame in active_leg:
         prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
-        prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=80)
-        # prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step + 2)
+        prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=25)
+        prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step + 2)
 
         # prb.createCostFunction(f"lift_{frame}_leg", 100000 * cs.sumsqr(p - p_goal), nodes=range(node_start_step, node_end_step))
         # prb.createCostFunction(f"land_{frame}_leg", 10000000 * cs.sumsqr(p - p_start), nodes=range(node_end_step, n_nodes+1))
@@ -233,7 +232,7 @@ prb.createCostFunction("min_q_dot", 1000. * cs.sumsqr(q_dot))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
-q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.1, 0.0, 0.0, 0.0, 1.0])
+# q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.1, 0.0, 0.0, 0.0, 1.0])
 # prb.createCostFunction("floating_base_orientation", 1000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]), nodes=list(range(node_start_step, node_end_step)))
 # prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[0:7] - q_fb_trg))
 # prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]))
@@ -245,14 +244,17 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.max_iter': 5000}
 # 'ipopt.linear_solver': 'ma57'}
 
+tic = time.time()
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+toc = time.time()
+print('time elapsed:', toc - tic)
 solver.solve()
 
 solution = solver.getSolutionDict()
 ms.store(solution)
 
 # ========================================================
-plot_all = False
+plot_all = True
 if plot_all:
     hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables(show_bounds=False, legend=True)
@@ -299,7 +301,7 @@ if resampling:
     dt_res = 0.001
     dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
     q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
-        solution["q"], solution["q_dot"], solution["q_ddot"], dt, dt_res, dae, contact_map, kindyn,
+        solution["q"], solution["q_dot"], solution["q_ddot"], solution['dt'].flatten(), dt_res, dae, contact_map, kindyn,
                                                                             cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
 

@@ -36,7 +36,7 @@ ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.ma
 transcription_method = 'multiple_shooting'  # direct_collocation # multiple_shooting
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -328,7 +328,7 @@ if plot_all:
 # ======================================================
 
 
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling

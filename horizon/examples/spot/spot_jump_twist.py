@@ -8,15 +8,14 @@ from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
-from scipy.io import loadmat
-from logging import DEBUG
 
+# =========================================
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
-transcription_method = 'direct_collocation' # 'multiple_shooting'  # direct_collocation
+transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -26,18 +25,21 @@ if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 
-n_nodes = 200
-node_start_wheelie = 100
+n_nodes = 50
+
+node_start_step = 20
+node_end_step = 40
+node_peak = 30
+jump_height = 0.1
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-load_initial_guess = False
 
 # SET PROBLEM STATE AND INPUT VARIABLES
-prb = problem.Problem(n_nodes)  # , logging_level=DEBUG
+prb = problem.Problem(n_nodes)
 q = prb.createStateVariable('q', n_q)
 q_dot = prb.createStateVariable('q_dot', n_v)
 q_ddot = prb.createInputVariable('q_ddot', n_v)
@@ -51,6 +53,7 @@ contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
 contact_map = dict(zip(contacts_name, f_list))
 
 
+load_initial_guess = False
 # import initial guess if present
 if load_initial_guess:
     prev_solution = ms.load()
@@ -61,9 +64,11 @@ if load_initial_guess:
     for f in f_list:
         f_ig_list.append(prev_solution[f'f{i}'])
 
+    dt_ig = prev_solution['dt']
+
 # SET DYNAMICS
-# dt = prb.createInputVariable("dt", 1)  # variable dt as input
-dt = 0.01
+dt = prb.createInputVariable("dt", 1)  # variable dt as input
+# dt = 0.01
 # Computing dynamics
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
@@ -85,14 +90,14 @@ q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                    0.0, 0.9, -1.5253125])
 
 # q_dot bounds
-q_dot_lim = 200. * np.ones(n_v)
+q_dot_lim = 100. * np.ones(n_v)
 # q_ddot bounds
-q_ddot_lim = 200. * np.ones(n_v)
+q_ddot_lim = 100. * np.ones(n_v)
 # f bounds
 f_lim = 10000. * np.ones(n_f)
 
 dt_min = 0.01  # [s]
-dt_max = 0.15  # [s]
+dt_max = 0.1  # [s]
 
 # set bounds and of q
 q.setBounds(q_min, q_max)
@@ -104,11 +109,16 @@ q_dot.setBounds(q_dot_init, q_dot_init, 0)
 # set bounds of q_ddot
 q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
 # set bounds of f
-for f in f_list:
-    f.setBounds(-f_lim, f_lim)
+# for f in f_list:
+#     f.setBounds(-f_lim, f_lim)
 
+f_min = [-10000., -10000., -10.]
+f_max = [10000., 10000., 10000.]
+for f in f_list:
+    f.setBounds(f_min, f_max)
 # set bounds of dt
-# dt.setBounds(dt_min, dt_max)
+if isinstance(dt, cs.SX):
+    dt.setBounds(dt_min, dt_max)
 
 # SET INITIAL GUESS
 if load_initial_guess:
@@ -124,10 +134,18 @@ if load_initial_guess:
     for f, f_ig in zip(f_list, f_ig_list):
         for node in range(f_ig.shape[1]):
             f.setInitialGuess(f_ig[:, node], node)
+
+    if isinstance(dt, cs.SX):
+        for node in range(dt_ig.shape[1]):
+            dt.setInitialGuess(dt_ig[:, node], node)
+
 else:
     q.setInitialGuess(q_init)
+    if isinstance(dt, cs.SX):
+        dt.setInitialGuess(dt_min)
 
-# dt.setInitialGuess(dt_min)
+
+
 # SET TRANSCRIPTION METHOD
 th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
 
@@ -145,69 +163,56 @@ prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_li
 
 # SET FINAL VELOCITY CONSTRAINT
 prb.createFinalConstraint('final_velocity', q_dot)
-# SET FINAL ACCELERATION CONSTRAINT
-prb.createConstraint('final_acceleration', q_ddot, nodes=range(n_nodes-10, n_nodes))
-# q_ddot.setBounds(np.zeros(n_v), np.zeros(n_v), nodes=range(n_nodes-10, n_nodes))
 
 # SET CONTACT POSITION CONSTRAINTS
-active_leg = ['lf_foot', 'rf_foot']
+active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
+
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-# FK = cs.Function.deserialize(kindyn.fk('lf_foot'))
-# intial_lf = FK(q=q_init)['ee_pos']
-#
-# FK = cs.Function.deserialize(kindyn.fk('rf_foot'))
-# intial_rf = FK(q=q_init)['ee_pos']
+fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0, 0, 0.8509035, 0.525322])
+q_final = q_init
+q_final[3:7] = [0, 0, 0.8509035, 0.525322]
 
 for frame, f in contact_map.items():
+    # 2. velocity of each end effector must be zero
     FK = cs.Function.deserialize(kindyn.fk(frame))
     p = FK(q=q)['ee_pos']
     p_start = FK(q=q_init)['ee_pos']
-    p_goal = p_start + [0., 0., 0.3]
-
+    p_goal = p_start + [0., 0., jump_height]
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-    # velocity of active end effector must be zero
-    if frame not in active_leg:
-        prb.createConstraint(f"{frame}_vel_wheelie", v)
-    else:
-        prb.createConstraint(f"{frame}_vel_before_wheelie", v, nodes=range(0, node_start_wheelie))
+    DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
+    a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
+
+    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
+    prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-    if frame not in active_leg:
-        prb.createIntermediateConstraint(f"{frame}_fc", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
-    else:
-        prb.createIntermediateConstraint(f"{frame}_fc_before_wheelie", fc, nodes=range(0, node_start_wheelie), bounds=dict(lb=fc_lb, ub=fc_ub))
+    prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
+    prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
-    if frame in active_leg:
-        # zero force for lifted legs
-        prb.createConstraint(f"{frame}_no_force_after_lift", f, nodes=range(node_start_wheelie, n_nodes))
-        # terrain constraint
-        prb.createConstraint(f"subterrain_{frame}_leg", p[2] - p_start[2], bounds=dict(lb=0., ub=100000))
-        # suggestion to lift leg
-        # prb.createCostFunction(f"lift_{frame}_leg", 10000 * cs.sumsqr(p[2] - p_goal[2]), nodes=node_start_wheelie)
+    prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
+
+    # prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
+    prb.createConstraint(f"land_{frame}_leg", p[2] - p_start[2], nodes=node_end_step)
+
+    # this is useful?
+    # prb.createConstraint(f"subterrain_{frame}_leg", p[2] - p_start[2], bounds=dict(lb=-0.0001))
 
 # SET COST FUNCTIONS
-
-# prb.createCostFunction("min_q_ddot", 10000. * cs.sumsqr(q_ddot), nodes=range(node_start_wheelie, n_nodes))
-
-# minimize the joint velocities
+# pose of the robot during jump
+prb.createCostFunction(f"jump_fb", 1000 * cs.sumsqr(q[0:7] - fb_during_jump), nodes=range(node_start_step, node_end_step)) #nodes_end_step
+# minimum joint velocity
 prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-
-# minimize the forces
+# final pose of the robot
+prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q - q_final))
+# forces
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
-# desired pose at the end of the wheelie
-# fb_rot_wheelie = np.array([0, -0.5, 0, 0.8660254]) # pi/3 pitch
-fb_rot_wheelie = np.array([0, -0.8509035, 0, 0.525322])  # pi/2 pitch
-# prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q[3:7] - fb_rot_wheelie))
-prb.createCostFunction(f"wheelie_fb", 10000 * cs.sumsqr(q[3:7] - fb_rot_wheelie), nodes=node_start_wheelie)
-# prb.createFinalCost(f"final_nominal_pos", 10 * cs.sumsqr(q[3:7] - fb_rot_wheelie))
-prb.createFinalCost(f"final_nominal_pos", 10000. * cs.sumsqr(q[4] - fb_rot_wheelie[2]))
-# prb.createFinalCost(f"final_nominal_pos", 10000. * cs.sumsqr(q[4] - fb_rot_wheelie[2]))
+# prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
 
 # =============
 # SOLVE PROBLEM
@@ -215,8 +220,7 @@ prb.createFinalCost(f"final_nominal_pos", 10000. * cs.sumsqr(q[4] - fb_rot_wheel
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
         'ipopt.max_iter': 2000}
-#         'ipopt.mu_strategy': 'adaptive',
-        # 'ipopt.linear_solver': 'ma57'}
+# 'ipopt.linear_solver': 'ma57'}
 
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
 solver.solve()
@@ -237,7 +241,9 @@ else:
     dt_dict = dict(constant_dt=dt)
     ms.store({**solution, **solution_constraints_dict, **dt_dict})
 
+
 # ========================================================
+contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling

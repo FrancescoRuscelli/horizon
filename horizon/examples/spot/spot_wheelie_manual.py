@@ -4,48 +4,9 @@ import numpy as np
 import time
 import os
 from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
+import horizon.transcriptions.integrators as integ
 
-
-def RK4(dae, opts=None, casadi_type=cs.SX):
-    if opts is None:
-        opts = dict()
-    x = dae['x']
-    qddot = dae['p']
-    xdot = dae['ode']
-    L = dae['quad']
-
-    f_RK = cs.Function('f_RK', [x, qddot], [xdot, L])
-
-    nx = x.size1()
-    nv = qddot.size1()
-
-    X0_RK = casadi_type.sym('X0_RK', nx)
-    U_RK = casadi_type.sym('U_RK', nv)
-
-    if 'tf' in opts:
-        DT_RK = opts['tf']
-    else:
-        DT_RK = casadi_type.sym('DT_RK', 1)
-
-    X_RK = X0_RK
-    Q_RK = 0
-
-    k1, k1_q = f_RK(X_RK, U_RK)
-    k2, k2_q = f_RK(X_RK + DT_RK / 2. * k1, U_RK)
-    k3, k3_q = f_RK(X_RK + DT_RK / 2. * k2, U_RK)
-    k4, k4_q = f_RK(X_RK + DT_RK * k3, U_RK)
-
-    X_RK = X_RK + DT_RK / 6. * (k1 + 2. * k2 + 2. * k3 + k4)
-    Q_RK = Q_RK + DT_RK / 6. * (k1_q + 2. * k2_q + 2. * k3_q + k4_q)
-
-    if 'tf' in opts:
-        f = cs.Function('F_RK', [X0_RK, U_RK], [X_RK, Q_RK], ['x0', 'p'], ['xf', 'qf'])
-    else:
-        f = cs.Function('F_RK', [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], ['x0', 'p', 'time'], ['xf', 'qf'])
-    return f
-
-
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -57,7 +18,7 @@ n_f = 3
 N = 100
 N_states = N + 1
 N_control = N
-dt = 0.01
+dt = 0.02
 
 node_start_step = 30
 node_end_step = N
@@ -79,7 +40,7 @@ for i in range(n_c):
     f_list.append(cs.SX.sym(f'f{i}', n_f))
 
 # SET CONTACTS MAP
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 
 
@@ -93,7 +54,7 @@ input = cs.vertcat(q_ddot, fs)
 
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 dae = {'x': state, 'p': input, 'ode': x_dot, 'quad': 1}
-integrator = RK4(dae, opts=dict(tf=dt))
+integrator = integ.RK4(dae, opts=dict(tf=dt))
 
 # technically should be faster
 # integrator = integrator.expand()
@@ -126,10 +87,10 @@ q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-g_v_list = list()
-g_lift_list = list()
-g_fc_list = list()
-g_no_force_list = list()
+g_v_dict = list()
+g_lift_dict = list()
+g_fc_dict = list()
+g_no_force_dict = list()
 # active_leg = slice(0,3)
 
 
@@ -142,25 +103,25 @@ g_tau_i = kin_dyn.InverseDynamicsMap(N, kindyn,
                               contact_map.keys(),
                               cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q_i[:, :N], q_dot_i[:, :N], q_ddot_i, contact_map_i)
 
-active_leg = ['lf_foot']
+active_leg = ['lf_foot', 'rf_foot']
 
 active_slice = slice(node_start_step, node_end_step)
 i = 0
+
 for frame, f in contact_map.items():
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q_i, qdot=q_dot_i)['ee_vel_linear']
     if frame in active_leg:
         # can move ee
-        g_v_list.append(v[:, 0:node_start_step])
-        # g_v_list.append(elem[85:])
+        g_v_dict.append(v[:, 0:node_start_step])
     else:
         # 0 vel for ee
-        g_v_list.append(v)
+        g_v_dict.append(v)
 
     if frame in active_leg:
-        g_fc_list.append(kin_dyn.linearized_friction_cone_map(f_i[3 * i:3 * i + 3, 0:node_start_step], mu, R, node_start_step))
+        g_fc_dict.append(kin_dyn.linearized_friction_cone_map(contact_map_i[frame][:, 0:node_start_step], mu, R, node_start_step))
     else:
-        g_fc_list.append(kin_dyn.linearized_friction_cone_map(f_i[3 * i:3 * i + 3, :], mu, R, N_control))
+        g_fc_dict.append(kin_dyn.linearized_friction_cone_map(contact_map_i[frame], mu, R, N_control))
 
     i += 1
 
@@ -170,10 +131,9 @@ for frame, f in contact_map.items():
         p_start = FK(q=q_init)['ee_pos']
         p_goal = p_start + [0., 0., 0.2]
 
-        g_lift_list.append(p_i[:, node_start_step + 20] - p_goal)
-
-# no force during lift of one leg
-g_no_force_list.append(f_i[0:3, node_start_step:])
+        g_lift_dict.append(p_i[:, node_start_step + 20] - p_goal)
+        # no force during lift
+        g_no_force_dict.append(contact_map_i[frame][:, node_start_step:node_end_step])
 
 
 # g_land = p_i[:, 90] - p_start
@@ -225,6 +185,7 @@ f_ubw = np.inf * np.ones([n_c * n_f, N_control])
 # initial guess q
 q0[:, 0] = q_init
 
+# zero initial velocity
 q_dot_lbw[:, 0] = np.zeros([1, n_v])
 q_dot_ubw[:, 0] = np.zeros([1, n_v])
 
@@ -232,37 +193,38 @@ q_dot_ubw[:, 0] = np.zeros([1, n_v])
 q_dot_lbw[:, N] = np.zeros([1, n_v])
 q_dot_ubw[:, N] = np.zeros([1, n_v])
 
-q_min = [-10., -10., -10., -1., -1., -1., -1.]  # floating base
-q_min.extend(kindyn.q_min()[7:])
-q_min = np.array(q_min)
-
-q_max = [10., 10., 10., 1., 1., 1., 1.]  # floating base
-q_max.extend(kindyn.q_max()[7:])
-q_max = np.array(q_max)
-
-q_lbw[:, :] = np.tile(q_min, (N_states, 1)).T
-q_ubw[:, :] = np.tile(q_max, (N_states, 1)).T
+# q bounds
+# q_min = [-10., -10., -10., -1., -1., -1., -1.]  # floating base
+# q_min.extend(kindyn.q_min()[7:])
+# q_min = np.array(q_min)
+#
+# q_max = [10., 10., 10., 1., 1., 1., 1.]  # floating base
+# q_max.extend(kindyn.q_max()[7:])
+# q_max = np.array(q_max)
+#
+# q_lbw[:, :] = np.tile(q_min, (N_states, 1)).T
+# q_ubw[:, :] = np.tile(q_max, (N_states, 1)).T
 
 # initial q
 q_lbw[:, 0] = q_init
 q_ubw[:, 0] = q_init
 
 # q_dot bounds
-q_dot_lim = 100. * np.ones(n_v)
+q_dot_lim = np.inf * np.ones(n_v)
 q_dot_lbw[:, :] = np.tile(-q_dot_lim, (N_states, 1)).T
 q_dot_ubw[:, :] = np.tile(q_dot_lim, (N_states, 1)).T
 
 # q_ddot bounds
-q_ddot_lim = 100. * np.ones(n_v)
+q_ddot_lim = np.inf * np.ones(n_v)
 q_ddot_lbw[:, :] = np.tile(-q_ddot_lim, (N_control, 1)).T
 q_ddot_ubw[:, :] = np.tile(q_ddot_lim, (N_control, 1)).T
 
 # f bounds
-f_lim = 1000. * np.ones(n_c * n_f)
+f_lim = np.inf * np.ones(n_c * n_f)
 f_lbw[:, :] = np.tile(-f_lim, (N_control, 1)).T
 f_ubw[:, :] = np.tile(f_lim, (N_control, 1)).T
 
-#
+# z component of f cannot go lower than 0
 f_lbw[2, :] = np.zeros(f_lbw[2, :].shape)
 f_lbw[5, :] = np.zeros(f_lbw[5, :].shape)
 f_lbw[8, :] = np.zeros(f_lbw[8, :].shape)
@@ -275,50 +237,61 @@ tau_lim = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
                     1000., 1000., 1000.,  # Contact 3
                     1000., 1000., 1000.])  # Contact 4
 
-tau_g_lbw = np.tile(-tau_lim, (N_control, 1)).T
-multi_shoot_g_lbw = np.zeros(g_multi_shoot.shape)
+# ======================================
+# tau_g_lbw = np.tile(-tau_lim, (N_control, 1)).T
+# tau_g_ubw = np.tile(tau_lim, (N_control, 1)).T
 
+tau_g_lbw = np.zeros(g_tau_i[0:6, :].shape)
+tau_g_ubw = np.zeros(g_tau_i[0:6, :].shape)
+# ======================================
+
+multi_shoot_g_lbw = np.zeros(g_multi_shoot.shape)
+multi_shoot_g_ubw = np.zeros(g_multi_shoot.shape)
+
+# ======================================
 g_lift_lbw = list()
-for elem in g_lift_list:
+for elem in g_lift_dict:
     g_lift_lbw.append(np.zeros(elem.shape))
 
 g_lift_ubw = list()
-for elem in g_lift_list:
+for elem in g_lift_dict:
     g_lift_ubw.append(np.zeros(elem.shape))
 
+# ======================================
 g_v_lbw = list()
-for elem in g_v_list:
+for elem in g_v_dict:
     g_v_lbw.append(np.zeros(elem.shape))
 
 g_v_ubw = list()
-for elem in g_v_list:
+for elem in g_v_dict:
     g_v_ubw.append(np.zeros(elem.shape))
 
+# ======================================
 g_fc_lbw = list()
-for elem in g_fc_list:
+for elem in g_fc_dict:
     g_fc_lbw.append(-np.inf * np.ones(elem.shape))
 
 g_fc_ubw = list()
-for elem in g_fc_list:
+for elem in g_fc_dict:
     g_fc_ubw.append(np.zeros(elem.shape))
 
+# ======================================
 g_no_force_lbw = list()
-for elem in g_no_force_list:
+for elem in g_no_force_dict:
     g_no_force_lbw.append(np.zeros(elem.shape))
 
 g_no_force_ubw = list()
-for elem in g_no_force_list:
+for elem in g_no_force_dict:
     g_no_force_ubw.append(np.zeros(elem.shape))
 
-# upper bound constraints
-tau_g_ubw = np.tile(tau_lim, (N_control, 1)).T
-multi_shoot_g_ubw = np.zeros(g_multi_shoot.shape)
-# g_land_ubw = np.zeros(g_land.shape)
+# ======================================
+
 
 # ======================================================================================================================
 # reshape stuff ========================================================================================================
 # ======================================================================================================================
 
+# VARIABLES
 q0_flat = np.reshape(q0, [1, q_dim], order='F')
 q_dot0_flat = np.reshape(q_dot0, [1, q_dot_dim], order='F')
 q_ddot0_flat = np.reshape(q_ddot0, [1, q_ddot_dim], order='F')
@@ -337,19 +310,20 @@ q_ddot_ubw_flat = np.reshape(q_ddot_ubw, [1, q_ddot_dim], order='F')
 f_ubw_flat = np.reshape(f_ubw, [1, f_dim], order='F')
 ubw = np.concatenate((q_ubw_flat, q_dot_ubw_flat, q_ddot_ubw_flat, f_ubw_flat), axis=1)
 
-tau_g_lbw = np.reshape(tau_g_lbw, [1, g_tau_i.shape[0] * g_tau_i.shape[1]], order='F')
-tau_g_ubw = np.reshape(tau_g_ubw, [1, g_tau_i.shape[0] * g_tau_i.shape[1]], order='F')
+tau_g_lbw_flat = np.reshape(tau_g_lbw, [1, g_tau_i[0:6, :].shape[0] * g_tau_i[0:6, :].shape[1]], order='F')
+tau_g_ubw_flat = np.reshape(tau_g_ubw, [1, g_tau_i[0:6, :].shape[0] * g_tau_i[0:6, :].shape[1]], order='F')
 
+# CONSTRAINTS
 multi_shoot_g_lbw_flat = np.reshape(multi_shoot_g_lbw, [1, g_multi_shoot.shape[0] * g_multi_shoot.shape[1]], order='F')
 multi_shoot_g_ubw_flat = np.reshape(multi_shoot_g_ubw, [1, g_multi_shoot.shape[0] * g_multi_shoot.shape[1]], order='F')
 
 g_lift_lbw_flat = list()
 for elem in g_lift_lbw:
-    g_lift_lbw_flat = np.reshape(elem, [1, elem.shape[0] * elem.shape[1]], order='F')
+    g_lift_lbw_flat.append(np.reshape(elem, [1, elem.shape[0] * elem.shape[1]], order='F'))
 
 g_lift_ubw_flat = list()
 for elem in g_lift_ubw:
-    g_lift_ubw_flat = np.reshape(elem, [1, elem.shape[0] * elem.shape[1]], order='F')
+    g_lift_ubw_flat.append(np.reshape(elem, [1, elem.shape[0] * elem.shape[1]], order='F'))
 
 g_v_lbw_flat = list()
 for elem in g_v_lbw:
@@ -380,12 +354,49 @@ for elem in g_no_force_ubw:
 # ======================================================================================================================
 # ======================================================================================================================
 w = cs.veccat(q_i, q_dot_i, q_ddot_i, f_i)
-g = cs.veccat(g_multi_shoot, g_tau_i, *g_v_list, *g_no_force_list, *g_lift_list, *g_fc_list) # *g_no_force_list # g_land
+g = cs.veccat(g_multi_shoot, g_tau_i[0:6, :], *g_v_dict, *g_no_force_dict, *g_lift_dict, *g_fc_dict) # *g_no_force_list # g_land
 f = sum(f_list)
 
+#
+# print('g_tau_i', g_tau_i.shape)
+# print('tau_g_lbw', tau_g_lbw.shape)
+# print('tau_g_ubw', tau_g_ubw.shape)
+# #
+# for elem in g_v_dict:
+#     print(f'g_v_dict', elem.shape)
+#
+# for elem in g_v_lbw:
+#     print('g_v_lbw', elem.shape)
+# for elem in g_v_ubw:
+#     print('g_v_ubw', elem.shape)
+#
+# for elem in g_no_force_dict:
+#     print(f'g_no_force_dict', elem.shape)
+#
+# for elem in g_no_force_lbw:
+#     print('g_no_force_lbw', elem.shape)
+# for elem in g_no_force_ubw:
+#     print('g_no_force_ubw', elem.shape)
+#
+# for elem in g_lift_dict:
+#     print(f'g_lift_dict', elem.shape)
+#
+# for elem in g_lift_lbw:
+#     print('g_lift_lbw', elem.shape)
+# for elem in g_lift_ubw:
+#     print('g_lift_ubw', elem.shape)
+#
+# for elem in g_fc_dict:
+#     print(f'g_fc_dict', elem.shape)
+#
+# for elem in g_fc_lbw:
+#     print('g_fc_lbw', elem.shape)
+# for elem in g_fc_ubw:
+#     print('g_fc_ubw', elem.shape)
+#
 
-lbg = np.concatenate((multi_shoot_g_lbw_flat, tau_g_lbw, *g_v_lbw_flat, *g_no_force_lbw_flat, g_lift_lbw_flat, *g_fc_lbw_flat), axis=1)  #*g_no_force_lbw_flat,  g_land_lbw_flat
-ubg = np.concatenate((multi_shoot_g_ubw_flat, tau_g_ubw, *g_v_ubw_flat, *g_no_force_ubw_flat, g_lift_ubw_flat, *g_fc_ubw_flat), axis=1) #*g_no_force_ubw_flat,  g_land_ubw_flat
+lbg = np.concatenate((multi_shoot_g_lbw_flat, tau_g_lbw_flat, *g_v_lbw_flat, *g_no_force_lbw_flat, *g_lift_lbw_flat, *g_fc_lbw_flat), axis=1)  #*g_no_force_lbw_flat,  g_land_lbw_flat
+ubg = np.concatenate((multi_shoot_g_ubw_flat, tau_g_ubw_flat, *g_v_ubw_flat, *g_no_force_ubw_flat, *g_lift_ubw_flat, *g_fc_ubw_flat), axis=1) #*g_no_force_ubw_flat,  g_land_ubw_flat
 
 prob_dict = {'f': f, 'x': w, 'g': cs.vec(g)}
 

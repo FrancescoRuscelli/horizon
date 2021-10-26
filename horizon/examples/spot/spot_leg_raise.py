@@ -37,7 +37,7 @@ ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.ma
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -219,7 +219,20 @@ toc = time.time()
 print('time elapsed solving:', toc - tic)
 
 solution = solver.getSolutionDict()
-ms.store(solution)
+solution_constraints = solver.getConstraintSolutionDict()
+
+solution_constraints_dict = dict()
+for name, item in prb.getConstraints().items():
+    lb, ub = item.getBounds()
+    lb_mat = np.reshape(lb, (item.getDim(), len(item.getNodes())), order='F')
+    ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
+    solution_constraints_dict[name] = dict(val=solution_constraints[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
+
+if isinstance(dt, cs.SX):
+    ms.store({**solution, **solution_constraints_dict})
+else:
+    dt_dict = dict(constant_dt=dt)
+    ms.store({**solution, **solution_constraints_dict, **dt_dict})
 
 # ========================================================
 plot_all = True
