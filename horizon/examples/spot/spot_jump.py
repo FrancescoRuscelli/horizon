@@ -72,7 +72,7 @@ for i in range(n_c):
     f_list.append(prb.createInputVariable(f'f{i}', n_f))
 
 # SET CONTACTS MAP
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 
 

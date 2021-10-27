@@ -76,7 +76,7 @@ f_list = list()
 for i in range(n_c):
     f_list.append(cs.SX.sym(f'f{i}', n_f))
 
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 fd = kin_dyn.ForwardDynamics(kindyn, contacts_name, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 q_ddot = fd.call(q, q_dot, tau, contact_map)
