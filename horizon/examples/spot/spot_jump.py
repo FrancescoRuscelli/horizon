@@ -9,6 +9,7 @@ from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 from scipy.io import loadmat
+# import rospkg
 
 def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
     t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
@@ -36,6 +37,8 @@ ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.ma
 transcription_method = 'multiple_shooting'  # direct_collocation # multiple_shooting
 transcription_opts = dict(integrator='RK4')
 
+# rospack = rospkg.RosPack()
+# rospack.get_path('spot_urdf')
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)

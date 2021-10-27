@@ -28,7 +28,7 @@ N_control = N
 
 dt = 0.02
 
-ms = mat_storer.matStorer('../examples/spot_backflip_manual.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_backflip_manual.mat')
 solution = ms.load()
 
 sol = solution['a']
