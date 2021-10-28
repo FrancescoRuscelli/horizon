@@ -1,7 +1,6 @@
 # /usr/bin/env python3
 import numpy
 import numpy as np
-
 ##### for robot and stuff
 import xbot_interface.config_options as xbot_opt
 from cartesian_interface.pyci_all import *
@@ -39,7 +38,7 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump_twist.mat')
 solution = ms.load()
 
 tau = solution['inverse_dynamics']['val'][0][0]
@@ -70,56 +69,58 @@ q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resa
     cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
 num_samples = tau_res.shape[1]
+plot_flag = True
+if plot_flag:
+    import matplotlib.pyplot as plt
 
-import matplotlib.pyplot as plt
 
-node_vec = np.zeros([n_nodes+1])
-for i in range(1, n_nodes+1):
-    node_vec[i] = node_vec[i - 1] + solution['dt'][0][i - 1]
+    node_vec = np.zeros([n_nodes+1])
+    for i in range(1, n_nodes+1):
+        node_vec[i] = node_vec[i - 1] + solution['dt'][0][i - 1]
 
-node_vec_res = np.zeros([num_samples + 1])
-for i in range(1, num_samples+1):
-    node_vec_res[i] = node_vec_res[i - 1] + dt_res
+    node_vec_res = np.zeros([num_samples + 1])
+    for i in range(1, num_samples+1):
+        node_vec_res[i] = node_vec_res[i - 1] + dt_res
 
-plt.figure()
-for dim in range(q_res.shape[0]):
-    plt.plot(node_vec_res, np.array(q_res[dim, :]))
+    plt.figure()
+    for dim in range(q_res.shape[0]):
+        plt.plot(node_vec_res, np.array(q_res[dim, :]))
 
-for dim in range(solution['q'].shape[0]):
-    plt.scatter(node_vec, np.array(solution['q'][dim, :]))
-plt.title('q')
+    for dim in range(solution['q'].shape[0]):
+        plt.scatter(node_vec, np.array(solution['q'][dim, :]))
+    plt.title('q')
 
-plt.figure()
-for dim in range(qdot_res.shape[0]):
-    plt.plot(node_vec_res, np.array(qdot_res[dim, :]))
+    plt.figure()
+    for dim in range(qdot_res.shape[0]):
+        plt.plot(node_vec_res, np.array(qdot_res[dim, :]))
 
-for dim in range(solution['q_dot'].shape[0]):
-    plt.scatter(node_vec, np.array(solution['q_dot'][dim, :]))
-plt.title('qdot')
+    for dim in range(solution['q_dot'].shape[0]):
+        plt.scatter(node_vec, np.array(solution['q_dot'][dim, :]))
+    plt.title('qdot')
 
-plt.figure()
-for dim in range(qddot_res.shape[0]):
-    plt.plot(node_vec_res[:-1], np.array(qddot_res[dim, :]))
+    plt.figure()
+    for dim in range(qddot_res.shape[0]):
+        plt.plot(node_vec_res[:-1], np.array(qddot_res[dim, :]))
 
-for dim in range(solution['q_ddot'].shape[0]):
-    plt.scatter(node_vec[:-1], np.array(solution['q_ddot'][dim, :]))
-plt.title('q_ddot')
+    for dim in range(solution['q_ddot'].shape[0]):
+        plt.scatter(node_vec[:-1], np.array(solution['q_ddot'][dim, :]))
+    plt.title('q_ddot')
 
-plt.figure()
-for dim in range(6):
-    plt.plot(node_vec_res[:-1], np.array(tau_res[dim, :]))
-for dim in range(6):
-    plt.scatter(node_vec[:-1], np.array(tau[dim, :]))
-plt.title('tau on base')
+    plt.figure()
+    for dim in range(6):
+        plt.plot(node_vec_res[:-1], np.array(tau_res[dim, :]))
+    for dim in range(6):
+        plt.scatter(node_vec[:-1], np.array(tau[dim, :]))
+    plt.title('tau on base')
 
-plt.figure()
-for dim in range(tau_res.shape[0]-6):
-    plt.plot(node_vec_res[:-1], np.array(tau_res[6+dim, :]))
-for dim in range(tau.shape[0] - 6):
-    plt.scatter(node_vec[:-1], np.array(tau[6 + dim, :]))
-plt.title('tau')
-plt.show()
-exit()
+    plt.figure()
+    for dim in range(tau_res.shape[0]-6):
+        plt.plot(node_vec_res[:-1], np.array(tau_res[6+dim, :]))
+    for dim in range(tau.shape[0] - 6):
+        plt.scatter(node_vec[:-1], np.array(tau[6 + dim, :]))
+    plt.title('tau')
+    plt.show()
+
 ## PREPARE ROBOT
 
 rospy.init_node('spot')
@@ -153,8 +154,9 @@ rate = rospy.Rate(1/dt_res)
 
 for i in range(100):
     robot.setPositionReference(q_homing)
-    robot.setStiffness(4 *[400, 400, 200])
+    robot.setStiffness(4 *[200, 200, 100])
     robot.move()
+
 # crude homing
 
 input('press a button to replay')
