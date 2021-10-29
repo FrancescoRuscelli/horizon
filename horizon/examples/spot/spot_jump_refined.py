@@ -140,7 +140,9 @@ new_dt_vec = np.diff(new_nodes_vec)
 new_indices = np.where(np.in1d(new_nodes_vec, times_exceed))[0]
 base_indices = np.where(np.in1d(new_nodes_vec, nodes_vec))[0]
 
-zip_indices = dict(zip(new_indices, nodes_exceed))
+zip_indices_base = dict(zip(nodes_vec, nodes_exceed))
+zip_indices_new = dict(zip(new_indices, nodes_exceed))
+
 
 original_value_indices = new_nodes_vec
 # =========================================
@@ -283,32 +285,40 @@ for f in f_list:
 #     dt.setBounds(dt_min, dt_max)
 
 # SET INITIAL GUESS
+k = 0
 for node in range(n_nodes+1):
     if node in base_indices:
-        q.setInitialGuess(prev_q[:, node], node)
-    if node in zip_indices.keys():
-        q.setInitialGuess(q_res[:, zip_indices[node]], node)
+        q.setInitialGuess(prev_q[:, k], node)
+        k += 1
+    if node in zip_indices_new.keys():
+        q.setInitialGuess(q_res[:, zip_indices_new[node]], node)
 
-q_to_print = q.getInitialGuess()
-q_to_print_matrix = np.reshape(q_to_print, (n_q, n_nodes+1), order='F')
-for dim in range(q_to_print_matrix.shape[0]):
-    plt.plot(range(q_to_print_matrix.shape[1]), q_to_print_matrix[dim, :])
-plt.show()
-exit()
-for node in range(prev_q_dot.shape[1]):
+# q_to_print = q.getInitialGuess()
+# q_to_print_matrix = np.reshape(q_to_print, (n_q, n_nodes+1), order='F')
+# for dim in range(q_to_print_matrix.shape[0]):
+#     plt.plot(range(q_to_print_matrix.shape[1]), q_to_print_matrix[dim, :])
+# plt.show()
+# exit()
+k = 0
+for node in range(n_nodes+1):
     if node in base_indices:
-        q_dot.setInitialGuess(prev_q_dot[:, node], node)
-    if node in zip_indices.keys():
-        q_dot.setInitialGuess(qdot_res[:, zip_indices[node]], node)
-for node in range(prev_q_ddot.shape[1]):
+        q_dot.setInitialGuess(prev_q_dot[:, k], node)
+        k += 1
+    if node in zip_indices_new.keys():
+        q_dot.setInitialGuess(qdot_res[:, zip_indices_new[node]], node)
+k = 0
+for node in range(n_nodes):
     if node in base_indices:
-        q_ddot.setInitialGuess(prev_q_ddot[:, node], node)
-    if node in zip_indices.keys():
-        q_ddot.setInitialGuess(qddot_res[:, zip_indices[node]], node)
+        q_ddot.setInitialGuess(prev_q_ddot[:, k], node)
+        k += 1
+    if node in zip_indices_new.keys():
+        q_ddot.setInitialGuess(qddot_res[:, zip_indices_new[node]], node)
+k = 0
 for f, f_ig in zip(f_list, prev_f_list):
-    for node in range(f_ig.shape[1]):
+    for node in range(n_nodes):
         if node in base_indices:
-            f.setInitialGuess(f_ig[:, node], node)
+            f.setInitialGuess(f_ig[:, k], node)
+            k += 1
         # if node in zip_indices.keys():
         #     f.setInitialGuess(f_[:, zip_indices[node]])
 # if isinstance(dt, cs.SX):
