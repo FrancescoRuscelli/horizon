@@ -79,7 +79,7 @@ contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 
 
-load_initial_guess = False
+load_initial_guess = True
 # import initial guess if present
 if load_initial_guess:
     prev_solution = ms.load()
@@ -87,7 +87,7 @@ if load_initial_guess:
     q_dot_ig = prev_solution['q_dot']
     q_ddot_ig = prev_solution['q_ddot']
     f_ig_list = list()
-    for f in f_list:
+    for i in range(n_c):
         f_ig_list.append(prev_solution[f'f{i}'])
 
     dt_ig = prev_solution['dt']
@@ -253,8 +253,8 @@ for f in f_list:
 # =============
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 2000}
-# 'ipopt.linear_solver': 'ma57'}
+        'ipopt.max_iter': 2000,
+        'ipopt.linear_solver': 'ma57'}
 
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
 solver.solve()

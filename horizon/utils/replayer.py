@@ -89,7 +89,7 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot/spot_leg_raise.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
 solution = ms.load()
 
 # print([name for name in solution])
@@ -101,15 +101,17 @@ replay_traj = False
 plotting = True
 check_bounds = False
 
+if 'dt' in solution:
+    dt_before_res = solution['dt'].flatten()
+elif 'constant_dt' in solution:
+    dt_before_res = solution['constant_dt'].flatten()[0]
+elif 'param_dt' in solution:
+    dt_before_res = solution['param_dt'].flatten()[0]
+
 if replay_traj:
     joint_names = kindyn.joint_names()
     if 'universe' in joint_names: joint_names.remove('universe')
     if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
-
-    if 'dt' in solution:
-        dt_before_res = solution['dt'].flatten()
-    else:
-        dt_before_res = solution['constant_dt'].flatten()[0]
 
     dt_res = 0.001
 

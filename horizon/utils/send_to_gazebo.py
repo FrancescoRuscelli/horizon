@@ -1,12 +1,8 @@
 # /usr/bin/env python3
-import numpy
 import numpy as np
 ##### for robot and stuff
 import xbot_interface.config_options as xbot_opt
-from cartesian_interface.pyci_all import *
 from xbot_interface import xbot_interface as xbot
-from moveit_commander.roscpp_initializer import roscpp_initialize
-from ci_solver_spot import CartesianInterfaceSolver
 import rospy
 from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_storer
 
@@ -22,23 +18,20 @@ urdffile = '../examples/urdf/spot.urdf'
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
-tot_time = 1
-dt_hint = 0.02
-duration_step = 0.5
+n_nodes = 50
 
-n_nodes = int(tot_time / dt_hint)
-n_nodes_step = int(duration_step / dt_hint)
+node_start_step = 20
+node_end_step = 40
+node_peak = 30
+jump_height = 0.2
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-jump_height = 0.1
-node_start_step = 15
-node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot/spot_jump_twist.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump_refined.mat')
 solution = ms.load()
 
 tau = solution['inverse_dynamics']['val'][0][0]
@@ -52,8 +45,10 @@ if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint
 
 if 'dt' in solution:
     dt_before_res = solution['dt'].flatten()
-else:
+elif 'constant_dt' in solution:
     dt_before_res = solution['constant_dt'].flatten()[0]
+elif 'param_dt' in solution:
+    dt_before_res = solution['param_dt'].flatten()
 
 dt_res = 0.001
 
@@ -69,25 +64,29 @@ q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resa
     cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
 num_samples = tau_res.shape[1]
+
+if 'nodes' in solution:
+    n_nodes = solution['nodes'] - 1
+    nodes_vec = solution['times'][0]
+else:
+    nodes_vec = np.zeros([n_nodes + 1])
+    for i in range(1, n_nodes + 1):
+        nodes_vec[i] = nodes_vec[i - 1] + dt_before_res[i - 1]
+
+node_vec_res = np.zeros([num_samples + 1])
+for i in range(1, num_samples + 1):
+    node_vec_res[i] = node_vec_res[i - 1] + dt_res
+
 plot_flag = True
 if plot_flag:
     import matplotlib.pyplot as plt
-
-
-    node_vec = np.zeros([n_nodes+1])
-    for i in range(1, n_nodes+1):
-        node_vec[i] = node_vec[i - 1] + solution['dt'][0][i - 1]
-
-    node_vec_res = np.zeros([num_samples + 1])
-    for i in range(1, num_samples+1):
-        node_vec_res[i] = node_vec_res[i - 1] + dt_res
 
     plt.figure()
     for dim in range(q_res.shape[0]):
         plt.plot(node_vec_res, np.array(q_res[dim, :]))
 
     for dim in range(solution['q'].shape[0]):
-        plt.scatter(node_vec, np.array(solution['q'][dim, :]))
+        plt.scatter(nodes_vec, np.array(solution['q'][dim, :]))
     plt.title('q')
 
     plt.figure()
@@ -95,7 +94,7 @@ if plot_flag:
         plt.plot(node_vec_res, np.array(qdot_res[dim, :]))
 
     for dim in range(solution['q_dot'].shape[0]):
-        plt.scatter(node_vec, np.array(solution['q_dot'][dim, :]))
+        plt.scatter(nodes_vec, np.array(solution['q_dot'][dim, :]))
     plt.title('qdot')
 
     plt.figure()
@@ -103,21 +102,21 @@ if plot_flag:
         plt.plot(node_vec_res[:-1], np.array(qddot_res[dim, :]))
 
     for dim in range(solution['q_ddot'].shape[0]):
-        plt.scatter(node_vec[:-1], np.array(solution['q_ddot'][dim, :]))
+        plt.scatter(nodes_vec[:-1], np.array(solution['q_ddot'][dim, :]))
     plt.title('q_ddot')
 
     plt.figure()
     for dim in range(6):
         plt.plot(node_vec_res[:-1], np.array(tau_res[dim, :]))
     for dim in range(6):
-        plt.scatter(node_vec[:-1], np.array(tau[dim, :]))
+        plt.scatter(nodes_vec[:-1], np.array(tau[dim, :]))
     plt.title('tau on base')
 
     plt.figure()
     for dim in range(tau_res.shape[0]-6):
         plt.plot(node_vec_res[:-1], np.array(tau_res[6+dim, :]))
     for dim in range(tau.shape[0] - 6):
-        plt.scatter(node_vec[:-1], np.array(tau[6 + dim, :]))
+        plt.scatter(nodes_vec[:-1], np.array(tau[6 + dim, :]))
     plt.title('tau')
     plt.show()
 
@@ -138,7 +137,7 @@ opt.set_string_parameter('framework', 'ROS')
 model = xbot.ModelInterface(opt)
 robot = xbot.RobotInterface(opt)
 
-robot_state = numpy.zeros( n_q-7)
+robot_state = np.zeros( n_q-7)
 robot_state = robot.getJointPosition()
 
 

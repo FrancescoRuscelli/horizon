@@ -61,7 +61,7 @@ if load_initial_guess:
     q_dot_ig = prev_solution['q_dot']
     q_ddot_ig = prev_solution['q_ddot']
     f_ig_list = list()
-    for f in f_list:
+    for i in range(n_f):
         f_ig_list.append(prev_solution[f'f{i}'])
 
     dt_ig = prev_solution['dt']
