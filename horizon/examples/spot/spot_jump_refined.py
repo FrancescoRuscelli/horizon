@@ -69,6 +69,7 @@ q_res, qdot_res, qddot_res, contact_map_res, tau_sol_res = resampler_trajectory.
     kindyn,
     cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
+f_res = resampler_trajectory.resample_input(prev_solution['f0'], prev_dt, dt_res)
 num_samples = tau_sol_res.shape[1]
 
 nodes_vec = np.zeros([n_nodes + 1])
@@ -79,9 +80,21 @@ nodes_vec_res = np.zeros([num_samples + 1])
 for i in range(1, num_samples + 1):
     nodes_vec_res[i] = nodes_vec_res[i - 1] + dt_res
 
-plot_flag = False
+plot_flag = True
 
 if plot_flag:
+
+    plt.figure()
+    for dim in range(prev_solution['f0'].shape[0]):
+        plt.plot(nodes_vec_res[:-1], np.array(f_res[dim, :]))
+        
+    for dim in range(prev_solution['f0'].shape[0]):
+        plt.scatter(nodes_vec[:-1], np.array(prev_solution['f0'][dim, :]))
+
+    plt.title('f0')
+
+    plt.show()
+    exit()
     plt.figure()
     for dim in range(q_res.shape[0]):
         plt.plot(nodes_vec_res, np.array(q_res[dim, :]))
@@ -293,12 +306,6 @@ for node in range(n_nodes+1):
     if node in zip_indices_new.keys():
         q.setInitialGuess(q_res[:, zip_indices_new[node]], node)
 
-# q_to_print = q.getInitialGuess()
-# q_to_print_matrix = np.reshape(q_to_print, (n_q, n_nodes+1), order='F')
-# for dim in range(q_to_print_matrix.shape[0]):
-#     plt.plot(range(q_to_print_matrix.shape[1]), q_to_print_matrix[dim, :])
-# plt.show()
-# exit()
 k = 0
 for node in range(n_nodes+1):
     if node in base_indices:
@@ -306,6 +313,7 @@ for node in range(n_nodes+1):
         k += 1
     if node in zip_indices_new.keys():
         q_dot.setInitialGuess(qdot_res[:, zip_indices_new[node]], node)
+
 k = 0
 for node in range(n_nodes):
     if node in base_indices:
@@ -313,8 +321,9 @@ for node in range(n_nodes):
         k += 1
     if node in zip_indices_new.keys():
         q_ddot.setInitialGuess(qddot_res[:, zip_indices_new[node]], node)
-k = 0
+
 for f, f_ig in zip(f_list, prev_f_list):
+    k = 0
     for node in range(n_nodes):
         if node in base_indices:
             f.setInitialGuess(f_ig[:, k], node)
@@ -324,6 +333,54 @@ for f, f_ig in zip(f_list, prev_f_list):
 # if isinstance(dt, cs.SX):
 #     for node in range(prev_dt.shape[0]):
 #         dt.setInitialGuess(prev_dt[node], node)
+plot_ig = True
+if plot_ig:
+    # ========================================================================================================
+    plt.figure()
+
+    for dim in range(q_res.shape[0]):
+        plt.plot(nodes_vec_res, q_res[dim, :], '--')
+
+    for dim in range(prev_q.shape[0]):
+        plt.scatter(nodes_vec, prev_q[dim, :], color='red')
+
+    q_to_print = q.getInitialGuess()
+    q_to_print_matrix = np.reshape(q_to_print, (n_q, n_nodes + 1), order='F')
+
+    for dim in range(q_to_print_matrix.shape[0]):
+        plt.scatter(new_nodes_vec, q_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+    # ========================================================================================================
+    plt.figure()
+
+    for dim in range(qdot_res.shape[0]):
+        plt.plot(nodes_vec_res, qdot_res[dim, :], '--')
+
+    for dim in range(prev_q_dot.shape[0]):
+        plt.scatter(nodes_vec, prev_q_dot[dim, :], color='red')
+
+    q_dot_to_print = q_dot.getInitialGuess()
+    q_dot_to_print_matrix = np.reshape(q_dot_to_print, (n_v, n_nodes + 1), order='F')
+
+    for dim in range(q_dot_to_print_matrix.shape[0]):
+        plt.scatter(new_nodes_vec, q_dot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+    # ========================================================================================================
+    plt.figure()
+
+    for dim in range(qddot_res.shape[0]):
+        plt.plot(nodes_vec_res[:-1], qddot_res[dim, :], '--')
+
+    for dim in range(prev_q_ddot.shape[0]):
+        plt.scatter(nodes_vec[:-1], prev_q_ddot[dim, :], color='red')
+
+    q_ddot_to_print = q_ddot.getInitialGuess()
+    q_ddot_to_print_matrix = np.reshape(q_ddot_to_print, (n_v, n_nodes), order='F')
+
+    for dim in range(q_ddot_to_print_matrix.shape[0]):
+        plt.scatter(new_nodes_vec[:-1], q_ddot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+    # ========================================================================================================
+    plt.show()
+
+exit()
 # SET TRANSCRIPTION METHOD
 th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
 
