@@ -136,50 +136,23 @@ if plot_flag:
 
 tau_sol_base = tau_sol_res[:6, :]
 
-threshold = 12
-## get index of values greater than a given threshold for each dimension of the vector, and remove all the duplicate values (given by the fact that there are more dimensions)
-indices_exceed = np.unique(np.argwhere(np.abs(tau_sol_base) > threshold)[:, 1])
-# these indices corresponds to some nodes ..
-values_exceed = nodes_vec_res[indices_exceed]
+index_to_add = 563
+values_exceed = nodes_vec_res[index_to_add]
+
 
 ## base vector nodes augmented with new nodes + sort
-nodes_vec_augmented = np.concatenate((nodes_vec, values_exceed))
+nodes_vec_augmented = np.concatenate((nodes_vec, [values_exceed])) # nodes_vec # np.concatenate((nodes_vec, [values_exceed]))
 nodes_vec_augmented.sort(kind='mergesort')
 
 # new number of nodes
 new_n_nodes = nodes_vec_augmented.shape[0]
 new_dt_vec = np.diff(nodes_vec_augmented)
 
-# remove dt that are too small
-index_granularity = np.where(new_dt_vec < 9e-4)[0]
 
-removed_values = nodes_vec_augmented[index_granularity]
-
-print(f'{index_granularity.shape[0]} dt are too small. Removing the corresponding values: {removed_values}')
-
-nodes_vec_augmented = np.delete(nodes_vec_augmented, index_granularity[0])
-
-index_removed = np.searchsorted(values_exceed, removed_values)
-# update the indices_exceed removing the one too small: for the zip
-indices_exceed = np.delete(indices_exceed, index_removed)
-
-new_dt_vec = np.diff(nodes_vec_augmented)
-
-
-# print(new_nodes_vec)
-index_granularity = np.where(new_dt_vec < 9e-4)
-if new_dt_vec[index_granularity].size == 0:
-    print('allright')
-
-
-new_n_nodes = nodes_vec_augmented.shape[0]
-
-## which index of the augmented vector were added to base vector nodes
 new_indices = np.where(np.in1d(nodes_vec_augmented, values_exceed))[0]
 base_indices = np.where(np.in1d(nodes_vec_augmented, nodes_vec))[0]
 
-zip_indices_new = dict(zip(new_indices, indices_exceed))
-
+zip_indices_new = dict(zip(new_indices, [index_to_add]))
 
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
@@ -212,48 +185,6 @@ if node_peak:
 else:
     raise Exception('something is wrong with node_peak')
 
-plot_nodes = True
-if plot_nodes:
-    plt.figure()
-    # nodes old
-    plt.scatter(nodes_vec, np.zeros([nodes_vec.shape[0]]), edgecolors='blue', facecolor='none')
-    plt.scatter(values_exceed, np.zeros([values_exceed.shape[0]]), edgecolors='red', facecolor='none')
-    plt.scatter(nodes_vec[old_node_start_step], 0, marker='x', color='black')
-    plt.vlines([nodes_vec[old_node_start_step], nodes_vec[old_node_end_step]],
-               plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
-
-    plt.scatter(nodes_vec[old_node_peak], 0, marker='x', color='black')
-    plt.scatter(nodes_vec[old_node_end_step], 0, marker='x', color='black')
-
-    plt.scatter(nodes_vec_augmented[node_start_step], 0, marker='x', color='green')
-    plt.scatter(nodes_vec_augmented[node_peak], 0, marker='x', color='green')
-    plt.scatter(nodes_vec_augmented[node_end_step], 0, marker='x', color='green')
-    plt.vlines([nodes_vec_augmented[node_start_step], nodes_vec_augmented[node_end_step]],
-               plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='r', linewidth=0.4)
-
-    # for dim in range(6):
-    #     plt.plot(nodes_vec_res[:-1], np.array(tau_sol_res[dim, :]))
-    # for dim in range(6):
-    #     plt.scatter(nodes_vec[:-1], np.array(prev_tau[dim, :]))
-    # plt.title('tau on base')
-    plt.show()
-
-print('old_node_start_step', old_node_start_step)
-print('old_node_end_step', old_node_end_step)
-print('old_node_peak', old_node_peak)
-print('node_start_step', node_start_step)
-print('node_end_step', node_end_step)
-print('node_peak', node_peak)
-
-print('nodes_vec shape', nodes_vec.shape)
-print('new_nodes_vec shape', nodes_vec_augmented.shape)
-
-print('base_indices', base_indices)
-print('new_indices', new_indices)
-print('n_nodes', n_nodes)
-
-# print('prev_dt_vec', prev_dt)
-# print('new_dt_vec', new_dt_vec)
 
 # SET PROBLEM STATE AND INPUT VARIABLES
 prb = problem.Problem(n_nodes)
@@ -356,7 +287,29 @@ for i_f in range(len(f_list)):
         if node in zip_indices_new.keys():
             f_list[i_f].setInitialGuess(f_res_list[i_f][:, zip_indices_new[node]], node)
 
-plot_ig = True
+plot_nodes = False
+if plot_nodes:
+    plt.figure()
+    plt.scatter(nodes_vec, np.zeros([nodes_vec.shape[0]]), edgecolors='blue', facecolor='none')
+    plt.scatter(nodes_vec_res[index_to_add], 0, edgecolors='red', facecolor='none')
+    plt.scatter(nodes_vec_augmented, np.zeros([nodes_vec_augmented.shape[0]]), marker='x', color='green')
+
+    plt.scatter(nodes_vec[old_node_start_step], 0, marker='x', color='black')
+    plt.vlines([nodes_vec[old_node_start_step], nodes_vec[old_node_end_step]],
+               plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
+
+    plt.scatter(nodes_vec[old_node_peak], 0, marker='x', color='black')
+    plt.scatter(nodes_vec[old_node_end_step], 0, marker='x', color='black')
+
+    plt.scatter(nodes_vec_augmented[node_start_step], 0, marker='x', color='green')
+    plt.scatter(nodes_vec_augmented[node_peak], 0, marker='x', color='green')
+    plt.scatter(nodes_vec_augmented[node_end_step], 0, marker='x', color='green')
+    plt.vlines([nodes_vec_augmented[node_start_step], nodes_vec_augmented[node_end_step]],
+               plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='r', linewidth=0.4)
+
+    plt.show()
+
+plot_ig = False
 if plot_ig:
     # ========================================================================================================
     plt.figure()
@@ -445,21 +398,6 @@ active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-# base_link stays at the same position
-# FK = cs.Function.deserialize(kindyn.fk('base_link'))
-# p_base = FK(q=q)['ee_pos']
-# p_base_start = FK(q=q_init)['ee_pos']
-
-# prb.createCostFunction(f"base_link_pos", 1000*cs.sumsqr(p_base[0:2] - p_base_start[0:2]))
-
-# DFK = cs.Function.deserialize(kindyn.frameVelocity('base_link', cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
-# v_base = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-# 2. velocity of each base_link must be zero
-# prb.createConstraint(f"base_link_vel_before_step", v_base, nodes=range(0, node_start_step))
-# prb.createConstraint(f"base_link_vel_after_step", v_base, nodes=range(node_end_step, n_nodes + 1))
-# COM = cs.Function.deserialize(kindyn.centerOfMass())
-# p_com = COM(q=q_init)['com']
-# exit()
 fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
 q_final = q_init
 
