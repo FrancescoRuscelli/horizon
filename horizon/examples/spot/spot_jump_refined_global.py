@@ -1,9 +1,12 @@
 # /usr/bin/env python3
 
 ############
-#experiment to augment the nodes with ONE MORE NODE in between somewhere, to study how its insertion changes the overall trajectory
-#to visualize the trajectory use appoggello.py
+#experiment to augment the nodes with supporting nodes.
+# This is useful when simply resampling the trajectory make it unfeasible (especially for the tau on the floating base, which become non zero).
+# The underlying idea is GLOBALLY refining the trajectory by injecting more nodes so that, when resampling, less errors pop up.
+#to visualize the trajectory use vis_refiner_global.py and to resample + send it to gazebo use send_to_gazebo.py
 ##################
+
 import horizon.variables
 from horizon import problem
 from horizon.transcriptions.transcriptor import Transcriptor
@@ -17,6 +20,7 @@ import matplotlib.pyplot as plt
 ## ==================
 ## PREPARE TRAJECTORY
 ## ==================
+
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
@@ -61,7 +65,7 @@ if 'dt' in prev_solution:
 else:
     prev_dt = prev_solution['constant_dt'].flatten()[0]
 
-dt_res = 0.001
+dt_res = 0.005
 
 q_sym = cs.SX.sym('q', n_q)
 q_dot_sym = cs.SX.sym('q_dot', n_v)
@@ -139,30 +143,10 @@ if plot_flag:
     plt.title('tau')
     plt.show()
 
-tau_sol_base = tau_sol_res[:6, :]
-
-index_to_add = 563
-values_exceed = nodes_vec_res[index_to_add]
-
-
-## base vector nodes augmented with new nodes + sort
-nodes_vec_augmented = np.concatenate((nodes_vec, [values_exceed])) # nodes_vec # np.concatenate((nodes_vec, [values_exceed]))
-nodes_vec_augmented.sort(kind='mergesort')
-
-# new number of nodes
-new_n_nodes = nodes_vec_augmented.shape[0]
-new_dt_vec = np.diff(nodes_vec_augmented)
-
-
-new_indices = np.where(np.in1d(nodes_vec_augmented, values_exceed))[0]
-base_indices = np.where(np.in1d(nodes_vec_augmented, nodes_vec))[0]
-
-zip_indices_new = dict(zip(new_indices, [index_to_add]))
-
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
 old_nodes = 50
-
+new_n_nodes = q_res.shape[1]
 old_node_start_step = node_start_step
 old_node_end_step = node_end_step
 old_node_peak = node_peak
@@ -172,24 +156,61 @@ time_end_step = nodes_vec[old_node_end_step]
 time_peak = nodes_vec[old_node_peak]
 n_nodes = new_n_nodes - 1  # in new_n_nodes the last node is there already
 
-node_start_step = np.where(abs(time_start_step - nodes_vec_augmented) < dt_res)
+node_start_step = np.where(abs(time_start_step - nodes_vec_res) < dt_res)
 if node_start_step:
-    node_start_step = int(node_start_step[0][0])
+    node_start_step = int(node_start_step[0][1])
 else:
     raise Exception('something is wrong with time_start_step')
 
-node_end_step = np.where(abs(time_end_step - nodes_vec_augmented) < dt_res)  # dt_res
+node_end_step = np.where(abs(time_end_step - nodes_vec_res) < dt_res)  # dt_res
 if node_end_step:
     node_end_step = int(node_end_step[0][0])
 else:
-    raise Exception('something is wrong with time_start_step')
+    raise Exception('something is wrong with time_end_step')
 
-node_peak = np.where(abs(time_peak - nodes_vec_augmented) < dt_res)  # dt_res
+node_peak = np.where(abs(time_peak - nodes_vec_res) < dt_res)  # dt_res
 if node_peak:
     node_peak = int(node_peak[0][0])
 else:
     raise Exception('something is wrong with node_peak')
 
+plot_nodes = False
+if plot_nodes:
+    plt.figure()
+    # nodes old
+    plt.scatter(nodes_vec, np.zeros([nodes_vec.shape[0]]), edgecolors='blue', facecolor='none')
+    plt.scatter(nodes_vec[old_node_start_step], 0, marker='x', color='black')
+    plt.vlines([nodes_vec[old_node_start_step], nodes_vec[old_node_end_step]],
+               plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
+
+    plt.scatter(nodes_vec[old_node_peak], 0, marker='x', color='black')
+    plt.scatter(nodes_vec[old_node_end_step], 0, marker='x', color='black')
+
+    plt.scatter(nodes_vec_res[node_start_step], 0, marker='x', color='green')
+    plt.scatter(nodes_vec_res[node_peak], 0, marker='x', color='green')
+    plt.scatter(nodes_vec_res[node_end_step], 0, marker='x', color='green')
+    plt.vlines([nodes_vec_res[node_start_step], nodes_vec_res[node_end_step]],
+               plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='r', linewidth=0.4)
+
+    # for dim in range(6):
+    #     plt.plot(nodes_vec_res[:-1], np.array(tau_sol_res[dim, :]))
+    # for dim in range(6):
+    #     plt.scatter(nodes_vec[:-1], np.array(prev_tau[dim, :]))
+    # plt.title('tau on base')
+    # plt.show()
+
+print('old_node_start_step', old_node_start_step)
+print('old_node_end_step', old_node_end_step)
+print('old_node_peak', old_node_peak)
+print('node_start_step', node_start_step)
+print('node_end_step', node_end_step)
+print('node_peak', node_peak)
+
+print('nodes_vec shape', nodes_vec.shape)
+print('n_nodes', n_nodes)
+
+# print('prev_dt_vec', prev_dt)
+# print('new_dt_vec', new_dt_vec)
 
 # SET PROBLEM STATE AND INPUT VARIABLES
 prb = problem.Problem(n_nodes)
@@ -259,60 +280,18 @@ for f in f_list:
     f.setBounds(f_min, f_max)
 
 # SET INITIAL GUESS
-k = 0
 for node in range(n_nodes+1):
-    if node in base_indices:
-        q.setInitialGuess(prev_q[:, k], node)
-        k += 1
-    if node in zip_indices_new.keys():
-        q.setInitialGuess(q_res[:, zip_indices_new[node]], node)
+    q.setInitialGuess(q_res[:, node], node)
 
-k = 0
 for node in range(n_nodes+1):
-    if node in base_indices:
-        q_dot.setInitialGuess(prev_q_dot[:, k], node)
-        k += 1
-    if node in zip_indices_new.keys():
-        q_dot.setInitialGuess(qdot_res[:, zip_indices_new[node]], node)
+    q_dot.setInitialGuess(qdot_res[:, node], node)
 
-k = 0
 for node in range(n_nodes):
-    if node in base_indices:
-        q_ddot.setInitialGuess(prev_q_ddot[:, k], node)
-        k += 1
-    if node in zip_indices_new.keys():
-        q_ddot.setInitialGuess(qddot_res[:, zip_indices_new[node]], node)
+    q_ddot.setInitialGuess(qddot_res[:, node], node)
 
 for i_f in range(len(f_list)):
-    k = 0
     for node in range(n_nodes):
-        if node in base_indices:
-            f_list[i_f].setInitialGuess(prev_f_list[i_f][:, k], node)
-            k += 1
-        if node in zip_indices_new.keys():
-            f_list[i_f].setInitialGuess(f_res_list[i_f][:, zip_indices_new[node]], node)
-
-plot_nodes = False
-if plot_nodes:
-    plt.figure()
-    plt.scatter(nodes_vec, np.zeros([nodes_vec.shape[0]]), edgecolors='blue', facecolor='none')
-    plt.scatter(nodes_vec_res[index_to_add], 0, edgecolors='red', facecolor='none')
-    plt.scatter(nodes_vec_augmented, np.zeros([nodes_vec_augmented.shape[0]]), marker='x', color='green')
-
-    plt.scatter(nodes_vec[old_node_start_step], 0, marker='x', color='black')
-    plt.vlines([nodes_vec[old_node_start_step], nodes_vec[old_node_end_step]],
-               plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
-
-    plt.scatter(nodes_vec[old_node_peak], 0, marker='x', color='black')
-    plt.scatter(nodes_vec[old_node_end_step], 0, marker='x', color='black')
-
-    plt.scatter(nodes_vec_augmented[node_start_step], 0, marker='x', color='green')
-    plt.scatter(nodes_vec_augmented[node_peak], 0, marker='x', color='green')
-    plt.scatter(nodes_vec_augmented[node_end_step], 0, marker='x', color='green')
-    plt.vlines([nodes_vec_augmented[node_start_step], nodes_vec_augmented[node_end_step]],
-               plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='r', linewidth=0.4)
-
-    plt.show()
+        f_list[i_f].setInitialGuess(f_res_list[i_f][:, node], node)
 
 plot_ig = False
 if plot_ig:
@@ -329,7 +308,7 @@ if plot_ig:
     q_to_print_matrix = np.reshape(q_to_print, (n_q, n_nodes + 1), order='F')
 
     for dim in range(q_to_print_matrix.shape[0]):
-        plt.scatter(nodes_vec_augmented, q_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+        plt.scatter(nodes_vec_res, q_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
     # ========================================================================================================
     plt.figure()
 
@@ -343,7 +322,7 @@ if plot_ig:
     q_dot_to_print_matrix = np.reshape(q_dot_to_print, (n_v, n_nodes + 1), order='F')
 
     for dim in range(q_dot_to_print_matrix.shape[0]):
-        plt.scatter(nodes_vec_augmented, q_dot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+        plt.scatter(nodes_vec_res, q_dot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
     # ========================================================================================================
     plt.figure()
 
@@ -357,7 +336,7 @@ if plot_ig:
     q_ddot_to_print_matrix = np.reshape(q_ddot_to_print, (n_v, n_nodes), order='F')
 
     for dim in range(q_ddot_to_print_matrix.shape[0]):
-        plt.scatter(nodes_vec_augmented[:-1], q_ddot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+        plt.scatter(nodes_vec_res[:-1], q_ddot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
     # ========================================================================================================
     for i_f in range(len(f_list)):
         plt.figure()
@@ -374,7 +353,7 @@ if plot_ig:
         f_to_print_matrix = np.reshape(f_to_print, (n_f, n_nodes), order='F')
 
         for dim in range(f_to_print_matrix.shape[0]):
-            plt.scatter(nodes_vec_augmented[:-1], f_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+            plt.scatter(nodes_vec_res[:-1], f_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
 
     # ========================================================================================================
     plt.show()
@@ -440,19 +419,10 @@ for f in f_list:
 
 # prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
 
-# supporting cost function #
-k = 0
-for node in range(n_nodes):
-    if node in base_indices:
-        prb.createCostFunction(f"q_close_to_old_node_{node}", 1000. * cs.sumsqr(q - prev_q[:, k]), nodes=node)
-        k = k+1
-        # prb.createCostFunction(f"qdot_close_to_old_node_{node}", 1000. * cs.sumsqr(q_dot - prev_q_dot[:, node]), nodes=node)
 
-# for node in range(n_nodes-1):
-#     if node in base_indices:
-#         prb.createCostFunction(f"qddot_close_to_old_node_{node}", 1000. * cs.sumsqr(q_ddot - prev_q_ddot[:, node]), nodes=node)
-
-
+######################################## supporting cost function #######################################
+for node in range(n_nodes+1):
+    prb.createCostFunction(f"q_close_to_resampled_node_{node}", 5e2 * cs.sumsqr(q - q_res[:, node]), nodes=node)
 
 # =============
 # SOLVE PROBLEM
@@ -462,8 +432,8 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.max_iter': 2000,
         'ipopt.linear_solver': 'ma57'}
 
-for i in range(len(new_dt_vec)):
-    dt.assign(new_dt_vec[i], nodes=i+1)
+for i in range(n_nodes):
+    dt.assign(dt_res, nodes=i+1)
 
 sol = Solver.make_solver('ipopt', prb, dt, opts)
 sol.solve()
@@ -480,13 +450,5 @@ for name, item in prb.getConstraints().items():
 
 
 from horizon.variables import Variable, SingleVariable, Parameter, SingleParameter
-
-nodes_dict = dict(nodes=new_n_nodes, times=nodes_vec_augmented)
-if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
-    ms.store({**solution, **solution_constraints_dict, **nodes_dict})
-elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
-    dt_dict = dict(param_dt=new_dt_vec)
-    ms.store({**solution, **solution_constraints_dict, **nodes_dict, **dt_dict})
-else:
-    dt_dict = dict(constant_dt=dt)
-    ms.store({**solution, **solution_constraints_dict, **nodes_dict, **dt_dict})
+dt_dict = dict(dt_res=dt_res, n_nodes=n_nodes)
+ms.store({**solution, **solution_constraints_dict, **dt_dict})

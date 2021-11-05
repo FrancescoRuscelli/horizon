@@ -1,4 +1,12 @@
 # /usr/bin/env python3
+
+############
+#experiment to augment the nodes with supporting nodes.
+# This is useful when simply resampling the trajectory make it unfeasible (especially for the tau on the floating base, which become non zero).
+# The underlying idea is LOCALLY refining the trajectory by injecting more nodes so that, when resampling, less errors pop up.
+#to visualize the trajectory use vis_refiner_local.py and to resample + send it to gazebo use send_to_gazebo.py
+##################
+
 import horizon.variables
 from horizon import problem
 from horizon.transcriptions.transcriptor import Transcriptor
@@ -12,7 +20,6 @@ import matplotlib.pyplot as plt
 ## ==================
 ## PREPARE TRAJECTORY
 ## ==================
-
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
@@ -20,21 +27,22 @@ urdffile = '../urdf/spot.urdf'
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
-n_nodes = 50
+ms = mat_storer.matStorer('../spot/spot_jump_refined_local.mat')
+prev_solution = ms.load()
 
-node_start_step = 20
-node_end_step = 40
-node_peak = 30
-jump_height = 0.2
+
+n_nodes = prev_solution['n_nodes'][0][0]
+
+node_start_step = prev_solution['node_start_step'][0][0]
+node_end_step = prev_solution['node_end_step'][0][0]
+node_peak = prev_solution['node_peak'][0][0]
+jump_height = prev_solution['jump_height'][0][0]
 
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
-
-ms = mat_storer.matStorer('../spot/spot_jump.mat')
-prev_solution = ms.load()
 
 prev_q = prev_solution['q']
 prev_q_dot = prev_solution['q_dot']
@@ -54,10 +62,12 @@ if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint
 
 if 'dt' in prev_solution:
     prev_dt = prev_solution['dt'].flatten()
-else:
+elif 'constant_dt' in prev_solution:
     prev_dt = prev_solution['constant_dt'].flatten()[0]
+elif 'param_dt' in prev_solution:
+    prev_dt = prev_solution['param_dt'].flatten()
 
-dt_res = 0.002
+dt_res = 0.001
 
 q_sym = cs.SX.sym('q', n_q)
 q_dot_sym = cs.SX.sym('q_dot', n_v)
@@ -135,10 +145,69 @@ if plot_flag:
     plt.title('tau')
     plt.show()
 
+tau_sol_base = tau_sol_res[:6, :]
+
+threshold = 4
+## get index of values greater than a given threshold for each dimension of the vector, and remove all the duplicate values (given by the fact that there are more dimensions)
+indices_exceed = np.unique(np.argwhere(np.abs(tau_sol_base) > threshold)[:, 1])
+# these indices corresponds to some nodes ..
+values_exceed = nodes_vec_res[indices_exceed]
+
+## search for duplicates and remove them, both in indices_exceed and values_exceed
+indices_duplicates = np.where(np.in1d(values_exceed, nodes_vec))
+value_duplicates = values_exceed[indices_duplicates]
+
+values_exceed = np.delete(values_exceed, np.where(np.in1d(values_exceed, value_duplicates)))
+indices_exceed = np.delete(indices_exceed, indices_duplicates)
+
+## base vector nodes augmented with new nodes + sort
+nodes_vec_augmented = np.concatenate((nodes_vec, values_exceed))
+nodes_vec_augmented.sort(kind='mergesort')
+
+# new number of nodes
+new_n_nodes = nodes_vec_augmented.shape[0]
+new_dt_vec = np.diff(nodes_vec_augmented)
+
+# remove repetition
+# ===================================== remove dt that are too small ====================================================
+remove_small_dt = False
+if remove_small_dt:
+    index_granularity = np.where(new_dt_vec < 9e-4)[0]
+    # removed values from the augmented vector of nodes
+    removed_values = nodes_vec_augmented[index_granularity]
+
+    nodes_vec_augmented = np.delete(nodes_vec_augmented, index_granularity)
+
+
+
+    print(f'{index_granularity.shape[0]} dt are too small. Removing the corresponding values: {removed_values} ({new_dt_vec[index_granularity]})')
+    # search in all the values exceeded which one are removed
+    index_removed = np.searchsorted(values_exceed, removed_values)
+
+    # update the indices_exceed removing the one too small: for the zip
+    indices_exceed = np.delete(indices_exceed, index_removed)
+
+    new_dt_vec = np.diff(nodes_vec_augmented)
+
+    index_granularity = np.where(new_dt_vec < 9e-4)
+    if new_dt_vec[index_granularity].size != 0:
+        raise Exception('Failed removing the small dt values')
+
+
+    new_n_nodes = nodes_vec_augmented.shape[0]
+
+# ======================================================================================================================
+# ## which index of the augmented vector were added to base vector nodes
+new_indices = np.where(np.in1d(nodes_vec_augmented, values_exceed))[0]
+base_indices = np.where(np.in1d(nodes_vec_augmented, nodes_vec))[0]
+
+zip_indices_new = dict(zip(new_indices, indices_exceed))
+
+
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
-old_nodes = 50
-new_n_nodes = q_res.shape[1]
+old_nodes = n_nodes
+
 old_node_start_step = node_start_step
 old_node_end_step = node_end_step
 old_node_peak = node_peak
@@ -148,19 +217,19 @@ time_end_step = nodes_vec[old_node_end_step]
 time_peak = nodes_vec[old_node_peak]
 n_nodes = new_n_nodes - 1  # in new_n_nodes the last node is there already
 
-node_start_step = np.where(abs(time_start_step - nodes_vec_res) < dt_res)
+node_start_step = np.where(abs(time_start_step - nodes_vec_augmented) < dt_res)
 if node_start_step:
-    node_start_step = int(node_start_step[0][1])
+    node_start_step = int(node_start_step[0][0])
 else:
     raise Exception('something is wrong with time_start_step')
 
-node_end_step = np.where(abs(time_end_step - nodes_vec_res) < dt_res)  # dt_res
+node_end_step = np.where(abs(time_end_step - nodes_vec_augmented) < dt_res)  # dt_res
 if node_end_step:
     node_end_step = int(node_end_step[0][0])
 else:
-    raise Exception('something is wrong with time_end_step')
+    raise Exception('something is wrong with time_start_step')
 
-node_peak = np.where(abs(time_peak - nodes_vec_res) < dt_res)  # dt_res
+node_peak = np.where(abs(time_peak - nodes_vec_augmented) < dt_res)  # dt_res
 if node_peak:
     node_peak = int(node_peak[0][0])
 else:
@@ -171,6 +240,7 @@ if plot_nodes:
     plt.figure()
     # nodes old
     plt.scatter(nodes_vec, np.zeros([nodes_vec.shape[0]]), edgecolors='blue', facecolor='none')
+    plt.scatter(values_exceed, np.zeros([values_exceed.shape[0]]), edgecolors='red', facecolor='none')
     plt.scatter(nodes_vec[old_node_start_step], 0, marker='x', color='black')
     plt.vlines([nodes_vec[old_node_start_step], nodes_vec[old_node_end_step]],
                plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
@@ -178,18 +248,13 @@ if plot_nodes:
     plt.scatter(nodes_vec[old_node_peak], 0, marker='x', color='black')
     plt.scatter(nodes_vec[old_node_end_step], 0, marker='x', color='black')
 
-    plt.scatter(nodes_vec_res[node_start_step], 0, marker='x', color='green')
-    plt.scatter(nodes_vec_res[node_peak], 0, marker='x', color='green')
-    plt.scatter(nodes_vec_res[node_end_step], 0, marker='x', color='green')
-    plt.vlines([nodes_vec_res[node_start_step], nodes_vec_res[node_end_step]],
+    plt.scatter(nodes_vec_augmented[node_start_step], 0, marker='x', color='green')
+    plt.scatter(nodes_vec_augmented[node_peak], 0, marker='x', color='green')
+    plt.scatter(nodes_vec_augmented[node_end_step], 0, marker='x', color='green')
+    plt.vlines([nodes_vec_augmented[node_start_step], nodes_vec_augmented[node_end_step]],
                plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='r', linewidth=0.4)
 
-    # for dim in range(6):
-    #     plt.plot(nodes_vec_res[:-1], np.array(tau_sol_res[dim, :]))
-    # for dim in range(6):
-    #     plt.scatter(nodes_vec[:-1], np.array(prev_tau[dim, :]))
-    # plt.title('tau on base')
-    # plt.show()
+    plt.show()
 
 print('old_node_start_step', old_node_start_step)
 print('old_node_end_step', old_node_end_step)
@@ -199,6 +264,10 @@ print('node_end_step', node_end_step)
 print('node_peak', node_peak)
 
 print('nodes_vec shape', nodes_vec.shape)
+print('new_nodes_vec shape', nodes_vec_augmented.shape)
+
+print('base_indices', base_indices)
+print('new_indices', new_indices)
 print('n_nodes', n_nodes)
 
 # print('prev_dt_vec', prev_dt)
@@ -272,18 +341,39 @@ for f in f_list:
     f.setBounds(f_min, f_max)
 
 # SET INITIAL GUESS
-for node in range(n_nodes+1):
-    q.setInitialGuess(q_res[:, node], node)
 
+k = 0
 for node in range(n_nodes+1):
-    q_dot.setInitialGuess(qdot_res[:, node], node)
+    if node in base_indices:
+        q.setInitialGuess(prev_q[:, k], node)
+        k += 1
+    if node in zip_indices_new.keys():
+        q.setInitialGuess(q_res[:, zip_indices_new[node]], node)
 
+k = 0
+for node in range(n_nodes+1):
+    if node in base_indices:
+        q_dot.setInitialGuess(prev_q_dot[:, k], node)
+        k += 1
+    if node in zip_indices_new.keys():
+        q_dot.setInitialGuess(qdot_res[:, zip_indices_new[node]], node)
+
+k = 0
 for node in range(n_nodes):
-    q_ddot.setInitialGuess(qddot_res[:, node], node)
+    if node in base_indices:
+        q_ddot.setInitialGuess(prev_q_ddot[:, k], node)
+        k += 1
+    if node in zip_indices_new.keys():
+        q_ddot.setInitialGuess(qddot_res[:, zip_indices_new[node]], node)
 
 for i_f in range(len(f_list)):
+    k = 0
     for node in range(n_nodes):
-        f_list[i_f].setInitialGuess(f_res_list[i_f][:, node], node)
+        if node in base_indices:
+            f_list[i_f].setInitialGuess(prev_f_list[i_f][:, k], node)
+            k += 1
+        if node in zip_indices_new.keys():
+            f_list[i_f].setInitialGuess(f_res_list[i_f][:, zip_indices_new[node]], node)
 
 plot_ig = True
 if plot_ig:
@@ -300,7 +390,7 @@ if plot_ig:
     q_to_print_matrix = np.reshape(q_to_print, (n_q, n_nodes + 1), order='F')
 
     for dim in range(q_to_print_matrix.shape[0]):
-        plt.scatter(nodes_vec_res, q_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+        plt.scatter(nodes_vec_augmented, q_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
     # ========================================================================================================
     plt.figure()
 
@@ -314,7 +404,7 @@ if plot_ig:
     q_dot_to_print_matrix = np.reshape(q_dot_to_print, (n_v, n_nodes + 1), order='F')
 
     for dim in range(q_dot_to_print_matrix.shape[0]):
-        plt.scatter(nodes_vec_res, q_dot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+        plt.scatter(nodes_vec_augmented, q_dot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
     # ========================================================================================================
     plt.figure()
 
@@ -328,7 +418,7 @@ if plot_ig:
     q_ddot_to_print_matrix = np.reshape(q_ddot_to_print, (n_v, n_nodes), order='F')
 
     for dim in range(q_ddot_to_print_matrix.shape[0]):
-        plt.scatter(nodes_vec_res[:-1], q_ddot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+        plt.scatter(nodes_vec_augmented[:-1], q_ddot_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
     # ========================================================================================================
     for i_f in range(len(f_list)):
         plt.figure()
@@ -345,7 +435,7 @@ if plot_ig:
         f_to_print_matrix = np.reshape(f_to_print, (n_f, n_nodes), order='F')
 
         for dim in range(f_to_print_matrix.shape[0]):
-            plt.scatter(nodes_vec_res[:-1], f_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
+            plt.scatter(nodes_vec_augmented[:-1], f_to_print_matrix[dim, :], edgecolors='blue', facecolor='none')
 
     # ========================================================================================================
     plt.show()
@@ -418,13 +508,30 @@ for frame, f in contact_map.items():
 
 
 # SET COST FUNCTIONS
-# prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
+# prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+# prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
 for f in f_list:
-    prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
+    prb.createIntermediateCost(f"min_{f.getName()}", 0.001 * cs.sumsqr(f))
 
-# prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
+prb.createIntermediateCost("min_qddot", 1 * cs.sumsqr(q_ddot))
+
+
+######################################## supporting cost function #######################################
+k = 0
+for node in range(n_nodes):
+    if node in base_indices:
+        prb.createCostFunction(f"q_close_to_old_node_{node}", 1e3 * cs.sumsqr(q - prev_q[:, k]), nodes=node)
+        k = k+1
+    if node in zip_indices_new.keys():
+        prb.createCostFunction(f"q_close_to_res_node_{node}", 1e3 * cs.sumsqr(q - q_res[:, zip_indices_new[node]]), nodes=node)
+
+k = 0
+for node in range(n_nodes):
+    if node in base_indices:
+        prb.createCostFunction(f"qdot_close_to_old_node_{node}", 1e3 * cs.sumsqr(q_dot - prev_q_dot[:, k]), nodes=node)
+        k = k+1
+    if node in zip_indices_new.keys():
+        prb.createCostFunction(f"qdot_close_to_res_node_{node}", 1e3 * cs.sumsqr(q_dot - qdot_res[:, zip_indices_new[node]]), nodes=node)
 
 # =============
 # SOLVE PROBLEM
@@ -434,8 +541,8 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.max_iter': 2000,
         'ipopt.linear_solver': 'ma57'}
 
-for i in range(n_nodes):
-    dt.assign(dt_res, nodes=i+1)
+for i in range(len(new_dt_vec)):
+    dt.assign(new_dt_vec[i], nodes=i+1)
 
 sol = Solver.make_solver('ipopt', prb, dt, opts)
 sol.solve()
@@ -452,5 +559,13 @@ for name, item in prb.getConstraints().items():
 
 
 from horizon.variables import Variable, SingleVariable, Parameter, SingleParameter
-dt_dict = dict(dt_res=dt_res, n_nodes=n_nodes)
-ms.store({**solution, **solution_constraints_dict, **dt_dict})
+info_dict = dict(n_nodes=n_nodes, times=nodes_vec_augmented, node_start_step=node_start_step, node_end_step=node_end_step, node_peak=node_peak, jump_height=jump_height)
+
+if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
+    ms.store({**solution, **solution_constraints_dict, **info_dict})
+elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
+    dt_dict = dict(param_dt=new_dt_vec)
+    ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})
+else:
+    dt_dict = dict(constant_dt=dt)
+    ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})

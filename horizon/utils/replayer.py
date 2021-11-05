@@ -89,7 +89,7 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump_refined.mat')
 solution = ms.load()
 
 # print([name for name in solution])
@@ -97,8 +97,8 @@ solution = ms.load()
 contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
-replay_traj = False
-plotting = True
+replay_traj = True
+plotting = False
 check_bounds = False
 
 if 'dt' in solution:

@@ -1,4 +1,12 @@
 # /usr/bin/env python3
+
+############
+#experiment to augment the nodes with supporting nodes.
+# This is useful when simply resampling the trajectory make it unfeasible (especially for the tau on the floating base, which become non zero).
+# The underlying idea is LOCALLY refining the trajectory by injecting more nodes so that, when resampling, less errors pop up.
+#to visualize the trajectory use vis_refiner_local.py and to resample + send it to gazebo use send_to_gazebo.py
+##################
+
 import horizon.variables
 from horizon import problem
 from horizon.transcriptions.transcriptor import Transcriptor
@@ -19,14 +27,6 @@ urdffile = '../urdf/spot.urdf'
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
-n_nodes = 50
-
-node_start_step = 20
-node_end_step = 40
-node_peak = 30
-jump_height = 0.2
-
-
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
@@ -34,6 +34,13 @@ n_f = 3
 
 ms = mat_storer.matStorer('../spot/spot_jump.mat')
 prev_solution = ms.load()
+
+n_nodes = prev_solution['n_nodes'][0][0]
+
+node_start_step = prev_solution['node_start_step'][0][0]
+node_end_step = prev_solution['node_end_step'][0][0]
+node_peak = prev_solution['node_peak'][0][0]
+jump_height = prev_solution['jump_height'][0][0]
 
 prev_q = prev_solution['q']
 prev_q_dot = prev_solution['q_dot']
@@ -53,8 +60,10 @@ if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint
 
 if 'dt' in prev_solution:
     prev_dt = prev_solution['dt'].flatten()
-else:
+elif 'constant_dt' in prev_solution:
     prev_dt = prev_solution['constant_dt'].flatten()[0]
+elif 'param_dt' in prev_solution:
+    prev_dt = prev_solution['param_dt'].flatten()
 
 dt_res = 0.001
 
@@ -136,11 +145,18 @@ if plot_flag:
 
 tau_sol_base = tau_sol_res[:6, :]
 
-threshold = 12
+threshold = 5
 ## get index of values greater than a given threshold for each dimension of the vector, and remove all the duplicate values (given by the fact that there are more dimensions)
 indices_exceed = np.unique(np.argwhere(np.abs(tau_sol_base) > threshold)[:, 1])
 # these indices corresponds to some nodes ..
 values_exceed = nodes_vec_res[indices_exceed]
+
+## search for duplicates and remove them, both in indices_exceed and values_exceed
+indices_duplicates = np.where(np.in1d(values_exceed, nodes_vec))
+value_duplicates = values_exceed[indices_duplicates]
+
+values_exceed = np.delete(values_exceed, np.where(np.in1d(values_exceed, value_duplicates)))
+indices_exceed = np.delete(indices_exceed, indices_duplicates)
 
 ## base vector nodes augmented with new nodes + sort
 nodes_vec_augmented = np.concatenate((nodes_vec, values_exceed))
@@ -150,31 +166,33 @@ nodes_vec_augmented.sort(kind='mergesort')
 new_n_nodes = nodes_vec_augmented.shape[0]
 new_dt_vec = np.diff(nodes_vec_augmented)
 
-# remove dt that are too small
-index_granularity = np.where(new_dt_vec < 9e-4)[0]
+# ===================================== remove dt that are too small ====================================================
+remove_small_dt = False
+if remove_small_dt:
+    index_granularity = np.where(new_dt_vec < 9e-4)[0]
+    if index_granularity.shape[0] > 0:
+        # removed values from the augmented vector of nodes
+        removed_values = nodes_vec_augmented[index_granularity]
+        nodes_vec_augmented = np.delete(nodes_vec_augmented, index_granularity)
 
-removed_values = nodes_vec_augmented[index_granularity]
+        print(f'{index_granularity.shape[0]} dt are too small. Removing the corresponding values: {removed_values} ({new_dt_vec[index_granularity]})')
+        # search in all the values exceeded which one are removed
+        index_removed = np.searchsorted(values_exceed, removed_values)
 
-print(f'{index_granularity.shape[0]} dt are too small. Removing the corresponding values: {removed_values}')
+        # update the indices_exceed removing the one too small: for the zip
+        indices_exceed = np.delete(indices_exceed, index_removed)
 
-nodes_vec_augmented = np.delete(nodes_vec_augmented, index_granularity[0])
+        new_dt_vec = np.diff(nodes_vec_augmented)
 
-index_removed = np.searchsorted(values_exceed, removed_values)
-# update the indices_exceed removing the one too small: for the zip
-indices_exceed = np.delete(indices_exceed, index_removed)
-
-new_dt_vec = np.diff(nodes_vec_augmented)
-
-
-# print(new_nodes_vec)
-index_granularity = np.where(new_dt_vec < 9e-4)
-if new_dt_vec[index_granularity].size == 0:
-    print('allright')
+        index_granularity = np.where(new_dt_vec < 9e-4)
+        if new_dt_vec[index_granularity].size != 0:
+            raise Exception('Failed removing the small dt values')
 
 
-new_n_nodes = nodes_vec_augmented.shape[0]
+        new_n_nodes = nodes_vec_augmented.shape[0]
 
-## which index of the augmented vector were added to base vector nodes
+# ======================================================================================================================
+# ## which index of the augmented vector were added to base vector nodes
 new_indices = np.where(np.in1d(nodes_vec_augmented, values_exceed))[0]
 base_indices = np.where(np.in1d(nodes_vec_augmented, nodes_vec))[0]
 
@@ -183,7 +201,7 @@ zip_indices_new = dict(zip(new_indices, indices_exceed))
 
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
-old_nodes = 50
+old_nodes = n_nodes
 
 old_node_start_step = node_start_step
 old_node_end_step = node_end_step
@@ -490,12 +508,29 @@ for frame, f in contact_map.items():
 
 # SET COST FUNCTIONS
 # prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
+# prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+# prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
-# prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
+prb.createIntermediateCost("min_qddot", 1 * cs.sumsqr(q_ddot))
+
+######################################## proximal auxiliary cost function #######################################
+k = 0
+for node in range(n_nodes):
+    if node in base_indices:
+        prb.createCostFunction(f"q_close_to_old_node_{node}", 1e5 * cs.sumsqr(q - prev_q[:, k]), nodes=node)
+        k = k+1
+    if node in zip_indices_new.keys():
+        prb.createCostFunction(f"q_close_to_res_node_{node}", 1e5 * cs.sumsqr(q - q_res[:, zip_indices_new[node]]), nodes=node)
+
+k = 0
+for node in range(n_nodes):
+    if node in base_indices:
+        prb.createCostFunction(f"qdot_close_to_old_node_{node}", 1e5 * cs.sumsqr(q_dot - prev_q_dot[:, k]), nodes=node)
+        k = k+1
+    if node in zip_indices_new.keys():
+        prb.createCostFunction(f"qdot_close_to_res_node_{node}", 1e5 * cs.sumsqr(q_dot - qdot_res[:, zip_indices_new[node]]), nodes=node)
 
 # =============
 # SOLVE PROBLEM
@@ -524,12 +559,12 @@ for name, item in prb.getConstraints().items():
 
 from horizon.variables import Variable, SingleVariable, Parameter, SingleParameter
 
-nodes_dict = dict(nodes=new_n_nodes, times=nodes_vec_augmented)
+info_dict = dict(n_nodes=n_nodes, times=nodes_vec_augmented, node_start_step=node_start_step, node_end_step=node_end_step, node_peak=node_peak, jump_height=jump_height)
 if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
-    ms.store({**solution, **solution_constraints_dict, **nodes_dict})
+    ms.store({**solution, **solution_constraints_dict, **info_dict})
 elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
     dt_dict = dict(param_dt=new_dt_vec)
-    ms.store({**solution, **solution_constraints_dict, **nodes_dict, **dt_dict})
+    ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})
 else:
     dt_dict = dict(constant_dt=dt)
-    ms.store({**solution, **solution_constraints_dict, **nodes_dict, **dt_dict})
+    ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})

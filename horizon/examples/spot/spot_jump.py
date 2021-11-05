@@ -235,6 +235,7 @@ for frame, f in contact_map.items():
 
     prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
+    prb.createConstraint(f"start_{frame}_leg", p - p_start, nodes=node_start_step)
     prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
     prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
 
@@ -269,11 +270,13 @@ for name, item in prb.getConstraints().items():
     ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
     solution_constraints_dict[name] = dict(val=solution_constraints[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
 
+info_dict = dict(n_nodes=n_nodes, node_start_step=node_start_step, node_end_step=node_end_step, node_peak=node_peak, jump_height=jump_height)
+
 if isinstance(dt, cs.SX):
-    ms.store({**solution, **solution_constraints_dict})
+    ms.store({**solution, **solution_constraints_dict, **info_dict})
 else:
     dt_dict = dict(dt=dt)
-    ms.store({**solution, **solution_constraints_dict, **dt_dict})
+    ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})
 
 
 # ========================================================

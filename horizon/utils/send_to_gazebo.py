@@ -31,7 +31,7 @@ n_v = kindyn.nv()
 n_f = 3
 
 
-ms = mat_storer.matStorer('../examples/spot/spot_jump_refined.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump_refined_local.mat')
 solution = ms.load()
 
 tau = solution['inverse_dynamics']['val'][0][0]
@@ -65,8 +65,8 @@ q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resa
 
 num_samples = tau_res.shape[1]
 
-if 'nodes' in solution:
-    n_nodes = solution['nodes'] - 1
+if 'param_dt' in solution:
+    n_nodes = solution['n_nodes'] - 1
     nodes_vec = solution['times'][0]
 else:
     nodes_vec = np.zeros([n_nodes + 1])
@@ -76,6 +76,12 @@ else:
 node_vec_res = np.zeros([num_samples + 1])
 for i in range(1, num_samples + 1):
     node_vec_res[i] = node_vec_res[i - 1] + dt_res
+
+replay_traj = False
+if replay_traj:
+    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    repl.sleep(1.)
+    repl.replay(is_floating_base=True)
 
 plot_flag = True
 if plot_flag:
@@ -149,11 +155,14 @@ tau_robot = tau_res[6:, :]
 q_homing = q_robot[:, 0]
 
 robot.sense()
-rate = rospy.Rate(1/dt_res)
+rate = rospy.Rate(1./dt_res)
 
 for i in range(100):
     robot.setPositionReference(q_homing)
-    robot.setStiffness(4 *[200, 200, 100])
+    # robot.setStiffness(4 *[1000, 1000, 500]) #[200, 200, 100]
+    # robot.setDamping(4 * [50, 50, 30])  # [200, 200, 100]
+    robot.setStiffness(4 *[200, 200, 100]) #[200, 200, 100]
+    # robot.setDamping(4 * [50, 50, 30])  # [200, 200, 100]
     robot.move()
 
 # crude homing
