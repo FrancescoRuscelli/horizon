@@ -7,7 +7,7 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, math
 from scipy.io import loadmat
 from itertools import filterfalse
 
@@ -95,7 +95,8 @@ prb.createFinalConstraint('final_velocity', q_dot)
 
 # final pose
 q_tgt = q_init.copy()
-q_tgt[0] = 0.0
+q_tgt[0] = 0
+q_tgt[5] = math.sin(math.pi/4)
 prb.createFinalConstraint('q_fb', q[:6] - q_tgt[:6])
 # prb.createFinalConstraint('q_f', q[7:] - q_tgt[7:])
 
@@ -149,7 +150,7 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
         'ipopt.max_iter': 2000,
         # 'ipopt.linear_solver': 'ma57',
-        'ilqr.max_iter': 10,
+        'ilqr.max_iter': 1000,
         'ilqr.integrator': 'RK4', 
         'ilqr.closed_loop_forward_pass': True,
         'ilqr.line_search_accept_ratio': 1e-9,
