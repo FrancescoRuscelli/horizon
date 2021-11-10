@@ -21,6 +21,7 @@ class AbstractVariable(ABC, cs.SX):
     Notes:
           Horizon allows the user to work only with abstract variables. Internally, these variables are projected over the horizon nodes.
     """
+
     def __init__(self, tag: str, dim: int):
         """
         Initialize the Abstract Variable. Inherits from the symbolic CASADI varaible SX.
@@ -55,8 +56,55 @@ class AbstractVariable(ABC, cs.SX):
     def getOffset(self):
         return self._offset
 
+    def __getitem__(self, item):
+        var_slice = super().__getitem__(item)
+        view = AbstractVariableView(self, var_slice, item)
+        return view
+
+    # todo old stuff
+    # def __getitem__(self, item):
+    #     view = AbstractVariableView(self, item)
+    #     return view
+
+class AbstractVariableView(cs.SX):
+    def __init__(self, parent: AbstractVariable, var_slice, indices):
+        super().__init__(var_slice)
+        self._parent = parent
+        self._indices = indices
+        self._dim = len(range(*self._indices.indices(self._parent.shape[0]))) if isinstance(self._indices, slice) else 1
+
+    def getName(self):
+        return self._parent.getName()
+
+    def __getitem__(self, item):
+        var_slice = super().__getitem__(item)
+        view = self.__class__(self._parent, var_slice, item)
+        return view
+
+    # todo old stuff
+# class AbstractVariableView(cs.SX):
+#     def __init__(self, parent: AbstractVariable, indices):
+#         elems = parent.elements()
+#         sx = cs.vertcat(*elems[indices]) if isinstance(indices, slice) else elems[indices]
+#         super().__init__(sx)
+#         self._parent = parent
+#         self._indices = indices
+#         self._dim = len(range(*self._indices.indices(self._parent.shape[0]))) if isinstance(self._indices, slice) else 1
+#
+#     def getName(self):
+#         return self._parent.getName()
+#
+#     def __getitem__(self, item):
+#         print(f'getitem of {type(self)} called with indices {item}')
+        # todo this is wrong, since getitem will return an AbstractVariableView initialized with the whole parent.
+        #  basically, if if I do x_slice = x[0:2] (where x is 6-dimensional), with this formulation I could get x_slice[3], since
+        #  i am plucking the values from the original parent. I should only be able to do x_slice[0] and x_slice[1]!!!
+        #  IMPORTANT: also it was fucking up the ipopt solver
+#         view = self.__class__(self._parent, item)
+#         return view
+
 class OffsetVariable(AbstractVariable):
-    def __init__(self, parent_name, tag, dim, nodes, offset, var_impl):
+    def __init__(self, parent_name, tag, dim, offset, var_impl):
         """
         Initialize the Offset Variable.
 
@@ -67,6 +115,8 @@ class OffsetVariable(AbstractVariable):
             offset: offset of the variable (which (previous/next) node it refers to
             var_impl: implemented variables it refers to (of base class Variable)
         """
+        self._tag = tag
+        self._dim = dim
         super(OffsetVariable, self).__init__(tag, dim)
 
         self.parent_name = parent_name
@@ -123,6 +173,13 @@ class OffsetVariable(AbstractVariable):
             list of active nodes
         """
         return self._nodes
+
+    def __reduce__(self):
+
+        for node in self._var_impl.keys():
+            self._var_impl[node]['var'] = self._var_impl[node]['var'].serialize()
+
+        return (self.__class__, (self.parent_name, self._tag, self._dim, self._offset, self._var_impl, ))
 
 class SingleParameter(AbstractVariable):
     """
@@ -215,6 +272,31 @@ class SingleParameter(AbstractVariable):
             name of the parameter
         """
         return self._tag
+
+    def __getitem__(self, item):
+        par_slice = super().__getitem__(item)
+        view = SingleParameterView(self, par_slice, item)
+        return view
+
+class SingleParameterView(AbstractVariableView):
+    def __init__(self, parent: SingleParameter, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
+
+    def assign(self, vals):
+        """
+        Assign a value to the parameter. Can be assigned also after the problem is built, before solving the problem.
+        If not assigned, its default value is zero.
+
+        Args:
+            vals: value of the parameter
+        """
+        vals = misc.checkValueEntry(vals)
+
+        # todo what if vals has no shape?
+        if vals.shape[0] != self._dim:
+            raise Exception('Wrong dimension of parameter values inserted.')
+
+        self._parent._par_impl['val'][self._indices] = vals
 
 class Parameter(AbstractVariable):
     """
@@ -338,6 +420,11 @@ class Parameter(AbstractVariable):
         """
         return self._tag
 
+    def __getitem__(self, item):
+        par_slice = super().__getitem__(item)
+        view = ParameterView(self, par_slice, item)
+        return view
+
     def __reduce__(self):
         """
         Experimental function to serialize this element.
@@ -346,6 +433,32 @@ class Parameter(AbstractVariable):
             instance of this element serialized
         """
         return (self.__class__, (self._tag, self._dim, self._nodes,))
+
+class ParameterView(AbstractVariableView):
+    def __init__(self, parent: SingleParameter, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
+
+    def assign(self, vals, nodes=None):
+        """
+       Assign a value to the parameter at a desired node. Can be assigned also after the problem is built, before solving the problem.
+       If not assigned, its default value is zero.
+
+       Args:
+           vals: value of the parameter
+           nodes: nodes at which the parameter is assigned
+       """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        vals = misc.checkValueEntry(vals)
+
+        if vals.shape[0] != self._dim:
+            raise Exception('Wrong dimension of parameter values inserted.')
+
+        for node in nodes:
+            self._parent._par_impl['n' + str(node)]['val'][self._indices] = vals
 
 class SingleVariable(AbstractVariable):
     """
@@ -549,6 +662,68 @@ class SingleVariable(AbstractVariable):
         """
         return self._tag
 
+    def __getitem__(self, item):
+        var_slice = super().__getitem__(item)
+        view = SingleVariableView(self, var_slice, item)
+        return view
+
+class SingleVariableView(AbstractVariableView):
+    def __init__(self, parent: SingleVariable, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
+
+    def setLowerBounds(self, bounds):
+        """
+        Setter for the lower bounds of the variable.
+
+        Args:
+            bounds: value of the lower bounds
+        """
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self._dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
+
+        self._parent._var_impl['lb'][self._indices] = bounds
+
+    def setUpperBounds(self, bounds):
+        """
+        Setter for the upper bounds of the variable.
+
+        Args:
+            bounds: value of the upper bounds
+        """
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self._dim:
+            raise Exception('Wrong dimension of upper bounds inserted.')
+
+        self._var_impl['ub'][self._indices] = bounds
+
+    def setBounds(self, lb, ub):
+        """
+        Setter for the bounds of the variable.
+
+        Args:
+            lb: value of the lower bounds
+            ub: value of the upper bounds
+        """
+        self.setLowerBounds(lb)
+        self.setUpperBounds(ub)
+
+    def setInitialGuess(self, val):
+        """
+        Setter for the initial guess of the variable.
+
+        Args:
+            val: value of the initial guess
+        """
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self._dim:
+            raise Exception('Wrong dimension of initial guess inserted.')
+
+        self._var_impl['w0'][self._indices] = val
+
 class Variable(AbstractVariable):
     """
     Variable of Horizon Problem: generic variable of the optimization problem.
@@ -681,7 +856,7 @@ class Variable(AbstractVariable):
             createTag = lambda name, node: name + str(node) if node is not None else name
 
             new_tag = createTag(self._tag, node)
-            var = OffsetVariable(self._tag, new_tag, self._dim, self._nodes, int(node), self._var_impl)
+            var = OffsetVariable(self._tag, new_tag, self._dim, int(node), self._var_impl)
 
             self.var_offset[node] = var
         return var
@@ -847,6 +1022,11 @@ class Variable(AbstractVariable):
         """
         return self._tag
 
+    def __getitem__(self, item):
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
+        return view
+
     def __reduce__(self):
         """
         Experimental function to serialize this element.
@@ -855,6 +1035,84 @@ class Variable(AbstractVariable):
             instance of this element serialized
         """
         return (self.__class__, (self._tag, self._dim, self._nodes, ))
+
+class VariableView(AbstractVariableView):
+    def __init__(self, parent: Variable, var_slice, indices):
+        super().__init__(parent, var_slice, indices)
+
+    def setLowerBounds(self, bounds, nodes=None):
+        """
+        Setter for the lower bounds of the variable.
+
+        Args:
+            bounds: desired bounds of the variable
+            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+        """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        bounds = misc.checkValueEntry(bounds)
+        if bounds.shape[0] != self._dim:
+            raise Exception('Wrong dimension of lower bounds inserted.')
+
+        for node in nodes:
+            self._parent._var_impl['n' + str(node)]['lb'][self._indices] = bounds
+
+    def setUpperBounds(self, bounds, nodes=None):
+        """
+        Setter for the upper bounds of the variable.
+
+        Args:
+            bounds: desired bounds of the variable
+            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+        """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        bounds = misc.checkValueEntry(bounds)
+
+        if bounds.shape[0] != self._dim:
+            raise Exception('Wrong dimension of upper bounds inserted.')
+
+        for node in nodes:
+            self._parent._var_impl['n' + str(node)]['ub'][self._indices] = bounds
+
+    def setBounds(self, lb, ub, nodes=None):
+        """
+        Setter for the bounds of the variable.
+
+        Args:
+            lb: desired lower bounds of the variable
+            ub: desired upper bounds of the variable
+            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+        """
+        self.setLowerBounds(lb, nodes)
+        self.setUpperBounds(ub, nodes)
+
+    def setInitialGuess(self, val, nodes=None):
+        """
+        Setter for the initial guess of the variable.
+
+        Args:
+            val: desired initial guess of the variable
+            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+        """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self._dim:
+            raise Exception('Wrong dimension of initial guess inserted.')
+
+        for node in nodes:
+            self._parent._var_impl['n' + str(node)]['w0'][self._indices] = val
 
 class InputVariable(Variable):
     """
@@ -877,6 +1135,11 @@ class InputVariable(Variable):
         """
         super(InputVariable, self).__init__(tag, dim, nodes)
 
+    def __getitem__(self, item):
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
+        return view
+
 class StateVariable(Variable):
     """
     State Variable of Horizon Problem.
@@ -887,6 +1150,7 @@ class StateVariable(Variable):
 
         Implemented variable "x" --> x_0, x_1, ... x_N-1, x_N
     """
+
     def __init__(self, tag, dim, nodes):
         """
         Initialize the State Variable.
@@ -897,6 +1161,11 @@ class StateVariable(Variable):
             nodes: should always be N, where N is the number of horizon nodes
         """
         super(StateVariable, self).__init__(tag, dim, nodes)
+
+    def __getitem__(self, item):
+        var_slice = super().__getitem__(item)
+        view = VariableView(self, var_slice, item)
+        return view
 
 class AbstractAggregate(ABC):
     """
@@ -1131,7 +1400,16 @@ class Aggregate(AbstractAggregate):
         Returns:
             [type]: [description]
         """
-        return np.vstack([var.getInitialGuess(node) for var in self])
+
+        ig_list = list()
+
+        for var in self:
+            num_nodes = len(var.getNodes()) if node is None else len(node)
+            ig = var.getInitialGuess(node)
+            ig = ig.reshape((var.getDim(), num_nodes), order='F')
+            ig_list.append(ig)
+
+        return np.vstack(ig_list)
 
 class StateAggregate(Aggregate):
     """
@@ -1429,19 +1707,13 @@ class VariablesContainer:
         Returns:
            instance of serialized Variable Container
         """
-        raise Exception('serialize yet to be re-implemented')
+
         # todo how to do? I may use __reduce__ but I don't know how
-        # for name, value in self.state_var.items():
-        #     print('state_var', type(value))
-        #     self.state_var[name] = value.serialize()
+        for name, var in self._vars.items():
+            self._vars[name] = var.serialize()
 
-        # for name, value in self.state_var_prev.items():
-        #     print('state_var_prev', type(value))
-        #     self.state_var_prev[name] = value.serialize()
-
-        for node, item in self._vars_impl.items():
-            for name, elem in item.items():
-                self._vars_impl[node][name]['var'] = elem['var'].serialize()
+        for name, par in self._pars.items():
+            self._pars[name] = par.serialize()
 
     def deserialize(self):
         """
@@ -1450,107 +1722,52 @@ class VariablesContainer:
         Returns:
            instance of deserialized Variable Container
         """
-        raise Exception('deserialize yet to be re-implemented')
-        # for name, value in self.state_var.items():
-        #     self.state_var[name] = cs.SX.deserialize(value)
-        #
-        # for name, value in self.state_var_prev.items():
-        #     self.state_var_prev[name] = cs.SX.deserialize(value)
+        for name, var in self._vars.items():
+            self._vars[name] = cs.SX.deserialize(var)
 
-        for node, item in self._vars_impl.items():
-            for name, elem in item.items():
-                self._vars_impl[node][name]['var'] = cs.SX.deserialize(elem['var'])
+        for name, par in self._pars.items():
+            self._pars[name] = cs.SX.deserialize(par)
 
     # def __reduce__(self):
     #     return (self.__class__, (self.nodes, self.logger, ))
 
 if __name__ == '__main__':
+    pass
+    ## PARAMETER
+    # a = Parameter('p', 6, [0, 1, 2, 3, 4, 5])
+    # print(a[2:4], f'type: {type(a[2:4])}')
+    # a.assign([1, 1, 1, 1, 1, 1])
+    # a[1:3].assign([2, 3])
+    # print(a.getValues())
+    # exit()
+    ## INPUT
+    # i = InputVariable('u', 6, [0, 1, 2, 3, 4, 5])
+    # print(i[2:4], f'type: {type(i[2:4])}')
+    # i[2:4].setLowerBounds([1, 1])
+    # print(i.getLowerBounds())
+    # exit()
+    # STATE VARIABLE
+    # p = StateVariable('x', 6, [0, 1, 2, 3, 4, 5])
+    # print(p, f'type: {type(p)}')
+    # print(p[0:2], f'type: {type(p[0:2])}')
+    # print(p[0:2]+2)
+    # p_sliced = p[0:2]
+    # print(p_sliced[1])
+    # print(p_sliced[0], f'type: {type(p_sliced[0])}')
 
-    # a = AbstractVariable('a', 2)
-    # print(a.getName())
-    p = StateVariable('x', 2, [0,2])
-    exit()
-    n_nodes = 10
-    sv = VariablesContainer(n_nodes)
-    x = sv.setStateVar('x', 2)
+    # p_sliced[0].setLowerBounds(5)
 
-    exit()
-    x = StateVariable('x', 2, 4)
-    u = InputVariable('u', 2, 4)
-    print(isinstance(u, StateVariable))
-
-
-    exit()
-    # x._project()
-    # print('before serialization:', x)
-    # print('bounds:', x.getBounds(2))
-    # x.setBounds(2,2)
-    # print('bounds:', x.getBounds(2))
-    # print('===PICKLING===')
-    # a = pickle.dumps(x)
-    # print(a)
-    # print('===DEPICKLING===')
-    # x_new = pickle.loads(a)
-    #
-    # print(type(x_new))
-    # print(x_new)
-    # print(x_new.tag)
-    #
-    # print('bounds:', x.getBounds(2))
-    # print(x.var_impl)
     # exit()
 
-    # x = StateVariable('x', 2, 15)
-    # print([id(val['var']) for val in x.var_impl.values()])
-    # x._setNNodes(20)
-    # print([id(val['var']) for val in x.var_impl.values()])
-
-    n_nodes = 10
-    sv = VariablesContainer(n_nodes)
-    x = sv.setStateVar('x', 2)
-    x_prev = x.createAbstrNode(-1)
-
-    print(x_prev)
-    print(type(x_prev))
-    print(type(x))
-
-    exit()
-    sv.setStateVar('x', 2, -1)
-    sv.setStateVar('y', 2)
-
-    for k in range(n_nodes):
-        sv.update(k)
-
-    # print(sv.state_var)
-    # print(sv.state_var_prev)
-    pprint.pprint(sv.vars_impl)
-    # pprint.pprint(sv.getVarAbstrDict())
-    # pprint.pprint(sv.getVarImplDict())
-    # pprint.pprint(sv.getVarImpl('x-1', 1))
-
-
-    exit()
-    # x_prev = sv.setVar('x', 2, -2)
-    #
-    # for i in range(4):
-    #     sv.update(i)
-    #
-    # print('state_var_prev', sv.state_var_prev)
-    # print('state_var_impl', sv.state_var_impl)
-    #
-    # print('sv.getVarAbstrDict()', sv.getVarAbstrDict())
-    # print('sv.getVarAbstrList()', sv.getVarAbstrList())
-    # print('sv.getVarImplList()', sv.getVarImplList())
-    # print('sv.getVarImpl()', sv.getVarImpl('x-2', 0))
-
-    print('===PICKLING===')
-    sv_serialized = pickle.dumps(sv)
-    print(sv_serialized)
-    print('===DEPICKLING===')
-    sv_new = pickle.loads(sv_serialized)
-
-    print(sv_new.vars)
-    print(sv_new.state_var_prev)
-    print(sv_new.vars_impl)
-    print(sv_new.getVarAbstrDict())
-    print(sv_new.getVarImplDict())
+    # p[-1].setLowerBounds(0)
+    # print(p.getLowerBounds())
+    # print(p[0].setInitialGuess(10, [1]))
+    # print(p.getInitialGuess())
+    # SINGLE VARIABLE
+    # p = SingleVariable('x', 6, [0, 1, 2])
+    # print(p, f'type: {type(p)}')
+    # print(p[0:2], f'type: {type(p[0:2])}')
+    # print(p[0:2]+2)
+    # print(f'type: {type(p[-1])}')
+    # p[-1].setLowerBounds(0)
+    # print(p.getLowerBounds())

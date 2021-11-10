@@ -63,12 +63,13 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     prob.createIntermediateCost('u', cs.sumsqr(u1) + cs.sumsqr(u2))
 
     # a final constraint
-    xtgt = np.array([1, 1, 2, 2, 3, 3])
+    xtgt = np.array([1, 2, 2, 3, 3, 4])
     prob.createFinalConstraint('xtgt', x - xtgt)
 
     # an initial state
     x0 = -xtgt
     prob.getState().setBounds(lb=x0, ub=x0, nodes=0)
+    prob.getState().setInitialGuess(x0)
 
     # solve first with ilqr
     if solver_type == 'ilqr':

@@ -116,12 +116,33 @@ def double_integrator_with_floating_base(q, ndot, nddot):
 
     qw = cs.SX.zeros(4,1)
     qw[0:3] = 0.5*ndot[3:6]
-    quaterniondot = quaterion_product(q[3:7], qw)
+
+    if q.shape[1] == 1:
+        quaterniondot = quaterion_product(q[3:7], qw)
+    else:
+        quaterniondot = quaterion_product(q[3:7, :], qw)
 
     R = toRot(q[3:7])
-
     x = cs.vertcat(q, ndot)
-    xdot = cs.vertcat(cs.mtimes(R, ndot[0:3]), cs.vertcat(*quaterniondot), ndot[6:ndot.shape[0]], nddot)
+
+    if ndot.shape[1] == 1:
+        first = cs.mtimes(R, ndot[0:3])
+    else:
+        first = cs.mtimes(R, ndot[0:3, :])
+
+    if ndot.shape[1] == 1:
+        third = ndot[6:ndot.shape[0]]
+    else:
+        third = ndot[6:ndot.shape[0], :]
+
+
+    # print(first.shape)
+    # print(cs.vertcat(*quaterniondot).shape)
+    # print(third.shape)
+    # print(nddot.shape)
+    # print('------------')
+    xdot = cs.vertcat(first, cs.vertcat(*quaterniondot), third, nddot)
+
 
     return x, xdot
 

@@ -101,12 +101,17 @@ public:
 
     WrappedFunction() = default;
     WrappedFunction(casadi::Function f);
+    WrappedFunction& operator=(casadi::Function f);
+
+    WrappedFunction(const WrappedFunction&);
+    WrappedFunction& operator=(const WrappedFunction&);
 
     void setInput(int i, Eigen::Ref<const Eigen::VectorXd> xi);
     void call(bool sparse = false);
     const Eigen::MatrixXd& getOutput(int i) const;
     const Eigen::SparseMatrix<double>& getSparseOutput(int i) const;
     casadi::Function& function();
+    const casadi::Function& function() const;
     Eigen::MatrixXd& out(int i);
 
     bool is_valid() const;

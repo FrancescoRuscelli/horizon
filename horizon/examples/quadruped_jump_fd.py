@@ -5,7 +5,7 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory
+from horizon.utils import utils, kin_dyn, resampler_trajectory
 from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
@@ -47,7 +47,7 @@ f3 = prb.createInputVariable("f3", nf)
 f4 = prb.createInputVariable("f4", nf)
 tau = cs.vertcat(cs.SX.zeros(6, 1), u)
 contact_names = ['Contact1', 'Contact2', 'Contact3', 'Contact4']
-fd = casadi_kin_dyn.ForwardDynamics(kindyn, contact_names, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+fd = kin_dyn.ForwardDynamics(kindyn, contact_names, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 frame_force_mapping = {'Contact1': f1, 'Contact2': f2, 'Contact3': f3, 'Contact4': f4}
 qddot = fd.call(q, qdot, tau, frame_force_mapping)
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
@@ -169,7 +169,7 @@ for frame, f in zip(contact_names, forces):
     prb.createConstraint(f"{frame}_vel_before_jump", v, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
     prb.createConstraint(f"{frame}_vel_after_jump", v, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
-    fc, fc_lb, fc_ub = casadi_kin_dyn.linearized_friciton_cone(f, mu, R)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
     prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=list(range(0, lift_node)), bounds=dict(lb=fc_lb, ub=fc_ub))
     prb.createConstraint(f"{frame}_friction_cone_after_jump", fc, nodes=list(range(touch_down_node, ns)), bounds=dict(lb=fc_lb, ub=fc_ub))
 
@@ -205,8 +205,11 @@ for i in range(ns):
     frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'Contact3': f3_hist[:, i], 'Contact4': f4_hist[:, i]}
     qddot_hist[:, i] = FD.call(q_hist[:, i], qdot_hist[:, i], tau_hist[:, i], frame_force_mapping_i).toarray().flatten()
 
-
-# resampling
+# print(q_hist.shape)
+# print(qdot_hist.shape)
+# print(np.array(cs.vertcat(u_hist, f1_hist, f2_hist, f3_hist, f4_hist).shape))
+# exit()
+# # resampling
 dt = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'Contact3': f3_hist, 'Contact4': f4_hist}
 q_res, qdot_res, input_res = resampler_trajectory.second_order_resample_integrator(q_hist, qdot_hist, np.array(cs.vertcat(u_hist, f1_hist, f2_hist, f3_hist, f4_hist)),

@@ -23,6 +23,7 @@ add_library(ilqr STATIC
     src/ilqr_backward_pass.cpp
     src/wrapped_function.cpp
     src/profiling.cpp
+    src/codegen_function.cpp
 )
 
 # sqp library

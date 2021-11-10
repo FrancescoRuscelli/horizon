@@ -37,9 +37,6 @@ class Problem:
             logging_level: accepts the level of logging from package logging (INFO, DEBUG, ...)
         """
         self.opts = None
-        self.solver = None
-        self.__solution = None
-        self.sol = None  # store solution from solver
         self.default_solver = cs.nlpsol
         self.default_solver_plugin = 'ipopt'
 
@@ -55,7 +52,6 @@ class Problem:
         # state variable to optimize
         self.var_container = sv.VariablesContainer(self.logger)
         self.function_container = fc.FunctionsContainer(self.logger)
-        self.prob = None
 
         self.state_aggr = sv.StateAggregate()
         self.input_aggr = sv.InputAggregate()
@@ -593,23 +589,11 @@ class Problem:
         Returns:
             instance of the serialized class "Problem"
         """
-        raise Exception('serialize yet to be re-implemented')
-        self.var_container.serialize()
+        raise Exception('serialize yet to implement')
+        # self.var_container.serialize()
         self.function_container.serialize()
-
-        if self.prob:
-            # self.prob.clear()
-            # print('serializing f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
-            # print('serializing x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
-            # print('serializing g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
-
-            self.prob['f'] = self.prob['f'].serialize()
-            self.prob['x'] = self.prob['x'].serialize()
-            self.prob['g'] = self.prob['g'].serialize()
-
-            # print('serialized f (type: {}): {}'.format(type(self.prob['f']), self.prob['f']))
-            # print('serialized x (type: {}): {}'.format(type(self.prob['x']), self.prob['x']))
-            # print('serialized g (type: {}): {}'.format(type(self.prob['g']), self.prob['g']))
+        if self.state_der is not None:
+            self.state_der = self.state_der.serialize()
 
         return self
 
@@ -620,79 +604,66 @@ class Problem:
         Returns:
             instance of the deserialized class "Problem"
         """
-        raise Exception('deserialize yet to be re-implemented')
-        self.var_container.deserialize()
+        raise Exception('serialize yet to implement')
+        # self.var_container.deserialize()
         self.function_container.deserialize()
-
-        if self.prob:
-            self.prob['f'] = cs.Sparsity.deserialize(
-                self.prob['f']) if self.function_container.getNCostFun() == 0 else cs.SX.deserialize(self.prob['f'])
-            self.prob['x'] = cs.SX.deserialize(self.prob['x'])
-            self.prob['g'] = cs.Sparsity.deserialize(
-                self.prob['g']) if self.function_container.getNCnstrFun() == 0 else cs.SX.deserialize(self.prob['g'])
-
-            # print('deserializing f', self.prob['f'])
-            # print('deserializing x', self.prob['x'])
-            # print('deserializing g', self.prob['g'])
+        if self.state_der is not None:
+            self.state_der = cs.SX.deserialize(self.state_der)
 
         return self
 
 
+def pickleable(obj):
+    try:
+        pickle.dumps(obj)
+    except pickle.PicklingError:
+        return False
+    return True
+
 if __name__ == '__main__':
 
-    prob = Problem(5)
-    dan = prob.createVariable('dan', 3)
-    print(dan.getNodes())
-
-    exit()
-    prob = Problem(2)
-    dan = prob.createStateVariable('dan', 3)
-    print(prob.getVariables())
-    prob.removeVariable('dan')
-
-    print(prob.getVariables())
-
-    exit()
-    from horizon.transcriptions import transcriptor
-    N = 3
-    dt = 0.01
-    prob = Problem(N)
-    x = prob.createStateVariable('x', 1)
-    prob.setDynamics(x)
-    transcriptor.Transcriptor.make_method('multiple_shooting', prob, dt)
-    x_prev = x.getVarOffset(-1)
-
-    print('==============================')
-    prob.setNNodes(10)
-
-    prob.removeConstraint('multiple_shooting')
-    transcriptor.Transcriptor.make_method('multiple_shooting', prob, dt)
-
-    print(prob.getConstraints('multiple_shooting').getNodes())
-    exit()
-
+    import pickle
+    from transcriptions import transcriptor
     from horizon.solvers import Solver
     from horizon.utils import plotter
     import matplotlib.pyplot as plt
-    N = 10
-    dt = 0.01
-    prob = Problem(10)
-    x = prob.createStateVariable('x', 1)
-    y = prob.createInputVariable('y', 1)
-    # z = prob.createVariable('z', 1, nodes=[0, 1, 2, 3, 4, 5])
 
-    cnsrt = prob.createIntermediateConstraint('cnsrt', x+y)
-    # cnsrt = prob.createIntermediateConstraint('cnsrt', x + z, nodes=[0, 1, 2, 3, 4, 5])
+
+    N = 2
+    dt = 0.01
+    prob = Problem(N)
+    x = prob.createStateVariable('x', 2)
+    y = prob.createInputVariable('y', 2)
+    x_prev = x.getVarOffset(-1)
+
     xdot = cs.vertcat(x)
     prob.setDynamics(xdot)
 
-    print('changing nodes to 1!')
-    prob.setNNodes(1)
-    print('changing nodes to 12!')
-    prob.setNNodes(12)
+    cnsrt = prob.createConstraint('cnsrt', x_prev + y, nodes=range(5, 11), bounds=dict(lb=[0, 0], ub=[10, 10]))
+    cost = prob.createIntermediateCost('cost', x*y)
 
-    cnsrt.setNodes(range(1, 10))
-    sol = Solver.make_solver('ipopt', prob, dt)
+    # print('before', prob.var_container._vars)
+    # print('before', prob.var_container._pars)
+    # print('before:', [elem.getFunction() for elem in prob.function_container._cnstr_container.values()])
+    # print('before:', [elem.getFunction() for elem in prob.function_container._costfun_container.values()])
+
+    for fun in prob.function_container._cnstr_container.values():
+        print(f"does {fun._f} depends on {prob.var_container._vars['y']}: {cs.depends_on(fun._f, prob.var_container._vars['y'])}")
+
+    prob.serialize()
+    print('===PICKLING===')
+    prob_serialized = pickle.dumps(prob)
+    print('===DEPICKLING===')
+    prob_new = pickle.loads(prob_serialized)
+    prb = prob_new.deserialize()
+
+    for fun in prb.function_container._cnstr_container.values():
+        print(f"does {fun._f} depends on {prb.var_container._vars['y']}: {cs.depends_on(fun._f, prb.var_container._vars['y'])}")
+
+    exit()
+
+    transcriptor.Transcriptor.make_method('multiple_shooting', prb, dt)
+    sol = Solver.make_solver('ipopt', prb, dt)
     sol.solve()
     solution = sol.getSolutionDict()
 

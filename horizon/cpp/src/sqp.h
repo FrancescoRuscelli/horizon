@@ -88,19 +88,19 @@ public:
         _g = g;
         _dg = _g.factory("dg", {g.name_in(0)}, {"jac:" + g.name_out(0) + ":" + g.name_in(0)});
 
-        if(opts.contains("max_iter"))
+        if(opts.count("max_iter"))
         {
             _max_iter = opts.at("max_iter");
             _qp_opts.erase("max_iter");
         }
 
-        if(opts.contains("reinitialize_qpsolver"))
+        if(opts.count("reinitialize_qpsolver"))
         {
             _reinitialize_qp_solver = opts.at("reinitialize_qpsolver");
             _qp_opts.erase("reinitialize_qpsolver");
         }
 
-        if(opts.contains("solution_convergence"))
+        if(opts.count("solution_convergence"))
         {
             _solution_convergence = opts.at("solution_convergence");
             _qp_opts.erase("solution_convergence");
@@ -140,19 +140,19 @@ public:
         _g = casadi::Function("g",{x}, {g}, {"x"}, {"g"});
         _dg = _g.factory("dg", {"x"}, {"jac:g:x"});
 
-        if(opts.contains("max_iter"))
+        if(opts.count("max_iter"))
         {
             _max_iter = opts.at("max_iter");
             _qp_opts.erase("max_iter");
         }
 
-        if(opts.contains("reinitialize_qpsolver"))
+        if(opts.count("reinitialize_qpsolver"))
         {
             _reinitialize_qp_solver = opts.at("reinitialize_qpsolver");
             _qp_opts.erase("reinitialize_qpsolver");
         }
 
-        if(opts.contains("solution_convergence"))
+        if(opts.count("solution_convergence"))
         {
             _solution_convergence = opts.at("solution_convergence");
             _qp_opts.erase("solution_convergence");

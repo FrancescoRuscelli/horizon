@@ -1,6 +1,7 @@
 #include <casadi/casadi.hpp>
 #include <Eigen/Dense>
 #include <memory>
+#include <variant>
 
 #include "profiling.h"
 
@@ -39,6 +40,9 @@ public:
      */
     typedef std::function<bool(const ForwardPassResult& res)> CallbackType;
 
+    typedef std::variant<int, double, bool, std::string> OptionTypes;
+    typedef std::map<std::string, OptionTypes> OptionDict;
+
 
     /**
      * @brief Class constructor
@@ -47,13 +51,22 @@ public:
      * @param N is the number of shooting intervals
      */
     IterativeLQR(casadi::Function fdyn,
-                 int N);
+                 int N,
+                 OptionDict opt = OptionDict());
 
     /**
      * @brief setStepLength
      * @param alpha
      */
     void setStepLength(double alpha);
+
+    /**
+     * @brief set an intermediate cost term for the k-th intermediate state,
+     * as specificed by a vector of indices
+     * @param indices: the nodes that the cost refers to
+     * @param inter_cost: a function with required signature (x, u) -> (l)
+     */
+    void setCost(std::vector<int> indices, const casadi::Function& inter_cost);
 
     /**
      * @brief set an intermediate cost term for each intermediate state
@@ -63,13 +76,6 @@ public:
     void setIntermediateCost(const std::vector<casadi::Function>& inter_cost);
 
     /**
-     * @brief set an intermediate cost term for the k-th intermediate state
-     * @param k: the node that the cost refers to
-     * @param inter_cost: a function with required signature (x, u) -> (l)
-     */
-    void setIntermediateCost(int k, const casadi::Function& inter_cost);
-
-    /**
      * @brief set the final cost
      * @param final_cost: a function with required signature (x, u) -> (l),
      * even though the input 'u' is not used
@@ -77,12 +83,17 @@ public:
     void setFinalCost(const casadi::Function& final_cost);
 
     /**
-     * @brief  set an intermediate constraint term for the k-th intermediate state
-     * @param k: the node that the cost refers to
+     * @brief  set an intermediate constraint term for the k-th intermediate state,
+     * as specificed by a vector of indices
+     * @param indices: the nodes that the cost refers to
      * @param inter_constraint: a function with required signature (x, u) -> (h),
      * where the constraint is h(x, u) = 0
+     * @param target_values: if specified, the i-th entry is used as target value
+     * for the constraint function at the indices[i]
      */
-    void setIntermediateConstraint(int k, const casadi::Function& inter_constraint);
+    void setConstraint(std::vector<int> indices,
+                       const casadi::Function& inter_constraint,
+                       std::vector<Eigen::VectorXd> target_values = std::vector<Eigen::VectorXd>());
 
     void setIntermediateConstraint(const std::vector<casadi::Function>& inter_constraint);
 
@@ -116,6 +127,7 @@ public:
     {
         Eigen::MatrixXd xtrj;
         Eigen::MatrixXd utrj;
+        double hxx_reg;
         double alpha;
         double cost;
         double merit;
@@ -142,6 +154,8 @@ private:
     struct Dynamics;
     struct Constraint;
     struct IntermediateCost;
+    struct ConstraintEntity;
+    struct IntermediateCostEntity;
     struct Temporaries;
     struct ConstraintToGo;
     struct BackwardPassResult;
@@ -153,7 +167,12 @@ private:
     void report_result(const ForwardPassResult& fpres);
     void backward_pass();
     void backward_pass_iter(int i);
+    void increase_regularization();
+    void reduce_regularization();
     HandleConstraintsRetType handle_constraints(int i);
+    void compute_constrained_input(Temporaries& tmp, BackwardPassResult& res);
+    void compute_constrained_input_svd(Temporaries& tmp, BackwardPassResult& res);
+    void compute_constrained_input_qr(Temporaries& tmp, BackwardPassResult& res);
     double compute_merit_value(double mu_f, double mu_c, double cost, double defect_norm, double constr_viol);
     double compute_merit_slope(double mu_f, double mu_c, double defect_norm, double constr_viol);
     std::pair<double, double> compute_merit_weights();
@@ -167,11 +186,25 @@ private:
 
     void set_default_cost();
 
+    enum DecompositionType
+    {
+        Svd, Qr
+    };
+
     const int _nx;
     const int _nu;
     const int _N;
 
     double _step_length;
+    double _hxx_reg;
+    double _hxx_reg_growth_factor;
+    double _line_search_accept_ratio;
+    double _alpha_min;
+    double _svd_threshold;
+    bool _closed_loop_forward_pass;
+    std::string _codegen_workdir;
+    bool _codegen_enabled;
+    DecompositionType _decomp_type;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;
@@ -186,7 +219,6 @@ private:
     Eigen::MatrixXd _utrj;
     std::vector<Eigen::VectorXd> _lam_g;
     Eigen::MatrixXd _lam_x;
-
 
     std::vector<Temporaries> _tmp;
 

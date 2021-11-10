@@ -4,7 +4,7 @@ import pprint
 import numpy as np
 import logging
 import casadi as cs
-import horizon.transcriptions.transcriptor as Transcriptor
+from horizon.transcriptions.transcriptor import Transcriptor
 
 def test_singleParameter():
     nodes = 10
@@ -153,7 +153,6 @@ def test_prev():
     prb.setDynamics(state_dot)
 
     th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='RK4'))
-
     solver = Solver.make_solver('ipopt', prb, dt, opts)
     solver.solve()
     sol = solver.getSolutionDict()
@@ -201,6 +200,60 @@ def test_boundsarray():
     lb = cnsrt.getLowerBounds()
     print(lb.shape)
 
+
+def test_view():
+    nodes = 10
+    prb = Problem(nodes)
+    x = prb.createStateVariable('x', 5)
+    y = prb.createInputVariable('y', 5)
+    z = prb.createVariable('z', 5, [3, 4, 5])
+    p = prb.createParameter('p', 4)
+    b = prb.createSingleParameter('b', 6)
+
+    x_prev = x.getVarOffset(-2)
+
+    cnsrt1 = prb.createIntermediateConstraint('cnsrt1', x + y)
+    cnsrt2 = prb.createConstraint('cnsrt2', x[0:4] + p)
+    cnsrt3 = prb.createConstraint('cnsrt3', z + b[1:6], [3, 4, 5])
+
+    state = prb.getState()
+    state[0][2].setLowerBounds([2])
+    print(state[0].getLowerBounds())
+    print('==============================')
+
+    print(f'type: {type(x_prev[2:5])}')
+    print('==============================')
+
+    x_slice = x[2:5]
+    print(f'{type(x)} --> {type(x_slice)}')
+    x_slice.setLowerBounds([10, 10, 10])
+    print(x.getLowerBounds())
+    print('==============================')
+
+    y_slice = y[2:5]
+    print(f'{type(y)} --> {type(y_slice)}')
+    y_slice.setLowerBounds([6, 6, 6])
+    print(y.getLowerBounds())
+    print('==============================')
+
+    z_slice = z[2]
+    print(f'{type(z)} --> {type(z_slice)}')
+    z_slice.setLowerBounds(23)
+    print(z.getLowerBounds())
+    print('==============================')
+
+    p_slice = p[2:4]
+    print(f'{type(p)} --> {type(p_slice)}')
+    p_slice.assign([52, 52])
+    print(p.getValues())
+    print('==============================')
+
+    b_slice = b[2:5]
+    print(f'{type(b)} --> {type(b_slice)}')
+    b_slice.assign([12, 12, 12])
+    print(b.getValues())
+
+
 if __name__ == '__main__':
     # test_singleParameter()
     # test_parameters()
@@ -211,7 +264,8 @@ if __name__ == '__main__':
     # test_prev()
     # test_bounds_input()
     # test_bounds_2()
-    test_boundsarray()
+    # test_boundsarray()
+    test_view()
 
 
 #

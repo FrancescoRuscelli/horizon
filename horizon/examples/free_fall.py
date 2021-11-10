@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter
 from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
@@ -146,7 +146,7 @@ if not FREE_FALL:
     tau_min[-1] = -10000.0
 
 frame_force_mapping = {'rope_anchor2': frope}
-tau = casadi_kin_dyn.InverseDynamics(kindyn, ['rope_anchor2']).call(q, qdot, qddot, frame_force_mapping)
+tau = kin_dyn.InverseDynamics(kindyn, ['rope_anchor2']).call(q, qdot, qddot, frame_force_mapping)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
 
 p_rope_init = FKRope(q=q_init)['ee_pos']
@@ -177,7 +177,7 @@ f2_hist = solution["f2"]
 frope_hist = solution["frope"]
 
 tau_hist = np.zeros(qddot_hist.shape)
-ID = casadi_kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'])
+ID = kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'])
 for i in range(ns):
     frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'rope_anchor2': frope_hist[:, i]}
     tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()

@@ -45,11 +45,7 @@ public:
 
 struct IterativeLQR::Constraint
 {
-    // constraint function
-    casadi_utils::WrappedFunction f;
-
-    // constraint jacobian
-    casadi_utils::WrappedFunction df;
+    std::list<ConstraintEntity> items;
 
     // dh/dx
     const Eigen::MatrixXd& C() const;
@@ -60,10 +56,53 @@ struct IterativeLQR::Constraint
     // constraint violation f(x, u)
     VecConstRef h() const;
 
+    // size getter
+    int size() const;
+
     // valid flag
     bool is_valid() const;
 
-    Constraint();
+    Constraint(int nx, int nu);
+
+    void linearize(VecConstRef x, VecConstRef u);
+
+    void evaluate(VecConstRef x, VecConstRef u);
+
+    void addConstraint(casadi::Function h);
+
+    void addConstraint(const ConstraintEntity& h);
+
+private:
+
+    Eigen::MatrixXd _C;
+    Eigen::MatrixXd _D;
+    Eigen::VectorXd _h;
+
+};
+
+struct IterativeLQR::ConstraintEntity
+{
+    // constraint function
+    casadi_utils::WrappedFunction f;
+
+    // constraint jacobian
+    casadi_utils::WrappedFunction df;
+
+
+
+    // dh/dx
+    const Eigen::MatrixXd& C() const;
+
+    // dh/du
+    const Eigen::MatrixXd& D() const;
+
+    // constraint violation h(x, u) - hdes
+    VecConstRef h() const;
+
+    // valid flag
+    bool is_valid() const;
+
+    ConstraintEntity();
 
     void linearize(VecConstRef x, VecConstRef u);
 
@@ -71,9 +110,23 @@ struct IterativeLQR::Constraint
 
     void setConstraint(casadi::Function h);
 
+    void setConstraint(casadi::Function h, casadi::Function dh);
+
+    void setTargetValue(const Eigen::VectorXd& hdes);
+
+    static casadi::Function Jacobian(const casadi::Function& h);
+
+private:
+
+    // desired value
+    Eigen::VectorXd _hdes;
+
+    // computed value
+    Eigen::VectorXd _hvalue;
+
 };
 
-struct IterativeLQR::IntermediateCost
+struct IterativeLQR::IntermediateCostEntity
 {
     // original cost
     casadi_utils::WrappedFunction l;
@@ -91,12 +144,42 @@ struct IterativeLQR::IntermediateCost
     VecConstRef r() const;
     const Eigen::MatrixXd& P() const;
 
-    IntermediateCost(int nx, int nu);
-
     void setCost(const casadi::Function& cost);
+
+    void setCost(const casadi::Function& f,
+                 const casadi::Function& df,
+                 const casadi::Function& ddf);
 
     double evaluate(VecConstRef x, VecConstRef u);
     void quadratize(VecConstRef x, VecConstRef u);
+
+    static casadi::Function Gradient(const casadi::Function& f);
+    static casadi::Function Hessian(const casadi::Function& df);
+};
+
+struct IterativeLQR::IntermediateCost
+{
+    std::list<IntermediateCostEntity> items;
+
+    /* Quadratized cost */
+    const Eigen::MatrixXd& Q() const;
+    VecConstRef q() const;
+    const Eigen::MatrixXd& R() const;
+    VecConstRef r() const;
+    const Eigen::MatrixXd& P() const;
+
+    IntermediateCost(int nx, int nu);
+
+    void addCost(const casadi::Function& cost);
+    void addCost(const IntermediateCostEntity& cost);
+
+    double evaluate(VecConstRef x, VecConstRef u);
+    void quadratize(VecConstRef x, VecConstRef u);
+
+private:
+
+    Eigen::MatrixXd _Q, _R, _P;
+    Eigen::VectorXd _q, _r;
 };
 
 struct IterativeLQR::Temporaries
@@ -136,7 +219,7 @@ struct IterativeLQR::Temporaries
     Eigen::VectorXd h;
 
     // svd of D
-    Eigen::BDCSVD<Eigen::MatrixXd> svd;
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd;
 
     // rotated constraint according to left singular vectors of D
     Eigen::MatrixXd rotC;
@@ -144,6 +227,9 @@ struct IterativeLQR::Temporaries
 
     // temporary that is used to compute lagrange multipliers
     Eigen::MatrixXd UrSinvVrT;
+
+    // qr of D
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr;
 
     // input component due to constraint (u = lc + Lc*x + Bz*z)
     Eigen::MatrixXd Lc;
@@ -164,6 +250,7 @@ struct IterativeLQR::Temporaries
 
     /* Forward pass */
     Eigen::VectorXd dx;
+    Eigen::VectorXd du;
     Eigen::VectorXd defect;
 
 };
@@ -244,5 +331,16 @@ struct IterativeLQR::ConstrainedCost
     VecConstRef q;
     VecConstRef r;
 };
+
+#define THROW_NAN(mat) \
+    if((mat).hasNaN()) \
+    { \
+        throw std::runtime_error("NaN value detected in " #mat); \
+    } \
+    if(!mat.allFinite()) \
+    { \
+        throw std::runtime_error("Inf value detected in " #mat); \
+    }
+
 
 #endif // ILQR_IMPL_H
