@@ -4,7 +4,6 @@ from casadi_kin_dyn import pycasadi_kin_dyn
 import casadi as cs
 import numpy as np
 import time
-from osqppurepy._osqp import solution
 
 from horizon import problem
 from horizon.transcriptions import integrators

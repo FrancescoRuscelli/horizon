@@ -196,10 +196,12 @@ plt.figure()
 plt.plot(walker.solver.x_opt[:3, :].T)
 plt.grid()
 
+solution = walker.solver.getSolutionDict()
+
 plt.figure()
 for i in range(4):
     plt.subplot(2, 2, i+1)
-    plt.plot(walker.solver.solution['f' + str(i)].T)
+    plt.plot(solution['f' + str(i)].T)
     plt.grid()
 
 
@@ -216,6 +218,6 @@ plt.grid()
 plt.figure()
 for i in range(4):
     plt.subplot(2, 2, i+1)
-    plt.plot(walker.solver.solution['f' + str(i)].T)
+    plt.plot(solution['f' + str(i)].T)
     plt.grid()
 plt.show()
