@@ -1,3 +1,6 @@
+#ifndef __HORIZON__ILQR__H__
+#define __HORIZON__ILQR__H__
+
 #include <casadi/casadi.hpp>
 #include <Eigen/Dense>
 #include <memory>
@@ -229,3 +232,5 @@ private:
 
 
 }
+
+#endif

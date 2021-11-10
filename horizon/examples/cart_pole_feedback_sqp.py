@@ -4,8 +4,9 @@ from casadi_kin_dyn import pycasadi_kin_dyn
 import casadi as cs
 import numpy as np
 import time
+from osqppurepy._osqp import solution
+
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.transcriptions import integrators
 from horizon.solvers import solver, pysqp
 import matplotlib.pyplot as plt
@@ -118,6 +119,7 @@ opts['max_iter'] = 1
 
 
 solver = solver.Solver.make_solver('gnsqp', prb, None, opts)
+solver.set_iteration_callback()
 
 
 class RealTimeIteration:

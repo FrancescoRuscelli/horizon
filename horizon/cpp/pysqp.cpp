@@ -22,6 +22,7 @@ PYBIND11_MODULE(pysqp, m) {
             .def("printConicOptions", &SQPGaussNewton<casadi::SX>::printConicOptions)
             .def("getQPOasesOptionsMPC", get_qpoases_options_mpc)
             .def("getQPOasesOptionsReliable", get_qpoases_options_reliable)
+            .def("setIterationCallback", &SQPGaussNewton<casadi::SX>::setIterationCallback)
             ;
 
     py::class_<SQPGaussNewton<casadi::MX>>(m, "SQPGaussNewtonMX")
@@ -42,7 +43,7 @@ PYBIND11_MODULE(pysqp, m) {
             .def("printConicOptions", &SQPGaussNewton<casadi::MX>::printConicOptions)
             .def("getQPOasesOptionsMPC", get_qpoases_options_mpc)
             .def("getQPOasesOptionsReliable", get_qpoases_options_reliable)
-
+            .def("setIterationCallback", &SQPGaussNewton<casadi::MX>::setIterationCallback)
             ;
 
 }

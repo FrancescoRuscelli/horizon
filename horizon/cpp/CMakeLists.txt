@@ -34,7 +34,7 @@ add_library(sqp STATIC
 
 
 target_link_libraries(ilqr Eigen3::Eigen casadi)
-target_link_libraries(sqp Eigen3::Eigen casadi)
+target_link_libraries(sqp Eigen3::Eigen casadi ilqr)
 
 # python binding
 set(PYBIND11_PYTHON_VERSION 3)

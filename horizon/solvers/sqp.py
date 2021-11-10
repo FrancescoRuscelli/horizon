@@ -1,5 +1,6 @@
 #try:
 from .pysqp import SQPGaussNewtonSX
+from horizon.solvers.pyilqr import IterativeLQR
 #except ImportError:
 #    print('failed to import pysqp extension; did you compile it?')
 #    exit(1)
@@ -45,6 +46,30 @@ class GNSQPSolver(Solver):
         F = cs.Function('f', [w], [f], ['x'], ['f'])
         G = cs.Function('g', [w], [g], ['x'], ['g'])
         self.solver = SQPGaussNewtonSX('gnsqp', qp_solver_plugin, F, G, self.opts)
+
+    def set_iteration_callback(self, cb=None):
+        if cb is None:
+            self.solver.setIterationCallback(self._iter_callback)
+        else:
+            self.solver.setIterationCallback(cb)
+
+    def _iter_callback(self, fpres):
+            if not fpres.accepted:
+                return
+            fmt = ' <#09.3e'
+            fmtf = ' <#04.2f'
+            star = '*' if fpres.accepted else ' '
+            print(f'{star}\
+    alpha={fpres.alpha:{fmtf}}  \
+    reg={fpres.hxx_reg:{fmt}}  \
+    merit={fpres.merit:{fmt}}  \
+    dm={fpres.merit_der:{fmt}}  \
+    mu_f={fpres.mu_f:{fmt}}  \
+    mu_c={fpres.mu_c:{fmt}}  \
+    cost={fpres.cost:{fmt}}  \
+    delta_u={fpres.step_length:{fmt}}  \
+    constr={fpres.constraint_violation:{fmt}}  \
+    gap={fpres.defect_norm:{fmt}}')
 
     def solve(self) -> bool:
         # update bounds and initial guess
