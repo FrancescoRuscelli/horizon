@@ -407,7 +407,7 @@ class Parameter(AbstractVariable):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
-        par_impl = cs.vertcat(*[self._par_impl['n' + str(i)]['val'] for i in nodes])
+        par_impl = cs.horzcat(*[self._par_impl['n' + str(i)]['val'] for i in nodes])
 
         return par_impl
 

@@ -178,7 +178,10 @@ class NlpsolSolver(Solver):
         # update parameters
         p_list = list()
         for par in self.var_container.getParList():
-            p_list.append(par.getValues())
+            pval = par.getValues()
+            pval = cs.reshape(pval, (pval.size1()*pval.size2(), 1))
+            p_list.append(pval)
+
         p = cs.vertcat(*p_list)
 
         # update lower bounds of constraints
