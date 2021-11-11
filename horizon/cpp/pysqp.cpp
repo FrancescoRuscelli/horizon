@@ -12,7 +12,7 @@ PYBIND11_MODULE(pysqp, m) {
             .def("g", gSX)
             .def("__call__", callSX,
                  py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"), py::arg("p"))
-            .def("setAlpha", &SQPGaussNewton<casadi::SX>::setAlpha)
+            .def("setAlphaMin", &SQPGaussNewton<casadi::SX>::setAlphaMin)
             .def("getAlpha", &SQPGaussNewton<casadi::SX>::getAlpha)
             .def("getVariableTrajectory", &SQPGaussNewton<casadi::SX>::getVariableTrajectory)
             .def("getObjectiveIterations", &SQPGaussNewton<casadi::SX>::getObjectiveIterations)
@@ -33,7 +33,7 @@ PYBIND11_MODULE(pysqp, m) {
             .def("g", gMX)
             .def("__call__", callSX,
                 py::arg("x0"), py::arg("lbx"), py::arg("ubx"), py::arg("lbg"), py::arg("ubg"), py::arg("p"))
-            .def("setAlpha", &SQPGaussNewton<casadi::MX>::setAlpha)
+            .def("setAlphaMin", &SQPGaussNewton<casadi::MX>::setAlphaMin)
             .def("getAlpha", &SQPGaussNewton<casadi::MX>::getAlpha)
             .def("getVariableTrajectory", &SQPGaussNewton<casadi::MX>::getVariableTrajectory)
             .def("getObjectiveIterations", &SQPGaussNewton<casadi::MX>::getObjectiveIterations)

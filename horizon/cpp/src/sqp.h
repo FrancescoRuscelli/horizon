@@ -176,12 +176,12 @@ public:
     }
 
     /**
-     * @brief setAlpha
-     * @param alpha Newton's method step
+     * @brief setAlphaMin set the minumi allowed alpha during linesearch
+     * @param alpha min in Newton's method step
      */
-    void setAlpha(const double alpha)
+    void setAlphaMin(const double alpha_min)
     {
-        _alpha = alpha;
+        _alpha_min = alpha_min;
     }
 
     const double& getAlpha() const
