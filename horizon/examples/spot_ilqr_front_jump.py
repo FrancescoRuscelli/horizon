@@ -24,7 +24,7 @@ load_initial_guess = False
 tf = 2.0
 n_nodes = 100
 ilqr_plot_iter = False
-t_jump = (1.0, 1.5)
+t_jump = (1.0, 3)
 
 # load urdf
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
@@ -86,18 +86,20 @@ prb.createFinalConstraint('final_velocity', q_dot)
 # final pose
 q_tgt = q_init.copy()
 q_tgt[0] = 0
-q_tgt[5] = math.sin(math.pi/4)
-prb.createFinalConstraint('q_fb', q[:6] - q_tgt[:6])
+# q_tgt[5] = math.sin(math.pi/4)
+prb.createFinalConstraint('q_dot', q_dot)
+# prb.createFinalConstraint('q_fb', q[:6] - q_tgt[:6])
+
 # prb.createFinalConstraint('q_f', q[7:] - q_tgt[7:])
 
-prb.createFinalCost('q_f', 100*cs.sumsqr(q[7:] - q_tgt[7:]))
+# prb.createFinalCost('q_f', 100*cs.sumsqr(q[7:] - q_tgt[7:]))
 # prb.createFinalCost('q_dot_f', 100*cs.sumsqr(q_dot))
 
 # contact handling
 k_all = range(1, n_nodes+1)
 k_swing = list(range(*[int(t/dt) for t in t_jump]))
 k_stance = list(filterfalse(lambda k: k in k_swing, k_all))
-lifted_legs = contacts_name.copy()
+lifted_legs = contacts_name[0:2]  #contacts_name.copy()
 
 def barrier(x):
     return cs.if_else(x > 0, 0, x**2)
@@ -148,7 +150,7 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.line_search_accept_ratio': 1e-9,
         'ilqr.svd_threshold': 1e-12,
         'ilqr.decomp_type': 'qr',
-        'ilqr.codegen_enabled': True,
+        'ilqr.codegen_enabled': False,
         'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump',
         'gnsqp.qp_solver': 'osqp'
         }
@@ -187,6 +189,16 @@ plot_all = False
 plot_fun = False
 plot_forces = False
 
+pos_contact_list = list()
+for contact in contacts_name:
+    FK = cs.Function.deserialize(kindyn.fk(contact))
+    pos = FK(q=solution['q'])['ee_pos']
+    plt.figure()
+    plt.title(contact)
+    for dim in range(n_f):
+        plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3, linestyle='solid')
+
+plt.show()
 if plot_forces:
     for f in [f'f{i}' for i in range(len(contacts_name))]:
         plt.figure()
