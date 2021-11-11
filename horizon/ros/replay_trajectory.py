@@ -46,6 +46,7 @@ class replay_trajectory:
         self.__sleep = 0.
         self.force_pub = []
         self.frame_force_mapping = {}
+        self.slow_down_rate = 1.
 
         if frame_force_mapping:
             self.frame_force_mapping = deepcopy(frame_force_mapping)
@@ -101,10 +102,18 @@ class replay_trajectory:
         '''
         self.__sleep = secs
 
+    def setSlowDownFactor(self, slow_down_factor):
+        '''
+        Set a slow down factor for the replay of the trajectory
+        Args:
+             slow_down_factor: fator to slow down
+        '''
+        self.slow_down_rate = 1./slow_down_factor
+
     def replay(self, is_floating_base=True):
         pub = rospy.Publisher('joint_states', JointState, queue_size=10)
         rospy.init_node('joint_state_publisher')
-        rate = rospy.Rate(1. / self.dt)
+        rate = rospy.Rate(self.slow_down_rate / self.dt)
         joint_state_pub = JointState()
         joint_state_pub.header = Header()
         joint_state_pub.name = self.joint_list

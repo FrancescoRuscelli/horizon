@@ -36,7 +36,7 @@ print("nv: ", nv)
 
 # OPTIMIZATION PARAMETERS
 tf = 5.0  # [s]
-ns = 30  # number of shooting nodes
+ns = 100  # number of shooting nodes
 dt = tf/ns
 use_ms = False
 

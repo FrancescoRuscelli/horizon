@@ -119,7 +119,7 @@ plt.suptitle('$\mathrm{Base \ Position}$', size=20)
 plt.xlabel('$\mathrm{[sec]}$', size=20)
 plt.ylabel('$\mathrm{[m]}$', size=20)
 
-plot_all = True
+plot_all = False
 if plot_all:
     hplt = PlotterHorizon(prb, solution)
     hplt.plotVariables()

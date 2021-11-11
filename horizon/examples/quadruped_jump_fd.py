@@ -200,7 +200,7 @@ f4_hist = solution["f4"]
 dt_hist = solution["dt"]
 
 qddot_hist = np.zeros(tau_hist.shape)
-FD = casadi_kin_dyn.ForwardDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+FD = kin_dyn.ForwardDynamics(kindyn, ['Contact1', 'Contact2', 'Contact3', 'Contact4'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 for i in range(ns):
     frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'Contact3': f3_hist[:, i], 'Contact4': f4_hist[:, i]}
     qddot_hist[:, i] = FD.call(q_hist[:, i], qdot_hist[:, i], tau_hist[:, i], frame_force_mapping_i).toarray().flatten()
