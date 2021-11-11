@@ -16,7 +16,7 @@ int main()
     x0 << 0.0;
     ilqr.setInitialState(x0);
 
-    ilqr.setIntermediateCost(std::vector<casadi::Function>(N, l));
+    ilqr.setCost({0, 1}, l);
 //    ilqr.setFinalCost(lf);
     ilqr.setFinalConstraint(cf);
 

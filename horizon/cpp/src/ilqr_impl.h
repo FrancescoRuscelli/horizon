@@ -137,6 +137,9 @@ struct IterativeLQR::IntermediateCostEntity
     // cost hessian
     casadi_utils::WrappedFunction ddl;
 
+    // parameters
+    ParameterMapPtr param;
+
     /* Quadratized cost */
     const Eigen::MatrixXd& Q() const;
     VecConstRef q() const;
@@ -150,8 +153,8 @@ struct IterativeLQR::IntermediateCostEntity
                  const casadi::Function& df,
                  const casadi::Function& ddf);
 
-    double evaluate(VecConstRef x, VecConstRef u);
-    void quadratize(VecConstRef x, VecConstRef u);
+    double evaluate(VecConstRef x, VecConstRef u, int k);
+    void quadratize(VecConstRef x, VecConstRef u, int k);
 
     static casadi::Function Gradient(const casadi::Function& f);
     static casadi::Function Hessian(const casadi::Function& df);
@@ -173,8 +176,8 @@ struct IterativeLQR::IntermediateCost
     void addCost(const casadi::Function& cost);
     void addCost(const IntermediateCostEntity& cost);
 
-    double evaluate(VecConstRef x, VecConstRef u);
-    void quadratize(VecConstRef x, VecConstRef u);
+    double evaluate(VecConstRef x, VecConstRef u, int k);
+    void quadratize(VecConstRef x, VecConstRef u, int k);
 
 private:
 

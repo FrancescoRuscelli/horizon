@@ -175,13 +175,13 @@ double IterativeLQR::compute_cost(const Eigen::MatrixXd& xtrj, const Eigen::Matr
     // intermediate cost
     for(int i = 0; i < _N; i++)
     {
-        cost += _cost[i].evaluate(xtrj.col(i), utrj.col(i));
+        cost += _cost[i].evaluate(xtrj.col(i), utrj.col(i), i);
     }
 
     // add final cost
     // note: u not used
     // todo: enforce this!
-    cost += _cost[_N].evaluate(xtrj.col(_N), utrj.col(_N-1));
+    cost += _cost[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
 
     return cost / _N;
 }

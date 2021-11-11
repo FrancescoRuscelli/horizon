@@ -69,13 +69,6 @@ public:
     void setCost(std::vector<int> indices, const casadi::Function& inter_cost);
 
     /**
-     * @brief set an intermediate cost term for each intermediate state
-     * @param inter_cost: a vector of N entries, each of which is a function with
-     * required signature (x, u) -> (l)
-     */
-    void setIntermediateCost(const std::vector<casadi::Function>& inter_cost);
-
-    /**
      * @brief set the final cost
      * @param final_cost: a function with required signature (x, u) -> (l),
      * even though the input 'u' is not used
@@ -98,6 +91,8 @@ public:
     void setIntermediateConstraint(const std::vector<casadi::Function>& inter_constraint);
 
     void setFinalConstraint(const casadi::Function& final_constraint);
+
+    void setParameterValue(const std::string& fname, const Eigen::MatrixXd& value);
 
     void setInitialState(const Eigen::VectorXd& x0);
 
@@ -161,7 +156,11 @@ private:
     struct BackwardPassResult;
     struct ValueFunction;
 
-    typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost> HandleConstraintsRetType;
+    typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost>
+        HandleConstraintsRetType;
+
+    typedef std::shared_ptr<std::map<std::string, Eigen::MatrixXd>>
+        ParameterMapPtr;
 
     void linearize_quadratize();
     void report_result(const ForwardPassResult& fpres);
@@ -205,6 +204,8 @@ private:
     std::string _codegen_workdir;
     bool _codegen_enabled;
     DecompositionType _decomp_type;
+
+    ParameterMapPtr _param_map;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;

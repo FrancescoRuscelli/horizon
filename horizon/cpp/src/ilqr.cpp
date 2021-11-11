@@ -100,6 +100,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _utrj.setZero(_nu, _N);
     _lam_x.setZero(_nx, _N);
 
+    // construct param map
+    _param_map = std::make_shared<ParameterMapPtr::element_type>();
 
     // a default cost so that it works out of the box
     //  *) default intermediate cost -> l(x, u) = eps*|u|^2
@@ -112,28 +114,32 @@ void IterativeLQR::setStepLength(double alpha)
     _step_length = alpha;
 }
 
-
-void IterativeLQR::setIntermediateCost(const std::vector<casadi::Function> &inter_cost)
-{
-    if(inter_cost.size() != _N)
-    {
-        throw std::invalid_argument("wrong intermediate cost length");
-    }
-
-    for(int i = 0; i < _N; i++)
-    {
-        _cost[i].addCost(inter_cost[i]);
-    }
-}
-
 void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& inter_cost)
 {
-    IntermediateCostEntity c;
+    // add parameters from this cost (init to NaN)
+    const int param_size = inter_cost.size1_in(2);
 
+    if(_param_map->count(inter_cost.name()))
+    {
+        throw std::invalid_argument("function name '" +
+                                    inter_cost.name() + "' already used");
+    }
+
+    (*_param_map)[inter_cost.name()].setConstant(param_size,
+                                                 _N+1,
+                                                 std::numeric_limits<double>::quiet_NaN()
+                                                 );
+
+    // create cost entity
+    IntermediateCostEntity c;
+    c.param = _param_map;
+
+    // set cost and derivatives
     auto cost = inter_cost;
     auto grad = c.Gradient(inter_cost);
     auto hess = c.Hessian(grad);
 
+    // codegen if required
     if(_codegen_enabled)
     {
         cost = utils::codegen(cost, _codegen_workdir);
@@ -164,7 +170,7 @@ void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& int
 
 void IterativeLQR::setFinalCost(const casadi::Function &final_cost)
 {
-    _cost.back().addCost(final_cost);
+    setCost(std::vector<int>{_N}, final_cost);
 }
 
 void IterativeLQR::setConstraint(std::vector<int> indices,
@@ -226,6 +232,25 @@ void IterativeLQR::setIntermediateConstraint(const std::vector<casadi::Function>
 void IterativeLQR::setFinalConstraint(const casadi::Function &final_constraint)
 {
     _constraint.back().addConstraint(final_constraint);
+}
+
+void IterativeLQR::setParameterValue(const std::string& fname, const Eigen::MatrixXd& value)
+{
+    auto it = _param_map->find(fname);
+
+    if(it == _param_map->end())
+    {
+        throw std::invalid_argument("undefined function name '" + fname + "'");
+    }
+
+    if(it->second.rows() != value.rows() ||
+            it->second.cols() != value.cols())
+    {
+        throw std::invalid_argument("wrong parameter value size for function name '"
+            + fname + "'");
+    }
+
+    it->second = value;
 }
 
 void IterativeLQR::setInitialState(const Eigen::VectorXd &x0)
@@ -330,12 +355,12 @@ void IterativeLQR::linearize_quadratize()
         _dyn[i].linearize(xi, ui);
         _dyn[i].computeDefect(xi, ui, xnext, _dyn[i].d);
         _constraint[i].linearize(xi, ui);
-        _cost[i].quadratize(xi, ui);
+        _cost[i].quadratize(xi, ui, i);
     }
 
     // handle final cost and constraint
     // note: these are only function of the state!
-    _cost.back().quadratize(state(_N), input(_N-1)); // note: input not used here!
+    _cost.back().quadratize(state(_N), input(_N-1), _N); // note: input not used here!
     _constraint.back().linearize(state(_N), input(_N-1)); // note: input not used here!
 }
 
@@ -353,14 +378,25 @@ void IterativeLQR::report_result(const IterativeLQR::ForwardPassResult& fpres)
 void IterativeLQR::set_default_cost()
 {
     const double dfl_cost_weight = 1e-160;
+
     auto x = cs::SX::sym("x", _nx);
     auto u = cs::SX::sym("u", _nu);
-    auto l = cs::Function("dfl_cost", {x, u},
+    auto p = cs::SX::sym("p", 0);
+
+    auto l = cs::Function("dfl_cost", {x, u, p},
                           {dfl_cost_weight*cs::SX::sumsqr(u)},
-                          {"x", "u"}, {"l"});
-    auto lf = cs::Function("dfl_cost_final", {x, u}, {dfl_cost_weight*cs::SX::sumsqr(x)},
-                           {"x", "u"}, {"l"});
-    setIntermediateCost(std::vector<cs::Function>(_N, l));
+                          {"x", "u", "p"}, {"l"});
+
+    auto lf = cs::Function("dfl_cost_final", {x, u, p}, {dfl_cost_weight*cs::SX::sumsqr(x)},
+                           {"x", "u", "p"}, {"l"});
+
+    std::vector<int> all_indices;
+    for(int i = 0; i < _N; i++)
+    {
+        all_indices.push_back(i);
+    }
+
+    setCost(all_indices, l);
     setFinalCost(lf);
 }
 
@@ -454,14 +490,8 @@ const Eigen::MatrixXd& IterativeLQR::IntermediateCostEntity::P() const
 void IterativeLQR::IntermediateCostEntity::setCost(const casadi::Function &cost)
 {
     l = cost;
-
-    // note: use grad to obtain a column vector!
-    dl = Gradient(cost);
+    dl = Gradient(cost);  // note: use grad to obtain a column vector!
     ddl = Hessian(dl.function());
-
-    // tbd: do something with this
-    // bool is_quadratic = ddl.function().jacobian().nnz_out() == 0;
-    // static_cast<void>(is_quadratic);
 }
 
 void IterativeLQR::IntermediateCostEntity::setCost(const casadi::Function &f,
@@ -473,26 +503,42 @@ void IterativeLQR::IntermediateCostEntity::setCost(const casadi::Function &f,
     ddl = ddf;
 }
 
-double IterativeLQR::IntermediateCostEntity::evaluate(VecConstRef x, VecConstRef u)
+double IterativeLQR::IntermediateCostEntity::evaluate(VecConstRef x,
+                                                      VecConstRef u,
+                                                      int k)
 {
+    // get the parameter valye for this function at this node
+    const auto& p = param->at(l.function().name()).col(k);
+    THROW_NAN(p);
+
     // compute cost value
     l.setInput(0, x);
     l.setInput(1, u);
+    l.setInput(2, p);
+
     l.call();
 
     return l.getOutput(0).value();
 }
 
-void IterativeLQR::IntermediateCostEntity::quadratize(VecConstRef x, VecConstRef u)
+void IterativeLQR::IntermediateCostEntity::quadratize(VecConstRef x,
+                                                      VecConstRef u,
+                                                      int k)
 {
+    // get the parameter valye for this function at this node
+    const auto& p = param->at(l.function().name()).col(k);
+    THROW_NAN(p);
+
     // compute cost gradient
     dl.setInput(0, x);
     dl.setInput(1, u);
+    dl.setInput(2, p);
     dl.call();
 
     // compute cost hessian
     ddl.setInput(0, x);
     ddl.setInput(1, u);
+    ddl.setInput(2, p);
     ddl.call();
 
 }
@@ -500,14 +546,14 @@ void IterativeLQR::IntermediateCostEntity::quadratize(VecConstRef x, VecConstRef
 casadi::Function IterativeLQR::IntermediateCostEntity::Gradient(const casadi::Function& f)
 {
     return f.factory(f.name() + "_grad",
-                     {"x", "u"},
+                     {"x", "u", "p"},
                      {"grad:l:x", "grad:l:u"});
 }
 
 casadi::Function IterativeLQR::IntermediateCostEntity::Hessian(const casadi::Function& df)
 {
     return df.factory(df.name() + "_hess",
-                      {"x", "u"},
+                      {"x", "u", "p"},
                       {"jac:grad_l_x:x", "jac:grad_l_u:u", "jac:grad_l_u:x"});
 }
 
@@ -556,7 +602,9 @@ void IterativeLQR::IntermediateCost::addCost(const IntermediateCostEntity &cost)
     items.emplace_back(cost);
 }
 
-double IterativeLQR::IntermediateCost::evaluate(VecConstRef x, VecConstRef u)
+double IterativeLQR::IntermediateCost::evaluate(VecConstRef x,
+                                                VecConstRef u,
+                                                int k)
 {
     TIC(evaluate_cost_inner);
 
@@ -564,13 +612,15 @@ double IterativeLQR::IntermediateCost::evaluate(VecConstRef x, VecConstRef u)
 
     for(auto& it : items)
     {
-        cost += it.evaluate(x, u);
+        cost += it.evaluate(x, u, k);
     }
 
     return cost;
 }
 
-void IterativeLQR::IntermediateCost::quadratize(VecConstRef x, VecConstRef u)
+void IterativeLQR::IntermediateCost::quadratize(VecConstRef x,
+                                                VecConstRef u,
+                                                int k)
 {
     TIC(quadratize_inner)
 
@@ -587,7 +637,7 @@ void IterativeLQR::IntermediateCost::quadratize(VecConstRef x, VecConstRef u)
 
     for(auto& it : items)
     {
-        it.quadratize(x, u);
+        it.quadratize(x, u, k);
         _Q += it.Q();
         _R += it.R();
         _P += it.P();

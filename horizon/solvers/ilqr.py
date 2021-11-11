@@ -71,14 +71,19 @@ class SolverILQR(Solver):
     
     def solve(self):
         
+        # set initial state
         x0 = self.prb.getInitialState()
         xinit = self.prb.getState().getInitialGuess()
         uinit = self.prb.getInput().getInitialGuess()
         xinit[:, 0] = x0.flatten()
 
+        # update initial guess
         self.ilqr.setStateInitialGuess(xinit)
         self.ilqr.setInputInitialGuess(uinit)
         self.ilqr.setIterationCallback(self._iter_callback)
+        
+        # update parameters
+        self._set_param_values(container=self.prb.function_container.getCost())
         ret = self.ilqr.solve(self.max_iter)
 
         # get solution
@@ -167,9 +172,11 @@ class SolverILQR(Solver):
 
             # get input variables for this function
             input_list = f.getVariables()
+            param_list = f.getParameters()
+            p = cs.vertcat(*param_list)
 
             # save function value
-            value = f.getFunction()(*input_list)
+            value = f.getFunction()(*input_list, *param_list)
 
             # active nodes
             nodes = f.getNodes()
@@ -184,8 +191,8 @@ class SolverILQR(Solver):
                 tgt_values = np.hsplit(lb, len(nodes))
 
             # wrap function
-            l = cs.Function(fname, [self.x, self.u], [value], 
-                                ['x', 'u'], [outname])
+            l = cs.Function(fname, [self.x, self.u, p], [value], 
+                                ['x', 'u', 'p'], [outname])
 
             # set it to solver
             if isinstance(f, Constraint):
@@ -193,7 +200,31 @@ class SolverILQR(Solver):
             else:
                 set_to_ilqr(nodes, l)
         
+    
+    def _set_param_values(self, container):
 
+        for fname, f in container.items():
+            
+            # give a type to f
+            f: Function = f
+
+            # get input variables for this function
+            param_list = f.getParameters()
+
+            if len(param_list) == 0:
+                continue
+
+            value_list = list()
+            for p in param_list:
+                v = p.getValues()
+                value_list.append(v)
+            
+            print(value_list)
+            p_value = np.vstack(value_list)
+            
+            print(fname)
+            print(p_value)
+            self.ilqr.setParameterValue(fname, p_value)
     
     def _iter_callback(self, fpres):
         if not fpres.accepted:

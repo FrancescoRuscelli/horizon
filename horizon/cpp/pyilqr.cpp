@@ -23,7 +23,6 @@ PYBIND11_MODULE(pyilqr, m) {
 
     py::class_<IterativeLQR>(m, "IterativeLQR")
             .def(py::init(&construct))
-            .def("setIntermediateCost", set_inter_cost_wrapper)
             .def("setIntermediateCost", set_inter_cost_wrapper_single)
             .def("setIntermediateConstraint", set_inter_constraint_wrapper)
             .def("setIntermediateConstraint",
@@ -31,6 +30,7 @@ PYBIND11_MODULE(pyilqr, m) {
                  py::arg("indices"), py::arg("h"), py::arg("target") = py::list())
             .def("setFinalCost", set_final_cost_wrapper)
             .def("setFinalConstraint", set_final_constraint_wrapper)
+            .def("setParameterValue", &IterativeLQR::setParameterValue)
             .def("setStepLength", &IterativeLQR::setStepLength)
             .def("solve", &IterativeLQR::solve)
             .def("state", &IterativeLQR::state)
