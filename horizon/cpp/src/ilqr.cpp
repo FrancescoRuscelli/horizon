@@ -89,19 +89,40 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
         _prof_info.timings[name].push_back(usec);
     };
 
+    // construct param map
+    _param_map = std::make_shared<ParameterMapPtr::element_type>();
+
     // set dynamics
+    std::cout << "computing dynamics jacobian.." << std::flush;
+    auto fdyn_jac = Dynamics::Jacobian(fdyn);
+    std::cout << ".done! \n";
+
+    // codegen if needed
+    if(_codegen_enabled)
+    {
+        fdyn = utils::codegen(fdyn, _codegen_workdir);
+        fdyn_jac = utils::codegen(fdyn_jac, _codegen_workdir);
+    }
+
     for(auto& d : _dyn)
     {
-        d.setDynamics(fdyn);
+        d.f = fdyn;
+        d.df = fdyn_jac;
+        d.param = _param_map;
     }
+
+    // create dynamics parameters
+    const int param_size = fdyn.size1_in(2);
+    std::cout << "param size for f: " << param_size << std::endl;
+    (*_param_map)["__dynamics__"].setConstant(param_size,
+                                              _N,
+                                              std::numeric_limits<double>::quiet_NaN()
+                                              );
 
     // initialize trajectories
     _xtrj.setZero(_nx, _N+1);
     _utrj.setZero(_nu, _N);
     _lam_x.setZero(_nx, _N);
-
-    // construct param map
-    _param_map = std::make_shared<ParameterMapPtr::element_type>();
 
     // a default cost so that it works out of the box
     //  *) default intermediate cost -> l(x, u) = eps*|u|^2
@@ -177,8 +198,22 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
                                  const casadi::Function &inter_constraint,
                                  std::vector<Eigen::VectorXd> target_values)
 {
+    // add parameters from this constraint (init to NaN)
+    const int param_size = inter_constraint.size1_in(2);
+
+    if(_param_map->count(inter_constraint.name()))
+    {
+        throw std::invalid_argument("function name '" +
+                                    inter_constraint.name() + "' already used");
+    }
+
+    (*_param_map)[inter_constraint.name()].setConstant(param_size,
+                                                 _N+1,
+                                                 std::numeric_limits<double>::quiet_NaN()
+                                                 );
 
     ConstraintEntity c;
+    c.param = _param_map;
 
     auto ic_fn = inter_constraint;
     auto ic_jac = c.Jacobian(inter_constraint);
@@ -352,16 +387,16 @@ void IterativeLQR::linearize_quadratize()
         auto ui = input(i);
         auto xnext = state(i+1);
 
-        _dyn[i].linearize(xi, ui);
-        _dyn[i].computeDefect(xi, ui, xnext, _dyn[i].d);
-        _constraint[i].linearize(xi, ui);
+        _dyn[i].linearize(xi, ui, i);
+        _dyn[i].computeDefect(xi, ui, xnext, i, _dyn[i].d);
+        _constraint[i].linearize(xi, ui, i);
         _cost[i].quadratize(xi, ui, i);
     }
 
     // handle final cost and constraint
     // note: these are only function of the state!
     _cost.back().quadratize(state(_N), input(_N-1), _N); // note: input not used here!
-    _constraint.back().linearize(state(_N), input(_N-1)); // note: input not used here!
+    _constraint.back().linearize(state(_N), input(_N-1), _N); // note: input not used here!
 }
 
 void IterativeLQR::report_result(const IterativeLQR::ForwardPassResult& fpres)
@@ -430,36 +465,61 @@ IterativeLQR::Dynamics::Dynamics(int nx, int)
     d.setZero(nx);
 }
 
-Eigen::Ref<const Eigen::VectorXd> IterativeLQR::Dynamics::integrate(VecConstRef x, VecConstRef u)
+Eigen::Ref<const Eigen::VectorXd> IterativeLQR::Dynamics::integrate(VecConstRef x,
+                                                                    VecConstRef u,
+                                                                    int k)
 {
+    TIC(integrate_dynamics_inner);
+
+    // get the parameter valye for this function at this node
+    const auto& p = param->at("__dynamics__").col(k);
+    THROW_NAN(p);
+
     f.setInput(0, x);
     f.setInput(1, u);
+    f.setInput(2, p);
     f.call();
     return f.getOutput(0);
 }
 
-void IterativeLQR::Dynamics::linearize(VecConstRef x, VecConstRef u)
+void IterativeLQR::Dynamics::linearize(VecConstRef x,
+                                       VecConstRef u,
+                                       int k)
 {
-    TIC(linearize_dynamics_inner)
+    TIC(linearize_dynamics_inner);
+
+    // get the parameter valye for this function at this node
+    const auto& p = param->at("__dynamics__").col(k);
+    THROW_NAN(p);
+
     df.setInput(0, x);
     df.setInput(1, u);
+    df.setInput(2, p);
     df.call();
 }
 
 void IterativeLQR::Dynamics::computeDefect(VecConstRef x,
                                            VecConstRef u,
                                            VecConstRef xnext,
+                                           int k,
                                            Eigen::VectorXd& _d)
 {
     TIC(compute_defect_inner)
-    auto xint = integrate(x, u);
+
+    auto xint = integrate(x, u, k);
     _d = xint - xnext;
 }
 
 void IterativeLQR::Dynamics::setDynamics(casadi::Function _f)
 {
     f = _f;
-    df = _f.factory("df", {"x", "u"}, {"jac:f:x", "jac:f:u"});
+    df = _f.factory("df", {"x", "u", "p"}, {"jac:f:x", "jac:f:u"});
+}
+
+casadi::Function IterativeLQR::Dynamics::Jacobian(const casadi::Function &f)
+{
+    auto df = f.factory("df", {"x", "u", "p"}, {"jac:f:x", "jac:f:u"});
+    return df;
 }
 
 const Eigen::MatrixXd& IterativeLQR::IntermediateCostEntity::Q() const
@@ -781,34 +841,42 @@ IterativeLQR::ConstraintEntity::ConstraintEntity()
 {
 }
 
-void IterativeLQR::ConstraintEntity::linearize(VecConstRef x, VecConstRef u)
+void IterativeLQR::ConstraintEntity::linearize(VecConstRef x, VecConstRef u, int k)
 {
     if(!is_valid())
     {
         return;
     }
 
+    // get the parameter valye for this function at this node
+    const auto& p = param->at(f.function().name()).col(k);
+    THROW_NAN(p);
+
     // compute constraint value
-    f.setInput(0, x);
-    f.setInput(1, u);
-    f.call();
+    evaluate(x, u, k);
 
     // compute constraint jacobian
     df.setInput(0, x);
     df.setInput(1, u);
+    df.setInput(2, p);
     df.call();
 }
 
-void IterativeLQR::ConstraintEntity::evaluate(VecConstRef x, VecConstRef u)
+void IterativeLQR::ConstraintEntity::evaluate(VecConstRef x, VecConstRef u, int k)
 {
     if(!is_valid())
     {
         return;
     }
 
+    // get the parameter valye for this function at this node
+    const auto& p = param->at(f.function().name()).col(k);
+    THROW_NAN(p);
+
     // compute constraint value
     f.setInput(0, x);
     f.setInput(1, u);
+    f.setInput(2, p);
     f.call();
 
     // remove target value and save it
@@ -841,7 +909,7 @@ void IterativeLQR::ConstraintEntity::setTargetValue(const Eigen::VectorXd &hdes)
 
 casadi::Function IterativeLQR::ConstraintEntity::Jacobian(const casadi::Function& h)
 {
-    return h.factory(h.name() + "_jac", {"x", "u"}, {"jac:h:x", "jac:h:u"});
+    return h.factory(h.name() + "_jac", {"x", "u", "p"}, {"jac:h:x", "jac:h:u"});
 }
 
 const Eigen::MatrixXd &IterativeLQR::Constraint::C() const
@@ -875,7 +943,7 @@ IterativeLQR::Constraint::Constraint(int nx, int nu)
     _D.setZero(0, nu);
 }
 
-void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u)
+void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u, int k)
 {
     TIC(linearize_constraint_inner)
 
@@ -883,14 +951,14 @@ void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u)
     for(auto& it : items)
     {
         int nc = it.C().rows();
-        it.linearize(x, u);
+        it.linearize(x, u, k);
         _C.middleRows(i, nc) = it.C();
         _D.middleRows(i, nc) = it.D();
         i += nc;
     }
 }
 
-void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
+void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u, int k)
 {
     TIC(evaluate_constraint_inner)
 
@@ -898,7 +966,7 @@ void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u)
     for(auto& it : items)
     {
         int nc = it.C().rows();
-        it.evaluate(x, u);
+        it.evaluate(x, u, k);
         _h.segment(i, nc) = it.h();
         i += nc;
     }

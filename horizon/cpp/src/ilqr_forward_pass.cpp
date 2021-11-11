@@ -200,7 +200,7 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
             continue;
         }
 
-        _constraint[i].evaluate(xtrj.col(i), utrj.col(i));
+        _constraint[i].evaluate(xtrj.col(i), utrj.col(i), i);
         constr += _constraint[i].h().cwiseAbs().sum();
 
     }
@@ -210,7 +210,7 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
     {
         // note: u not used
         // todo: enforce this!
-        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1));
+        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
         constr += _constraint[_N].h().cwiseAbs().sum();
     }
 
@@ -229,6 +229,7 @@ double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         _dyn[i].computeDefect(xtrj.col(i),
                               utrj.col(i),
                               xtrj.col(i+1),
+                              i,
                               _tmp[i].defect);
 
         defect += _tmp[i].defect.cwiseAbs().sum();
@@ -272,6 +273,7 @@ void IterativeLQR::line_search(int iter)
             _fp_res->constraint_violation);
 
     _fp_res->merit_der = merit_der;
+
 
     // run line search
     while(alpha >= alpha_min)

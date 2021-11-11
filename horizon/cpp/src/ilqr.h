@@ -50,7 +50,7 @@ public:
     /**
      * @brief Class constructor
      * @param fdyn is a function mapping state and control to the integrated state;
-     * required signature is (x, u) -> (f)
+     * required signature is (x, u, p) -> (f)
      * @param N is the number of shooting intervals
      */
     IterativeLQR(casadi::Function fdyn,
@@ -67,7 +67,7 @@ public:
      * @brief set an intermediate cost term for the k-th intermediate state,
      * as specificed by a vector of indices
      * @param indices: the nodes that the cost refers to
-     * @param inter_cost: a function with required signature (x, u) -> (l)
+     * @param inter_cost: a function with required signature (x, u, p) -> (l)
      */
     void setCost(std::vector<int> indices, const casadi::Function& inter_cost);
 
@@ -82,7 +82,7 @@ public:
      * @brief  set an intermediate constraint term for the k-th intermediate state,
      * as specificed by a vector of indices
      * @param indices: the nodes that the cost refers to
-     * @param inter_constraint: a function with required signature (x, u) -> (h),
+     * @param inter_constraint: a function with required signature (x, u, p) -> (h),
      * where the constraint is h(x, u) = 0
      * @param target_values: if specified, the i-th entry is used as target value
      * for the constraint function at the indices[i]

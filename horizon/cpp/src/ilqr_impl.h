@@ -22,6 +22,9 @@ public:
     // dynamics jacobian
     casadi_utils::WrappedFunction df;
 
+    // parameters
+    ParameterMapPtr param;
+
     // df/dx
     const Eigen::MatrixXd& A() const;
 
@@ -33,13 +36,23 @@ public:
 
     Dynamics(int nx, int nu);
 
-    VecConstRef integrate(VecConstRef x, VecConstRef u);
+    VecConstRef integrate(VecConstRef x,
+                          VecConstRef u,
+                          int k);
 
-    void linearize(VecConstRef x, VecConstRef u);
+    void linearize(VecConstRef x,
+                   VecConstRef u,
+                   int k);
 
-    void computeDefect(VecConstRef x, VecConstRef u, VecConstRef xnext, Eigen::VectorXd& d);
+    void computeDefect(VecConstRef x,
+                       VecConstRef u,
+                       VecConstRef xnext,
+                       int k,
+                       Eigen::VectorXd& d);
 
     void setDynamics(casadi::Function f);
+
+    static casadi::Function Jacobian(const casadi::Function& f);
 
 };
 
@@ -64,9 +77,9 @@ struct IterativeLQR::Constraint
 
     Constraint(int nx, int nu);
 
-    void linearize(VecConstRef x, VecConstRef u);
+    void linearize(VecConstRef x, VecConstRef u, int k);
 
-    void evaluate(VecConstRef x, VecConstRef u);
+    void evaluate(VecConstRef x, VecConstRef u, int k);
 
     void addConstraint(casadi::Function h);
 
@@ -88,7 +101,8 @@ struct IterativeLQR::ConstraintEntity
     // constraint jacobian
     casadi_utils::WrappedFunction df;
 
-
+    // parameter map
+    ParameterMapPtr param;
 
     // dh/dx
     const Eigen::MatrixXd& C() const;
@@ -104,9 +118,9 @@ struct IterativeLQR::ConstraintEntity
 
     ConstraintEntity();
 
-    void linearize(VecConstRef x, VecConstRef u);
+    void linearize(VecConstRef x, VecConstRef u, int k);
 
-    void evaluate(VecConstRef x, VecConstRef u);
+    void evaluate(VecConstRef x, VecConstRef u, int k);
 
     void setConstraint(casadi::Function h);
 
@@ -338,11 +352,11 @@ struct IterativeLQR::ConstrainedCost
 #define THROW_NAN(mat) \
     if((mat).hasNaN()) \
     { \
-        throw std::runtime_error("NaN value detected in " #mat); \
+        throw std::runtime_error("[" + std::string(__func__) + "] NaN value detected in " #mat); \
     } \
     if(!mat.allFinite()) \
     { \
-        throw std::runtime_error("Inf value detected in " #mat); \
+        throw std::runtime_error("[" + std::string(__func__) + "] Inf value detected in " #mat); \
     }
 
 

@@ -4,6 +4,7 @@ except ImportError:
     print('failed to import pyilqr extension; did you compile it?')
     exit(1)
 
+from horizon.variables import Parameter
 from horizon.solvers import Solver
 from horizon.problem import Problem
 from horizon.functions import Function, Constraint
@@ -33,12 +34,36 @@ class SolverILQR(Solver):
         # num shooting interval
         self.N = prb.getNNodes() - 1  
 
-        # get integrator and compute discrete dynamics in the form (x, u) -> f
+        # get integrator and compute discrete dynamics in the form (x, u, p) -> f
         integrator_name = self.opts.get('ilqr.integrator', 'RK4')
         dae = {'ode': self.xdot, 'x': self.x, 'p': self.u, 'quad': 0}
-        self.int = integrators.__dict__[integrator_name](dae, {'tf': dt})
-        self.dyn = cs.Function('f', {'x': self.x, 'u': self.u, 'f': self.int(self.x, self.u)[0]},
-                               ['x', 'u'], ['f'])
+
+        # handle parametric time
+        integrator_opt = {}
+        if isinstance(dt, float):
+            integrator_opt['tf'] = dt 
+        elif isinstance(dt, Parameter):
+            pass
+        else:
+            raise TypeError('ilqr supports only float and Parameter dt')
+
+        self.int = integrators.__dict__[integrator_name](dae, integrator_opt)
+
+        # handle possible parametric time 
+        if self.int.n_in() == 3:
+            time = cs.SX.sym('time', 1)
+            x_int = self.int(self.x, self.u, time)[0]
+        elif self.int.n_in() == 2:
+            time = cs.SX.sym('time', 0)
+            x_int = self.int(self.x, self.u)[0]
+        else:
+            raise IndexError('integrated dynamics should either have 2 or 3 inputs')
+
+
+        self.dyn = cs.Function('f', 
+                               {'x': self.x, 'u': self.u, 'p': time, 'f': x_int},
+                               ['x', 'u', 'p'], ['f']
+                               )
 
         # create ilqr solver
         self.ilqr = IterativeLQR(self.dyn, self.N, self.opts)
@@ -84,6 +109,11 @@ class SolverILQR(Solver):
         
         # update parameters
         self._set_param_values(container=self.prb.function_container.getCost())
+        self._set_param_values(container=self.prb.function_container.getCnstr())
+        if isinstance(self.dt, Parameter):
+            # note: dt is a N+1 length vector, we ignore the last entry
+            self.ilqr.setParameterValue('__dynamics__', self.dt.getValues()[0:-1])
+
         ret = self.ilqr.solve(self.max_iter)
 
         # get solution
@@ -117,13 +147,13 @@ class SolverILQR(Solver):
         for k, v in prof_info.timings.items():
             if '_inner' not in k:
                 continue
-            print(f'{k[:-6]:30}{np.mean(v)} us')
+            print(f'{k[:-6]:30}{np.sum(v)/self.N/1000} ms')
 
         print('\ntimings (iter):')
         for k, v in prof_info.timings.items():
             if '_inner' in k:
                 continue
-            print(f'{k:30}{np.mean(v)} us')
+            print(f'{k:30}{np.sum(v)/self.N/1000} ms')
     
     
     def _set_cost(self):
@@ -143,13 +173,14 @@ class SolverILQR(Solver):
 
         outname = 'h'
         set_to_ilqr = self.ilqr.setIntermediateConstraint
+        pnull = cs.SX.sym('pnull', 0)
         
         # state
         xlb, xub = self.prb.getState().getBounds(node=k)
         eq_indices = np.array(np.nonzero(xlb == xub)).flatten().tolist()
         if k > 0 and len(eq_indices) > 0:  # note: skip initial condition
-            l = cs.Function(f'xc_{k}', [self.x, self.u], [self.x[eq_indices] - xlb[eq_indices]], 
-                            ['x', 'u'], [outname])
+            l = cs.Function(f'xc_{k}', [self.x, self.u, pnull], [self.x[eq_indices] - xlb[eq_indices]], 
+                            ['x', 'u', 'p'], [outname])
             set_to_ilqr([k], l)
 
         # input
@@ -157,8 +188,8 @@ class SolverILQR(Solver):
             ulb, uub = self.prb.getInput().getBounds(node=k)
             eq_indices = np.array(np.nonzero(ulb == uub)).flatten().tolist()
             if len(eq_indices) > 0:
-                l = cs.Function(f'uc_{k}', [self.x, self.u], [self.u[eq_indices] - ulb[eq_indices]], 
-                                ['x', 'u'], [outname])
+                l = cs.Function(f'uc_{k}', [self.x, self.u, pnull], [self.u[eq_indices] - ulb[eq_indices]], 
+                                ['x', 'u', 'p'], [outname])
                 set_to_ilqr([k], l)
 
 
@@ -219,11 +250,8 @@ class SolverILQR(Solver):
                 v = p.getValues()
                 value_list.append(v)
             
-            print(value_list)
             p_value = np.vstack(value_list)
             
-            print(fname)
-            print(p_value)
             self.ilqr.setParameterValue(fname, p_value)
     
     def _iter_callback(self, fpres):
