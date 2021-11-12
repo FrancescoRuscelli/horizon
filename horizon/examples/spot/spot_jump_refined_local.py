@@ -272,7 +272,7 @@ print('n_nodes', n_nodes)
 
 # print('prev_dt_vec', prev_dt)
 # print('new_dt_vec', new_dt_vec)
-
+# ======================================================================================================================
 # SET PROBLEM STATE AND INPUT VARIABLES
 prb = problem.Problem(n_nodes)
 q = prb.createStateVariable('q', n_q)
