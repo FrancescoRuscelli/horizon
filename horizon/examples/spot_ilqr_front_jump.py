@@ -150,8 +150,8 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.line_search_accept_ratio': 1e-9,
         'ilqr.svd_threshold': 1e-12,
         'ilqr.decomp_type': 'qr',
-        'ilqr.codegen_enabled': False,
-        'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump',
+        'ilqr.codegen_enabled': True,
+        'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump_front',
         'gnsqp.qp_solver': 'osqp'
         }
         
@@ -189,16 +189,6 @@ plot_all = False
 plot_fun = False
 plot_forces = False
 
-pos_contact_list = list()
-for contact in contacts_name:
-    FK = cs.Function.deserialize(kindyn.fk(contact))
-    pos = FK(q=solution['q'])['ee_pos']
-    plt.figure()
-    plt.title(contact)
-    for dim in range(n_f):
-        plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3, linestyle='solid')
-
-plt.show()
 if plot_forces:
     for f in [f'f{i}' for i in range(len(contacts_name))]:
         plt.figure()
