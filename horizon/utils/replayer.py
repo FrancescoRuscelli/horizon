@@ -89,16 +89,16 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot/spot_jump_refined.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump_forward.mat')
 solution = ms.load()
 
 # print([name for name in solution])
 # exit()
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 replay_traj = True
-plotting = False
+plotting = True
 check_bounds = False
 
 if 'dt' in solution:
@@ -214,13 +214,18 @@ if plotting:
         for i in range(solution['dt'].shape[1]):
             dt_timeline.append(dt_timeline[-1] + solution['dt'][0, i])
 
-        for f in [f'f{i}' for i in range(len(contacts_name))]:
+        fig = plt.figure()
+        gs = fig.add_gridspec(2, 2, hspace=0, wspace=0)
+        # fig.suptitle('Force')
 
-            plt.figure()
+        i = 0
+        for f in [f'f{i}' for i in range(len(contacts_name))]:
+            ax = fig.add_subplot(gs[i])
             for dim in range(solution[f].shape[0]):
-                plt.plot(dt_timeline[:-1], solution[f][dim, :])
-                plt.scatter(dt_timeline[:-1], solution[f][dim, :])
-            plt.title(f'forces {f} with dt')
+                ax.plot(dt_timeline[:-1], solution[f][dim, :])
+                ax.scatter(dt_timeline[:-1], solution[f][dim, :])
+            plt.title(f'{contacts_name[i]}')
+            i += 1
 
         # for tau in solution['inverse_dynamics']:
         #     for dim in range(solution['inverse_dynamics'].shape[0]):
