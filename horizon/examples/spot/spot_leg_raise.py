@@ -9,14 +9,35 @@ from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 from scipy.io import loadmat
-from logging import DEBUG
 
+
+def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
+    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
+    traj_z = np.full(traj_len_before, 0.)
+    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
+    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
+    return traj_z
+
+# ========================================
+# traj = trajectoryInitializer(100, 10, 60, 10)
+# initial_q = -0.5
+# mod_q = initial_q + traj
+#
+# FK = cs.Function.deserialize(kindyn.ik(frame))
+# p = FK(q=q)['ee_pos']
+# p_start = FK(q=q_init)['ee_pos']
+
+# plt.scatter(range(mod_q.shape[0]), mod_q)
+# plt.show()
+# exit()
+
+# =========================================
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
-transcription_method = 'direct_collocation' # 'multiple_shooting'  # direct_collocation
+transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -26,18 +47,20 @@ if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 
-n_nodes = 200
-node_start_wheelie = 100
+n_nodes = 100
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
+node_start_step = 30
+node_end_step = n_nodes
+
 load_initial_guess = False
 
 # SET PROBLEM STATE AND INPUT VARIABLES
-prb = problem.Problem(n_nodes)  # , logging_level=DEBUG
+prb = problem.Problem(n_nodes)
 q = prb.createStateVariable('q', n_q)
 q_dot = prb.createStateVariable('q_dot', n_v)
 q_ddot = prb.createInputVariable('q_ddot', n_v)
@@ -47,7 +70,7 @@ for i in range(n_c):
     f_list.append(prb.createInputVariable(f'f{i}', n_f))
 
 # SET CONTACTS MAP
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 
 
@@ -85,14 +108,12 @@ q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                    0.0, 0.9, -1.5253125])
 
 # q_dot bounds
-q_dot_lim = 200. * np.ones(n_v)
+q_dot_lim = 100. * np.ones(n_v)
 # q_ddot bounds
-q_ddot_lim = 200. * np.ones(n_v)
+q_ddot_lim = 100. * np.ones(n_v)
 # f bounds
-f_lim = 10000. * np.ones(n_f)
+f_lim = 1000. * np.ones(n_f)
 
-dt_min = 0.01  # [s]
-dt_max = 0.15  # [s]
 
 # set bounds and of q
 q.setBounds(q_min, q_max)
@@ -100,34 +121,21 @@ q.setBounds(q_init, q_init, 0)
 # set bounds of q_dot
 q_dot_init = np.zeros(n_v)
 q_dot.setBounds(-q_dot_lim, q_dot_lim)
+# zero initial velocity
 q_dot.setBounds(q_dot_init, q_dot_init, 0)
+# zero final velocity
+q_dot.setBounds(q_dot_init, q_dot_init, n_nodes+1)
 # set bounds of q_ddot
 q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
 # set bounds of f
 for f in f_list:
     f.setBounds(-f_lim, f_lim)
+    f[2].setBounds(0, 1000)
 
 # set bounds of dt
 # dt.setBounds(dt_min, dt_max)
 
-# SET INITIAL GUESS
-if load_initial_guess:
-    for node in range(q_ig.shape[1]):
-        q.setInitialGuess(q_ig[:, node], node)
 
-    for node in range(q_dot_ig.shape[1]):
-        q_dot.setInitialGuess(q_dot_ig[:, node], node)
-
-    for node in range(q_ddot_ig.shape[1]):
-        q_ddot.setInitialGuess(q_ddot_ig[:, node], node)
-
-    for f, f_ig in zip(f_list, f_ig_list):
-        for node in range(f_ig.shape[1]):
-            f.setInitialGuess(f_ig[:, node], node)
-else:
-    q.setInitialGuess(q_init)
-
-# dt.setInitialGuess(dt_min)
 # SET TRANSCRIPTION METHOD
 th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
 
@@ -143,83 +151,72 @@ tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinD
                                                                                                              contact_map)
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
 
-# SET FINAL VELOCITY CONSTRAINT
-prb.createFinalConstraint('final_velocity', q_dot)
-# SET FINAL ACCELERATION CONSTRAINT
-prb.createConstraint('final_acceleration', q_ddot, nodes=range(n_nodes-10, n_nodes))
-# q_ddot.setBounds(np.zeros(n_v), np.zeros(n_v), nodes=range(n_nodes-10, n_nodes))
-
 # SET CONTACT POSITION CONSTRAINTS
-active_leg = ['lf_foot', 'rf_foot']
+active_leg = 'lf_foot'
+# active_leg = ['lf_foot', 'rf_foot']
+# active_leg = ['lf_foot', 'rf_foot', 'lh_foot']
+# active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
+
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
-
-# FK = cs.Function.deserialize(kindyn.fk('lf_foot'))
-# intial_lf = FK(q=q_init)['ee_pos']
-#
-# FK = cs.Function.deserialize(kindyn.fk('rf_foot'))
-# intial_rf = FK(q=q_init)['ee_pos']
 
 for frame, f in contact_map.items():
     FK = cs.Function.deserialize(kindyn.fk(frame))
     p = FK(q=q)['ee_pos']
     p_start = FK(q=q_init)['ee_pos']
-    p_goal = p_start + [0., 0., 0.3]
+
+    p_goal = p_start + [0., 0., 0.2]
 
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-    # velocity of active end effector must be zero
+    # 2. velocity of each end effector must be zero
     if frame not in active_leg:
-        prb.createConstraint(f"{frame}_vel_wheelie", v)
+        prb.createConstraint(f"{frame}_vel_before_step", v)
     else:
-        prb.createConstraint(f"{frame}_vel_before_wheelie", v, nodes=range(0, node_start_wheelie))
+        prb.createConstraint(f"{frame}_vel_before_step", v, nodes=range(0, node_start_step))
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
     if frame not in active_leg:
-        prb.createIntermediateConstraint(f"{frame}_fc", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
+        prb.createIntermediateConstraint(f"{frame}_friction_cone", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
     else:
-        prb.createIntermediateConstraint(f"{frame}_fc_before_wheelie", fc, nodes=range(0, node_start_wheelie), bounds=dict(lb=fc_lb, ub=fc_ub))
+        prb.createIntermediateConstraint(f"{frame}_friction_cone_before_step", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
 
     if frame in active_leg:
-        # zero force for lifted legs
-        prb.createConstraint(f"{frame}_no_force_after_lift", f, nodes=range(node_start_wheelie, n_nodes))
-        # terrain constraint
-        prb.createConstraint(f"subterrain_{frame}_leg", p[2] - p_start[2], bounds=dict(lb=0., ub=100000))
-        # suggestion to lift leg
-        # prb.createCostFunction(f"lift_{frame}_leg", 10000 * cs.sumsqr(p[2] - p_goal[2]), nodes=node_start_wheelie)
+        prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, n_nodes))
+
+        prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_start_step + 20)
+
 
 # SET COST FUNCTIONS
+prb.createCostFunction("min_q_dot", 1000. * cs.sumsqr(q_dot))
+# prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
 
-# prb.createCostFunction("min_q_ddot", 10000. * cs.sumsqr(q_ddot), nodes=range(node_start_wheelie, n_nodes))
-
-# minimize the joint velocities
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-
-# minimize the forces
+# don't know why this is not working
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
-# desired pose at the end of the wheelie
-# fb_rot_wheelie = np.array([0, -0.5, 0, 0.8660254]) # pi/3 pitch
-fb_rot_wheelie = np.array([0, -0.8509035, 0, 0.525322])  # pi/2 pitch
-# prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q[3:7] - fb_rot_wheelie))
-prb.createCostFunction(f"wheelie_fb", 10000 * cs.sumsqr(q[3:7] - fb_rot_wheelie), nodes=node_start_wheelie)
-# prb.createFinalCost(f"final_nominal_pos", 10 * cs.sumsqr(q[3:7] - fb_rot_wheelie))
-prb.createFinalCost(f"final_nominal_pos", 10000. * cs.sumsqr(q[4] - fb_rot_wheelie[2]))
-# prb.createFinalCost(f"final_nominal_pos", 10000. * cs.sumsqr(q[4] - fb_rot_wheelie[2]))
-
+# q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.1, 0.0, 0.0, 0.0, 1.0])
+# prb.createCostFunction("floating_base_orientation", 1000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]), nodes=list(range(node_start_step, node_end_step)))
+# prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[0:7] - q_fb_trg))
+# prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]))
 # =============
 # SOLVE PROBLEM
 # =============
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 2000}
-#         'ipopt.mu_strategy': 'adaptive',
-        # 'ipopt.linear_solver': 'ma57'}
+        'ipopt.max_iter': 2000,
+        'ipopt.linear_solver': 'ma57'}
 
+tic = time.time()
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+toc = time.time()
+print('time elapsed loading:', toc - tic)
+
+tic = time.time()
 solver.solve()
+toc = time.time()
+print('time elapsed solving:', toc - tic)
 
 solution = solver.getSolutionDict()
 solution_constraints = solver.getConstraintSolutionDict()
@@ -238,23 +235,57 @@ else:
     ms.store({**solution, **solution_constraints_dict, **dt_dict})
 
 # ========================================================
+plot_all = True
+if plot_all:
+    # hplt = plotter.PlotterHorizon(prb, solution)
+    # hplt.plotVariables(show_bounds=False, legend=True)
+    # hplt.plotFunctions(show_bounds=False)
+    # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
+
+    pos_contact_list = list()
+    for contact in contacts_name:
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+        plt.figure()
+        plt.title(contact)
+        for dim in range(n_f):
+            plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3, linestyle='dotted')
+
+        plt.vlines([node_start_step, node_end_step], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
+
+    plt.figure()
+    for contact in contacts_name:
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+
+        plt.title(f'plane_xy')
+        plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
+
+    plt.figure()
+    for contact in contacts_name:
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+
+        plt.title(f'plane_xz')
+        plt.scatter(np.array(pos[0, :]), np.array(pos[2, :]), linewidth=0.1)
+
+    plt.show()
+# ======================================================
+
+
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling
-resampling = True
+resampling = False
 if resampling:
-
-    if isinstance(dt, cs.SX):
-        dt_before_res = solution['dt'].flatten()
-    else:
-        dt_before_res = dt
-
     dt_res = 0.001
     dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
     q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
-        solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
-        kindyn,
-        cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+        solution["q"], solution["q_dot"], solution["q_ddot"], solution['dt'].flatten(), dt_res, dae, contact_map, kindyn,
+                                                                            cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+
+
 
     repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
 else:
@@ -263,4 +294,3 @@ else:
 
 repl.sleep(1.)
 repl.replay(is_floating_base=True)
-

@@ -45,13 +45,7 @@ def RK4(dae, opts=None, casadi_type=cs.SX):
     return f
 
 
-# 0 sx
-# 1 sx with map
-# 2 full mx with map
-
-type_sol = 3
-
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -60,8 +54,9 @@ n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-N = 50
+N = 100
 
+dt = 0.02
 # ====================
 # unraveled dimensions
 # ====================
@@ -81,7 +76,7 @@ f_list = list()
 for i in range(n_c):
     f_list.append(cs.SX.sym(f'f{i}', n_f))
 
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 fd = kin_dyn.ForwardDynamics(kindyn, contacts_name, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 q_ddot = fd.call(q, q_dot, tau, contact_map)
@@ -93,7 +88,7 @@ state = cs.vertcat(q, q_dot)
 input = cs.vertcat(u, fs)
 
 dae = {'x': state, 'p': input, 'ode': x_dot, 'quad': 1}
-integrator = RK4(dae, opts=dict(tf=0.01))
+integrator = RK4(dae, opts=dict(tf=dt))
 # technically should be faster
 # integrator = integrator.expand()
 int_map = integrator.map(N-1, 'thread', 15)
@@ -125,15 +120,33 @@ mu = 0.8
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
 g_v_list = list()
+g_fc_list = list()
+g_no_force_list = list()
+# active_leg = slice(0,3)
+
 for frame, f in contact_map.items():
     # velocity of each end effector must be zero
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q_i, qdot=q_dot_i)['ee_vel_linear']
     g_v_list.append(v)
 
-#     # friction cones must be satisfied
-#     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-#     g_fc_list.append(), bounds=dict(lb=fc_lb, ub=fc_ub))
+    # friction cones must be satisfied
+
+    # fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f_i, mu, R)
+    # g_fc_list.append(fc)
+    FK = cs.Function.deserialize(kindyn.fk(frame))
+    p_i = FK(q=q_i)['ee_pos']
+    p_start = FK(q=q_init)['ee_pos']
+
+    # p_goal = p_start + [0.1, 0., 0.2]
+
+g_no_force_list.append(f_i[0:3, 30:85])
+
+        # g_lift = p_i - p_goal
+        # prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step + 2)
+
+# prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=25)
+# prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step + 2)
 
 f_list = list()
 f_list.append(1000 * cs.sumsqr(q_i - q_init))
@@ -142,7 +155,7 @@ f_list.append(100. * cs.sumsqr(q_dot_i))
 # =====================================================================================
 # =====================================================================================
 w = cs.veccat(q_i, q_dot_i, u_i, f_i)
-g = cs.veccat(g_multi_shoot, *g_v_list)
+g = cs.veccat(g_multi_shoot, *g_v_list, *g_no_force_list)
 f = sum(f_list)
 
 # ====================
@@ -187,8 +200,8 @@ q_max = [10., 10., 10., 1., 1., 1., 1.]  # floating base
 q_max.extend(kindyn.q_max()[7:])
 q_max = np.array(q_max)
 
-q_lbw[:, :] = np.tile(q_min, (50, 1)).T
-q_ubw[:, :] = np.tile(q_max, (50, 1)).T
+q_lbw[:, :] = np.tile(q_min, (N, 1)).T
+q_ubw[:, :] = np.tile(q_max, (N, 1)).T
 
 # initial q
 q_lbw[:, 0] = q_init
@@ -196,8 +209,8 @@ q_ubw[:, 0] = q_init
 
 # q_dot bounds
 q_dot_lim = 100. * np.ones(n_v)
-q_dot_lbw[:, :] = np.tile(-q_dot_lim, (50, 1)).T
-q_dot_ubw[:, :] = np.tile(q_dot_lim, (50, 1)).T
+q_dot_lbw[:, :] = np.tile(-q_dot_lim, (N, 1)).T
+q_dot_ubw[:, :] = np.tile(q_dot_lim, (N, 1)).T
 
 # f bounds
 f_lim = 1000. * np.ones(n_c * n_f)
@@ -235,33 +248,51 @@ ubw = np.concatenate((q_ubw_flat, q_dot_ubw_flat, u_ubw_flat, f_ubw_flat), axis=
 
 # lower bound constraints
 multi_shoot_g_lbw = np.zeros(g_multi_shoot.shape)
-g_v_0_lbw = np.zeros(g_v_list[0].shape)
-g_v_1_lbw = np.zeros(g_v_list[1].shape)
-g_v_2_lbw = np.zeros(g_v_list[2].shape)
-g_v_3_lbw = np.zeros(g_v_list[3].shape)
 
+g_v_lbw = list()
+for elem in g_v_list:
+    g_v_lbw.append(np.zeros(elem.shape))
+
+g_v_ubw = list()
+for elem in g_v_list:
+    g_v_ubw.append(np.zeros(elem.shape))
+
+g_no_force_lbw = list()
+for elem in g_no_force_list:
+    g_no_force_lbw.append(np.zeros(elem.shape))
+
+g_no_force_lbw_flat = list()
+for elem in g_no_force_lbw:
+    g_no_force_lbw_flat.append(np.reshape(elem, [1, elem.shape[0] * elem.shape[1]], order='F'))
+
+# g_fc_lbw = fc_lb
+# print(fc_lb)
+# exit()
 # upper bound constraints
 multi_shoot_g_ubw = np.zeros(g_multi_shoot.shape)
-g_v_0_ubw = np.zeros(g_v_list[0].shape)
-g_v_1_ubw = np.zeros(g_v_list[1].shape)
-g_v_2_ubw = np.zeros(g_v_list[2].shape)
-g_v_3_ubw = np.zeros(g_v_list[3].shape)
 
 multi_shoot_g_lbw_flat = np.reshape(multi_shoot_g_lbw, [1, g_multi_shoot.shape[0] * g_multi_shoot.shape[1]], order='F')
 multi_shoot_g_ubw_flat = np.reshape(multi_shoot_g_ubw, [1, g_multi_shoot.shape[0] * g_multi_shoot.shape[1]], order='F')
 
-g_v_0_lbw_flat = np.reshape(g_v_0_lbw, [1, g_v_0_lbw.shape[0] * g_v_0_lbw.shape[1]], order='F')
-g_v_1_lbw_flat = np.reshape(g_v_1_lbw, [1, g_v_1_lbw.shape[0] * g_v_1_lbw.shape[1]], order='F')
-g_v_2_lbw_flat = np.reshape(g_v_2_lbw, [1, g_v_2_lbw.shape[0] * g_v_2_lbw.shape[1]], order='F')
-g_v_3_lbw_flat = np.reshape(g_v_3_lbw, [1, g_v_3_lbw.shape[0] * g_v_3_lbw.shape[1]], order='F')
+g_v_lbw_flat = list()
+for elem in g_v_lbw:
+    g_v_lbw_flat.append(np.reshape(elem, [1, elem.shape[0] * elem.shape[1]], order='F'))
 
-g_v_0_ubw_flat = np.reshape(g_v_0_ubw, [1, g_v_0_ubw.shape[0] * g_v_0_ubw.shape[1]], order='F')
-g_v_1_ubw_flat = np.reshape(g_v_1_ubw, [1, g_v_1_ubw.shape[0] * g_v_1_ubw.shape[1]], order='F')
-g_v_2_ubw_flat = np.reshape(g_v_2_ubw, [1, g_v_2_ubw.shape[0] * g_v_2_ubw.shape[1]], order='F')
-g_v_3_ubw_flat = np.reshape(g_v_3_ubw, [1, g_v_3_ubw.shape[0] * g_v_3_ubw.shape[1]], order='F')
+g_v_ubw_flat = list()
+for elem in g_v_ubw:
+    g_v_ubw_flat.append(np.reshape(elem, [1, elem.shape[0] * elem.shape[1]], order='F'))
 
-lbg = np.concatenate((multi_shoot_g_lbw_flat, g_v_0_lbw_flat, g_v_1_lbw_flat, g_v_2_lbw_flat, g_v_3_lbw_flat), axis=1)
-ubg = np.concatenate((multi_shoot_g_ubw_flat, g_v_0_ubw_flat, g_v_1_ubw_flat, g_v_2_ubw_flat, g_v_3_ubw_flat), axis=1)
+g_no_force_ubw = list()
+for elem in g_no_force_list:
+    g_no_force_ubw.append(np.zeros(elem.shape))
+
+g_no_force_ubw_flat = list()
+for elem in g_no_force_ubw:
+    g_no_force_ubw_flat.append(np.reshape(elem, [1, elem.shape[0] * elem.shape[1]], order='F'))
+
+lbg = np.concatenate((multi_shoot_g_lbw_flat, *g_v_lbw_flat, *g_no_force_lbw_flat), axis=1)  #*g_no_force_lbw_flat
+ubg = np.concatenate((multi_shoot_g_ubw_flat, *g_v_ubw_flat, *g_no_force_ubw_flat), axis=1) #*g_no_force_ubw_flat
+
 
 prob_dict = {'f': f, 'x': w, 'g': cs.vec(g)}
 
@@ -285,6 +316,5 @@ print('time elapsed:', toc - tic)
 # exit()
 solution = solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
 
-print(solution)
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 ms.store(dict(a=np.array(solution['x'])))

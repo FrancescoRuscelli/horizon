@@ -117,6 +117,8 @@ def double_integrator_with_floating_base(q, ndot, nddot):
     qw = cs.SX.zeros(4,1)
     qw[0:3] = 0.5*ndot[3:6]
 
+
+
     if q.shape[1] == 1:
         quaterniondot = quaterion_product(q[3:7], qw)
     else:

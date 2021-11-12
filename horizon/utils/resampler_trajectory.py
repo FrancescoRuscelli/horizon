@@ -32,10 +32,10 @@ def resample_torques(p, v, a, node_time, dt, dae, frame_force_mapping, kindyn, f
             frame_res_force_mapping: resampled frame_force_mapping
             tau_res: resampled tau
         """
-
     p_res, v_res, a_res = second_order_resample_integrator(p, v, a, node_time, dt, dae)
 
     frame_res_force_mapping = dict()
+
     for frame, wrench in frame_force_mapping.items():
         frame_res_force_mapping[frame] = resample_input(wrench, node_time, dt)
     tau_res = np.zeros(a_res.shape)
@@ -48,6 +48,7 @@ def resample_torques(p, v, a, node_time, dt, dae, frame_force_mapping, kindyn, f
             frame_force_map_i[frame] = wrench[:, i]
         tau_i = ID.call(p_res[:, i], v_res[:, i], a_res[:, i], frame_force_map_i)
         tau_res[:, i] = tau_i.toarray().flatten()
+
 
     return p_res, v_res, a_res, frame_res_force_mapping, tau_res
 
@@ -78,7 +79,7 @@ def resample_input(input, node_time, dt):
     t = 0.
     node = 0
     i = 0
-    while i < input_res.shape[1] - 1:
+    while i < input_res.shape[1]:
         input_res[:, i] = input[:, node]
         t += dt
         i += 1
@@ -147,11 +148,20 @@ def second_order_resample_integrator(p, v, u, node_time, dt, dae):
 
         if t > node_time_array[node+1]:
             new_dt = t - node_time_array[node+1]
+
+            # if t goes beyond the current node, first of all reset the state to the new one
             node += 1
+            x_res[:, i] = np.hstack((p[:, node], v[:, node]))
+            p_res[:, i] = x_resi[0:p.shape[0]]
+            v_res[:, i] = x_resi[p.shape[0]:]
+            u_res[:, i] = u[:, node]
+
+            # then, if the dt is big enough, recompute by using the new input starting from the state at the node
             if new_dt >= 1e-6:
                 opts = {'tf': new_dt}
                 new_F_integrator = integrators.RK4(dae, opts, cs.SX)
-                x_resi = new_F_integrator(x0=np.hstack((p[:,node], v[:,node])), p=u[:, node])['xf'].toarray().flatten()
+                x_resi = new_F_integrator(x0=x_res[:, i], p=u[:, node])['xf'].toarray().flatten()
+
                 x_res[:, i] = x_resi
                 p_res[:, i] = x_resi[0:p.shape[0]]
                 v_res[:, i] = x_resi[p.shape[0]:]
@@ -225,6 +235,9 @@ def resampler(state_vec, input_vec, nodes_dt, desired_dt, dae):
         if t > node_time_array[node + 1]:
             new_dt = t - node_time_array[node + 1]
             node += 1
+
+            state_res[:, i] = states[:, node]
+
             if new_dt >= 1e-6:
                 # I set the new_dt as the integrator time
                 opts = {'tf': new_dt}
