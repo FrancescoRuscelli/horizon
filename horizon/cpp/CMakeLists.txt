@@ -10,6 +10,7 @@ endif()
 
 find_package(Eigen3 REQUIRED)
 find_package(casadi 3.5.5 REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(CMAKE_CXX_STANDARD 20)
@@ -59,5 +60,9 @@ target_link_libraries(ilqr_test ilqr)
 
 add_executable(sqp_test src/sqp_test.cpp)
 target_link_libraries(sqp_test sqp)
+
+add_executable(horizon_parsing horizon_parsing_test.cpp)
+target_link_libraries(horizon_parsing ilqr yaml-cpp)
+
 
 add_subdirectory(tests)

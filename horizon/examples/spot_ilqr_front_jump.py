@@ -164,6 +164,13 @@ try:
 except:
     pass
 
+prb_data = solver.save()
+import yaml
+with open('/tmp/spot_ilqr_front_jump.yaml', 'w') as f:
+    yaml.dump(prb_data, f, default_flow_style=None)
+    
+exit()
+
 t = time.time()
 solver.solve()
 elapsed = time.time() - t
