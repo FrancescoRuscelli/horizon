@@ -611,6 +611,67 @@ class Problem:
 
         return self
 
+    def save(self):
+        data = dict()
+        
+        data['n_nodes'] = self.getNNodes() - 1
+
+        # save state variables
+        data['state'] = dict()
+        for sv in self.getState():
+            var_data = dict()
+            var_data['name'] = sv.getName()
+            var_data['size'] = sv.size1()
+            var_data['lb'] = sv.getLowerBounds().tolist()
+            var_data['ub'] = sv.getUpperBounds().tolist()
+            data['state'][var_data['name']] = var_data
+
+        # save input variables
+        data['input'] = dict()
+        for sv in self.getInput():
+            var_data = dict()
+            var_data['name'] = sv.getName()
+            var_data['size'] = sv.size1()
+            var_data['lb'] = sv.getLowerBounds().tolist()
+            var_data['ub'] = sv.getUpperBounds().tolist()
+            data['input'][var_data['name']] = var_data
+
+        # save parameters
+        data['param'] = dict()
+        for p in self.var_container.getParList():
+            var_data = dict()
+            var_data['name'] = p.getName()
+            var_data['size'] = p.getDim()
+            var_data['values'] = p.getValues().tolist()
+            data['param'][var_data['name']] = var_data
+
+        # save cost and constraints
+        data['cost'] = dict()
+        for f in self.function_container.getCost().values():
+            f : fc.Function = f
+            var_data = dict()
+            var_data['name'] = f.getName()
+            var_data['repr'] = str(f.getFunction())
+            var_data['var_depends'] = [v.getName() for v in f.getVariables()]
+            var_data['param_depends'] = [v.getName() for v in f.getParameters()]
+            var_data['nodes'] = f.getNodes()
+            var_data['function'] = f.getFunction().serialize()
+            data['cost'][var_data['name']] = var_data
+
+        data['constraint'] = dict()
+        for f in self.function_container.getCnstr().values():
+            f : fc.Function = f
+            var_data = dict()
+            var_data['name'] = f.getName()
+            var_data['repr'] = str(f.getFunction())
+            var_data['var_depends'] = [v.getName() for v in f.getVariables()]
+            var_data['param_depends'] = [v.getName() for v in f.getParameters()]
+            var_data['nodes'] = f.getNodes()
+            var_data['function'] = f.getFunction().serialize()
+            data['constraint'][var_data['name']] = var_data
+
+        return data
+
 
 def pickleable(obj):
     try:

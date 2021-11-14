@@ -83,6 +83,14 @@ class SolverILQR(Solver):
         # empty solution dict
         self.solution_dict = dict()
 
+    def save(self):
+        data = self.prb.save()
+        data['solver'] = dict()
+        data['solver']['name'] = 'ilqr'
+        data['solver']['opt'] = self.opts
+        data['dynamics'] = self.dyn.serialize()
+        return data
+
     
     def set_iteration_callback(self, cb=None):
         if cb is None:
