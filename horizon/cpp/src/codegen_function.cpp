@@ -48,12 +48,13 @@ casadi::Function horizon::utils::codegen(const casadi::Function &f, std::string 
     std::string fname = f.name() + "_generated_" + std::to_string(hash);
     if(access((fname + ".so").c_str(), F_OK) == 0)
     {
+        std::cout << "up-to-date shared object found for '" << f.name() << "'\n";
         return casadi::external(f.name(),
                                 "./" + fname + ".so");
     }
 
     // else, generate and compile
-    std::cout << "performing codegen step for '" << fname << "..\n";
+    std::cout << "performing codegen step for '" << fname << "'..\n";
     f.generate(fname + ".c");
     system(("gcc -fPIC -shared -O3 -march=native " + fname + ".c -o " + fname + ".so").c_str());
     return  casadi::external(f.name(),
