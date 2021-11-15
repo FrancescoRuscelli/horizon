@@ -150,7 +150,7 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.line_search_accept_ratio': 1e-9,
         'ilqr.svd_threshold': 1e-12,
         'ilqr.decomp_type': 'qr',
-        'ilqr.codegen_enabled': True,
+        'ilqr.codegen_enabled': False,
         'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump_front',
         'gnsqp.qp_solver': 'osqp'
         }

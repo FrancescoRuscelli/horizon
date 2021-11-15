@@ -124,15 +124,42 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _utrj.setZero(_nu, _N);
     _lam_x.setZero(_nx, _N);
 
+    // initialize bounds
+    _x_lb.setConstant(_nx, _N+1, -inf);
+    _x_ub.setConstant(_nx, _N+1, inf);
+    _u_lb.setConstant(_nu, _N, -inf);
+    _u_ub.setConstant(_nu, _N, inf);
+
     // a default cost so that it works out of the box
     //  *) default intermediate cost -> l(x, u) = eps*|u|^2
     //  *) default final cost        -> lf(x)   = eps*|xf|^2
     set_default_cost();
 }
 
-void IterativeLQR::setStepLength(double alpha)
+void IterativeLQR::setStateBounds(const Eigen::MatrixXd& lb, const Eigen::MatrixXd& ub)
 {
-    _step_length = alpha;
+    if(_x_lb.rows() != lb.rows() || _x_lb.cols() != lb.cols() || 
+        _x_ub.rows() != ub.rows() || _x_ub.cols() != ub.cols()
+        )
+    {
+        throw std::invalid_argument("state bound size mismatch");
+    }
+
+    _x_lb = lb;
+    _x_ub = ub;
+}
+    
+void IterativeLQR::setInputBounds(const Eigen::MatrixXd& lb, const Eigen::MatrixXd& ub)
+{
+    if(_u_lb.rows() != lb.rows() || _u_lb.cols() != lb.cols() || 
+        _u_ub.rows() != ub.rows() || _u_ub.cols() != ub.cols()
+        )
+    {
+        throw std::invalid_argument("input bound size mismatch");
+    }
+
+    _u_lb = lb;
+    _u_ub = ub;
 }
 
 void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& inter_cost)
@@ -160,7 +187,7 @@ void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& int
     auto grad = c.Gradient(inter_cost);
     auto hess = c.Hessian(grad);
 
-    // codegen if required
+    // codegen if required (we skip it for quadratic costs)
     if(_codegen_enabled)
     {
         cost = utils::codegen(cost, _codegen_workdir);
@@ -746,6 +773,22 @@ void IterativeLQR::ConstraintToGo::set(MatConstRef C, VecConstRef h)
     _D.array().topRows(_dim) = 0;  // note! we assume no input dependence here!
 }
 
+void IterativeLQR::ConstraintToGo::add(MatConstRef C, MatConstRef D, VecConstRef h)
+{
+    const int constr_size = h.size();
+
+    if(_dim + constr_size >= _h.size())
+    {
+        throw std::runtime_error("maximum constraint-to-go dimension "
+            "exceeded: try reducing the svd_threshold parameter");
+    }
+
+    _C.middleRows(_dim, constr_size) = C;
+    _D.middleRows(_dim, constr_size) = D;
+    _h.segment(_dim, constr_size) = h;
+    _dim += constr_size;
+}
+
 void IterativeLQR::ConstraintToGo::set(const IterativeLQR::Constraint &constr)
 {
     if(!constr.is_valid())
@@ -778,18 +821,7 @@ void IterativeLQR::ConstraintToGo::add(const Constraint &constr)
         return;
     }
 
-    const int constr_size = constr.h().size();
-
-    if(_dim + constr_size >= _h.size())
-    {
-        throw std::runtime_error("maximum constraint-to-go dimension "
-            "exceeded: try reducing the svd_threshold parameter");
-    }
-
-    _C.middleRows(_dim, constr_size) = constr.C();
-    _D.middleRows(_dim, constr_size) = constr.D();
-    _h.segment(_dim, constr_size) = constr.h();
-    _dim += constr_size;
+    add(constr.C(), constr.D(), constr.h());
 }
 
 void IterativeLQR::ConstraintToGo::clear()

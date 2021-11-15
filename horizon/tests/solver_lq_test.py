@@ -27,12 +27,12 @@ class SolverConsistency(unittest.TestCase):
 
     def test_blocksqp_vs_ipopt(self):
         ipopt = make_problem('ipopt', *self.matrices)
-        blocksqp = make_problem('blocksqp', *self.matrices)
+        blocksqp = make_problem('ilqr', *self.matrices)
         self._test_a_vs_b(ipopt, blocksqp)
     
     def test_blocksqp_vs_ilqr(self):
         ilqr = make_problem('ilqr', *self.matrices)
-        blocksqp = make_problem('blocksqp', *self.matrices)
+        blocksqp = make_problem('ipopt', *self.matrices)
         self._test_a_vs_b(ilqr, blocksqp)
 
 def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
@@ -64,11 +64,12 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
 
     # a final constraint
     xtgt = np.array([1, 2, 2, 3, 3, 4])
-    prob.createFinalConstraint('xtgt', x - xtgt)
+    # prob.createFinalConstraint('xtgt', x - xtgt)
 
     # an initial state
     x0 = -xtgt
     prob.getState().setBounds(lb=x0, ub=x0, nodes=0)
+    prob.getState().setBounds(lb=xtgt, ub=xtgt, nodes=N)
     prob.getState().setInitialGuess(x0)
 
     # solve first with ilqr

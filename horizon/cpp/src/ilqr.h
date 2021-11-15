@@ -57,11 +57,10 @@ public:
                  int N,
                  OptionDict opt = OptionDict());
 
-    /**
-     * @brief setStepLength
-     * @param alpha
-     */
-    void setStepLength(double alpha);
+
+    void setStateBounds(const Eigen::MatrixXd& lb, const Eigen::MatrixXd& ub);
+
+    void setInputBounds(const Eigen::MatrixXd& lb, const Eigen::MatrixXd& ub);
 
     /**
      * @brief set an intermediate cost term for the k-th intermediate state,
@@ -147,6 +146,8 @@ protected:
 
 private:
 
+    static constexpr double inf = std::numeric_limits<double>::infinity();
+
     struct ConstrainedDynamics;
     struct ConstrainedCost;
     struct Dynamics;
@@ -172,6 +173,7 @@ private:
     void increase_regularization();
     void reduce_regularization();
     HandleConstraintsRetType handle_constraints(int i);
+    void add_bounds(int i);
     void compute_constrained_input(Temporaries& tmp, BackwardPassResult& res);
     void compute_constrained_input_svd(Temporaries& tmp, BackwardPassResult& res);
     void compute_constrained_input_qr(Temporaries& tmp, BackwardPassResult& res);
@@ -212,6 +214,8 @@ private:
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;
+    Eigen::MatrixXd _x_lb, _x_ub;
+    Eigen::MatrixXd _u_lb, _u_ub;
     std::vector<ValueFunction> _value;
     std::vector<Dynamics> _dyn;
 

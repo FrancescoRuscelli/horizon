@@ -284,6 +284,8 @@ struct IterativeLQR::ConstraintToGo
 
     void add(const Constraint& constr);
 
+    void add(MatConstRef C, MatConstRef D, VecConstRef h);
+
     void clear();
 
     int dim() const;

@@ -68,12 +68,16 @@ class SolverILQR(Solver):
         # create ilqr solver
         self.ilqr = IterativeLQR(self.dyn, self.N, self.opts)
 
-        # set costs and constraints
-        for k in range(self.N + 1):
-            self._set_bounds_k(k)
-
+        
         self._set_constraint()
         self._set_cost()
+        xlb, xub = self.prb.getState().getBounds(node=None)
+        ulb, uub = self.prb.getInput().getBounds(node=None)
+
+        print(xlb.shape, ulb.shape, xub.shape, uub.shape)
+
+        self.ilqr.setStateBounds(xlb.reshape((self.nx, self.N+1)), xub.reshape((self.nx, self.N+1)))
+        self.ilqr.setInputBounds(ulb.reshape((self.nu, self.N)), uub.reshape((self.nu, self.N)))
 
         # set a default iteration callback
         self.plot_iter = False

@@ -13,23 +13,17 @@ void IterativeLQR::backward_pass()
     _value.back().S = _cost.back().Q();
     _value.back().s = _cost.back().q();
 
+    // regularize final cost
+    _value.back().S.diagonal().array() += _hxx_reg;
+
     // ..and constraint
     _constraint_to_go->set(_constraint.back());
+    add_bounds(_N);
 
     // backward pass
-    bool reg_needed = false;
     int i = _N - 1;
     while(i >= 0)
     {
-        if(i == _N)
-        {
-            // if we got here (because of an HessianIndefinite exception),
-            // we need to regularize the final cost!
-            _value.back().S.diagonal().array() += _hxx_reg;
-            --i;
-            continue;
-        }
-
         try
         {
             backward_pass_iter(i);
@@ -39,15 +33,12 @@ void IterativeLQR::backward_pass()
         {
             increase_regularization();
             std::cout << "increasing reg at k = " << i << ", hxx_reg = " << _hxx_reg << "\n";
-            reg_needed = true;
-            ++i;
+            // retry with increased reg
+            return backward_pass();
         }
     }
 
-    if(!reg_needed)
-    {
-        reduce_regularization();
-    }
+    reduce_regularization();
 }
 
 void IterativeLQR::backward_pass_iter(int i)
@@ -185,6 +176,54 @@ void IterativeLQR::backward_pass_iter(int i)
 
 }
 
+void IterativeLQR::add_bounds(int k)
+{
+
+    Eigen::RowVectorXd x_ei, u_ei;
+    
+    // state bounds
+    u_ei.setZero(_nu);
+    for(int i = 0; i < _nx; i++)
+    {
+        if(k == 0)
+        {
+            break;
+        }
+
+        if(_x_lb(i, k) == _x_ub(i, k))
+        {
+            x_ei = x_ei.Unit(_nx, i);
+            
+            Eigen::Matrix<double, 1, 1> hd;
+            hd(0) = _xtrj(i, k) - _x_lb(i, k);
+
+            _constraint_to_go->add(x_ei, u_ei, hd);
+
+        }
+    }
+
+    // input bounds
+    x_ei.setZero(_nx);
+    for(int i = 0; i < _nu; i++)
+    {
+        if(k == _N)
+        {
+            break;
+        }
+
+        if(_u_lb(i, k) == _u_ub(i, k))
+        {
+            u_ei = u_ei.Unit(_nu, i);
+            
+            Eigen::Matrix<double, 1, 1> hd;
+            hd(0) = _utrj(i, k) - _u_lb(i, k);
+
+            _constraint_to_go->add(x_ei, u_ei, hd);
+
+        }
+    }
+}
+
 void IterativeLQR::increase_regularization()
 {
     if(_hxx_reg < 1e-6)
@@ -239,25 +278,27 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     // ..backward pass result
     auto& res = _bp_res[i];
 
+    // back-propagate constraint to go from next step to current step
+    _constraint_to_go->propagate_backwards(A, B, d);
+
+    // add current step intermediate constraint
+    _constraint_to_go->add(_constraint[i]);
+    
+    // add bounds
+    add_bounds(i);
+
+    // number of constraints
+    int nc = _constraint_to_go->dim();
+    res.nc = nc;
+
     // no constraint to handle, do nothing
-    if(_constraint_to_go->dim() == 0 &&
-            !_constraint[i].is_valid())
+    if(nc == 0)
     {
         ConstrainedDynamics cd = {A, B, d};
         ConstrainedCost cc = {Q, R, P, q, r};
         res.nc = 0;
         return std::make_tuple(_nu, cd, cc);
     }
-
-    // back-propagate constraint to go from next step to current step
-    _constraint_to_go->propagate_backwards(A, B, d);
-
-    // add current step intermediate constraint
-    _constraint_to_go->add(_constraint[i]);
-
-    // number of constraints
-    int nc = _constraint_to_go->dim();
-    res.nc = nc;
 
     // compute quadritized free value function (before constraints)
     // note: this is needed by the compute_constrained_input routine!

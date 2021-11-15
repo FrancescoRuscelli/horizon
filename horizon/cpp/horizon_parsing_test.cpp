@@ -2,6 +2,27 @@
 #include "src/ilqr.h"
 #include <vector>
 
+namespace horizon
+{
+
+class Problem
+{
+
+public:
+
+private:
+
+    struct Variable
+    {
+        std::string name;
+        casadi::SX sym;
+        Eigen::MatrixXd lb, ub;
+    };
+
+};
+
+}
+
 int main(int argc, char **argv)
 {
     std::string path_to_yaml = argv[1];
@@ -9,7 +30,7 @@ int main(int argc, char **argv)
     auto problem_yaml = YAML::LoadFile(path_to_yaml);
 
     std::vector<casadi::SX> state_vec, input_vec;
-    std::map<std::string, casadi::SX> var_map;
+    std::map<std::string, casadi::SX> var_map, param_map;
     int N = problem_yaml["n_nodes"].as<int>();
 
     std::cout << "n_nodes = " << N << "\n";
@@ -81,7 +102,7 @@ int main(int argc, char **argv)
         std::cout << "param " << name << "[" << size << "]\n" <<
                      "=======\n";
 
-        var_map[name] = casadi::SX::sym(name, size);
+        var_map[name] = param_map[name] = casadi::SX::sym(name, size);
     }
 
     // retrive costs
@@ -90,19 +111,29 @@ int main(int argc, char **argv)
         auto name = item.first.as<std::string>();
         auto var_data = item.second;
         auto fun = casadi::Function::deserialize(var_data["function"].as<std::string>());
+        auto nodes = var_data["nodes"].as<std::vector<int>>();
         
+        // compute function value as SX
         std::vector<casadi::SX> fun_input;
+        std::vector<casadi::SX> fun_input_param;
         for(int i = 0; i < fun.n_in(); i++)
         {
             fun_input.push_back(var_map.at(fun.name_in(i)));
+            
+            if(param_map.count(fun.name_in(i)))
+            {
+                fun_input_param.push_back(fun_input.back());
+            }
         }
-        
+
+        auto p = casadi::SX::vertcat(fun_input_param);
         casadi::SX fn_value = fun(fun_input)[0];
 
         auto fun_xup = casadi::Function(fun.name(), 
-            {x, u, p})
+            {x, u, p}, {fn_value}, 
+            {"x", "u", "p"}, {"l"});
 
-        std::cout << fn_value << std::endl;
+        ilqr.setCost(nodes, fun_xup);
     }
 
 }

@@ -1,5 +1,6 @@
 import time
 import casadi as cs
+from numpy.core.fromnumeric import var
 from horizon import functions as fc
 from horizon import variables as sv
 import numpy as np
