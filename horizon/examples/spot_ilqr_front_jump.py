@@ -22,7 +22,7 @@ transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
 tf = 2.0
-n_nodes = 100
+n_nodes = 20
 ilqr_plot_iter = False
 t_jump = (1.0, 3)
 
@@ -87,7 +87,6 @@ prb.createFinalConstraint('final_velocity', q_dot)
 q_tgt = q_init.copy()
 q_tgt[0] = 0
 # q_tgt[5] = math.sin(math.pi/4)
-prb.createFinalConstraint('q_dot', q_dot)
 # prb.createFinalConstraint('q_fb', q[:6] - q_tgt[:6])
 
 # prb.createFinalConstraint('q_f', q[7:] - q_tgt[7:])
@@ -150,7 +149,7 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.line_search_accept_ratio': 1e-9,
         'ilqr.svd_threshold': 1e-12,
         'ilqr.decomp_type': 'qr',
-        'ilqr.codegen_enabled': False,
+        'ilqr.codegen_enabled': True,
         'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump_front',
         'gnsqp.qp_solver': 'osqp'
         }
@@ -169,8 +168,6 @@ import yaml
 with open('/tmp/spot_ilqr_front_jump.yaml', 'w') as f:
     yaml.dump(prb_data, f, default_flow_style=None)
     
-exit()
-
 t = time.time()
 solver.solve()
 elapsed = time.time() - t
