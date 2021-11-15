@@ -138,6 +138,7 @@ public:
         bool accepted;
 
         ForwardPassResult(int nx, int nu, int N);
+        void print() const;
     };
 
 

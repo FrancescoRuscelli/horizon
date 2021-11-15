@@ -752,6 +752,17 @@ IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N):
     step_length = 0.0;
 }
 
+void IterativeLQR::ForwardPassResult::print() const
+{
+    if(!accepted)
+    {
+        return;
+    }
+
+    printf("alpha=%.3e  reg=%.3e  merit=%.3e  dm=%.3e  mu_f=%.3e  mu_c=%.3e  cost=%.3e  delta_u=%.3e  constr=%.3e  gap=%.3e \n",
+           alpha, hxx_reg, merit, merit_der, mu_f, mu_c, cost, step_length, constraint_violation, defect_norm);
+}
+
 IterativeLQR::ConstraintToGo::ConstraintToGo(int nx, int nu):
     _dim(0)
 {

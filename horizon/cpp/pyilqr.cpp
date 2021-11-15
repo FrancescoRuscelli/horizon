@@ -3,6 +3,7 @@
 PYBIND11_MODULE(pyilqr, m) {
 
     py::class_<IterativeLQR::ForwardPassResult>(m, "ForwardPassResult")
+            .def("print", &IterativeLQR::ForwardPassResult::print)
             .def_readonly("xtrj", &IterativeLQR::ForwardPassResult::xtrj)
             .def_readonly("utrj", &IterativeLQR::ForwardPassResult::utrj)
             .def_readonly("accepted", &IterativeLQR::ForwardPassResult::accepted)
