@@ -94,7 +94,7 @@ public:
 
     void setFinalConstraint(const casadi::Function& final_constraint);
 
-    void setParameterValue(const std::string& fname, const Eigen::MatrixXd& value);
+    void setParameterValue(const std::string& pname, const Eigen::MatrixXd& value);
 
     void setInitialState(const Eigen::VectorXd& x0);
 
@@ -166,6 +166,7 @@ private:
     typedef std::shared_ptr<std::map<std::string, Eigen::MatrixXd>>
         ParameterMapPtr;
 
+    void add_param_to_map(const casadi::Function& f);
     void linearize_quadratize();
     void report_result(const ForwardPassResult& fpres);
     void backward_pass();
@@ -187,7 +188,6 @@ private:
     void forward_pass_iter(int i, double alpha);
     void line_search(int iter);
     bool should_stop();
-
     void set_default_cost();
 
     enum DecompositionType

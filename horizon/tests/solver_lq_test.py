@@ -27,12 +27,12 @@ class SolverConsistency(unittest.TestCase):
 
     def test_blocksqp_vs_ipopt(self):
         ipopt = make_problem('ipopt', *self.matrices)
-        blocksqp = make_problem('ilqr', *self.matrices)
+        blocksqp = make_problem('blocksqp', *self.matrices)
         self._test_a_vs_b(ipopt, blocksqp)
     
     def test_blocksqp_vs_ilqr(self):
         ilqr = make_problem('ilqr', *self.matrices)
-        blocksqp = make_problem('ipopt', *self.matrices)
+        blocksqp = make_problem('blocksqp', *self.matrices)
         self._test_a_vs_b(ilqr, blocksqp)
 
 def make_problem(solver_type, A11, A13, A21, A32, B21, B32):

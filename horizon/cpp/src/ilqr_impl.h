@@ -351,6 +351,9 @@ struct IterativeLQR::ConstrainedCost
     VecConstRef r;
 };
 
+static void set_param_inputs(std::shared_ptr<std::map<std::string, Eigen::MatrixXd>> params, int k,
+                             casadi_utils::WrappedFunction& f);
+
 #define THROW_NAN(mat) \
     if((mat).hasNaN()) \
     { \

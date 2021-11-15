@@ -201,9 +201,15 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         }
 
         _constraint[i].evaluate(xtrj.col(i), utrj.col(i), i);
-        constr += _constraint[i].h().cwiseAbs().sum();
+        constr += _constraint[i].h().lpNorm<1>();
 
     }
+
+    // bound violation
+    constr += (_x_lb - xtrj).cwiseMax(0).lpNorm<1>();
+    constr += (_x_ub - xtrj).cwiseMin(0).lpNorm<1>();
+    constr += (_u_lb - utrj).cwiseMax(0).lpNorm<1>();
+    constr += (_u_ub - utrj).cwiseMin(0).lpNorm<1>();
 
     // add final constraint violation
     if(_constraint[_N].is_valid())
@@ -211,7 +217,7 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         // note: u not used
         // todo: enforce this!
         _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
-        constr += _constraint[_N].h().cwiseAbs().sum();
+        constr += _constraint[_N].h().lpNorm<1>();
     }
 
     return constr / _N;
