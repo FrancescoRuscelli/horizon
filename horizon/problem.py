@@ -618,24 +618,26 @@ class Problem:
         data['n_nodes'] = self.getNNodes() - 1
 
         # save state variables
-        data['state'] = dict()
+        data['state'] = list()
         for sv in self.getState():
             var_data = dict()
             var_data['name'] = sv.getName()
             var_data['size'] = sv.size1()
-            var_data['lb'] = sv.getLowerBounds().tolist()
-            var_data['ub'] = sv.getUpperBounds().tolist()
-            data['state'][var_data['name']] = var_data
+            var_data['lb'] = sv.getLowerBounds().flatten('F').tolist()
+            var_data['ub'] = sv.getUpperBounds().flatten('F').tolist()
+            var_data['initial_guess'] = sv.getInitialGuess().flatten('F').tolist()
+            data['state'].append(var_data)
 
         # save input variables
-        data['input'] = dict()
+        data['input'] = list()
         for sv in self.getInput():
             var_data = dict()
             var_data['name'] = sv.getName()
             var_data['size'] = sv.size1()
-            var_data['lb'] = sv.getLowerBounds().tolist()
-            var_data['ub'] = sv.getUpperBounds().tolist()
-            data['input'][var_data['name']] = var_data
+            var_data['lb'] = sv.getLowerBounds().flatten('F').tolist()
+            var_data['ub'] = sv.getUpperBounds().flatten('F').tolist()
+            var_data['initial_guess'] = sv.getInitialGuess().flatten('F').tolist()
+            data['input'].append(var_data)
 
         # save parameters
         data['param'] = dict()
@@ -643,7 +645,7 @@ class Problem:
             var_data = dict()
             var_data['name'] = p.getName()
             var_data['size'] = p.getDim()
-            var_data['values'] = p.getValues().tolist()
+            var_data['values'] = p.getValues().flatten('F').tolist()
             data['param'][var_data['name']] = var_data
 
         # save cost and constraints
@@ -669,6 +671,8 @@ class Problem:
             var_data['param_depends'] = [v.getName() for v in f.getParameters()]
             var_data['nodes'] = f.getNodes()
             var_data['function'] = f.getFunction().serialize()
+            var_data['lb'] = f.getLowerBounds().flatten('F').tolist()
+            var_data['ub'] = f.getUpperBounds().flatten('F').tolist()
             data['constraint'][var_data['name']] = var_data
 
         return data
