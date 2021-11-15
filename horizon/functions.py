@@ -383,7 +383,7 @@ class Constraint(Function):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
-        vals = np.hstack([self.bounds['n' + str(i)][val_type] for i in nodes])
+        vals = np.hstack([np.atleast_2d(self.bounds['n' + str(i)][val_type]).T for i in nodes])
 
         return vals
 
