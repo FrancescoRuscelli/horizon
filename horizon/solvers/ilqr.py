@@ -155,13 +155,13 @@ class SolverILQR(Solver):
         for k, v in prof_info.timings.items():
             if '_inner' not in k:
                 continue
-            print(f'{k[:-6]:30}{np.sum(v)/self.N/1000} ms')
+            print(f'{k[:-6]:30}{np.mean(v)*1e-3*self.N} ms')
 
         print('\ntimings (iter):')
         for k, v in prof_info.timings.items():
             if '_inner' in k:
                 continue
-            print(f'{k:30}{np.sum(v)/self.N/1000} ms')
+            print(f'{k:30}{np.mean(v)*1e-3} ms')
     
     
     def _set_cost(self):
