@@ -1,6 +1,6 @@
 import time
-
 import casadi as cs
+from numpy.core.fromnumeric import var
 from horizon import functions as fc
 from horizon import variables as sv
 import numpy as np
@@ -611,6 +611,71 @@ class Problem:
             self.state_der = cs.SX.deserialize(self.state_der)
 
         return self
+
+    def save(self):
+        data = dict()
+        
+        data['n_nodes'] = self.getNNodes() - 1
+
+        # save state variables
+        data['state'] = list()
+        for sv in self.getState():
+            var_data = dict()
+            var_data['name'] = sv.getName()
+            var_data['size'] = sv.size1()
+            var_data['lb'] = sv.getLowerBounds().flatten('F').tolist()
+            var_data['ub'] = sv.getUpperBounds().flatten('F').tolist()
+            var_data['initial_guess'] = sv.getInitialGuess().flatten('F').tolist()
+            data['state'].append(var_data)
+
+        # save input variables
+        data['input'] = list()
+        for sv in self.getInput():
+            var_data = dict()
+            var_data['name'] = sv.getName()
+            var_data['size'] = sv.size1()
+            var_data['lb'] = sv.getLowerBounds().flatten('F').tolist()
+            var_data['ub'] = sv.getUpperBounds().flatten('F').tolist()
+            var_data['initial_guess'] = sv.getInitialGuess().flatten('F').tolist()
+            data['input'].append(var_data)
+
+        # save parameters
+        data['param'] = dict()
+        for p in self.var_container.getParList():
+            var_data = dict()
+            var_data['name'] = p.getName()
+            var_data['size'] = p.getDim()
+            var_data['values'] = p.getValues().flatten('F').tolist()
+            data['param'][var_data['name']] = var_data
+
+        # save cost and constraints
+        data['cost'] = dict()
+        for f in self.function_container.getCost().values():
+            f : fc.Function = f
+            var_data = dict()
+            var_data['name'] = f.getName()
+            var_data['repr'] = str(f.getFunction())
+            var_data['var_depends'] = [v.getName() for v in f.getVariables()]
+            var_data['param_depends'] = [v.getName() for v in f.getParameters()]
+            var_data['nodes'] = f.getNodes()
+            var_data['function'] = f.getFunction().serialize()
+            data['cost'][var_data['name']] = var_data
+
+        data['constraint'] = dict()
+        for f in self.function_container.getCnstr().values():
+            f : fc.Function = f
+            var_data = dict()
+            var_data['name'] = f.getName()
+            var_data['repr'] = str(f.getFunction())
+            var_data['var_depends'] = [v.getName() for v in f.getVariables()]
+            var_data['param_depends'] = [v.getName() for v in f.getParameters()]
+            var_data['nodes'] = f.getNodes()
+            var_data['function'] = f.getFunction().serialize()
+            var_data['lb'] = f.getLowerBounds().flatten('F').tolist()
+            var_data['ub'] = f.getUpperBounds().flatten('F').tolist()
+            data['constraint'][var_data['name']] = var_data
+
+        return data
 
 
 def pickleable(obj):

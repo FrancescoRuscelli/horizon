@@ -9,12 +9,12 @@ np.set_printoptions(suppress=True, precision=3)
 
 class SolverConsistency(unittest.TestCase):
     def setUp(self) -> None:
-        A11 = cs.DM.rand(2, 2)
-        A13 = cs.DM.rand(2, 2)
-        A21 = cs.DM.rand(2, 2)
-        A32 = cs.DM.rand(2, 2)
-        B21 = cs.DM.rand(2, 2)
-        B32 = cs.DM.rand(2, 2)
+        A11 = np.array([[1, 2], [3, 4]])
+        A13 = np.array([[1, -2], [-3, 4]])
+        A21 = np.array([[3, 2], [5, 4]])
+        A32 = np.array([[-3, 2], [-5, 4]])
+        B21 = np.array([[1, -1], [3, 2]])
+        B32 = np.array([[1, -2], [-3, 4]])
         self.matrices = [A11, A13, A21, A32, B21, B32]
 
     def _test_a_vs_b(self, a: Solver, b: Solver):
@@ -64,11 +64,12 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
 
     # a final constraint
     xtgt = np.array([1, 2, 2, 3, 3, 4])
-    prob.createFinalConstraint('xtgt', x - xtgt)
+    # prob.createFinalConstraint('xtgt', x - xtgt)
 
     # an initial state
     x0 = -xtgt
     prob.getState().setBounds(lb=x0, ub=x0, nodes=0)
+    prob.getState().setBounds(lb=xtgt, ub=xtgt, nodes=N)
     prob.getState().setInitialGuess(x0)
 
     # solve first with ilqr

@@ -211,6 +211,7 @@ public:
         casadi_utils::toEigen(x0_, _sol);
         _variable_trj[0] = x0_;
         _iteration_to_solve = 0;
+
         for(unsigned int k = 0; k < _max_iter; ++k)
         {
             //1. Cost function is linearized around actual x0
@@ -253,7 +254,10 @@ public:
             {
                 _conic_init_input["h"] = H_.get().sparsity();
                 _conic_init_input["a"] = A_.sparsity();
-                _conic = std::make_unique<casadi::Function>(casadi::conic("qp_solver", _qp_solver, _conic_init_input, _qp_opts));
+                _conic = std::make_unique<casadi::Function>(casadi::conic("qp_solver",
+                                                                          _qp_solver,
+                                                                          _conic_init_input,
+                                                                          _qp_opts));
             }
 
             _conic_dict.input["h"] = H_.get();
@@ -294,7 +298,10 @@ public:
             else
                 throw std::runtime_error("Linesearch failed, unable to solve");
 
-            _iter_cb(_fpr);
+            if(_iter_cb)
+            {
+                _iter_cb(_fpr);
+            }
 
         }
 
@@ -351,7 +358,7 @@ public:
         Eigen::VectorXd x0 = x;
 
 
-        const double merit_safety_factor = 2.0;
+        const double merit_safety_factor = 10.0;
         double norminf_lam_x = lam_x.lpNorm<Eigen::Infinity>();
         double norminf_lam_a = lam_a.lpNorm<Eigen::Infinity>();
         double norminf_lam = merit_safety_factor*std::max(norminf_lam_x, norminf_lam_a);
@@ -367,7 +374,7 @@ public:
 
         _alpha = 1.;
         bool accepted = false;
-        double eta = 1e-4;
+        double eta = 1e-9;
         while( _alpha > _alpha_min)
         {
             x = x0 + _alpha*dx;
@@ -385,6 +392,13 @@ public:
             _fpr.merit = candidate_merit;
             _fpr.step_length = _alpha * dx.norm();
             _fpr.accepted = accepted;
+            _fpr.defect_norm = NAN;
+            _fpr.hxx_reg = 0.0;
+            _fpr.merit_der = merit_der;
+            _fpr.mu_c = norminf_lam;
+            _fpr.mu_f = NAN;
+
+
 
             if(accepted)
                 break;

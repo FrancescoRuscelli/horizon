@@ -50,33 +50,25 @@ public:
     /**
      * @brief Class constructor
      * @param fdyn is a function mapping state and control to the integrated state;
-     * required signature is (x, u) -> (f)
+     * required signature is (x, u, p) -> (f)
      * @param N is the number of shooting intervals
      */
     IterativeLQR(casadi::Function fdyn,
                  int N,
                  OptionDict opt = OptionDict());
 
-    /**
-     * @brief setStepLength
-     * @param alpha
-     */
-    void setStepLength(double alpha);
+
+    void setStateBounds(const Eigen::MatrixXd& lb, const Eigen::MatrixXd& ub);
+
+    void setInputBounds(const Eigen::MatrixXd& lb, const Eigen::MatrixXd& ub);
 
     /**
      * @brief set an intermediate cost term for the k-th intermediate state,
      * as specificed by a vector of indices
      * @param indices: the nodes that the cost refers to
-     * @param inter_cost: a function with required signature (x, u) -> (l)
+     * @param inter_cost: a function with required signature (x, u, p) -> (l)
      */
     void setCost(std::vector<int> indices, const casadi::Function& inter_cost);
-
-    /**
-     * @brief set an intermediate cost term for each intermediate state
-     * @param inter_cost: a vector of N entries, each of which is a function with
-     * required signature (x, u) -> (l)
-     */
-    void setIntermediateCost(const std::vector<casadi::Function>& inter_cost);
 
     /**
      * @brief set the final cost
@@ -89,7 +81,7 @@ public:
      * @brief  set an intermediate constraint term for the k-th intermediate state,
      * as specificed by a vector of indices
      * @param indices: the nodes that the cost refers to
-     * @param inter_constraint: a function with required signature (x, u) -> (h),
+     * @param inter_constraint: a function with required signature (x, u, p) -> (h),
      * where the constraint is h(x, u) = 0
      * @param target_values: if specified, the i-th entry is used as target value
      * for the constraint function at the indices[i]
@@ -101,6 +93,8 @@ public:
     void setIntermediateConstraint(const std::vector<casadi::Function>& inter_constraint);
 
     void setFinalConstraint(const casadi::Function& final_constraint);
+
+    void setParameterValue(const std::string& pname, const Eigen::MatrixXd& value);
 
     void setInitialState(const Eigen::VectorXd& x0);
 
@@ -144,6 +138,7 @@ public:
         bool accepted;
 
         ForwardPassResult(int nx, int nu, int N);
+        void print() const;
     };
 
 
@@ -151,6 +146,8 @@ public:
 protected:
 
 private:
+
+    static constexpr double inf = std::numeric_limits<double>::infinity();
 
     struct ConstrainedDynamics;
     struct ConstrainedCost;
@@ -164,8 +161,13 @@ private:
     struct BackwardPassResult;
     struct ValueFunction;
 
-    typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost> HandleConstraintsRetType;
+    typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost>
+        HandleConstraintsRetType;
 
+    typedef std::shared_ptr<std::map<std::string, Eigen::MatrixXd>>
+        ParameterMapPtr;
+
+    void add_param_to_map(const casadi::Function& f);
     void linearize_quadratize();
     void report_result(const ForwardPassResult& fpres);
     void backward_pass();
@@ -173,6 +175,7 @@ private:
     void increase_regularization();
     void reduce_regularization();
     HandleConstraintsRetType handle_constraints(int i);
+    void add_bounds(int i);
     void compute_constrained_input(Temporaries& tmp, BackwardPassResult& res);
     void compute_constrained_input_svd(Temporaries& tmp, BackwardPassResult& res);
     void compute_constrained_input_qr(Temporaries& tmp, BackwardPassResult& res);
@@ -186,7 +189,6 @@ private:
     void forward_pass_iter(int i, double alpha);
     void line_search(int iter);
     bool should_stop();
-
     void set_default_cost();
 
     enum DecompositionType
@@ -209,8 +211,12 @@ private:
     bool _codegen_enabled;
     DecompositionType _decomp_type;
 
+    ParameterMapPtr _param_map;
+
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;
+    Eigen::MatrixXd _x_lb, _x_ub;
+    Eigen::MatrixXd _u_lb, _u_ub;
     std::vector<ValueFunction> _value;
     std::vector<Dynamics> _dyn;
 

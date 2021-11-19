@@ -146,7 +146,7 @@ class NlpsolSolver(Solver):
             fun_list.append(fun.getImpl())
         g = cs.vertcat(*fun_list)
 
-               # build cost functions list
+        # build cost functions list
         fun_list = list()
         for fun in self.fun_container.getCost().values():
             fun_list.append(fun.getImpl())
@@ -159,38 +159,40 @@ class NlpsolSolver(Solver):
         # update lower bounds of variables
         lb_list = list()
         for var in self.var_container.getVarList(offset=False):
-            lb_list.append(var.getLowerBounds())
+            lb_list.append(var.getLowerBounds().flatten(order='F'))
         lbw = cs.vertcat(*lb_list)
 
         # update upper bounds of variables
         ub_list = list()
         for var in self.var_container.getVarList(offset=False):
-            ub_list.append(var.getUpperBounds())
+            ub_list.append(var.getUpperBounds().flatten(order='F'))
         ubw = cs.vertcat(*ub_list)
 
         # update initial guess of variables
         w0_list = list()
         for var in self.var_container.getVarList(offset=False):
-            w0_list.append(var.getInitialGuess())
+            w0_list.append(var.getInitialGuess().flatten(order='F'))
         w0 = cs.vertcat(*w0_list)
         # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
 
         # update parameters
         p_list = list()
         for par in self.var_container.getParList():
-            p_list.append(par.getValues())
+            pval = par.getValues().flatten(order='F')
+            p_list.append(pval)
+
         p = cs.vertcat(*p_list)
 
         # update lower bounds of constraints
         lbg_list = list()
         for fun in self.fun_container.getCnstr().values():
-            lbg_list.append(fun.getLowerBounds())
+            lbg_list.append(fun.getLowerBounds().flatten(order='F'))
         lbg = cs.vertcat(*lbg_list)
 
         # update upper bounds of constraints
         ubg_list = list()
         for fun in self.fun_container.getCnstr().values():
-            ubg_list.append(fun.getUpperBounds())
+            ubg_list.append(fun.getUpperBounds().flatten(order='F'))
         ubg = cs.vertcat(*ubg_list)
 
         # solve

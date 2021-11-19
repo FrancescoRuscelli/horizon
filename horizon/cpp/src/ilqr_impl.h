@@ -22,6 +22,9 @@ public:
     // dynamics jacobian
     casadi_utils::WrappedFunction df;
 
+    // parameters
+    ParameterMapPtr param;
+
     // df/dx
     const Eigen::MatrixXd& A() const;
 
@@ -33,13 +36,23 @@ public:
 
     Dynamics(int nx, int nu);
 
-    VecConstRef integrate(VecConstRef x, VecConstRef u);
+    VecConstRef integrate(VecConstRef x,
+                          VecConstRef u,
+                          int k);
 
-    void linearize(VecConstRef x, VecConstRef u);
+    void linearize(VecConstRef x,
+                   VecConstRef u,
+                   int k);
 
-    void computeDefect(VecConstRef x, VecConstRef u, VecConstRef xnext, Eigen::VectorXd& d);
+    void computeDefect(VecConstRef x,
+                       VecConstRef u,
+                       VecConstRef xnext,
+                       int k,
+                       Eigen::VectorXd& d);
 
     void setDynamics(casadi::Function f);
+
+    static casadi::Function Jacobian(const casadi::Function& f);
 
 };
 
@@ -64,9 +77,9 @@ struct IterativeLQR::Constraint
 
     Constraint(int nx, int nu);
 
-    void linearize(VecConstRef x, VecConstRef u);
+    void linearize(VecConstRef x, VecConstRef u, int k);
 
-    void evaluate(VecConstRef x, VecConstRef u);
+    void evaluate(VecConstRef x, VecConstRef u, int k);
 
     void addConstraint(casadi::Function h);
 
@@ -88,7 +101,8 @@ struct IterativeLQR::ConstraintEntity
     // constraint jacobian
     casadi_utils::WrappedFunction df;
 
-
+    // parameter map
+    ParameterMapPtr param;
 
     // dh/dx
     const Eigen::MatrixXd& C() const;
@@ -104,9 +118,9 @@ struct IterativeLQR::ConstraintEntity
 
     ConstraintEntity();
 
-    void linearize(VecConstRef x, VecConstRef u);
+    void linearize(VecConstRef x, VecConstRef u, int k);
 
-    void evaluate(VecConstRef x, VecConstRef u);
+    void evaluate(VecConstRef x, VecConstRef u, int k);
 
     void setConstraint(casadi::Function h);
 
@@ -137,6 +151,9 @@ struct IterativeLQR::IntermediateCostEntity
     // cost hessian
     casadi_utils::WrappedFunction ddl;
 
+    // parameters
+    ParameterMapPtr param;
+
     /* Quadratized cost */
     const Eigen::MatrixXd& Q() const;
     VecConstRef q() const;
@@ -150,8 +167,8 @@ struct IterativeLQR::IntermediateCostEntity
                  const casadi::Function& df,
                  const casadi::Function& ddf);
 
-    double evaluate(VecConstRef x, VecConstRef u);
-    void quadratize(VecConstRef x, VecConstRef u);
+    double evaluate(VecConstRef x, VecConstRef u, int k);
+    void quadratize(VecConstRef x, VecConstRef u, int k);
 
     static casadi::Function Gradient(const casadi::Function& f);
     static casadi::Function Hessian(const casadi::Function& df);
@@ -173,8 +190,8 @@ struct IterativeLQR::IntermediateCost
     void addCost(const casadi::Function& cost);
     void addCost(const IntermediateCostEntity& cost);
 
-    double evaluate(VecConstRef x, VecConstRef u);
-    void quadratize(VecConstRef x, VecConstRef u);
+    double evaluate(VecConstRef x, VecConstRef u, int k);
+    void quadratize(VecConstRef x, VecConstRef u, int k);
 
 private:
 
@@ -267,6 +284,8 @@ struct IterativeLQR::ConstraintToGo
 
     void add(const Constraint& constr);
 
+    void add(MatConstRef C, MatConstRef D, VecConstRef h);
+
     void clear();
 
     int dim() const;
@@ -332,14 +351,17 @@ struct IterativeLQR::ConstrainedCost
     VecConstRef r;
 };
 
+static void set_param_inputs(std::shared_ptr<std::map<std::string, Eigen::MatrixXd>> params, int k,
+                             casadi_utils::WrappedFunction& f);
+
 #define THROW_NAN(mat) \
     if((mat).hasNaN()) \
     { \
-        throw std::runtime_error("NaN value detected in " #mat); \
+        throw std::runtime_error("[" + std::string(__func__) + "] NaN value detected in " #mat); \
     } \
     if(!mat.allFinite()) \
     { \
-        throw std::runtime_error("Inf value detected in " #mat); \
+        throw std::runtime_error("[" + std::string(__func__) + "] Inf value detected in " #mat); \
     }
 
 

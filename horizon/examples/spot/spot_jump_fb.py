@@ -8,6 +8,27 @@ from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
+from scipy.io import loadmat
+
+def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
+    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
+    traj_z = np.full(traj_len_before, 0.)
+    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
+    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
+    return traj_z
+
+# ========================================
+# traj = trajectoryInitializer(100, 10, 60, 10)
+# initial_q = -0.5
+# mod_q = initial_q + traj
+#
+# FK = cs.Function.deserialize(kindyn.ik(frame))
+# p = FK(q=q)['ee_pos']
+# p_start = FK(q=q_init)['ee_pos']
+
+# plt.scatter(range(mod_q.shape[0]), mod_q)
+# plt.show()
+# exit()
 
 # =========================================
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
@@ -15,7 +36,7 @@ ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.ma
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -25,17 +46,19 @@ if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 
+
 n_nodes = 50
 
 node_start_step = 20
 node_end_step = 40
 node_peak = 30
-jump_height = 0.1
+jump_height = 0.2
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
+
 
 
 # SET PROBLEM STATE AND INPUT VARIABLES
@@ -49,7 +72,7 @@ for i in range(n_c):
     f_list.append(prb.createInputVariable(f'f{i}', n_f))
 
 # SET CONTACTS MAP
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 
 
@@ -165,14 +188,29 @@ prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_li
 prb.createFinalConstraint('final_velocity', q_dot)
 
 # SET CONTACT POSITION CONSTRAINTS
+active_leg = list()
 active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0, 0, 0.8509035, 0.525322])
+# base_link stays at the same position
+# FK = cs.Function.deserialize(kindyn.fk('base_link'))
+# p_base = FK(q=q)['ee_pos']
+# p_base_start = FK(q=q_init)['ee_pos']
+
+# prb.createCostFunction(f"base_link_pos", 1000*cs.sumsqr(p_base[0:2] - p_base_start[0:2]))
+
+# DFK = cs.Function.deserialize(kindyn.frameVelocity('base_link', cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
+# v_base = DFK(q=q, qdot=q_dot)['ee_vel_linear']
+# 2. velocity of each base_link must be zero
+# prb.createConstraint(f"base_link_vel_before_step", v_base, nodes=range(0, node_start_step))
+# prb.createConstraint(f"base_link_vel_after_step", v_base, nodes=range(node_end_step, n_nodes + 1))
+# COM = cs.Function.deserialize(kindyn.centerOfMass())
+# p_com = COM(q=q_init)['com']
+# exit()
+fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
 q_final = q_init
-q_final[3:7] = [0, 0, 0.8509035, 0.525322]
 
 for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
@@ -196,19 +234,13 @@ for frame, f in contact_map.items():
     prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
     # prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
-    prb.createConstraint(f"land_{frame}_leg", p[2] - p_start[2], nodes=node_end_step)
+    prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
 
-    # this is useful?
-    # prb.createConstraint(f"subterrain_{frame}_leg", p[2] - p_start[2], bounds=dict(lb=-0.0001))
 
 # SET COST FUNCTIONS
-# pose of the robot during jump
-prb.createCostFunction(f"jump_fb", 1000 * cs.sumsqr(q[0:7] - fb_during_jump), nodes=range(node_start_step, node_end_step)) #nodes_end_step
-# minimum joint velocity
+prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
 prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-# final pose of the robot
-prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q - q_final))
-# forces
+prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
@@ -243,7 +275,61 @@ else:
 
 
 # ========================================================
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+plot_all = False
+plot_fun = False
+plot_forces = False
+
+if plot_forces:
+    for f in [f'f{i}' for i in range(len(contacts_name))]:
+        plt.figure()
+        for dim in range(solution[f].shape[0]):
+            plt.plot(np.array(range(solution[f].shape[1])), solution[f][dim, :])
+
+        plt.title(f'force {f}')
+
+    plt.show()
+
+if plot_fun:
+
+    hplt = plotter.PlotterHorizon(prb, solution)
+    # hplt.plotVariables(show_bounds=True, legend=False)
+    hplt.plotFunctions(show_bounds=True)
+    # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
+    plt.show()
+
+if plot_all:
+    pos_contact_list = list()
+    for contact in contacts_name:
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+        plt.figure()
+        plt.title(contact)
+        for dim in range(n_f):
+            plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3, linestyle='dotted')
+
+        plt.vlines([node_start_step, node_end_step], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
+
+    plt.figure()
+    for contact in contacts_name:
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+
+        plt.title(f'plane_xy')
+        plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
+
+    plt.figure()
+    for contact in contacts_name:
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+
+        plt.title(f'plane_xz')
+        plt.scatter(np.array(pos[0, :]), np.array(pos[2, :]), linewidth=0.1)
+
+    plt.show()
+# ======================================================
+
+
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling

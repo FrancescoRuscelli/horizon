@@ -89,7 +89,7 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot_step_fd.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_step_fd.mat')
 solution = ms.load()
 
 # print([name for name in solution])

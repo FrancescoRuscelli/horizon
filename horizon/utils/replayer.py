@@ -89,7 +89,7 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot_direct_collo.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump_refined.mat')
 solution = ms.load()
 
 # print([name for name in solution])
@@ -97,19 +97,21 @@ solution = ms.load()
 contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
-replay_traj = False
-plotting = True
+replay_traj = True
+plotting = False
 check_bounds = False
+
+if 'dt' in solution:
+    dt_before_res = solution['dt'].flatten()
+elif 'constant_dt' in solution:
+    dt_before_res = solution['constant_dt'].flatten()[0]
+elif 'param_dt' in solution:
+    dt_before_res = solution['param_dt'].flatten()[0]
 
 if replay_traj:
     joint_names = kindyn.joint_names()
     if 'universe' in joint_names: joint_names.remove('universe')
     if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
-
-    if 'dt' in solution:
-        dt_before_res = solution['dt'].flatten()
-    else:
-        dt_before_res = solution['constant_dt'].flatten()[0]
 
     dt_res = 0.001
 
@@ -169,6 +171,12 @@ if plotting:
         plt.title(f'plane_xy')
         plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
 
+    FK = cs.Function.deserialize(kindyn.centerOfMass())
+    pos_com = FK(q=solution['q'])['com']
+    plt.scatter(np.array(pos_com[0, :]), np.array(pos_com[1, :]), marker='x')
+    plt.scatter(np.array(pos_com[0, 0]), np.array(pos_com[1, 0]), marker='x', c='blue')
+    plt.scatter(np.array(pos_com[0, -1]), np.array(pos_com[1, -1]), marker='x', c='green')
+
     # plane_xz
     plt.figure()
     for contact in contacts_name:
@@ -186,7 +194,12 @@ if plotting:
 
         plt.title(f'force {f}')
 
-    plotFunction('inverse_dynamics')
+    plt.figure()
+    for f in [f'f{i}' for i in range(len(contacts_name))]:
+        plt.plot(np.array(range(solution[f].shape[1])), solution[f][2, :])
+        plt.title(f'forces_z')
+
+    # plotFunction('inverse_dynamics')
 
     # dt
     if 'dt' in solution:

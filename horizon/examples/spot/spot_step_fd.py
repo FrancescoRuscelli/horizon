@@ -15,7 +15,7 @@ ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.ma
 transcription_method = 'direct_collocation'  # direct_collocation #multiple_shooting
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -26,10 +26,8 @@ if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint
 
 
 n_nodes = 50
-
-node_start_step = 15
-n_nodes_step = 30
-node_end_step = node_start_step + n_nodes_step
+node_start_step = 25
+node_end_step = 45
 
 n_c = 4
 n_q = kindyn.nq()
@@ -54,7 +52,7 @@ for i in range(n_c):
     f_list.append(prb.createInputVariable(f'f{i}', n_f))
 
 # SET CONTACTS MAP
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 fd = kin_dyn.ForwardDynamics(kindyn, contacts_name, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
@@ -77,7 +75,7 @@ if load_initial_guess:
 
 # SET DYNAMICS
 # dt = prb.createInputVariable("dt", 1)  # variable dt as input
-dt = 0.01
+dt = 0.05
 # Computing dynamics
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
@@ -99,17 +97,17 @@ q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                    0.0, 0.9, -1.5253125])
 
 # q_dot bounds
-q_dot_lim = 200. * np.ones(n_v)
+q_dot_lim = 100. * np.ones(n_v)
 
 # f bounds
-f_lim = 10000. * np.ones(n_f)
+f_lim = 200.
 
 # dt bounds
 dt_min = 0.01  # [s]
 dt_max = 0.15  # [s]
 
 # torques bounds
-u_lim = 1000.*np.ones(n_v-6)
+u_lim = 500.* np.ones(n_v-6)
 
 #  ==========================================
 # set bounds of q
@@ -121,7 +119,10 @@ q_dot.setBounds(-q_dot_lim, q_dot_lim)
 q_dot.setBounds(q_dot_init, q_dot_init, 0)
 # set bounds of f
 for f in f_list:
-    f.setBounds(-f_lim, f_lim)
+    f[0].setBounds(-f_lim, f_lim)
+    f[1].setBounds(-f_lim, f_lim)
+    f[2].setBounds(0, f_lim)
+
 # set bounds of u
 u.setBounds(-u_lim, u_lim)
 # set bounds of dt
@@ -138,32 +139,47 @@ prb.createFinalConstraint('final_velocity', q_dot)
 mu = 0.8
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-# base_link stays at the same position
-FK = cs.Function.deserialize(kindyn.fk('base_link'))
-p_base = FK(q=q)['ee_pos']
-p_base_start = FK(q=q_init)['ee_pos']
-
-prb.createCostFunction(f"base_link_pos", 10 * cs.sumsqr(p_base - p_base_start))
-
-# without this, variable dt sucks
-DFK = cs.Function.deserialize(kindyn.frameVelocity('base_link', cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
-v_base_lin = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-v_base_rot = DFK(q=q, qdot=q_dot)['ee_vel_angular']
+# active_leg = next(iter(contact_map))
+active_leg = ['lf_foot', 'rf_foot']
 
 for frame, f in contact_map.items():
-    # velocity of each end effector must be zero
+    FK = cs.Function.deserialize(kindyn.fk(frame))
+    p = FK(q=q)['ee_pos']
+    p_start = FK(q=q_init)['ee_pos']
+
+    p_goal = p_start + [0., 0., 0.2]
+
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-    prb.createConstraint(f"{frame}_vel", v)
+    # 2. velocity of each end effector must be zero
+    if frame not in active_leg:
+        prb.createConstraint(f"{frame}_vel_before_step", v)
+    else:
+        prb.createConstraint(f"{frame}_vel_before_step", v, nodes=range(0, node_start_step))
+        prb.createConstraint(f"{frame}_vel_after_step", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-    prb.createIntermediateConstraint(f"{frame}_fc", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
+    # fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+    # if frame not in active_leg:
+    #     prb.createIntermediateConstraint(f"{frame}_friction_cone", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
+    # else:
+    #     prb.createIntermediateConstraint(f"{frame}_friction_cone_before_step", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
+    #     prb.createIntermediateConstraint(f"{frame}_friction_cone_after_step", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
+    if frame in active_leg:
+        prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
+
+        # prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=25)
+        # prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step + 2)
 
 # SET COST FUNCTIONS
-# prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
+prb.createCostFunction("min_q_dot", 100. * cs.sumsqr(q_dot))
+q_final = q_init
+# prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_final))
+# don't know why this is not working
+for f in f_list:
+    prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
+
 # =============
 # SOLVE PROBLEM
 # =============
@@ -196,7 +212,7 @@ else:
 # ========================================================
 
 
-contacts_name = {'lf_foot', 'rf_foot', 'lh_foot', 'rh_foot'}
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling

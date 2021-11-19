@@ -1,6 +1,6 @@
 import casadi as cs
 import horizon.problem as prb
-from horizon.variables import AbstractVariable
+from horizon.variables import AbstractVariable, SingleVariable, Variable, SingleParameter, Parameter
 import numpy as np
 from horizon.transcriptions.transcriptor import Transcriptor
 import horizon.transcriptions.integrators as integ
@@ -121,7 +121,7 @@ class MultipleShooting(Transcriptor):
 
         Args:
             prob (prb.Problem): the horizon problem
-            dt (float|StateVariable): discretization interval (cal be a control input)
+            dt (float|StateVariable): discretization interval (can be a control input)
             integrator (string|any): name of the default integrator or custom integrator
         """
         super().__init__(prob, dt)
@@ -136,8 +136,10 @@ class MultipleShooting(Transcriptor):
             self.integrator = integrator
 
         # todo if the dt is a variable, the integrator requires it (its offset)
-        if isinstance(dt, AbstractVariable):
+        if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
             state_int = self.__integrate(self.state_prev, self.input_prev, self.dt_prev)
+        elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
+            state_int = self.__integrate(self.state_prev, self.input_prev, self.dt)
         else:
             state_int = self.__integrate(self.state_prev, self.input_prev)
 

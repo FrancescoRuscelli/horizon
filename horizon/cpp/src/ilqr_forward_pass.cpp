@@ -175,13 +175,13 @@ double IterativeLQR::compute_cost(const Eigen::MatrixXd& xtrj, const Eigen::Matr
     // intermediate cost
     for(int i = 0; i < _N; i++)
     {
-        cost += _cost[i].evaluate(xtrj.col(i), utrj.col(i));
+        cost += _cost[i].evaluate(xtrj.col(i), utrj.col(i), i);
     }
 
     // add final cost
     // note: u not used
     // todo: enforce this!
-    cost += _cost[_N].evaluate(xtrj.col(_N), utrj.col(_N-1));
+    cost += _cost[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
 
     return cost / _N;
 }
@@ -200,18 +200,24 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
             continue;
         }
 
-        _constraint[i].evaluate(xtrj.col(i), utrj.col(i));
-        constr += _constraint[i].h().cwiseAbs().sum();
+        _constraint[i].evaluate(xtrj.col(i), utrj.col(i), i);
+        constr += _constraint[i].h().lpNorm<1>();
 
     }
+
+    // bound violation
+    constr += (_x_lb - xtrj).cwiseMax(0).lpNorm<1>();
+    constr += (_x_ub - xtrj).cwiseMin(0).lpNorm<1>();
+    constr += (_u_lb - utrj).cwiseMax(0).lpNorm<1>();
+    constr += (_u_ub - utrj).cwiseMin(0).lpNorm<1>();
 
     // add final constraint violation
     if(_constraint[_N].is_valid())
     {
         // note: u not used
         // todo: enforce this!
-        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1));
-        constr += _constraint[_N].h().cwiseAbs().sum();
+        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
+        constr += _constraint[_N].h().lpNorm<1>();
     }
 
     return constr / _N;
@@ -229,6 +235,7 @@ double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         _dyn[i].computeDefect(xtrj.col(i),
                               utrj.col(i),
                               xtrj.col(i+1),
+                              i,
                               _tmp[i].defect);
 
         defect += _tmp[i].defect.cwiseAbs().sum();
@@ -272,6 +279,7 @@ void IterativeLQR::line_search(int iter)
             _fp_res->constraint_violation);
 
     _fp_res->merit_der = merit_der;
+
 
     // run line search
     while(alpha >= alpha_min)

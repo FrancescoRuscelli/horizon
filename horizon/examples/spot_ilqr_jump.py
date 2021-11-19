@@ -8,7 +8,6 @@ from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os, math
-from scipy.io import loadmat
 from itertools import filterfalse
 
 # mat storer
@@ -17,7 +16,7 @@ filename, _ = os.path.splitext(filename_with_ext)
 ms = mat_storer.matStorer(f'{filename}.mat')
 
 # options
-solver_type = 'ilqr'
+solver_type = 'gnsqp'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
@@ -56,16 +55,6 @@ prb.setDynamics(x_dot)
 contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 
-# import initial guess if present
-if load_initial_guess:
-    prev_solution = ms.load()
-    q_ig = prev_solution['q']
-    q_dot_ig = prev_solution['q_dot']
-    q_ddot_ig = prev_solution['q_ddot']
-    f_ig_list = list()
-    for f in f_list:
-        f_ig_list.append(prev_solution[f'f{i}'])
-
 # initial state and initial guess
 q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                    0.0, 0.9, -1.5238505,
@@ -90,6 +79,13 @@ id_fn = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKi
 tau = id_fn.call(q, q_dot, q_ddot, contact_map)
 prb.createIntermediateConstraint("dynamic_feasibility", tau[:6])
 
+if solver_type == 'gnsqp':
+    def residual_to_cost(r):
+        return r
+else:
+    def residual_to_cost(r):
+        return cs.sumsqr(r)
+
 # final velocity is zero
 prb.createFinalConstraint('final_velocity', q_dot)
 
@@ -100,7 +96,7 @@ q_tgt[5] = math.sin(math.pi/4)
 prb.createFinalConstraint('q_fb', q[:6] - q_tgt[:6])
 # prb.createFinalConstraint('q_f', q[7:] - q_tgt[7:])
 
-prb.createFinalCost('q_f', 100*cs.sumsqr(q[7:] - q_tgt[7:]))
+prb.createFinalCost('q_f', residual_to_cost(10*(q[7:] - q_tgt[7:])))
 # prb.createFinalCost('q_dot_f', 100*cs.sumsqr(q_dot))
 
 # contact handling
@@ -125,7 +121,8 @@ for frame, f in contact_map.items():
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
     a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
-    prb.createConstraint(f"{frame}_vel", v, nodes=list(nodes))
+    # node: on first swing node vel should be zero!
+    prb.createConstraint(f"{frame}_vel", v, nodes=list(nodes) + [k_swing[0]])
     # prb.createIntermediateCost(f'{frame}_fn', barrier(f[2] - 25.0)) #, nodes=nodes)
 
 # swing force is zero
@@ -133,14 +130,15 @@ for leg in lifted_legs:
     fzero = np.zeros(n_f)
     contact_map[leg].setBounds(fzero, fzero, nodes=k_swing)
 
+
 # cost
 # prb.createCostFunction("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
 # prb.createCostFunction("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
-prb.createCostFunction("min_q", 1e-2 * cs.sumsqr(q[7:] - q_init[7:]))
+prb.createCostFunction("min_q", residual_to_cost(1e-1 * (q[7:] - q_init[7:])))
 # prb.createCostFunction("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
-prb.createIntermediateCost("min_q_ddot", 1e-6 * cs.sumsqr(q_ddot))
+prb.createIntermediateCost("min_q_ddot", residual_to_cost(1e-3* (q_ddot)))
 for f in f_list:
-    prb.createIntermediateCost(f"min_{f.getName()}", 1e-6 * cs.sumsqr(f))
+    prb.createIntermediateCost(f"min_{f.getName()}", residual_to_cost(1e-3 * (f)))
 
 
 # =============
@@ -157,9 +155,14 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.svd_threshold': 1e-12,
         'ilqr.decomp_type': 'qr',
         'ilqr.codegen_enabled': False,
-        'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump'
+        'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump',
+        'gnsqp.qp_solver': 'osqp'
         }
-        
+
+opts['warm_start_primal'] = True
+opts['warm_start_dual'] = True
+opts['osqp.polish'] = False
+opts['osqp.verbose'] = False
 
 solver = solver.Solver.make_solver(solver_type, prb, dt, opts)
 
