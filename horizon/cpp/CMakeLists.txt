@@ -18,6 +18,11 @@ set(CMAKE_CXX_STANDARD 20)
 
 
 # ilqr library
+add_library(horizon STATIC
+    src/horizon_parser.cpp)
+
+target_link_libraries(horizon Eigen3::Eigen casadi)
+
 add_library(ilqr STATIC
     src/ilqr.cpp
     src/ilqr_forward_pass.cpp

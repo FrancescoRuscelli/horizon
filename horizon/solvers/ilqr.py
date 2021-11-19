@@ -87,6 +87,8 @@ class SolverILQR(Solver):
     def save(self):
         data = self.prb.save()
         data['solver'] = dict()
+        if isinstance(self.dt, float):
+            data['solver']['dt'] = self.dt
         data['solver']['name'] = 'ilqr'
         data['solver']['opt'] = self.opts
         data['dynamics'] = self.dyn.serialize()
