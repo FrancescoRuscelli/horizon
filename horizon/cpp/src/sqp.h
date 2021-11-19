@@ -294,7 +294,10 @@ public:
             else
                 throw std::runtime_error("Linesearch failed, unable to solve");
 
-            _iter_cb(_fpr);
+            if(_iter_cb)
+            {
+                _iter_cb(_fpr);
+            }
 
         }
 
