@@ -71,7 +71,7 @@ public:
         _max_iter(1000),
         _reinitialize_qp_solver(false),
         _opts(opts), _qp_opts(opts),
-        _alpha(1.), _solution_convergence(1e-6),_alpha_min(1e-3),
+        _alpha(1.), _beta(1e-4), _solution_convergence(1e-6),_alpha_min(1e-3),
         _fpr(0, 0, 0) ///TODO: this needs to be improved!
     {
 
@@ -134,7 +134,7 @@ public:
         _max_iter(1000),
         _reinitialize_qp_solver(false),
         _opts(opts), _qp_opts(opts),
-        _alpha(1.), _solution_convergence(1e-6), _alpha_min(1e-3),
+        _alpha(1.), _beta(1e-4), _solution_convergence(1e-6), _alpha_min(1e-3),
         _fpr(0, 0, 0) ///TODO: this needs to be improved!
     {
         _f = casadi::Function("f", {x}, {f}, {"x"}, {"f"});
@@ -206,7 +206,6 @@ public:
         _hessian_computation_time.clear();
         _qp_computation_time.clear();
 
-        bool sparse = true;
         x0_ = initial_guess_x;
         casadi_utils::toEigen(x0_, _sol);
         _variable_trj[0] = x0_;
@@ -215,20 +214,13 @@ public:
         for(unsigned int k = 0; k < _max_iter; ++k)
         {
             //1. Cost function is linearized around actual x0
-            _f.setInput(0, _sol); // cost function
-            _f.call();
-
-            _df.setInput(0, _sol); // cost function Jacobian
-            _df.call(sparse);
+            eval(_f, 0, _sol, false); // cost function
+            eval(_df,0, _sol, true); // cost function Jacobian
             _J = _df.getSparseOutput(0);
 
             //2. Constraints are linearized around actual x0
-            _g_dict.input[_g.name_in(0)] = x0_;
-            _g.call(_g_dict.input, _g_dict.output);
-
-            _A_dict.input[_g.name_in(0)] = x0_;
-            _dg.call(_A_dict.input, _A_dict.output);
-
+            eval(_g, _g_dict, x0_);
+            eval(_dg, _A_dict, x0_);
             g_ = _g_dict.output[_g.name_out(0)];
             A_ = _A_dict.output[_dg.name_out(0)];
 
@@ -305,6 +297,7 @@ public:
 
         }
 
+
         _solution["x"] = x0_;
         double norm_f = _f.getOutput(0).norm();
         _solution["f"] = 0.5*norm_f*norm_f;
@@ -313,11 +306,14 @@ public:
         return _solution;
     }
 
-    double getCost(const Eigen::VectorXd& x)
+    double computeCost(const casadi_utils::WrappedFunction& f)
     {
-        _f.setInput(0, x);
-        _f.call();
-        return _f.getOutput(0).squaredNorm();
+        return f.getOutput(0).squaredNorm();
+    }
+
+    double computeCostDerivative(const Eigen::VectorXd& dx, const Eigen::VectorXd& grad)
+    {
+        return dx.dot(grad);
     }
 
     double getCostDerivative(const Eigen::VectorXd& x, const Eigen::VectorXd& dx)
@@ -329,21 +325,14 @@ public:
         return dx.dot(grad);
     }
 
-    double getConstraintViolation(const Eigen::VectorXd& x,
-                                  const Eigen::VectorXd& lbg, const Eigen::VectorXd& ubg,
-                                  const Eigen::VectorXd& lbx, const Eigen::VectorXd& ubx)
+    double computeConstraintViolation(const Eigen::VectorXd& g, const Eigen::VectorXd& x,
+                                      const Eigen::VectorXd& lbg, const Eigen::VectorXd& ubg,
+                                      const Eigen::VectorXd& lbx, const Eigen::VectorXd& ubx)
     {
-        casadi::DM _x_;
-        casadi_utils::toCasadiMatrix(x, _x_);
-        _g_dict.input[_g.name_in(0)] = _x_;
-        _g.call(_g_dict.input, _g_dict.output);
-        Eigen::VectorXd g;
-        casadi_utils::toEigen(_g_dict.output[_g.name_out(0)], g);
-
-
         return (lbg-g).cwiseMax(0.).lpNorm<1>() + (ubg-g).cwiseMin(0.).lpNorm<1>() +
                (lbx-x).cwiseMax(0.).lpNorm<1>() + (ubx-x).cwiseMin(0.).lpNorm<1>();
     }
+
 
     bool lineSearch(Eigen::VectorXd& x, const Eigen::VectorXd& dx, const Eigen::VectorXd& lam_x, const Eigen::VectorXd& lam_a,
                     const casadi::DM& lbg, const casadi::DM& ubg,
@@ -358,33 +347,40 @@ public:
         Eigen::VectorXd x0 = x;
 
 
-        const double merit_safety_factor = 10.0;
+        const double merit_safety_factor = 2.0;
         double norminf_lam_x = lam_x.lpNorm<Eigen::Infinity>();
         double norminf_lam_a = lam_a.lpNorm<Eigen::Infinity>();
         double norminf_lam = merit_safety_factor*std::max(norminf_lam_x, norminf_lam_a);
 
-        double initial_cost = getCost(x0);
+        double initial_cost = computeCost(_f);
 
-        double cost_derr = getCostDerivative(x0, dx);
+        double cost_derr = computeCostDerivative(dx, _grad);
 
-        double constraint_violation = getConstraintViolation(x0, _lbg_, _ubg_, _lbx_, _ubx_);
+        casadi::DM _x_;
+        Eigen::VectorXd g;
+        casadi_utils::toEigen(_g_dict.output[_g.name_out(0)], g);
+        double constraint_violation = computeConstraintViolation(g, x0, _lbg_, _ubg_, _lbx_, _ubx_);
 
         double merit_der = cost_derr - norminf_lam * constraint_violation;
         double initial_merit = initial_cost + norminf_lam*constraint_violation;
 
         _alpha = 1.;
         bool accepted = false;
-        double eta = 1e-9;
         while( _alpha > _alpha_min)
         {
             x = x0 + _alpha*dx;
-            double candidate_cost = getCost(x);
-            double candidate_constraint_violation = getConstraintViolation(x, _lbg_, _ubg_, _lbx_, _ubx_);
+            eval(_f, 0, x, false);
+            double candidate_cost = computeCost(_f);
+
+            casadi_utils::toCasadiMatrix(x, _x_);
+            eval(_g, _g_dict, _x_);
+            casadi_utils::toEigen(_g_dict.output[_g.name_out(0)], g);
+            double candidate_constraint_violation = computeConstraintViolation(g, x, _lbg_, _ubg_, _lbx_, _ubx_);
 
             double candidate_merit = candidate_cost + norminf_lam*candidate_constraint_violation;
 
             // evaluate Armijo's condition
-            accepted = candidate_merit <= initial_merit + eta*_alpha*merit_der;
+            accepted = candidate_merit <= initial_merit + _beta*_alpha*merit_der;
 
             _fpr.alpha = _alpha;
             _fpr.cost = candidate_cost;
@@ -530,6 +526,16 @@ public:
         return _qp_computation_time;
     }
 
+    void setBeta(const double beta)
+    {
+        _beta = beta;
+    }
+
+    double getBeta()
+    {
+        return _beta;
+    }
+
     typedef std::function<bool(const IterativeLQR::ForwardPassResult& res)> CallbackType;
     void setIterationCallback(const CallbackType& cb)
     {
@@ -539,6 +545,31 @@ public:
 
 
 private:
+
+    /**
+     * @brief eval to evaluate WrappedFunctions on point x
+     * @param wf WrappedFunction to evaluate
+     * @param i which input to set
+     * @param x point
+     * @param sparse if result will be sparse
+     */
+    void eval(casadi_utils::WrappedFunction& wf, const int i, const Eigen::VectorXd& x, const bool sparse)
+    {
+        wf.setInput(i, x); // cost function
+        wf.call(sparse);
+    }
+
+    /**
+     * @brief eval to evaluate casadi Function on point x
+     * @param cf casadi Function to evaluate
+     * @param dict input/output dict
+     * @param x point
+     */
+    void eval(casadi::Function& cf, IODMDict& dict, const casadi::DM& x)
+    {
+        dict.input[cf.name_in(0)] = x;
+        cf.call(dict.input, dict.output);
+    }
 
 
 
@@ -592,6 +623,8 @@ private:
 
     IterativeLQR::ForwardPassResult _fpr;
     CallbackType _iter_cb;
+
+    double _beta;
 
 };
 

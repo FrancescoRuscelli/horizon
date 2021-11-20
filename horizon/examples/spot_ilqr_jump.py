@@ -161,10 +161,12 @@ opts = {'ipopt.tol': 0.001,
 
 opts['warm_start_primal'] = True
 opts['warm_start_dual'] = True
-opts['osqp.polish'] = False
+opts['osqp.polish'] = True
 opts['osqp.verbose'] = False
+opts['solution_convergence'] = 1.
 
 solver = solver.Solver.make_solver(solver_type, prb, dt, opts)
+solver.setAlphaMin(0.01)
 
 try:
     solver.set_iteration_callback()
