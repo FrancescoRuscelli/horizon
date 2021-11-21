@@ -72,6 +72,7 @@ public:
         _reinitialize_qp_solver(false),
         _opts(opts), _qp_opts(opts),
         _alpha(1.), _beta(1e-4), _solution_convergence(1e-6),_alpha_min(1e-3),
+        _constraint_violation_tolerance(1e-6), _merit_derivative_tolerance(1e-6),
         _fpr(0, 0, 0) ///TODO: this needs to be improved!
     {
 
@@ -91,24 +92,8 @@ public:
         _g = g;
         _dg = _g.factory("dg", {g.name_in(0)}, {"jac:" + g.name_out(0) + ":" + g.name_in(0)});
 
-        if(opts.count("max_iter"))
-        {
-            _max_iter = opts.at("max_iter");
-            _qp_opts.erase("max_iter");
-        }
 
-        if(opts.count("reinitialize_qpsolver"))
-        {
-            _reinitialize_qp_solver = opts.at("reinitialize_qpsolver");
-            _qp_opts.erase("reinitialize_qpsolver");
-        }
-
-        if(opts.count("solution_convergence"))
-        {
-            _solution_convergence = opts.at("solution_convergence");
-            _qp_opts.erase("solution_convergence");
-        }
-
+        parseOptions();
 
         _variable_trj.resize(_max_iter+1, casadi::DM(f.size1_in(0), f.size2_in(0)));
 
@@ -135,6 +120,7 @@ public:
         _reinitialize_qp_solver(false),
         _opts(opts), _qp_opts(opts),
         _alpha(1.), _beta(1e-4), _solution_convergence(1e-6), _alpha_min(1e-3),
+        _constraint_violation_tolerance(1e-6), _merit_derivative_tolerance(1e-6),
         _fpr(0, 0, 0) ///TODO: this needs to be improved!
     {
         _f = casadi::Function("f", {x}, {f}, {"x"}, {"f"});
@@ -144,28 +130,47 @@ public:
         _g = casadi::Function("g",{x}, {g}, {"x"}, {"g"});
         _dg = _g.factory("dg", {"x"}, {"jac:g:x"});
 
-        if(opts.count("max_iter"))
-        {
-            _max_iter = opts.at("max_iter");
-            _qp_opts.erase("max_iter");
-        }
-
-        if(opts.count("reinitialize_qpsolver"))
-        {
-            _reinitialize_qp_solver = opts.at("reinitialize_qpsolver");
-            _qp_opts.erase("reinitialize_qpsolver");
-        }
-
-        if(opts.count("solution_convergence"))
-        {
-            _solution_convergence = opts.at("solution_convergence");
-            _qp_opts.erase("solution_convergence");
-        }
+        parseOptions();
 
         _variable_trj.resize(_max_iter+1, casadi::DM(x.rows(), x.columns()));
 
         _hessian_computation_time.reserve(_max_iter);
         _qp_computation_time.reserve(_max_iter);
+
+    }
+
+    void parseOptions()
+    {
+
+        if(_qp_opts.count("max_iter"))
+        {
+            _max_iter = _qp_opts.at("max_iter");
+            _qp_opts.erase("max_iter");
+        }
+
+        if(_qp_opts.count("reinitialize_qpsolver"))
+        {
+            _reinitialize_qp_solver = _qp_opts.at("reinitialize_qpsolver");
+            _qp_opts.erase("reinitialize_qpsolver");
+        }
+
+        if(_qp_opts.count("constraint_violation_tolerance"))
+        {
+            _constraint_violation_tolerance = _qp_opts.at("constraint_violation_tolerance");
+            _qp_opts.erase("constraint_violation_tolerance");
+        }
+
+        if(_qp_opts.count("_merit_derivative_tolerance"))
+        {
+            _merit_derivative_tolerance = _qp_opts.at("_merit_derivative_tolerance");
+            _qp_opts.erase("_merit_derivative_tolerance");
+        }
+
+        if(_qp_opts.count("solution_convergence"))
+        {
+            _solution_convergence = _qp_opts.at("solution_convergence");
+            _qp_opts.erase("solution_convergence");
+        }
 
     }
 
@@ -211,7 +216,7 @@ public:
         _variable_trj[0] = x0_;
         _iteration_to_solve = 0;
 
-        for(unsigned int k = 0; k < _max_iter; ++k)
+        for(unsigned int k = 0; k < _max_iter; ++k) ///BREAK CRITERIA #1
         {
             //1. Cost function is linearized around actual x0
             eval(_f, 0, _sol, false); // cost function
@@ -270,10 +275,6 @@ public:
             casadi_utils::toEigen(_conic_dict.output["lam_a"], _lam_a);
             casadi_utils::toEigen(_conic_dict.output["lam_x"], _lam_x);
 
-            /// BREAK CRITERIA
-            if(_dx.norm() <= _solution_convergence)
-                break;
-
 
             casadi_utils::toEigen(x0_, _sol);
             Eigen::VectorXd dx;
@@ -294,6 +295,15 @@ public:
             {
                 _iter_cb(_fpr);
             }
+
+            ///BREAK CRITERIA #2
+            if(fabs(_fpr.constraint_violation) <= _constraint_violation_tolerance &&
+               fabs(_fpr.merit_der) <= _merit_derivative_tolerance)
+                break;
+
+            /// BREAK CRITERIA #3
+            if(_dx.norm() <= _solution_convergence)
+                break;
 
         }
 
@@ -571,6 +581,19 @@ private:
         cf.call(dict.input, dict.output);
     }
 
+    bool checkIsStationary(const Eigen::VectorXd& grad, const double tol)
+    {
+        for(unsigned int i = 0; i < grad.size(); ++i)
+        {
+            if (fabs(grad[i]) > tol)
+            {
+                    std::cout<<"grad[i]: "<<grad[i]<<std::endl;
+                    return false;
+            }
+        }
+        return true;
+    }
+
 
 
 
@@ -617,7 +640,6 @@ private:
     std::vector<double> _hessian_computation_time;
     std::vector<double> _qp_computation_time;
 
-    double _solution_convergence;
 
     unsigned int _iteration_to_solve;
 
@@ -625,6 +647,10 @@ private:
     CallbackType _iter_cb;
 
     double _beta;
+
+    double _solution_convergence;
+    double _constraint_violation_tolerance;
+    double _merit_derivative_tolerance;
 
 };
 

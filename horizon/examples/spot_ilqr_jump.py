@@ -161,9 +161,9 @@ opts = {'ipopt.tol': 0.001,
 
 opts['warm_start_primal'] = True
 opts['warm_start_dual'] = True
-opts['osqp.polish'] = True
+opts['osqp.polish'] = True # without this
+opts['osqp.delta'] = 1e-9 # and this, it does not converge!
 opts['osqp.verbose'] = False
-opts['solution_convergence'] = 1.
 
 solver = solver.Solver.make_solver(solver_type, prb, dt, opts)
 solver.setAlphaMin(0.01)
