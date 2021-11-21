@@ -22,8 +22,6 @@ PYBIND11_MODULE(pysqp, m) {
             .def("getHessianComputationTime", &SQPGaussNewton<casadi::SX>::getHessianComputationTime)
             .def("getQPComputationTime", &SQPGaussNewton<casadi::SX>::getQPComputationTime)
             .def("printConicOptions", &SQPGaussNewton<casadi::SX>::printConicOptions)
-            .def("getQPOasesOptionsMPC", get_qpoases_options_mpc)
-            .def("getQPOasesOptionsReliable", get_qpoases_options_reliable)
             .def("setIterationCallback", &SQPGaussNewton<casadi::SX>::setIterationCallback)
             ;
 
@@ -45,8 +43,6 @@ PYBIND11_MODULE(pysqp, m) {
             .def("getHessianComputationTime", &SQPGaussNewton<casadi::MX>::getHessianComputationTime)
             .def("getQPComputationTime", &SQPGaussNewton<casadi::MX>::getQPComputationTime)
             .def("printConicOptions", &SQPGaussNewton<casadi::MX>::printConicOptions)
-            .def("getQPOasesOptionsMPC", get_qpoases_options_mpc)
-            .def("getQPOasesOptionsReliable", get_qpoases_options_reliable)
             .def("setIterationCallback", &SQPGaussNewton<casadi::MX>::setIterationCallback)
             ;
 

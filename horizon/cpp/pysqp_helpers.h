@@ -61,9 +61,14 @@ bool setOption(const std::string& key, const std::string& solver_key, py::handle
 bool checkOptions(const std::string& key, py::handle& value, casadi::Dict& dict)
 {
     // -- sqp options --//
+    if(setOption    <double>           (key,   "beta",                         value, dict)) return true;
+    if(setOption    <double>          (key,   "alpha_min",            value, dict)) return true;
     if(setOption    <int>           (key,   "max_iter",                         value, dict)) return true;
     if(setOption    <bool>          (key,   "reinitialize_qpsolver",            value, dict)) return true;
+    if(setOption    <double>        (key,   "merit_derivative_tolerance",       value, dict)) return true;
+    if(setOption    <double>        (key,   "constraint_violation_tolerance",   value, dict)) return true;
     if(setOption    <double>        (key,   "solution_convergence",             value, dict)) return true;
+    if(setOption    <bool>          (key,   "use_golden_ratio_update",          value, dict)) return true;
     // -- qpoases options --//
     if(setOption    <bool>          (key,   "sparse",                           value, dict)) return true;
     if(setOption    <bool>          (key,   "schur",                            value, dict)) return true;

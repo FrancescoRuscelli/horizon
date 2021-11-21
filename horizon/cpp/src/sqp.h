@@ -12,6 +12,8 @@
 
 #include "ilqr.h"
 
+#define GR 1.61803398875
+
 namespace horizon{
 
 typedef Eigen::Ref<const Eigen::VectorXd> VecConstRef;
@@ -70,9 +72,9 @@ public:
         _name(name), _qp_solver(qp_solver),
         _max_iter(1000),
         _reinitialize_qp_solver(false),
-        _opts(opts), _qp_opts(opts),
+        _qp_opts(opts),
         _alpha(1.), _beta(1e-4), _solution_convergence(1e-6),_alpha_min(1e-3),
-        _constraint_violation_tolerance(1e-6), _merit_derivative_tolerance(1e-6),
+        _constraint_violation_tolerance(1e-6), _merit_derivative_tolerance(1e-6), _use_gr(false),
         _fpr(0, 0, 0) ///TODO: this needs to be improved!
     {
 
@@ -118,9 +120,9 @@ public:
         _name(name), _qp_solver(qp_solver),
         _max_iter(1000),
         _reinitialize_qp_solver(false),
-        _opts(opts), _qp_opts(opts),
+        _qp_opts(opts),
         _alpha(1.), _beta(1e-4), _solution_convergence(1e-6), _alpha_min(1e-3),
-        _constraint_violation_tolerance(1e-6), _merit_derivative_tolerance(1e-6),
+        _constraint_violation_tolerance(1e-6), _merit_derivative_tolerance(1e-6), _use_gr(false),
         _fpr(0, 0, 0) ///TODO: this needs to be improved!
     {
         _f = casadi::Function("f", {x}, {f}, {"x"}, {"f"});
@@ -141,6 +143,17 @@ public:
 
     void parseOptions()
     {
+        if(_qp_opts.count("beta"))
+        {
+            _beta = _qp_opts.at("beta");
+            _qp_opts.erase("beta");
+        }
+
+        if(_qp_opts.count("alpha_min"))
+        {
+            _alpha_min = _qp_opts.at("alpha_min");
+            _qp_opts.erase("alpha_min");
+        }
 
         if(_qp_opts.count("max_iter"))
         {
@@ -160,16 +173,22 @@ public:
             _qp_opts.erase("constraint_violation_tolerance");
         }
 
-        if(_qp_opts.count("_merit_derivative_tolerance"))
+        if(_qp_opts.count("merit_derivative_tolerance"))
         {
-            _merit_derivative_tolerance = _qp_opts.at("_merit_derivative_tolerance");
-            _qp_opts.erase("_merit_derivative_tolerance");
+            _merit_derivative_tolerance = _qp_opts.at("merit_derivative_tolerance");
+            _qp_opts.erase("merit_derivative_tolerance");
         }
 
         if(_qp_opts.count("solution_convergence"))
         {
             _solution_convergence = _qp_opts.at("solution_convergence");
             _qp_opts.erase("solution_convergence");
+        }
+
+        if(_qp_opts.count("use_golden_ratio_update"))
+        {
+            _use_gr = _qp_opts.at("use_golden_ratio_update");
+            _qp_opts.erase("use_golden_ratio_update");
         }
 
     }
@@ -232,8 +251,8 @@ public:
             //2. We compute Gauss-Newton Hessian approximation and gradient function
             auto tic = std::chrono::high_resolution_clock::now();
             _H.resize(_J.cols(), _J.cols());
-            //_H.selfadjointView<Eigen::Lower>().rankUpdate(_J.transpose());
-            _H = _J.transpose() * _J;
+            _H.selfadjointView<Eigen::Lower>().rankUpdate(_J.transpose());
+            //_H = _J.transpose() * _J;
             auto toc = std::chrono::high_resolution_clock::now();
             _hessian_computation_time.push_back((toc-tic).count()*1E-9);
 
@@ -409,7 +428,10 @@ public:
             if(accepted)
                 break;
 
-            _alpha *= 0.5;
+            if(_use_gr)
+                _alpha *= 1./GR;
+            else
+                _alpha *= 0.5;
         }
 
         if(!accepted)
@@ -616,7 +638,6 @@ private:
 
     casadi::DMDict _solution;
 
-    casadi::Dict _opts;
     casadi::Dict _qp_opts;
 
     casadi::DMVector _variable_trj;
@@ -651,6 +672,8 @@ private:
     double _solution_convergence;
     double _constraint_violation_tolerance;
     double _merit_derivative_tolerance;
+
+    bool _use_gr;
 
 };
 
