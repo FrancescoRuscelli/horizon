@@ -101,6 +101,7 @@ public:
 
         _hessian_computation_time.reserve(_max_iter);
         _qp_computation_time.reserve(_max_iter);
+        _line_search_time.reserve(_max_iter);
     }
 
     /**
@@ -138,7 +139,7 @@ public:
 
         _hessian_computation_time.reserve(_max_iter);
         _qp_computation_time.reserve(_max_iter);
-
+        _line_search_time.reserve(_max_iter);
     }
 
     void parseOptions()
@@ -283,7 +284,19 @@ public:
             _conic_dict.input["uba"] = ubg - g_;
             _conic_dict.input["lbx"] = lbx - x0_;
             _conic_dict.input["ubx"] = ubx - x0_;
-            _conic_dict.input["x0"] = x0_;
+//            _conic_dict.input["x0"] = x0_;
+//            if(_lam_a.size() > 0)
+//            {
+//                casadi::DM lama;
+//                casadi_utils::toCasadiMatrix(_lam_a, lama);
+//                _conic_dict.input["lam_a0"] = lama;
+//            }
+//            if(_lam_x.size() > 0)
+//            {
+//                casadi::DM lamx;
+//                casadi_utils::toCasadiMatrix(_lam_x, lamx);
+//                _conic_dict.input["lam_x0"] = lamx;
+//            }
 
             tic = std::chrono::high_resolution_clock::now();
             _conic->call(_conic_dict.input, _conic_dict.output);
@@ -298,7 +311,11 @@ public:
             casadi_utils::toEigen(x0_, _sol);
             Eigen::VectorXd dx;
             casadi_utils::toEigen(_conic_dict.output["x"], dx);
-            if(lineSearch(_sol, dx, _lam_a, _lam_x, lbg, ubg, lbx, ubx))
+            tic = std::chrono::high_resolution_clock::now();
+            bool success = lineSearch(_sol, dx, _lam_a, _lam_x, lbg, ubg, lbx, ubx);
+            toc = std::chrono::high_resolution_clock::now();
+            _line_search_time.push_back((toc-tic).count()*1E-9);
+            if(success)
             {
                 casadi_utils::toCasadiMatrix(_sol, x0_);
                 // store trajectory
@@ -558,6 +575,11 @@ public:
         return _qp_computation_time;
     }
 
+    const std::vector<double>& getLineSearchComputationTime() const
+    {
+        return _line_search_time;
+    }
+
     void setBeta(const double beta)
     {
         _beta = beta;
@@ -660,6 +682,7 @@ private:
 
     std::vector<double> _hessian_computation_time;
     std::vector<double> _qp_computation_time;
+    std::vector<double> _line_search_time;
 
 
     unsigned int _iteration_to_solve;

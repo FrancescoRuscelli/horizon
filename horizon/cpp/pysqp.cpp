@@ -21,6 +21,7 @@ PYBIND11_MODULE(pysqp, m) {
             .def("getConstraintNormIterations", &SQPGaussNewton<casadi::SX>::getConstraintNormIterations)
             .def("getHessianComputationTime", &SQPGaussNewton<casadi::SX>::getHessianComputationTime)
             .def("getQPComputationTime", &SQPGaussNewton<casadi::SX>::getQPComputationTime)
+            .def("getLineSearchComputationTime", &SQPGaussNewton<casadi::SX>::getLineSearchComputationTime)
             .def("printConicOptions", &SQPGaussNewton<casadi::SX>::printConicOptions)
             .def("setIterationCallback", &SQPGaussNewton<casadi::SX>::setIterationCallback)
             ;
@@ -42,6 +43,7 @@ PYBIND11_MODULE(pysqp, m) {
             .def("getConstraintNormIterations", &SQPGaussNewton<casadi::MX>::getConstraintNormIterations)
             .def("getHessianComputationTime", &SQPGaussNewton<casadi::MX>::getHessianComputationTime)
             .def("getQPComputationTime", &SQPGaussNewton<casadi::MX>::getQPComputationTime)
+            .def("getLineSearchComputationTime", &SQPGaussNewton<casadi::MX>::getLineSearchComputationTime)
             .def("printConicOptions", &SQPGaussNewton<casadi::MX>::printConicOptions)
             .def("setIterationCallback", &SQPGaussNewton<casadi::MX>::setIterationCallback)
             ;

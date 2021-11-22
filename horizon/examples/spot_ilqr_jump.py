@@ -210,7 +210,8 @@ print(f'solved in {elapsed} s')
 
 if solver_type == 'gnsqp':
     print(f"mean Hessian computation time: {sum(solver.getHessianComputationTime())/len(solver.getHessianComputationTime())}")
-    print(f"meabnb QP computation time: {sum(solver.getQPComputationTime())/len(solver.getQPComputationTime())}")
+    print(f"mean QP computation time: {sum(solver.getQPComputationTime())/len(solver.getQPComputationTime())}")
+    print(f"mean Line Search computation time: {sum(solver.getLineSearchComputationTime()) / len(solver.getLineSearchComputationTime())}")
 
 
 try:

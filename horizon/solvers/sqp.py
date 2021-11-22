@@ -158,6 +158,9 @@ class GNSQPSolver(Solver):
     def getQPComputationTime(self):
         return self.solver.getQPComputationTime()
 
+    def getLineSearchComputationTime(self):
+        return self.solver.getLineSearchComputationTime()
+
     def getObjectiveIterations(self):
         return self.solver.getObjectiveIterations()
 
