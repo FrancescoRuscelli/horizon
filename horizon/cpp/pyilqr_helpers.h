@@ -32,17 +32,6 @@ auto construct(py::object fdyn, int N, IterativeLQR::OptionDict opt)
     return std::make_unique<IterativeLQR>(to_cpp(fdyn), N, opt);
 }
 
-auto set_inter_cost_wrapper(IterativeLQR& self, std::vector<py::object> flist)
-{
-    std::vector<casadi::Function> flist_cpp;
-    for(auto pyfn : flist)
-    {
-        flist_cpp.push_back(to_cpp(pyfn));
-    }
-
-    self.setIntermediateCost(flist_cpp);
-}
-
 auto set_inter_cost_wrapper_single(IterativeLQR& self, std::vector<int> k, py::object f)
 {
     self.setCost(k, to_cpp(f));

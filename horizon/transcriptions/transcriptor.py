@@ -2,7 +2,7 @@ import casadi as cs
 import horizon.transcriptions.integrators as integ
 from abc import ABC
 from horizon.problem import Problem
-from horizon.variables import AbstractVariable
+from horizon.variables import SingleVariable, Variable
 
 class Transcriptor(ABC):
 
@@ -62,7 +62,7 @@ class Transcriptor(ABC):
         self.input_prev = cs.vertcat(*input_prev_list)
 
         # todo if the dt is a variable, then compute also the dt_prev, which is used by the RK4 integrator
-        if isinstance(self.dt, AbstractVariable):
+        if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
             self.dt_prev = self.dt.getVarOffset(-1)
 
 

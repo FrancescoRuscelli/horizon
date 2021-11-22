@@ -20,8 +20,6 @@ except ImportError:
     do_replay = False
 
 
-horizon_ros_utils.roslaunch("horizon_examples", "cart_pole.launch")
-time.sleep(3.)
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
@@ -38,7 +36,7 @@ print("nv: ", nv)
 tf = 5.0  # [s]
 ns = 100  # number of shooting nodes
 dt = tf/ns
-use_ms = False
+use_ms = True
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -93,8 +91,15 @@ tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 iv = prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
+tic = time.time()
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
+toc = time.time()
+print('time elapsed loading:', toc - tic)
+
+tic = time.time()
 solver.solve()
+toc = time.time()
+print('time elapsed solving:', toc - tic)
 solution = solver.getSolutionDict()
 q_hist = solution["q"]
 
