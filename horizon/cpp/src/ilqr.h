@@ -194,8 +194,10 @@ private:
 
     enum DecompositionType
     {
-        Ldlt, Qr, Lu
+        Ldlt, Qr, Lu, Cod, Svd
     };
+
+    static DecompositionType str_to_decomp_type(const std::string& dt_str);
 
     const int _nx;
     const int _nu;
@@ -210,7 +212,8 @@ private:
     bool _closed_loop_forward_pass;
     std::string _codegen_workdir;
     bool _codegen_enabled;
-    DecompositionType _decomp_type;
+    DecompositionType _kkt_decomp_type;
+    DecompositionType _constr_decomp_type;
 
     ParameterMapPtr _param_map;
 

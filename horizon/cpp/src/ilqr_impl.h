@@ -214,7 +214,9 @@ struct IterativeLQR::Temporaries
     Eigen::VectorXd hf;
 
     // cod of constraint
-    Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod;
+    Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> ccod;
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> cqr;
+    Eigen::BDCSVD<Eigen::MatrixXd> csvd;
     Eigen::MatrixXd codQ;
 
     // quadratized value function

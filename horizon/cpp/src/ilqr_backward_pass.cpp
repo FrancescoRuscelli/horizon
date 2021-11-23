@@ -117,7 +117,7 @@ void IterativeLQR::backward_pass_iter(int i)
     TIC(solve_kkt_inner);
     THROW_NAN(K);
     THROW_NAN(kx0);
-    switch(_decomp_type)
+    switch(_kkt_decomp_type)
     {
         case Lu:
             tmp.lu.compute(K);
@@ -133,6 +133,10 @@ void IterativeLQR::backward_pass_iter(int i)
             tmp.ldlt.compute(K);
             u_lam = tmp.ldlt.solve(kx0);
             break;
+
+        default:
+             throw std::invalid_argument("kkt decomposition supports only qr, lu, or ldlt");
+
     }
 
     THROW_NAN(u_lam);
@@ -246,7 +250,9 @@ IterativeLQR::FeasibleConstraint IterativeLQR::handle_constraints(int i)
     auto& Cf = tmp.Cf;
     auto& Df = tmp.Df;
     auto& hf = tmp.hf;
-    auto& cod = tmp.cod;
+    auto& cod = tmp.ccod;
+    auto& qr = tmp.cqr;
+    auto& svd = tmp.csvd;
 
     // ..backward pass result
     auto& res = _bp_res[i];
@@ -280,9 +286,32 @@ IterativeLQR::FeasibleConstraint IterativeLQR::handle_constraints(int i)
 
     // cod of D
     TIC(constraint_cod_inner);
-    cod.compute(_constraint_to_go->D());
-    int rank = cod.rank();
-    tmp.codQ = cod.matrixQ();
+    int rank = -1;
+    switch(_constr_decomp_type)
+    {
+        case Cod:
+            cod.compute(D);
+            rank = cod.rank();
+            tmp.codQ = cod.matrixQ();
+            break;
+
+        case Qr:
+            qr.compute(D);
+            rank = qr.rank();
+            tmp.codQ = qr.matrixQ();
+            break;
+
+        case Svd:
+            svd.compute(D, Eigen::ComputeFullU);
+            rank = svd.rank();
+            tmp.codQ = svd.matrixU();
+            break;
+
+       default:
+            throw std::invalid_argument("constraint decomposition supports only qr, svd, or cod");
+
+    }
+
     MatConstRef codQ1 = tmp.codQ.leftCols(rank);
     MatConstRef codQ2 = tmp.codQ.rightCols(nc - rank);
     TOC(constraint_cod_inner);

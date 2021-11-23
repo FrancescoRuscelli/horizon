@@ -88,23 +88,11 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _codegen_workdir = value_or<std::string>(opt, "ilqr.codegen_workdir", "/tmp");
     _codegen_enabled = value_or(opt, "ilqr.codegen_enabled", 0);
 
-    auto decomp_type_str = value_or<std::string>(opt, "ilqr.decomp_type", "lu");
-    if(decomp_type_str == "ldlt")
-    {
-        _decomp_type = Ldlt;
-    }
-    else if (decomp_type_str == "qr")
-    {
-        _decomp_type = Qr;
-    }
-    else if (decomp_type_str == "lu")
-    {
-        _decomp_type = Lu;
-    }
-    else
-    {
-        throw std::invalid_argument("invalid value for option ilqr.decomp_type: select ldlt, qr, lu'");
-    }
+    auto decomp_type_str = value_or<std::string>(opt, "ilqr.constr_decomp_type", "qr");
+    _constr_decomp_type = str_to_decomp_type(decomp_type_str);
+
+    decomp_type_str = value_or<std::string>(opt, "ilqr.kkt_decomp_type", "lu");
+    _kkt_decomp_type = str_to_decomp_type(decomp_type_str);
 
     // set timer callback
     on_timer_toc = [this](const char * name, double usec)
@@ -453,6 +441,34 @@ void IterativeLQR::set_default_cost()
 
     setCost(all_indices, l);
     setFinalCost(lf);
+}
+
+IterativeLQR::DecompositionType IterativeLQR::str_to_decomp_type(const std::string &dt_str)
+{
+    if(dt_str == "ldlt")
+    {
+        return Ldlt;
+    }
+    else if(dt_str == "qr")
+    {
+        return Qr;
+    }
+    else if(dt_str == "lu")
+    {
+        return Lu;
+    }
+    else if(dt_str == "cod")
+    {
+        return Lu;
+    }
+    else if(dt_str == "svd")
+    {
+        return Svd;
+    }
+    else
+    {
+        throw std::invalid_argument("invalid value for option ilqr.decomp_type: select ldlt, qr, lu'");
+    }
 }
 
 VecConstRef IterativeLQR::state(int i) const
