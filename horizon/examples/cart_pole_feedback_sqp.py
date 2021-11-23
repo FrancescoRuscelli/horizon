@@ -98,7 +98,7 @@ else:
 
 
 opts = dict()
-qp_solver = "qpoases"
+qp_solver = "osqp"
 
 opts['gnsqp.qp_solver'] = qp_solver
 
