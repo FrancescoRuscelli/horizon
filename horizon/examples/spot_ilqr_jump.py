@@ -16,7 +16,7 @@ filename, _ = os.path.splitext(filename_with_ext)
 ms = mat_storer.matStorer(f'{filename}.mat')
 
 # options
-solver_type = 'gnsqp'
+solver_type = 'ilqr'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
