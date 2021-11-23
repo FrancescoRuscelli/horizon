@@ -1,5 +1,7 @@
 import casadi as cs
 from horizon.utils import utils, kin_dyn, mat_storer
+import numpy as np
+import time
 
 def RK4(dae, opts=None, casadi_type=cs.SX):
 
@@ -40,29 +42,127 @@ def RK4(dae, opts=None, casadi_type=cs.SX):
     f = cs.Function('F_RK', [X0_RK, U_RK, DT_RK], [X_RK, Q_RK], ['x0', 'p', 'time'], ['xf', 'qf'])
   return f
 
+# ==============================================================
+#
 q = cs.SX.sym("q", 1)
 qdot = cs.SX.sym("qdot", 1)
 qddot = cs.SX.sym("qddot", 1)
 
 # Creates double integrator
-x, xdot = utils.double_integrator(q, qdot, qddot)
+x = cs.vertcat(q, qdot)
+xdot = cs.vertcat(qdot, qddot)
 
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': 1}
+integrator = RK4(dae, opts=dict(tf=0.01))
+N = 10
 
-f = RK4(dae, opts=dict(tf=0.01))
-N = 4
+g_list = list()
+w_list = list()
 
-for i in range(N):
-  q_impl = q = cs.SX.sym(f"q_{i}", 1)
-  qdot_impl = q = cs.SX.sym(f"q_{i}", 1)
-  qddot_impl = q = cs.SX.sym(f"q_{i}", 1)
+for i in range(N+1):
+  q_i = cs.SX.sym(f"q_{i}", 1)
+  qdot_i = cs.SX.sym(f"qdot_{i}", 1)
+  qddot_i = cs.SX.sym(f"qddot_{i}", 1)
+
+  w_list.append(q_i)
+  w_list.append(qdot_i)
+  w_list.append(qddot_i)
+
+  x_prev_i = cs.vertcat(q_i, qdot_i)
+  x_int = integrator(x0=x_prev_i, p=qddot_i)
+  g_list.append(x_int["xf"] - x_prev_i)
+
+for elem in g_list:
+  print(elem)
 
 
-F = f.map(N)
-print(F)
+w0 = np.zeros(3 * N)
+lbw = np.ones(3 * N)
+ubw = np.ones(3 * N)
 
-F = f.map(N,"thread",2)
-print(F)
+lbg = - 100 * np.ones(2 * N)
+ubg = 100 * np.ones(2 * N)
+
+w = cs.vertcat(*w_list)
+g = cs.vertcat(*g_list)
+
+
+prob_dict = {'f': 1, 'x': w, 'g': g}
+opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000}
+# create solver from prob
+tic = time.time()
+solver = cs.nlpsol('solver', 'ipopt', prob_dict, opts)
+toc = time.time()
+print('time elapsed:', toc-tic)
+
+sol = solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+
+print(sol)
+exit()
+# ======================================================
+# ======================================================
+# ======================================================
+n = 1
+
+q = cs.SX.sym("q", n)
+qdot = cs.SX.sym("qdot", n)
+qddot = cs.SX.sym("qddot", n)
+
+# Creates double integrator
+x = cs.vertcat(q, qdot)
+xdot = cs.vertcat(qdot, qddot)
+
+dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': 1}
+integrator = RK4(dae, opts=dict(tf=0.01))
+N = 3
+
+g_list = list()
+w_list = list()
+
+int_map = integrator.map(N, 'thread', 4)
+
+q_i = cs.SX.sym("q_i", n, N)
+qdot_i = cs.SX.sym("qdot_i", n, N)
+qddot_i = cs.SX.sym("qddot_i", n, N)
+
+
+X = cs.vertcat(q_i, qdot_i)
+U = qddot_i
+
+X_int = int_map(X, U)
+g = X_int[0] - X
+
+print(g[:, 0])
+
+w = cs.veccat(q_i, qdot_i, qddot_i)
+prob_dict = {'f': 1, 'x': w, 'g': cs.vec(g)}
+
+opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000}
+# create solver from prob
+tic = time.time()
+solver = cs.nlpsol('solver', 'ipopt', prob_dict, opts)
+toc = time.time()
+print('time elapsed:', toc-tic)
+exit()
+
+w0 = np.zeros(3 * N)
+lbw = np.ones(3 * N)
+ubw = np.ones(3 * N)
+
+lbg = - 100 * np.ones(2 * N)
+ubg = 100 * np.ones(2 * N)
+
+sol = solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+
+print(sol)
+# for elem in g:
+#   print(elem)
+
+# F = f.map(N)
+# print(F)
+
+# F = f.map(N, "thread", 2)
+# print(F)
 
 # Xn = F(X, )
 # ======================================

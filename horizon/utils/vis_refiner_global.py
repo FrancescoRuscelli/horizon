@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 
 
-ms = mat_storer.matStorer('../examples/spot/spot_jump_refining_hard.mat')
+ms = mat_storer.matStorer('../examples/spot/spot_jump_refined_global.mat')
 solution_refined = ms.load()
 dt_res = solution_refined['dt_res'][0][0]
 n_nodes_refined = solution_refined['n_nodes'][0][0]
