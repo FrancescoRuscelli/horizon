@@ -51,6 +51,7 @@ qddot = prb.createInputVariable("qddot", nv)
 # Creates double integrator
 x, xdot = utils.double_integrator(q, qdot, qddot)
 prb.setDynamics(xdot)
+prb.setDt(dt)
 
 # Limits
 q_min = [-0.5, -2.*np.pi]
@@ -92,9 +93,17 @@ iv = prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-t
 
 # Creates problem
 tic = time.time()
-solver = solver.Solver.make_solver('ipopt', prb, dt, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
+solver = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
 toc = time.time()
 print('time elapsed loading:', toc - tic)
+
+# new_nodes = 100
+# prb.setNNodes(new_nodes)
+#
+# for cnsrt_name, cnsrt_fun in prb.getConstraints().items():
+#     print(cnsrt_fun.getNodes())
+#
+# exit()
 
 tic = time.time()
 solver.solve()

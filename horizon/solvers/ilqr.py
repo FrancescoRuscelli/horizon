@@ -16,12 +16,11 @@ from matplotlib import pyplot as plt
 class SolverILQR(Solver):
     
     def __init__(self, 
-                 prb: Problem, 
-                 dt: float, 
+                 prb: Problem,
                  opts: Dict = None) -> None:
 
         # init base class
-        super().__init__(prb, dt, opts)
+        super().__init__(prb, opts)
 
         # save max iter if any
         self.max_iter = self.opts.get('max_iter', 10)
@@ -32,7 +31,7 @@ class SolverILQR(Solver):
         # get integrator and compute discrete dynamics in the form (x, u) -> f
         integrator_name = self.opts.get('ilqr.integrator', 'EULER')
         dae = {'ode': self.xdot, 'x': self.x, 'p': self.u, 'quad': 0}
-        self.int = integrators.__dict__[integrator_name](dae, {'tf': dt})
+        self.int = integrators.__dict__[integrator_name](dae, {'tf': self.dt})
         self.dyn = cs.Function('f', {'x': self.x, 'u': self.u, 'f': self.int(self.x, self.u)[0]},
                                ['x', 'u'], ['f'])
 

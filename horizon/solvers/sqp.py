@@ -13,9 +13,9 @@ import casadi as cs
 
 class GNSQPSolver(Solver):
 
-    def __init__(self, prb: Problem, dt: float, opts: Dict, qp_solver_plugin: str) -> None:
+    def __init__(self, prb: Problem, opts: Dict, qp_solver_plugin: str) -> None:
 
-        super().__init__(prb, dt, opts=opts)
+        super().__init__(prb, opts=opts)
 
         self.solution: Dict[str:np.array] = None
         self.prb = prb

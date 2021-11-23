@@ -5,9 +5,9 @@ import casadi as cs
 
 class BlockSqpSolver(NlpsolSolver):
 
-    def __init__(self, prb: Problem, dt: float, opts: Dict) -> None:
+    def __init__(self, prb: Problem, opts: Dict) -> None:
         
-        super().__init__(prb, dt, opts=opts, solver_plugin='blocksqp')
+        super().__init__(prb, opts=opts, solver_plugin='blocksqp')
 
     def configure_rti(self) -> bool:
         rti_opts = {

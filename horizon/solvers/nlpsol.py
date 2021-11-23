@@ -7,9 +7,9 @@ import pprint
 
 class NlpsolSolver(Solver):
     
-    def __init__(self, prb: Problem, dt: float, opts: Dict, solver_plugin: str) -> None:
+    def __init__(self, prb: Problem, opts: Dict, solver_plugin: str) -> None:
         
-        super().__init__(prb, dt, opts=opts)
+        super().__init__(prb, opts=opts)
         
         self.var_solution: Dict[str:np.array] = None
         self.cnstr_solution: Dict[str:np.array] = None
@@ -369,7 +369,7 @@ if __name__ == '__main__':
     xdot = cs.vertcat(y, u)
     # xdot = cs.vertcat(u)
     prob.setDynamics(xdot)
-    sol = NlpsolSolver(prb=prob, dt=dt, opts=dict(), solver_plugin='ipopt')
+    sol = NlpsolSolver(prb=prob, opts=dict(), solver_plugin='ipopt')
     sol.solve()
 
 

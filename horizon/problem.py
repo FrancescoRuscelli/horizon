@@ -55,6 +55,7 @@ class Problem:
         self.state_aggr = sv.StateAggregate()
         self.input_aggr = sv.InputAggregate()
         self.state_der: cs.SX = None
+        self.dt = None
 
     def createStateVariable(self, name: str, dim: int) -> sv.StateVariable:
         """
@@ -215,6 +216,27 @@ class Problem:
 
     def resetDynamics(self):
         self.state_der = None
+
+    def setDt(self, dt):
+        """
+        Setter of the system dt used in the optimization problem.
+
+        Args:
+            dt: dt of the system
+        """
+        self.dt = dt
+
+    def getDt(self):
+        """
+        Getter of the system dt used in the optimization problem.
+
+        Returns:
+            instance of the dt
+
+        """
+        if self.dt is None:
+            raise ValueError('dt not defined, have you called setDt?')
+        return self.dt
 
     def setInitialState(self, x0: Iterable):
         self.getState().setBounds(lb=x0, ub=x0, nodes=0)
