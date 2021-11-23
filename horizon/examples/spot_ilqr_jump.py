@@ -16,7 +16,7 @@ filename, _ = os.path.splitext(filename_with_ext)
 ms = mat_storer.matStorer(f'{filename}.mat')
 
 # options
-solver_type = 'gnsqp'
+solver_type = 'ilqr'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
@@ -153,7 +153,7 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.closed_loop_forward_pass': True,
         'ilqr.line_search_accept_ratio': 1e-9,
         'ilqr.svd_threshold': 1e-12,
-        'ilqr.decomp_type': 'qr',
+        'ilqr.decomp_type': 'lu',
         'ilqr.codegen_enabled': False,
         'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump',
         'gnsqp.qp_solver': 'osqp'

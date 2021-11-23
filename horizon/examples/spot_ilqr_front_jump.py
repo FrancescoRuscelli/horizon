@@ -22,7 +22,7 @@ transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
 tf = 2.0
-n_nodes = 20
+n_nodes = 100
 ilqr_plot_iter = False
 t_jump = (1.0, 3)
 
