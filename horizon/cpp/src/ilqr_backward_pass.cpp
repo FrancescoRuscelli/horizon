@@ -46,24 +46,27 @@ void IterativeLQR::backward_pass_iter(int i)
     TIC(backward_pass_inner);
 
     // constraint handling
-    auto [nz, cdyn, ccost] = handle_constraints(i);
+    // this will filter out any constraint that can't be
+    // fullfilled with the current u_k, and needs to be
+    // propagated to the previous time step
+    auto constr_feas = handle_constraints(i);
 
-    const bool has_constraints = (nz != _nu);
-
-    // note: after handling constraints, we're actually optimizing an
-    // auxiliary input z, where the original input u = lc + Lc*x + Lz*z
+    // num of feasible constraints
+    const int nc = constr_feas.h.size();
 
     // intermediate cost
-    const auto r = ccost.r;
-    const auto q = ccost.q;
-    const auto Q = ccost.Q;
-    const auto R = ccost.R;
-    const auto P = ccost.P;
+    const auto& cost = _cost[i];
+    const auto r = cost.r();
+    const auto q = cost.q();
+    const auto& Q = cost.Q();
+    const auto& R = cost.R();
+    const auto& P = cost.P();
 
     // dynamics
-    const auto A = cdyn.A;
-    const auto B = cdyn.B;
-    const auto d = cdyn.d;
+    const auto& dyn = _dyn[i];
+    const auto& A = dyn.A();
+    const auto& B = dyn.B();
+    const auto& d = dyn.d;
 
     // ..value function
     const auto& value_next = _value[i+1];
@@ -75,16 +78,12 @@ void IterativeLQR::backward_pass_iter(int i)
 
     // ..workspace
     auto& tmp = _tmp[i];
+    auto& K = tmp.kkt;
+    auto& kx0 = tmp.kx0;
+    auto& u_lam = tmp.u_lam;
 
-    // mapping to original input u
-    const auto& lc = tmp.lc;
-    const auto& Lc = tmp.Lc;
-    const auto& Bz = tmp.Bz;
-
-    // components of next node's value function (as a function of
-    // current state and control via the dynamics)
-    // note: first compute state-only components, since after constraints
-    // there might be no input dof to optimize at all!
+    // components of next node's value function
+    TIC(form_value_fn_inner);
     tmp.s_plus_S_d.noalias() = snext + Snext*d;
     tmp.S_A.noalias() = Snext*A;
 
@@ -92,87 +91,73 @@ void IterativeLQR::backward_pass_iter(int i)
     tmp.Hxx.noalias() = Q + A.transpose()*tmp.S_A;
     tmp.Hxx.diagonal().array() += _hxx_reg;
 
-//    double eig_min_Q = Q.eigenvalues().real().minCoeff();
-//    tmp.Hxx.diagonal().array() -= std::min(eig_min_Q, 0.0)*2.0;
-
-
-    // handle case where nz = 0, i.e. no nullspace left after constraints
-    if(nz == 0)
-    {
-        // save solution
-        auto& res = _bp_res[i];
-        res.Lu = Lc;
-        res.lu = lc;
-        res.Lz.setZero(0, _nx);
-        res.lz.setZero(0);
-
-        // save multipliers
-
-        // save optimal value function
-        auto& value = _value[i];
-        auto& S = value.S;
-        auto& s = value.s;
-        S = tmp.Hxx;
-        s = tmp.hx;
-
-        return;
-    }
-
-    // remaining components of next node's value function (if nz > 0)
+    // remaining components of next node's value function
     tmp.hu.noalias() = r + B.transpose()*tmp.s_plus_S_d;
     tmp.Huu.noalias() = R + B.transpose()*Snext*B;
     tmp.Hux.noalias() = P + B.transpose()*tmp.S_A;
-
-    // set huHux = [hu Hux]
-    tmp.huHux.resize(nz, 1+_nx);
-    tmp.huHux.col(0) = tmp.hu;
-    tmp.huHux.rightCols(_nx) = tmp.Hux;
+    TOC(form_value_fn_inner);
 
     // todo: second-order terms from dynamics
 
-    // solve linear system to get ff and fb terms
-    // after solveInPlace we will have huHux = [-l, -L]
-    TIC(llt_inner);
-    tmp.llt.compute(tmp.Huu);
-    tmp.llt.solveInPlace(tmp.huHux);
-    if(tmp.llt.info() != Eigen::ComputationInfo::Success)
-    {
-        throw HessianIndefinite("backward pass error: hessian not positive");
-    }
-    TOC(llt_inner);
+    // form kkt matrix
+    TIC(form_kkt_inner);
+    K.setZero(nc + _nu, nc + _nu);
+    K.topLeftCorner(_nu, _nu) = tmp.Huu;
+    K.topRightCorner(_nu, nc) = constr_feas.D.transpose();
+    K.bottomLeftCorner(nc, _nu) = constr_feas.D;
 
-    THROW_NAN(tmp.huHux);
+    kx0.resize(_nu + nc, _nx + 1);
+    kx0.leftCols(_nx) << -tmp.Hux,
+                         -constr_feas.C;
+    kx0.col(_nx) << -tmp.hu,
+                    -constr_feas.h;
+    TOC(form_kkt_inner);
+
+    // solve kkt equation
+    TIC(solve_kkt_inner);
+    THROW_NAN(K);
+    THROW_NAN(kx0);
+    switch(_decomp_type)
+    {
+        case Lu:
+            tmp.lu.compute(K);
+            u_lam = tmp.lu.solve(kx0);
+            break;
+
+        case Qr:
+            tmp.qr.compute(K);
+            u_lam = tmp.qr.solve(kx0);
+            break;
+
+        case Ldlt:
+            tmp.ldlt.compute(K);
+            u_lam = tmp.ldlt.solve(kx0);
+            break;
+    }
+
+    THROW_NAN(u_lam);
+    TOC(solve_kkt_inner);
+
 
     // save solution
     auto& res = _bp_res[i];
-    auto& Lz = res.Lz;
-    auto& lz = res.lz;
-    Lz = -tmp.huHux.rightCols(_nx);
-    lz = -tmp.huHux.col(0);
+    auto& Lu = res.Lu;
+    auto& lu = res.lu;
+    auto& lam = res.glam;
+    Lu = u_lam.topLeftCorner(_nu, _nx);
+    lu = u_lam.col(_nx).head(_nu);
+    lam = u_lam.col(_nx).tail(nc);
 
     // save optimal value function
-    TIC(value_fn_inner);
+    TIC(upd_value_fn_inner);
     auto& value = _value[i];
     auto& S = value.S;
     auto& s = value.s;
 
-    S.noalias() = tmp.Hxx + Lz.transpose()*(tmp.Huu*Lz + tmp.Hux) + tmp.Hux.transpose()*Lz;
+    S.noalias() = tmp.Hxx + Lu.transpose()*(tmp.Huu*Lu + tmp.Hux) + tmp.Hux.transpose()*Lu;
     S = 0.5*(S + S.transpose());  // note: symmetrize
-    s.noalias() = tmp.hx + tmp.Hux.transpose()*lz + Lz.transpose()*(tmp.hu + tmp.Huu*lz);
-    TOC(value_fn_inner);
-
-    // map to original input u
-    if(has_constraints)
-    {
-        res.lu.noalias() = lc + Bz*lz;
-        res.Lu.noalias() = Lc + Bz*Lz;
-    }
-    else
-    {
-        res.lu = lz;
-        res.Lu = Lz;
-        tmp.huf = tmp.hu;
-    }
+    s.noalias() = tmp.hx + tmp.Hux.transpose()*lu + Lu.transpose()*(tmp.hu + tmp.Huu*lu);
+    TOC(upd_value_fn_inner);
 
 }
 
@@ -244,24 +229,11 @@ void IterativeLQR::reduce_regularization()
     _hxx_reg /= std::sqrt(_hxx_reg_growth_factor);
 }
 
-IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
+IterativeLQR::FeasibleConstraint IterativeLQR::handle_constraints(int i)
 {
     TIC(handle_constraints_inner);
 
     // some shorthands for..
-
-    // ..value function
-    const auto& value_next = _value[i+1];
-    const auto& Snext = value_next.S;
-    const auto& snext = value_next.s;
-
-    // ..intermediate cost
-    const auto& cost = _cost[i];
-    const auto r = cost.r();
-    const auto q = cost.q();
-    const auto& Q = cost.Q();
-    const auto& R = cost.R();
-    const auto& P = cost.P();
 
     // ..dynamics
     auto& dyn = _dyn[i];
@@ -271,9 +243,10 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
 
     // ..workspace
     auto& tmp = _tmp[i];
-    auto& lc = tmp.lc;
-    auto& Lc = tmp.Lc;
-    auto& Bz = tmp.Bz;
+    auto& Cf = tmp.Cf;
+    auto& Df = tmp.Df;
+    auto& hf = tmp.hf;
+    auto& cod = tmp.cod;
 
     // ..backward pass result
     auto& res = _bp_res[i];
@@ -294,48 +267,41 @@ IterativeLQR::HandleConstraintsRetType IterativeLQR::handle_constraints(int i)
     // no constraint to handle, do nothing
     if(nc == 0)
     {
-        ConstrainedDynamics cd = {A, B, d};
-        ConstrainedCost cc = {Q, R, P, q, r};
-        res.nc = 0;
-        return std::make_tuple(_nu, cd, cc);
+        Cf.setZero(0, _nx);
+        Df.setZero(0, _nu);
+        hf.setZero(0);
+        return FeasibleConstraint{Cf, Df, hf};
     }
 
-    // compute quadritized free value function (before constraints)
-    // note: this is needed by the compute_constrained_input routine!
-    tmp.huf.noalias() = r + B.transpose()*(snext + Snext*d);
-    tmp.Huuf.noalias() = R + B.transpose()*Snext*B;
-    // tmp.Huxf.noalias() = P + B.transpose()*Snext*A;
+    // decompose constraint into a feasible and infeasible components
+    auto C = _constraint_to_go->C();
+    auto D = _constraint_to_go->D();
+    auto h = _constraint_to_go->h();
 
-    // compute constraint-consistent input
-    compute_constrained_input(tmp, res);
+    // cod of D
+    TIC(constraint_cod_inner);
+    cod.compute(_constraint_to_go->D());
+    int rank = cod.rank();
+    tmp.codQ = cod.matrixQ();
+    MatConstRef codQ1 = tmp.codQ.leftCols(rank);
+    MatConstRef codQ2 = tmp.codQ.rightCols(nc - rank);
+    TOC(constraint_cod_inner);
 
-    // nullspace left after constraints
-    int ns_dim = Bz.cols();
+    // feasible part
+    Cf.noalias() = codQ1.transpose()*C;
+    Df.noalias() = codQ1.transpose()*D;
+    hf.noalias() = codQ1.transpose()*h;
 
-    // modified cost and dynamics due to uc = uc(x, z)
-    // note: our new control input will be z!
-    TIC(constraint_modified_dynamics_inner);
-    tmp.Ac.noalias() = A + B*Lc;
-    tmp.Bc.noalias() = B*Bz;
-    tmp.dc.noalias() = d + B*lc;
+    // infeasible part
+    _constraint_to_go->set(codQ2.transpose()*C, codQ2.transpose()*h);
 
-    tmp.qc.noalias() = q + Lc.transpose()*(r + R*lc) + P.transpose()*lc;
-    tmp.rc.noalias() = Bz.transpose()*(r + R*lc);
-    tmp.Qc.noalias() = Q + Lc.transpose()*R*Lc + Lc.transpose()*P + P.transpose()*Lc;
-    tmp.Qc = 0.5*(tmp.Qc + tmp.Qc.transpose());
-    tmp.Rc.noalias() = Bz.transpose()*R*Bz;
-    tmp.Pc.noalias() = Bz.transpose()*(P + R*Lc);
-    TOC(constraint_modified_dynamics_inner);
-
-    // return
-    ConstrainedDynamics cd = {tmp.Ac, tmp.Bc, tmp.dc};
-    ConstrainedCost cc = {tmp.Qc, tmp.Rc, tmp.Pc, tmp.qc, tmp.rc};
-    return std::make_tuple(ns_dim, cd, cc);
+    return FeasibleConstraint{Cf, Df, hf};
 
 }
 
 void IterativeLQR::compute_constrained_input(Temporaries& tmp, BackwardPassResult& res)
 {
+#if false
     if(_decomp_type == Qr)
     {
         TIC(compute_constrained_input_qr_inner);
@@ -350,10 +316,12 @@ void IterativeLQR::compute_constrained_input(Temporaries& tmp, BackwardPassResul
     {
         throw std::invalid_argument("invalid decomposition");
     }
+#endif
 }
 
 void IterativeLQR::compute_constrained_input_svd(Temporaries& tmp, BackwardPassResult& res)
 {
+#if false
     auto C = _constraint_to_go->C();
     auto D = _constraint_to_go->D();
     auto h = _constraint_to_go->h();
@@ -415,11 +383,13 @@ void IterativeLQR::compute_constrained_input_svd(Temporaries& tmp, BackwardPassR
     int nc = _constraint_to_go->dim();
     _constraint_to_go->set(rotC.bottomRows(nc - rank),
                            roth.tail(nc - rank));
+#endif
 }
 
 
 void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassResult &res)
 {
+#if false
     auto C = _constraint_to_go->C();
     auto D = _constraint_to_go->D();
     auto h = _constraint_to_go->h();
@@ -611,7 +581,7 @@ void IterativeLQR::compute_constrained_input_qr(Temporaries &tmp, BackwardPassRe
         _constraint_to_go->set(q2.transpose()*C, q2.transpose()*h);
 
     }
-
+#endif
 }
 
 

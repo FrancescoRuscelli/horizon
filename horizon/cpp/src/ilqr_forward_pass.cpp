@@ -99,7 +99,7 @@ double IterativeLQR::compute_merit_slope(double mu_f, double mu_c,
 
     for(int i = 0; i < _N; i++)
     {
-        auto& hu = _tmp[i].huf;
+        auto& hu = _tmp[i].hu;
         auto& lu = _bp_res[i].lu;
 
         der += lu.dot(hu);
@@ -142,7 +142,6 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
     for(int i = 0; i < _N; i++)
     {
         auto& res = _bp_res[i];
-        auto& l = res.lu;
 
         // compute largest multiplier..
         // ..for dynamics (lam_x = S*dx + s)
@@ -152,7 +151,7 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
         // ..for constraints (lam_g = TBD)
         if(res.nc > 0)
         {
-            _lam_g[i] = res.glam + res.Gu*l;
+            _lam_g[i] = res.glam;
             lam_g_max = std::max(lam_g_max, _lam_g[i].cwiseAbs().maxCoeff());
         }
     }

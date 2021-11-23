@@ -151,6 +151,7 @@ private:
 
     struct ConstrainedDynamics;
     struct ConstrainedCost;
+    struct FeasibleConstraint;
     struct Dynamics;
     struct Constraint;
     struct IntermediateCost;
@@ -174,7 +175,7 @@ private:
     void backward_pass_iter(int i);
     void increase_regularization();
     void reduce_regularization();
-    HandleConstraintsRetType handle_constraints(int i);
+    FeasibleConstraint handle_constraints(int i);
     void add_bounds(int i);
     void compute_constrained_input(Temporaries& tmp, BackwardPassResult& res);
     void compute_constrained_input_svd(Temporaries& tmp, BackwardPassResult& res);
@@ -193,7 +194,7 @@ private:
 
     enum DecompositionType
     {
-        Svd, Qr
+        Ldlt, Qr, Lu
     };
 
     const int _nx;

@@ -209,61 +209,41 @@ struct IterativeLQR::Temporaries
     // temporary for S*A
     Eigen::MatrixXd S_A;
 
-    // quadratized value function (after constraints, if any)
-    // note: 'u' is actually 'z' in this context!
+    // feasible constraint
+    Eigen::MatrixXd Cf, Df;
+    Eigen::VectorXd hf;
+
+    // cod of constraint
+    Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod;
+    Eigen::MatrixXd codQ;
+
+    // quadratized value function
     Eigen::MatrixXd Huu;
     Eigen::MatrixXd Hux;
     Eigen::MatrixXd Hxx;
-
     Eigen::VectorXd hx;
     Eigen::VectorXd hu;
 
-    // quadratized value function (free)
-    Eigen::MatrixXd Huuf;
-    Eigen::MatrixXd Huxf;
-    Eigen::VectorXd huf;
+    // temporary for kkt rhs
+    Eigen::MatrixXd kkt;
+    Eigen::MatrixXd kx0;
 
-    // temporary for [hu Hux]
-    // note: it is used to store gains as well, take care!
-    Eigen::MatrixXd huHux;
+    // lu for kkt matrix
+    Eigen::PartialPivLU<Eigen::MatrixXd> lu;
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr;
+    Eigen::LDLT<Eigen::MatrixXd> ldlt;
 
-    // cholesky for Huu
-    Eigen::LLT<Eigen::MatrixXd> llt;
+    // kkt solution
+    Eigen::MatrixXd u_lam;
 
     // linearized constraint to go (C*x + D*u + h = 0)
     Eigen::MatrixXd C;
     Eigen::MatrixXd D;
     Eigen::VectorXd h;
 
-    // svd of D
-    Eigen::JacobiSVD<Eigen::MatrixXd> svd;
-
     // rotated constraint according to left singular vectors of D
     Eigen::MatrixXd rotC;
     Eigen::VectorXd roth;
-
-    // temporary that is used to compute lagrange multipliers
-    Eigen::MatrixXd UrSinvVrT;
-
-    // qr of D
-    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr;
-
-    // input component due to constraint (u = lc + Lc*x + Bz*z)
-    Eigen::MatrixXd Lc;
-    Eigen::VectorXd lc;
-    Eigen::MatrixXd Bz;
-
-    // modified dynamics and cost due to
-    // constraints
-    Eigen::MatrixXd Ac;
-    Eigen::MatrixXd Bc;
-    Eigen::VectorXd dc;
-    Eigen::MatrixXd Qc;
-    Eigen::MatrixXd Rc;
-    Eigen::MatrixXd Pc;
-    Eigen::VectorXd qc;
-    Eigen::VectorXd rc;
-
 
     /* Forward pass */
     Eigen::VectorXd dx;
@@ -335,20 +315,11 @@ struct IterativeLQR::BackwardPassResult
     BackwardPassResult(int nx, int nu);
 };
 
-struct IterativeLQR::ConstrainedDynamics
+struct IterativeLQR::FeasibleConstraint
 {
-    MatConstRef A;
-    MatConstRef B;
-    VecConstRef d;
-};
-
-struct IterativeLQR::ConstrainedCost
-{
-    MatConstRef Q;
-    MatConstRef R;
-    MatConstRef P;
-    VecConstRef q;
-    VecConstRef r;
+    MatConstRef C;
+    MatConstRef D;
+    VecConstRef h;
 };
 
 static void set_param_inputs(std::shared_ptr<std::map<std::string, Eigen::MatrixXd>> params, int k,
