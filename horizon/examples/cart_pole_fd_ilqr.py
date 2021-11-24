@@ -42,7 +42,7 @@ tau = cs.vertcat(u, 0)
 fd = kindyn.aba()  # this is the forward dynamics function
 xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
 prb.setDynamics(xdot)
-
+prb.setDt(dt)
 # Limits
 q_min = [-1, -2.*np.pi]
 q_max = [1, 2.*np.pi]
@@ -70,9 +70,9 @@ prb.createIntermediateCost("qdot", cs.sumsqr(qdot))
 if solver_type != 'ilqr':
     # Dynamics
     if use_ms:
-        th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
+        th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='EULER'))
     else:
-        th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
+        th = Transcriptor.make_method('direct_collocation', prb)  # opts=dict(degree=5)
 
 # Constraints
 prb.createFinalConstraint("up", q[1] - qtgt[1])
@@ -80,7 +80,7 @@ prb.createFinalConstraint("center", q[0] - qtgt[0])
 prb.createFinalConstraint("final_qdot", qdot)
 
 # Creates problem
-solver = Solver.make_solver(solver_type, prb, dt)  #, opts={'max_iter': 10})
+solver = Solver.make_solver(solver_type, prb)  #, opts={'max_iter': 10})
 
 solver.plot_iter = True
 solver.set_iteration_callback()

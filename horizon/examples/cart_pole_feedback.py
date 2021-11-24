@@ -42,6 +42,7 @@ tau = cs.vertcat(u, 0)
 fd = kindyn.aba()  # this is the forward dynamics function
 xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
 prb.setDynamics(xdot)
+prb.setDt(dt)
 
 # Limits
 q_min = np.array([-1, -2.*np.pi])
@@ -70,9 +71,9 @@ prb.createFinalConstraint("qdotfinal", qdot)
 
 # Dynamics
 if use_ms:
-    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
+    th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='EULER'))
 else:
-    th = Transcriptor.make_method('direct_collocation', prb, dt)
+    th = Transcriptor.make_method('direct_collocation', prb)
 
 blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact
     'warmstart': False,
@@ -87,7 +88,7 @@ blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact
     }
 
 # Creates problem
-solver = solver.Solver.make_solver('blocksqp', prb, dt, opts=blocksqp_opts)
+solver = solver.Solver.make_solver('blocksqp', prb, opts=blocksqp_opts)
 # prb.createProblem(solver_plugin='blocksqp', opts=blocksqp_opts)
 
 

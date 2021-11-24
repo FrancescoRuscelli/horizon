@@ -15,8 +15,7 @@ class DirectCollocation(Transcriptor):
 
     def __init__(self,
                  prob: prb.Problem,
-                 degree: int,
-                 dt) -> None:
+                 degree: int) -> None:
 
         """
         Initialize the direct collocation method.
@@ -24,15 +23,15 @@ class DirectCollocation(Transcriptor):
         Parameters:
             prob (prb.Problem): the horizon problem
             degree (int): degree of approximating polynomial
-            dt (float|StateVariable): discretization interval (can be a control input)
         """
 
-        super().__init__(prob, dt)
+        super().__init__(prob)
 
         # todo some of this is a duplicate of the Transcriptor initialization
         # handle input
         d = degree
 
+        dt = prob.getDt()
         # some constants
         N = prob.getNNodes() - 1
 
@@ -114,8 +113,7 @@ class MultipleShooting(Transcriptor):
     """
     def __init__(self,
                  prob: prb.Problem,
-                 integrator,
-                 dt):
+                 integrator):
         """
         Initialize the multiple shooting method.
 
@@ -124,7 +122,7 @@ class MultipleShooting(Transcriptor):
             dt (float|StateVariable): discretization interval (can be a control input)
             integrator (string|any): name of the default integrator or custom integrator
         """
-        super().__init__(prob, dt)
+        super().__init__(prob)
         # logic to pick a default integrator or keep a custom integrator
         # todo could be done dividing the arguments, for instance default_integrator_type and integrator
         if isinstance(integrator, str):
@@ -136,6 +134,8 @@ class MultipleShooting(Transcriptor):
             self.integrator = integrator
 
         # todo if the dt is a variable, the integrator requires it (its offset)
+        dt = prob.getDt()
+
         if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
             state_int = self.__integrate(self.state_prev, self.input_prev, self.dt_prev)
         elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):

@@ -8,30 +8,7 @@ from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
-from scipy.io import loadmat
 
-
-def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
-    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
-    traj_z = np.full(traj_len_before, 0.)
-    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
-    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
-    return traj_z
-
-# ========================================
-# traj = trajectoryInitializer(100, 10, 60, 10)
-# initial_q = -0.5
-# mod_q = initial_q + traj
-#
-# FK = cs.Function.deserialize(kindyn.ik(frame))
-# p = FK(q=q)['ee_pos']
-# p_start = FK(q=q_init)['ee_pos']
-
-# plt.scatter(range(mod_q.shape[0]), mod_q)
-# plt.show()
-# exit()
-
-# =========================================
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
 transcription_method = 'multiple_shooting'  # direct_collocation
@@ -90,6 +67,7 @@ dt = 0.01
 # Computing dynamics
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
+prb.setDt(dt)
 
 # SET BOUNDS
 # q bounds
@@ -137,59 +115,36 @@ for f in f_list:
 
 
 # SET TRANSCRIPTION METHOD
-th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
-
-# SET INVERSE DYNAMICS CONSTRAINTS
-tau_lim = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
-                    1000., 1000., 1000.,  # Contact 1
-                    1000., 1000., 1000.,  # Contact 2
-                    1000., 1000., 1000.,  # Contact 3
-                    1000., 1000., 1000.])  # Contact 4
+th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
 tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, q_dot,
                                                                                                              q_ddot,
                                                                                                              contact_map)
-prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
+prb.createIntermediateConstraint("inverse_dynamics", tau[:6])
 
 # SET CONTACT POSITION CONSTRAINTS
-active_leg = 'lf_foot'
-# active_leg = ['lf_foot', 'rf_foot']
-# active_leg = ['lf_foot', 'rf_foot', 'lh_foot']
-# active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
-
-mu = 1
-R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
+active_leg = ['lf_foot']
 
 for frame, f in contact_map.items():
-    FK = cs.Function.deserialize(kindyn.fk(frame))
-    p = FK(q=q)['ee_pos']
-    p_start = FK(q=q_init)['ee_pos']
-
-    p_goal = p_start + [0., 0., 0.2]
-
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-    # 2. velocity of each end effector must be zero
     if frame not in active_leg:
         prb.createConstraint(f"{frame}_vel_before_step", v)
     else:
         prb.createConstraint(f"{frame}_vel_before_step", v, nodes=range(0, node_start_step))
 
-    # friction cones must be satisfied
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-    if frame not in active_leg:
-        prb.createIntermediateConstraint(f"{frame}_friction_cone", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
-    else:
-        prb.createIntermediateConstraint(f"{frame}_friction_cone_before_step", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
-
     if frame in active_leg:
         prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, n_nodes))
 
-        prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_start_step + 20)
-
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 1000. * cs.sumsqr(q_dot))
+prb.createCostFunction("min_q_dot", 10. * cs.sumsqr(q_dot))
+
+FK = cs.Function.deserialize(kindyn.fk(active_leg[0]))
+p = FK(q=q)['ee_pos']
+p_start = FK(q=q_init)['ee_pos']
+p_goal = p_start + [0., 0., -0.1]
+prb.createFinalCost(f"lift_{frame}_leg", cs.sumsqr(p - p_start))
 # prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
 
 # don't know why this is not working
@@ -209,7 +164,7 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.linear_solver': 'ma57'}
 
 tic = time.time()
-solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+solver = solver.Solver.make_solver('ipopt', prb, opts)
 toc = time.time()
 print('time elapsed loading:', toc - tic)
 

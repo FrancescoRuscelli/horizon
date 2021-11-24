@@ -7,7 +7,7 @@ from horizon.variables import SingleVariable, Variable
 class Transcriptor(ABC):
 
     @classmethod
-    def make_method(cls, type: str, prb: Problem, dt: float, opts=None, logger=None):
+    def make_method(cls, type: str, prb: Problem, opts=None, logger=None):
         """
         Construct a transcription method. The optimal control problem is an infinite-dimensional optimization problem, since the decision variables are functions, rather than real numbers. All solution techniques perform transcription, a process by which the trajectory optimization problem (optimizing over functions) is converted into a constrained parameter optimization problem (optimizing over real numbers).
 
@@ -27,22 +27,22 @@ class Transcriptor(ABC):
         if type == 'multiple_shooting':
             default_integrator = 'RK4'
             integrator = opts.get('integrator', default_integrator)
-            return tm.MultipleShooting(prob=prb, integrator=integrator, dt=dt)
+            return tm.MultipleShooting(prob=prb, integrator=integrator)
         elif type == 'direct_collocation':
             default_degree = 3
             degree = opts.get('degree', default_degree)
-            return tm.DirectCollocation(prob=prb, degree=degree, dt=dt)
+            return tm.DirectCollocation(prob=prb, degree=degree)
         else:
             raise KeyError(f'unsupported transcription method type "{type}"')
 
-    def __init__(self, prb: Problem, dt: float, logger=None):
+    def __init__(self, prb: Problem, logger=None):
 
         self.logger = logger
         self.problem = prb
         self.integrator = None
 
         self.state_dot = prb.getDynamics()
-        self.dt = dt
+        self.dt = prb.getDt()
 
         state_list = self.problem.getState()
         state_prev_list = list()
@@ -62,7 +62,7 @@ class Transcriptor(ABC):
         self.input_prev = cs.vertcat(*input_prev_list)
 
         # todo if the dt is a variable, then compute also the dt_prev, which is used by the RK4 integrator
-        if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
+        if isinstance(self.dt, Variable) or isinstance(self.dt, SingleVariable):
             self.dt_prev = self.dt.getVarOffset(-1)
 
 

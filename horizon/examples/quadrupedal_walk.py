@@ -63,6 +63,7 @@ class Walker:
         a = sum(self.f)/mass - self.gv
         xdot = cs.vertcat(v, a, *fdot)
         self.prb.setDynamics(xdot)
+        self.prb.setDt(self.dt)
 
         # set contact position
         for i in range(self.nc):
@@ -77,7 +78,7 @@ class Walker:
         self.prb.createIntermediateConstraint('euler', momtot, nodes=range(1, self.ns))
 
         # (2) transcription
-        Transcriptor.make_method(self.transcription, self.prb, self.dt, opts={'integrator': 'RK4'})
+        Transcriptor.make_method(self.transcription, self.prb, opts={'integrator': 'RK4'})
 
         # reset steps
         self.steps: List[Walker.Step] = []
@@ -97,7 +98,7 @@ class Walker:
         v.setBounds(lb=np.zeros(3), ub=np.zeros(3), nodes=ns)
 
         # create solver
-        self.solver = Solver.make_solver(self.solver_type, self.prb, self.dt, 
+        self.solver = Solver.make_solver(self.solver_type, self.prb,
                         opts={'ipopt.linear_solver': 'ma57', 
                             'ipopt.warm_start_init_point': 'yes'
                         })

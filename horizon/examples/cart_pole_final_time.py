@@ -90,13 +90,16 @@ qdot_prev = qdot.getVarOffset(-1)
 u_prev = u.getVarOffset(-1)
 x_prev, _ = utils.double_integrator(q_prev, qdot_prev, fd(q=q_prev, v=qdot_prev, tau=cs.vertcat(u_prev, 0.))['a'])
 dt = tf/ns
+
+prb.setDt(dt)
+
 x_int = F_integrator(x0=x_prev, p=u_prev, time=dt)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))
 prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
 
 # Creates problem
-solver = solver.Solver.make_solver('ipopt', prb, None, opts=None)
+solver = solver.Solver.make_solver('ipopt', prb, opts=None)
 solver.solve()
 
 solution = solver.getSolutionDict()

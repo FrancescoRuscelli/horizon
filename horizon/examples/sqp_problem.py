@@ -12,7 +12,7 @@ import time
 
 N = 21  # Control discretization
 T = 10.0  # End time
-
+dt = T/N
 prb = problem.Problem(N, logging_level=logging.DEBUG)
 
 dx = prb.createStateVariable('dx', 2)
@@ -30,6 +30,8 @@ du.setInitialGuess([0.])
 # System dynamics
 xdot = cs.vertcat(*[(1. - dx[1] ** 2) * dx[0] - dx[1] + du, dx[0]])
 prb.setDynamics(xdot)
+prb.setDt(dt)
+
 print(f'xdot: {xdot}')
 dae = {'x': dx, 'p': du, 'ode': xdot, 'quad': []}
 opts = {'tf': T/N}
@@ -53,7 +55,7 @@ opts = {#SQP
         #QPOASES
         'sparse': True, 'hessian_type': 'posdef', 'printLevel': 'none', 'linsol_plugin': 'ma57'}
 
-solver = solver.Solver.make_solver('gnsqp', prb, None, opts)
+solver = solver.Solver.make_solver('gnsqp', prb, opts)
 solver.set_iteration_callback()
 solver.solve()
 

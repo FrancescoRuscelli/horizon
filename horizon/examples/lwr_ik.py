@@ -37,7 +37,7 @@ qdot = prb.createInputVariable("qdot", nv)
 
 # Create dynamics
 prb.setDynamics(qdot)
-
+prb.setDt(dt)
 # Limits
 q_min = np.full((nq), -3.0)
 q_max = -q_min
@@ -70,13 +70,13 @@ pos_des[2] += 0.1
 
 if solver_type != 'ilqr':
     # Dynamics
-    Transcriptor.make_method(transcription, prb, dt, opts={'integrator': 'EULER'})
+    Transcriptor.make_method(transcription, prb, opts={'integrator': 'EULER'})
 
 # Constraints
 prb.createFinalConstraint("goal", pos - pos_des)
 
 # Creates problem
-solver = Solver.make_solver(solver_type, prb, dt, opts={'hxx_reg_growth_factor': 10.0})  #, opts={'max_iter': 10})
+solver = Solver.make_solver(solver_type, prb, opts={'hxx_reg_growth_factor': 10.0})  #, opts={'max_iter': 10})
 
 if solver_type == 'ilqr':
     solver.plot_iter = True

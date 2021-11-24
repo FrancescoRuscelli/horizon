@@ -35,6 +35,9 @@ DoF = nq - 7  # Contacts + anchor_rope + rope
 nv = kindyn.nv()  # Velocity DoFs
 nf = 3  # 2 feet contacts + rope contact with wall, Force DOfs
 
+
+
+
 # Create horizon problem
 prb = problem.Problem(ns)
 
@@ -51,12 +54,17 @@ frope = prb.createInputVariable("frope", nf)
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
-prb.setDynamics(xdot)
-# Formulate discrete time dynamics
 tf = 1.0  # [s]
+dt = tf / ns
+
+prb.setDynamics(xdot)
+prb.setDt(dt)
+# Formulate discrete time dynamics
+
+
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
-opts = {'tf': tf/ns}
+opts = {'tf': dt}
 F_integrator = integrators.RK4(dae, opts, cs.SX)
 
 # Add bounds to STATE and CONTROL variables
@@ -158,7 +166,7 @@ opts = {'ipopt.tol': 1e-4,
         'ipopt.max_iter': 2000,
         'ipopt.linear_solver': 'ma57'}
 
-solver = solver.Solver.make_solver('ipopt', prb, tf/ns, opts)
+solver = solver.Solver.make_solver('ipopt', prb, opts)
 solver.solve()
 
 solution = solver.getSolutionDict()
@@ -186,16 +194,16 @@ for i in range(ns):
 
 
 # resampling
-dt = 0.001
+dt_res = 0.001
 frame_force_hist_mapping = {'Contact1': f1_hist, 'Contact2': f2_hist, 'rope_anchor2': frope_hist}
-q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, tf/ns, dt, dae, frame_force_hist_mapping, kindyn)
+q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(q_hist, qdot_hist, qddot_hist, dt, dt_res, dae, frame_force_hist_mapping, kindyn)
 
 
 PRINT = True
 if PRINT:
     # plots raw solution
-    time = np.arange(0.0, tf+1e-6, tf/ns)
-    time_res = np.arange(0.0, q_res.shape[1]*dt - dt, dt)
+    time = np.arange(0.0, tf+1e-6, dt)
+    time_res = np.arange(0.0, q_res.shape[1] * dt_res - dt_res, dt_res)
 
     plt.figure()
     for i in range(0, 3):
@@ -270,5 +278,5 @@ joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
               'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
               'rope_joint']
 
-replay_trajectory(dt, joint_list, q_res, frame_force_res_mapping).replay()
+replay_trajectory(dt_res, joint_list, q_res, frame_force_res_mapping).replay()
 

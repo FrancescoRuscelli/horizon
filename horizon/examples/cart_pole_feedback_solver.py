@@ -43,6 +43,7 @@ tau = cs.vertcat(u, 0)
 fd = kindyn.aba()  # this is the forward dynamics function
 xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
 prb.setDynamics(xdot)
+prb.setDt(dt)
 
 # Limits
 q_min = np.array([-1, -2.*np.pi])
@@ -71,15 +72,15 @@ prb.createFinalConstraint("qdotfinal", qdot)
 
 # Create solver
 if use_ilqr:
-    solver = ilqr.SolverILQR(prb, dt, opts={'realtime_iteration': True})
+    solver = ilqr.SolverILQR(prb, opts={'realtime_iteration': True})
 else:
     # Dynamics
     if use_ms:
-        th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
+        th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='EULER'))
     else:
-        th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
+        th = Transcriptor.make_method('direct_collocation', prb)  # opts=dict(degree=5)
 
-    solver = blocksqp.BlockSqpSolver(prb, dt, opts={'realtime_iteration': True})
+    solver = blocksqp.BlockSqpSolver(prb, opts={'realtime_iteration': True})
 
 # the rti loop
 rti_dt = 0.01

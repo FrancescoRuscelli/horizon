@@ -41,6 +41,7 @@ fd = kindyn.aba()  # this is the forward dynamics function
 x = cs.vertcat(q, qdot)
 xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
 prb.setDynamics(xdot)
+prb.setDt(dt)
 
 # Quantities at previous time step (to be removed!)
 q_prev = q.getVarOffset(-1)
@@ -117,7 +118,7 @@ if qp_solver == "osqp":
 opts['max_iter'] = 1
 
 
-solver = solver.Solver.make_solver('gnsqp', prb, None, opts)
+solver = solver.Solver.make_solver('gnsqp', prb, opts)
 solver.set_iteration_callback()
 
 

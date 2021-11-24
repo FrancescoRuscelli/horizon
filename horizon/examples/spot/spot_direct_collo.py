@@ -61,6 +61,7 @@ dt = 0.01
 # Computing dynamics
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
+prb.setDt(dt)
 
 # SET BOUNDS
 # q bounds
@@ -114,7 +115,7 @@ for f in f_list:
     f.setInitialGuess([0., 0, 60.])
 
 # SET TRANSCRIPTION METHOD
-th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
+th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
 # SET INVERSE DYNAMICS CONSTRAINTS
 tau_lim = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
@@ -168,7 +169,7 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.max_iter': 2000,
         'ipopt.linear_solver': 'ma57'}
 
-solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+solver = solver.Solver.make_solver('ipopt', prb, opts)
 solver.solve()
 
 solution = solver.getSolutionDict()

@@ -16,7 +16,7 @@ filename, _ = os.path.splitext(filename_with_ext)
 ms = mat_storer.matStorer(f'{filename}.mat')
 
 # options
-solver_type = 'gnsqp'
+solver_type = 'ilqr'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
@@ -50,6 +50,7 @@ q_ddot = prb.createInputVariable('q_ddot', n_v)
 f_list = [prb.createInputVariable(f'f{i}', n_f) for i in range(n_c)]
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
+prb.setDt(dt)
 
 # contact map
 contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
@@ -72,7 +73,7 @@ for f in f_list:
 
 # transcription
 if solver_type != 'ilqr':
-    th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
+    th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
 # dynamic feasibility
 id_fn = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
@@ -164,7 +165,7 @@ opts['warm_start_dual'] = True
 opts['osqp.polish'] = False
 opts['osqp.verbose'] = False
 
-solver = solver.Solver.make_solver(solver_type, prb, dt, opts)
+solver = solver.Solver.make_solver(solver_type, prb, opts)
 
 try:
     solver.set_iteration_callback()

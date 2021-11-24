@@ -79,9 +79,9 @@ prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
 # Dynamics
 if use_ms:
-    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='RK4'))
+    th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='RK4'))
 else:
-    th = Transcriptor.make_method('direct_collocation', prb, dt) # opts=dict(degree=5)
+    th = Transcriptor.make_method('direct_collocation', prb) # opts=dict(degree=5)
 
 prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)

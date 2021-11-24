@@ -48,6 +48,7 @@ dt = prb.createInputVariable("dt", 1)
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
 prb.setDynamics(xdot)
+prb.setDt(dt)
 # Formulate discrete time dynamics
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
@@ -185,7 +186,7 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.max_iter': 5000}#,
         # 'ipopt.linear_solver': 'ma57'}
 
-solver = solver.Solver.make_solver('ipopt', prb, None, opts)
+solver = solver.Solver.make_solver('ipopt', prb, opts)
 solver.solve()
 
 solution = solver.getSolutionDict()

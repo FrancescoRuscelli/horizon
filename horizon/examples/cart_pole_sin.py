@@ -58,6 +58,7 @@ q_ref = prb.createParameter('q_ref', 1)
 # Creates double integrator
 x, xdot = utils.double_integrator(q, qdot, qddot)
 prb.setDynamics(xdot)
+prb.setDt(dt)
 
 # Limits
 q_min = [-0.5, -0.5, -2. * np.pi]
@@ -85,9 +86,9 @@ prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
 # Dynamics
 if use_ms:
-    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='EULER'))
+    th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='EULER'))
 else:
-    th = Transcriptor.make_method('direct_collocation', prb, dt)  # opts=dict(degree=5)
+    th = Transcriptor.make_method('direct_collocation', prb)  # opts=dict(degree=5)
 
 prb.createFinalConstraint("up", q[2] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
@@ -100,7 +101,7 @@ tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Creates problem
-solver = solver.Solver.make_solver('ipopt', prb, dt, opts={'ipopt.tol': 1e-4, 'ipopt.max_iter': 2000})
+solver = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4, 'ipopt.max_iter': 2000})
 
 cos_fun = 1/3 * np.cos(np.linspace(np.pi/2, 4*2*np.pi, ns+1))
 
