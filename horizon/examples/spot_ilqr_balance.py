@@ -21,10 +21,10 @@ solver_type = 'ilqr'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
-tf = 2.0
+tf = 10.0
 n_nodes = 100
 ilqr_plot_iter = False
-t_jump = (1.0, 3)
+t_jump = (5.0, tf+1)
 
 # load urdf
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
@@ -59,10 +59,10 @@ contact_map = dict(zip(contacts_name, f_list))
 
 # initial state and initial guess
 q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                   0.0, 0.9, -1.5238505,
-                   0.0, 0.9, -1.5202315,
-                   0.0, 0.9, -1.5300265,
-                   0.0, 0.9, -1.5253125])
+                   0.0, 0.9, -1.52,
+                   0.0, 0.9, -1.52,
+                   0.0, 0.9, -1.52,
+                   0.0, 0.9, -1.52])
 
 q.setBounds(q_init, q_init, 0)
 q_dot.setBounds(np.zeros(n_v), np.zeros(n_v), 0)
@@ -84,58 +84,58 @@ prb.createIntermediateConstraint("dynamic_feasibility", tau[:6])
 # final velocity is zero
 prb.createFinalConstraint('final_velocity', q_dot)
 
-# final pose
-q_tgt = q_init.copy()
-q_tgt[0] = 0.1
-# q_tgt[5] = math.sin(math.pi/4)
-# prb.createFinalConstraint('q_fb', q[0] - q_tgt[0])
-
-# prb.createFinalConstraint('q_f', q[7:] - q_tgt[7:])
-
-# prb.createFinalCost('q_f', 100*cs.sumsqr(q[7:] - q_tgt[7:]))
-# prb.createFinalCost('q_dot_f', 100*cs.sumsqr(q_dot))
-
 # contact handling
 k_all = range(1, n_nodes+1)
 k_swing = list(range(*[int(t/dt) for t in t_jump]))
 k_stance = list(filterfalse(lambda k: k in k_swing, k_all))
-lifted_legs = []  #contacts_name[0:2]  #contacts_name.copy()
+lifted_legs = [contacts_name[0], contacts_name[3]] # contacts_name.copy()
 
 def barrier(x):
     return cs.if_else(x > 0, 0, x**2)
 
 # contact velocity is zero, and normal force is positive
 for frame, f in contact_map.items():
+    
     nodes = k_stance if frame in lifted_legs else k_all
     
-    FK = cs.Function.deserialize(kindyn.fk(frame))
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     
-    p = FK(q=q)['ee_pos']
-    p_start = FK(q=q_init)['ee_pos']
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
     a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
     # node: on first swing node vel should be zero!
     prb.createConstraint(f"{frame}_vel", v, nodes=list(nodes) + [k_swing[0]])
-    # prb.createIntermediateCost(f'{frame}_fn', barrier(f[2] - 25.0)) #, nodes=nodes)
-
-# swing force is zero
+    
+# swing force is zero and z = zref
 for leg in lifted_legs:
     fzero = np.zeros(n_f)
     contact_map[leg].setBounds(fzero, fzero, nodes=k_swing)
 
+    FK = cs.Function.deserialize(kindyn.fk(leg))
+    p = FK(q=q)['ee_pos']
+    p_start = FK(q=q_init)['ee_pos']
+    z_tgt = p_start[2] + 0.2
+    prb.createIntermediateCost(f'{leg}_z', 0.1*cs.sumsqr(p[2] - z_tgt), nodes=k_swing[3:])
+
+prb.createConstraint(f"int_vel", q_dot, nodes=k_stance[-1])
+prb.createConstraint(f"int_acc", q_ddot, nodes=range(40, 60))
 
 # cost
 # prb.createCostFunction("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
 # prb.createCostFunction("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
 prb.createCostFunction("min_q", 1e-2 * cs.sumsqr(q[7:] - q_init[7:]))
 # prb.createCostFunction("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
-prb.createIntermediateCost("min_q_ddot", 1e-6 * cs.sumsqr(q_ddot))
+prb.createIntermediateCost("min_q_ddot", 1e-3 * cs.sumsqr(q_ddot))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 1e-6 * cs.sumsqr(f))
 
+# bound acceleration
+# qddot < 10 -> 10 - qddot > 0
+# qddot > -10 -> qddot + 10 > 0
+qddot_max = 5
+qddot_barrier = cs.vertcat(barrier(qddot_max - q_ddot), barrier(qddot_max + q_ddot))
+# prb.createIntermediateCost('acc_bound', cs.sum1(qddot_barrier))
 
 # =============
 # SOLVE PROBLEM
@@ -150,20 +150,15 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.line_search_accept_ratio': 1e-9,
         'ilqr.svd_threshold': 1e-12,
         'ilqr.decomp_type': 'qr',
-        'ilqr.codegen_enabled': True,
-        'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump_front',
+        'ilqr.codegen_enabled': False,
+        'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump',
         'gnsqp.qp_solver': 'osqp'
         }
         
 
 solver = solver.Solver.make_solver(solver_type, prb, dt, opts)
 
-try:
-    solver.set_iteration_callback()
-    solver.plot_iter = ilqr_plot_iter 
-except:
-    pass
-
+# save problem
 prb_data = solver.save()
 
 # save also id function
@@ -171,9 +166,15 @@ id_fn = cs.Function('id', [x, u], [tau], ['x', 'u'], ['tau'])
 prb_data['inv_dyn'] = id_fn.serialize()
 
 import yaml
-with open('/tmp/spot_ilqr_front_jump.yaml', 'w') as f:
+with open('/tmp/spot_ilqr_balance.yaml', 'w') as f:
     yaml.dump(prb_data, f, default_flow_style=None)
-    
+
+try:
+    solver.set_iteration_callback()
+    solver.plot_iter = ilqr_plot_iter 
+except:
+    pass
+
 t = time.time()
 solver.solve()
 elapsed = time.time() - t
@@ -186,6 +187,7 @@ except:
 
 solution = solver.getSolutionDict()
 solution_constraints_dict = dict()
+solution['gain'] = [solver.ilqr.gain(i) for i in range(n_nodes)]
 
 if isinstance(dt, cs.SX):
     ms.store({**solution, **solution_constraints_dict})
@@ -194,8 +196,12 @@ else:
     ms.store({**solution, **solution_constraints_dict, **dt_dict})
 
 
+plt.figure()
+plt.plot(solution['q_dot'].T)
+plt.show()
+
 # ========================================================
-plot_all = False
+plot_all = True
 plot_fun = False
 plot_forces = False
 
@@ -218,24 +224,32 @@ if plot_fun:
     plt.show()
 
 if plot_all:
+    COM = cs.Function.deserialize(kindyn.centerOfMass())
     pos_contact_list = list()
     for contact in contacts_name:
+        
         FK = cs.Function.deserialize(kindyn.fk(contact))
         pos = FK(q=solution['q'])['ee_pos']
         plt.figure()
         plt.title(contact)
         for dim in range(n_f):
-            plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3, linestyle='dotted')
-
-        plt.vlines([node_start_step, node_end_step], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
+            plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]))
+    
+    plt.figure()
+    plt.title('com')
+    com = COM(q=solution['q'])['com']
+    plt.plot(com[0:2, :].toarray().T)
 
     plt.figure()
     for contact in contacts_name:
+        
         FK = cs.Function.deserialize(kindyn.fk(contact))
         pos = FK(q=solution['q'])['ee_pos']
+        
 
         plt.title(f'plane_xy')
         plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
+        plt.scatter(np.array(com[0, :]), np.array(com[1, :]), linewidth=0.1)
 
     plt.figure()
     for contact in contacts_name:
