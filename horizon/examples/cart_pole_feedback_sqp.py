@@ -103,7 +103,6 @@ qp_solver = "qpoases"
 opts['gnsqp.qp_solver'] = qp_solver
 
 if qp_solver == "qpoases":
-    opts = pysqp.SQPGaussNewtonSX.getQPOasesOptionsMPC()
     opts['sparse'] = True
     opts['hessian_type'] = 'posdef'
     opts['printLevel'] = 'none'
