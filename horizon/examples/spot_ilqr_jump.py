@@ -66,6 +66,8 @@ q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
 q.setBounds(q_init, q_init, 0)
 q_dot.setBounds(np.zeros(n_v), np.zeros(n_v), 0)
 
+
+
 q.setInitialGuess(q_init)
 
 for f in f_list:
@@ -145,11 +147,15 @@ for f in f_list:
 # =============
 # SOLVE PROBLEM
 # =============
-opts = {'ipopt.tol': 0.001,
-        'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 2000,
-        # 'ipopt.linear_solver': 'ma57',
-        'ilqr.max_iter': 1000,
+opts = dict()
+if solver_type == 'ipopt':
+    opts['ipopt.tol'] = 0.001
+    opts['ipopt.constr_viol_tol'] = 0.001
+    opts['ipopt.max_iter'] = 2000
+    opts['ipopt.linear_solver'] = 'ma57'
+
+if solver_type == 'ilqr':
+    opts = {'ilqr.max_iter': 1000,
         'ilqr.integrator': 'RK4', 
         'ilqr.closed_loop_forward_pass': True,
         'ilqr.line_search_accept_ratio': 1e-9,
@@ -157,13 +163,38 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.decomp_type': 'qr',
         'ilqr.codegen_enabled': False,
         'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump',
-        'gnsqp.qp_solver': 'osqp'
         }
 
-opts['warm_start_primal'] = True
-opts['warm_start_dual'] = True
-opts['osqp.polish'] = False
-opts['osqp.verbose'] = False
+if solver_type == 'gnsqp':
+    qp_solver = 'osqp'
+    if qp_solver == 'osqp':
+        opts['gnsqp.qp_solver'] = 'osqp'
+        opts['warm_start_primal'] = True
+        opts['warm_start_dual'] = True
+        opts['merit_derivative_tolerance'] = 1e-10
+        opts['constraint_violation_tolerance'] = 1e-11
+        opts['osqp.polish'] = True # without this
+        opts['osqp.delta'] = 1e-9 # and this, it does not converge!
+        opts['osqp.verbose'] = False
+        opts['osqp.rho'] = 0.02
+        opts['osqp.scaled_termination'] = False
+    if qp_solver == 'qpoases': #does not work!
+        opts['gnsqp.qp_solver'] = 'qpoases'
+        opts['sparse'] = True
+        opts["enableEqualities"] = True
+        opts["initialStatusBounds"] = "inactive"
+        opts["numRefinementSteps"] = 0
+        opts["enableDriftCorrection"] = 0
+        opts["terminationTolerance"] = 10e9 * 1e-7
+        opts["enableFlippingBounds"] = False
+        opts["enableNZCTests"] = False
+        opts["enableRamping"] = False
+        opts["enableRegularisation"] = True
+        opts["numRegularisationSteps"] = 2
+        opts["epsRegularisation"] = 5. * 10e3 * 1e-7
+        opts['hessian_type'] =  'posdef'
+        #opts['printLevel'] = 'high'
+        opts['linsol_plugin'] = 'ma57'
 
 solver = solver.Solver.make_solver(solver_type, prb, opts)
 
@@ -177,6 +208,12 @@ t = time.time()
 solver.solve()
 elapsed = time.time() - t
 print(f'solved in {elapsed} s')
+
+if solver_type == 'gnsqp':
+    print(f"mean Hessian computation time: {sum(solver.getHessianComputationTime())/len(solver.getHessianComputationTime())}")
+    print(f"mean QP computation time: {sum(solver.getQPComputationTime())/len(solver.getQPComputationTime())}")
+    print(f"mean Line Search computation time: {sum(solver.getLineSearchComputationTime()) / len(solver.getLineSearchComputationTime())}")
+
 
 try:
     solver.print_timings()

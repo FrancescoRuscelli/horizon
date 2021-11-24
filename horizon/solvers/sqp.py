@@ -158,8 +158,23 @@ class GNSQPSolver(Solver):
     def getQPComputationTime(self):
         return self.solver.getQPComputationTime()
 
+    def getLineSearchComputationTime(self):
+        return self.solver.getLineSearchComputationTime()
+
     def getObjectiveIterations(self):
         return self.solver.getObjectiveIterations()
 
     def getConstraintNormIterations(self):
         return self.solver.getConstraintNormIterations()
+
+    def setAlphaMin(self, alpha_min):
+        self.solver.setAlphaMin(alpha_min)
+
+    def getAlpha(self):
+        return self.solver.getAlpha()
+
+    def getBeta(self):
+        return self.solver.getBeta()
+
+    def setBeta(self, beta):
+        self.solver.setBeta(beta)
