@@ -9,6 +9,7 @@ bool IterativeLQR::forward_pass(double alpha)
     _fp_res->accepted = false;
     _fp_res->alpha = alpha;
     _fp_res->step_length = 0.0;
+    _fp_res->hxx_reg = _hxx_reg;
 
     // initialize forward pass with initial state
     _fp_res->xtrj.col(0) = _xtrj.col(0);
@@ -52,14 +53,19 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
     // backward pass solution
     const auto& res = _bp_res[i];
     const auto& L = res.Lu;
-    auto l = alpha * res.lu;
 
     // update control
-    auto ui_upd = ui + l + L*tmp.dx;
-    _fp_res->utrj.col(i) = ui_upd;
+    tmp.du = alpha * res.lu;
+
+    if(_closed_loop_forward_pass)
+    {
+        tmp.du += L * tmp.dx;
+    }
+
+    _fp_res->utrj.col(i) = ui + tmp.du;
 
     // update next state
-    auto xnext_upd = xnext + (A + B*L)*tmp.dx + B*l + alpha*d;
+    auto xnext_upd = xnext + A*tmp.dx + B*tmp.du + alpha*d;
     _fp_res->xtrj.col(i+1) = xnext_upd;
 
 #if false
@@ -77,13 +83,15 @@ void IterativeLQR::forward_pass_iter(int i, double alpha)
 #endif
 
     // compute step length
-    _fp_res->step_length += l.cwiseAbs().sum();
+    _fp_res->step_length += tmp.du.cwiseAbs().sum();
 
 }
 
 double IterativeLQR::compute_merit_slope(double mu_f, double mu_c,
                                          double defect_norm, double constr_viol)
 {
+    TIC(compute_merit_slope);
+
     // see Nocedal and Wright, Theorem 18.2, pg. 541
     // available online http://www.apmath.spbu.ru/cnsa/pdf/monograf/Numerical_Optimization2006.pdf
 
@@ -91,8 +99,8 @@ double IterativeLQR::compute_merit_slope(double mu_f, double mu_c,
 
     for(int i = 0; i < _N; i++)
     {
-        auto& hu = _tmp[i].hu;
-        auto& lu = _bp_res[i].lz;
+        auto& hu = _tmp[i].huf;
+        auto& lu = _bp_res[i].lu;
 
         der += lu.dot(hu);
     }
@@ -123,6 +131,8 @@ double IterativeLQR::compute_merit_value(double mu_f,
 
 std::pair<double, double> IterativeLQR::compute_merit_weights()
 {
+    TIC(compute_merit_weights);
+
     // note: we here assume dx = 0, since this function runs before
     // the forward pass
 
@@ -158,24 +168,28 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
 
 double IterativeLQR::compute_cost(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj)
 {
+    TIC(compute_cost);
+
     double cost = 0.0;
 
     // intermediate cost
     for(int i = 0; i < _N; i++)
     {
-        cost += _cost[i].evaluate(xtrj.col(i), utrj.col(i));
+        cost += _cost[i].evaluate(xtrj.col(i), utrj.col(i), i);
     }
 
     // add final cost
     // note: u not used
     // todo: enforce this!
-    cost += _cost[_N].evaluate(xtrj.col(_N), utrj.col(_N-1));
+    cost += _cost[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
 
     return cost / _N;
 }
 
 double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj)
 {
+    TIC(compute_constr);
+
     double constr = 0.0;
 
     // intermediate constraint violation
@@ -186,17 +200,24 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
             continue;
         }
 
-        _constraint[i].evaluate(xtrj.col(i), utrj.col(i));
-        constr += _constraint[i].h().cwiseAbs().sum();
+        _constraint[i].evaluate(xtrj.col(i), utrj.col(i), i);
+        constr += _constraint[i].h().lpNorm<1>();
+
     }
+
+    // bound violation
+    constr += (_x_lb - xtrj).cwiseMax(0).lpNorm<1>();
+    constr += (_x_ub - xtrj).cwiseMin(0).lpNorm<1>();
+    constr += (_u_lb - utrj).cwiseMax(0).lpNorm<1>();
+    constr += (_u_ub - utrj).cwiseMin(0).lpNorm<1>();
 
     // add final constraint violation
     if(_constraint[_N].is_valid())
     {
         // note: u not used
         // todo: enforce this!
-        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1));
-        constr += _constraint[_N].h().cwiseAbs().sum();
+        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
+        constr += _constraint[_N].h().lpNorm<1>();
     }
 
     return constr / _N;
@@ -204,6 +225,8 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
 
 double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::MatrixXd& utrj)
 {
+    TIC(compute_defect);
+
     double defect = 0.0;
 
     // compute defects on given trajectory
@@ -212,6 +235,7 @@ double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         _dyn[i].computeDefect(xtrj.col(i),
                               utrj.col(i),
                               xtrj.col(i+1),
+                              i,
                               _tmp[i].defect);
 
         defect += _tmp[i].defect.cwiseAbs().sum();
@@ -225,9 +249,9 @@ void IterativeLQR::line_search(int iter)
     TIC(line_search);
 
     const double step_reduction_factor = 0.5;
-    const double alpha_min = 0.001;
-    double alpha = 1.0;
-    const double eta = 1e-4;
+    const double alpha_min = _alpha_min;
+    double alpha = _step_length;
+    const double eta = _line_search_accept_ratio;
 
     // compute merit function weights
     auto [mu_f, mu_c] = compute_merit_weights();
@@ -243,6 +267,8 @@ void IterativeLQR::line_search(int iter)
 
     if(iter == 0)
     {
+        _fp_res->alpha = 0;
+        _fp_res->accepted = true;
         _fp_res->merit = merit;
         report_result(*_fp_res);
     }
@@ -253,6 +279,7 @@ void IterativeLQR::line_search(int iter)
             _fp_res->constraint_violation);
 
     _fp_res->merit_der = merit_der;
+
 
     // run line search
     while(alpha >= alpha_min)
@@ -293,6 +320,8 @@ void IterativeLQR::line_search(int iter)
 
 bool IterativeLQR::should_stop()
 {
+    TIC(should_stop);
+
     // first, evaluate feasibility
     if(_fp_res->constraint_violation > 1e-6)
     {

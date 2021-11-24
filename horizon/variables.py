@@ -262,7 +262,7 @@ class SingleParameter(AbstractVariable):
         else:
             nodes = misc.checkNodes(nodes)
             par_impl = cs.vertcat(*[self._par_impl['val'] for i in nodes])
-        return par_impl
+        return par_impl.toarray()
 
     def getName(self):
         """
@@ -407,9 +407,9 @@ class Parameter(AbstractVariable):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
-        par_impl = cs.vertcat(*[self._par_impl['n' + str(i)]['val'] for i in nodes])
+        par_impl = cs.horzcat(*[self._par_impl['n' + str(i)]['val'] for i in nodes])
 
-        return par_impl
+        return par_impl.toarray()
 
     def getName(self):
         """
@@ -939,7 +939,7 @@ class Variable(AbstractVariable):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
-        vals = np.hstack([self._var_impl['n' + str(i)][val_type] for i in nodes])
+        vals = np.hstack([np.atleast_2d(self._var_impl['n' + str(i)][val_type]).T for i in nodes])
 
         return vals
 
@@ -1342,7 +1342,7 @@ class Aggregate(AbstractAggregate):
             var.setInitialGuess(v0[idx:idx+nv], nodes)
             idx += nv    
     
-    def getBounds(self, node):
+    def getBounds(self, node=None):
         """
         Getter for the bounds of the variables in the aggregate.
 
@@ -1373,7 +1373,7 @@ class Aggregate(AbstractAggregate):
         todo:
             test this!
         """
-        return np.hstack([var.getLowerBounds(node) for var in self])
+        return np.vstack([var.getLowerBounds(node) for var in self])
 
     def getUpperBounds(self, node):
         """
@@ -1388,7 +1388,7 @@ class Aggregate(AbstractAggregate):
         todo:
             test this!
         """
-        return np.hstack([var.getUpperBounds(node) for var in self])
+        return np.vstack([var.getUpperBounds(node) for var in self])
 
     def getInitialGuess(self, node=None) -> np.array:
         """
@@ -1400,7 +1400,16 @@ class Aggregate(AbstractAggregate):
         Returns:
             [type]: [description]
         """
-        return np.vstack([var.getInitialGuess(node) for var in self])
+
+        ig_list = list()
+
+        for var in self:
+            num_nodes = len(var.getNodes()) if node is None else len(node)
+            ig = var.getInitialGuess(node)
+            ig = ig.reshape((var.getDim(), num_nodes), order='F')
+            ig_list.append(ig)
+
+        return np.vstack(ig_list)
 
 class StateAggregate(Aggregate):
     """

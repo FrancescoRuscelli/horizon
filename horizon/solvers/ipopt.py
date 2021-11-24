@@ -6,5 +6,7 @@ import casadi as cs
 class IpoptSolver(NlpsolSolver):
 
     def __init__(self, prb: Problem, opts: Dict) -> None:
-        
-        super().__init__(prb, opts=opts, solver_plugin='ipopt')
+        filtered_opts = None 
+        if opts is not None:
+            filtered_opts = {k: opts[k] for k in opts.keys() if k.startswith('ipopt.')}
+        super().__init__(prb, opts=filtered_opts, solver_plugin='ipopt')

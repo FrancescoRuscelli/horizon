@@ -2,7 +2,7 @@ import unittest
 
 from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.utils.transcription_methods import TranscriptionsHandler
+from horizon.transcriptions.transcriptor import Transcriptor
 import casadi as cs
 import numpy as np
 
@@ -85,9 +85,7 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
 
 
     # solver with sqp or ipopt need a dynamic constraint
-    th = TranscriptionsHandler(prob, dt)
-    th.setDefaultIntegrator(type='EULER')
-    th.setMultipleShooting()
+    th = Transcriptor.make_method('multiple_shooting', prob, dt, opts=dict(integrator='EULER'))
 
     # blocksqp needs exact hessian to be accurate
     opts = None

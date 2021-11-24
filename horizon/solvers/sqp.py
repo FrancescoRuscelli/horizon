@@ -1,5 +1,6 @@
 #try:
 from .pysqp import SQPGaussNewtonSX
+from horizon.solvers.pyilqr import IterativeLQR
 #except ImportError:
 #    print('failed to import pysqp extension; did you compile it?')
 #    exit(1)
@@ -46,43 +47,67 @@ class GNSQPSolver(Solver):
         G = cs.Function('g', [w], [g], ['x'], ['g'])
         self.solver = SQPGaussNewtonSX('gnsqp', qp_solver_plugin, F, G, self.opts)
 
+    def set_iteration_callback(self, cb=None):
+        if cb is None:
+            self.solver.setIterationCallback(self._iter_callback)
+        else:
+            self.solver.setIterationCallback(cb)
+
+    def _iter_callback(self, fpres):
+            if not fpres.accepted:
+                return
+            fmt = ' <#09.3e'
+            fmtf = ' <#04.2f'
+            star = '*' if fpres.accepted else ' '
+            print(f'{star}\
+    alpha={fpres.alpha:{fmtf}}  \
+    reg={fpres.hxx_reg:{fmt}}  \
+    merit={fpres.merit:{fmt}}  \
+    dm={fpres.merit_der:{fmt}}  \
+    mu_f={fpres.mu_f:{fmt}}  \
+    mu_c={fpres.mu_c:{fmt}}  \
+    cost={fpres.cost:{fmt}}  \
+    delta_u={fpres.step_length:{fmt}}  \
+    constr={fpres.constraint_violation:{fmt}}  \
+    gap={fpres.defect_norm:{fmt}}')
+
     def solve(self) -> bool:
         # update bounds and initial guess
 
         lb_list = list()
         for var in self.prb.var_container.getVarList(offset=False):
-            lb_list.append(var.getLowerBounds())
+            lb_list.append(var.getLowerBounds().flatten(order='F'))
         lbw = cs.vertcat(*lb_list)
 
         # update upper bounds of variables
         ub_list = list()
         for var in self.prb.var_container.getVarList(offset=False):
-            ub_list.append(var.getUpperBounds())
+            ub_list.append(var.getUpperBounds().flatten(order='F'))
         ubw = cs.vertcat(*ub_list)
 
         # update initial guess of variables
         w0_list = list()
         for var in self.prb.var_container.getVarList(offset=False):
-            w0_list.append(var.getInitialGuess())
+            w0_list.append(var.getInitialGuess().flatten(order='F'))
         w0 = cs.vertcat(*w0_list)
         # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
 
         # update parameters
         p_list = list()
         for par in self.prb.var_container.getParList():
-            p_list.append(par.getValues())
+            p_list.append(par.getValues().flatten(order='F'))
         p = cs.vertcat(*p_list)
 
         # update lower bounds of constraints
         lbg_list = list()
         for fun in self.prb.function_container.getCnstr().values():
-            lbg_list.append(fun.getLowerBounds())
+            lbg_list.append(fun.getLowerBounds().flatten(order='F'))
         lbg = cs.vertcat(*lbg_list)
 
         # update upper bounds of constraints
         ubg_list = list()
         for fun in self.prb.function_container.getCnstr().values():
-            ubg_list.append(fun.getUpperBounds())
+            ubg_list.append(fun.getUpperBounds().flatten(order='F'))
         ubg = cs.vertcat(*ubg_list)
 
         # solve
