@@ -523,6 +523,21 @@ class Problem:
 
         return fun
 
+    def getCosts(self, name=None):
+        """
+        Getter for a desired constraint of the optimization problem.
+
+        Args:
+            name: name of the desired constraint. If not specified, a dict with all the constraint is returned
+
+        Returns:
+            the desired constraint/s
+        """
+        fun = self.function_container.getCost(name)
+
+
+        return fun
+
     def evalFun(self, fun: fc.Function, solution):
         """
         Evaluates a given function over the solution found.

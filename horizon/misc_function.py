@@ -37,7 +37,7 @@ def checkNodes(nodes, nodes_self=None):
             pass
         else:
             nodes = [node for node in nodes if node in nodes_self]
-    elif isinstance(nodes, int):
+    elif isinstance(nodes, (int, np.integer)):
         if nodes_self is None:
             nodes = [nodes]
         else:
