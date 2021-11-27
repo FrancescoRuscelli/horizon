@@ -99,7 +99,7 @@ class replay_trajectory:
         '''
         self.__sleep = secs
 
-    def replay(self, is_floating_base=True):
+    def replay(self, is_floating_base=True, iter_pause=0):
         pub = rospy.Publisher('joint_states', JointState, queue_size=10)
         rospy.init_node('joint_state_publisher')
         rate = rospy.Rate(1. / self.dt)
@@ -151,6 +151,10 @@ class replay_trajectory:
                         self.publishContactForces(t, k)
                 rate.sleep()
                 k += 1
+                if iter_pause != 0:
+                    if k % iter_pause == 0:
+                        input('press button to continue trajectory...')
+
             if self.__sleep > 0.:
                 time.sleep(self.__sleep)
                 print('replaying traj ...')
