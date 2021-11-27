@@ -1,46 +1,227 @@
-# /usr/bin/env python3
+import time
 
-############
-#experiment to augment the nodes with supporting nodes.
-# This is useful when simply resampling the trajectory make it unfeasible (especially for the tau on the floating base, which become non zero).
-# The underlying idea is LOCALLY refining the trajectory by injecting more nodes so that, when resampling, less errors pop up.
-#to visualize the trajectory use vis_refiner_local.py and to resample + send it to gazebo use send_to_gazebo.py
-##################
-
-import horizon.variables
 from horizon import problem
-from horizon.transcriptions.transcriptor import Transcriptor
-from horizon.solvers import Solver
 from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_storer
-import os
+from horizon.transcriptions import integrators
+from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
-import numpy as np
+from horizon.solvers import solver
 import matplotlib.pyplot as plt
+import os
+from scipy.io import loadmat
+# import rospkg
 
-## ==================
-## PREPARE TRAJECTORY
-## ==================
-transcription_method = 'multiple_shooting'  # direct_collocation
+def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
+    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
+    traj_z = np.full(traj_len_before, 0.)
+    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
+    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
+    return traj_z
+
+# ========================================
+# traj = trajectoryInitializer(100, 10, 60, 10)
+# initial_q = -0.5
+# mod_q = initial_q + traj
+#
+# FK = cs.Function.deserialize(kindyn.ik(frame))
+# p = FK(q=q)['ee_pos']
+# p_start = FK(q=q_init)['ee_pos']
+
+# plt.scatter(range(mod_q.shape[0]), mod_q)
+# plt.show()
+# exit()
+
+# =========================================
+ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
+
+transcription_method = 'multiple_shooting'  # direct_collocation # multiple_shooting
 transcription_opts = dict(integrator='RK4')
 
-urdffile = '../urdf/spot.urdf'
+# rospack = rospkg.RosPack()
+# rospack.get_path('spot_urdf')
+urdffile = '../examples/urdf/spot.urdf'
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
+
+# joint names
+joint_names = kindyn.joint_names()
+if 'universe' in joint_names: joint_names.remove('universe')
+if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
+
+
+
+n_nodes = 50
+
+node_start_step = 20
+node_end_step = 40
+node_peak = 30
+jump_height = 0.2
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-ms = mat_storer.matStorer('../spot/spot_jump.mat')
-prev_solution = ms.load()
 
-n_nodes = prev_solution['n_nodes'][0][0]
 
-node_start_step = prev_solution['node_start_step'][0][0]
-node_end_step = prev_solution['node_end_step'][0][0]
-node_peak = prev_solution['node_peak'][0][0]
-jump_height = prev_solution['jump_height'][0][0]
+# SET PROBLEM STATE AND INPUT VARIABLES
+prb = problem.Problem(n_nodes)
+q = prb.createStateVariable('q', n_q)
+q_dot = prb.createStateVariable('q_dot', n_v)
+q_ddot = prb.createInputVariable('q_ddot', n_v)
+
+f_list = list()
+for i in range(n_c):
+    f_list.append(prb.createInputVariable(f'f{i}', n_f))
+
+# SET CONTACTS MAP
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
+contact_map = dict(zip(contacts_name, f_list))
+
+# SET DYNAMICS
+dt = prb.createInputVariable("dt", 1)  # variable dt as input
+# dt = 0.01
+# Computing dynamics
+x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
+prb.setDynamics(x_dot)
+
+# SET BOUNDS
+# q bounds
+q_min = [-10., -10., -10., -1., -1., -1., -1.]  # floating base
+q_min.extend(kindyn.q_min()[7:])
+q_min = np.array(q_min)
+
+q_max = [10., 10., 10., 1., 1., 1., 1.]  # floating base
+q_max.extend(kindyn.q_max()[7:])
+q_max = np.array(q_max)
+
+q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                   0.0, 0.9, -1.5238505,
+                   0.0, 0.9, -1.5202315,
+                   0.0, 0.9, -1.5300265,
+                   0.0, 0.9, -1.5253125])
+
+# q_dot bounds
+q_dot_lim = 100. * np.ones(n_v)
+# q_ddot bounds
+q_ddot_lim = 100. * np.ones(n_v)
+# f bounds
+f_lim = 10000. * np.ones(n_f)
+
+dt_min = 0.01  # [s]
+dt_max = 0.1  # [s]
+
+# set bounds and of q
+q.setBounds(q_min, q_max)
+q.setBounds(q_init, q_init, 0)
+# set bounds of q_dot
+q_dot_init = np.zeros(n_v)
+q_dot.setBounds(-q_dot_lim, q_dot_lim)
+q_dot.setBounds(q_dot_init, q_dot_init, 0)
+# set bounds of q_ddot
+q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
+# set bounds of f
+# for f in f_list:
+#     f.setBounds(-f_lim, f_lim)
+
+f_min = [-10000., -10000., -10.]
+f_max = [10000., 10000., 10000.]
+for f in f_list:
+    f.setBounds(f_min, f_max)
+# set bounds of dt
+if isinstance(dt, cs.SX):
+    dt.setBounds(dt_min, dt_max)
+
+
+# SET TRANSCRIPTION METHOD
+th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
+
+# SET INVERSE DYNAMICS CONSTRAINTS
+tau_lim = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
+                    1000., 1000., 1000.,  # Contact 1
+                    1000., 1000., 1000.,  # Contact 2
+                    1000., 1000., 1000.,  # Contact 3
+                    1000., 1000., 1000.])  # Contact 4
+
+tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, q_dot,
+                                                                                                             q_ddot,
+                                                                                                             contact_map)
+prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
+
+# SET FINAL VELOCITY CONSTRAINT
+prb.createFinalConstraint('final_velocity', q_dot)
+
+# SET CONTACT POSITION CONSTRAINTS
+active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
+
+mu = 1
+R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
+
+fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
+q_final = q_init
+
+for frame, f in contact_map.items():
+    # 2. velocity of each end effector must be zero
+    FK = cs.Function.deserialize(kindyn.fk(frame))
+    p = FK(q=q)['ee_pos']
+    p_start = FK(q=q_init)['ee_pos']
+    p_goal = p_start + [0., 0., jump_height]
+    DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
+    v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
+    DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
+    a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
+
+    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
+    prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
+
+    # friction cones must be satisfied
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+    prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
+    prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
+
+    prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
+
+    prb.createConstraint(f"start_{frame}_leg", p - p_start, nodes=node_start_step)
+    prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
+    prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
+
+
+# SET COST FUNCTIONS
+# prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
+prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
+for f in f_list:
+    prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
+
+# prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
+
+# =============
+# SOLVE PROBLEM
+# =============
+opts = {'ipopt.tol': 0.001,
+        'ipopt.constr_viol_tol': 0.001,
+        'ipopt.max_iter': 2000,
+        'ipopt.linear_solver': 'ma57'}
+
+solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+solver.solve()
+
+solution = solver.getSolutionDict()
+solution_constraints = solver.getConstraintSolutionDict()
+
+# ==================================================================================================================
+
+prev_solution = solution.copy()
+
+# ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
+# prev_solution = ms.load()
+
+# n_nodes = prev_solution['n_nodes'][0][0]
+
+# node_start_step = prev_solution['node_start_step'][0][0]
+# node_end_step = prev_solution['node_end_step'][0][0]
+# node_peak = prev_solution['node_peak'][0][0]
+# jump_height = prev_solution['jump_height'][0][0]
 
 prev_q = prev_solution['q']
 prev_q_dot = prev_solution['q_dot']
@@ -50,7 +231,7 @@ prev_f_list = list()
 for i in range(n_c):
     prev_f_list.append(prev_solution[f'f{i}'])
 
-prev_tau = prev_solution['inverse_dynamics']['val'][0][0]
+# prev_tau = prev_solution['inverse_dynamics']['val'][0][0]
 contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 prev_contact_map = dict(zip(contacts_name, prev_f_list))
 
@@ -92,56 +273,6 @@ nodes_vec_res = np.zeros([num_samples + 1])
 for i in range(1, num_samples + 1):
     nodes_vec_res[i] = nodes_vec_res[i - 1] + dt_res
 
-plot_flag = False
-
-if plot_flag:
-
-    for i_f in range(len(f_res_list)):
-        plt.figure()
-        for dim in range(f_res_list[i_f].shape[0]):
-            plt.plot(nodes_vec_res[:-1], np.array(f_res_list[i_f][dim, :]))
-
-        for dim in range(prev_f_list[i_f].shape[0]):
-            plt.scatter(nodes_vec[:-1], np.array(prev_f_list[i_f][dim, :]))
-
-    plt.figure()
-    for dim in range(q_res.shape[0]):
-        plt.plot(nodes_vec_res, np.array(q_res[dim, :]))
-
-    for dim in range(prev_q.shape[0]):
-        plt.scatter(nodes_vec, np.array(prev_q[dim, :]))
-    plt.title('q')
-
-    plt.figure()
-    for dim in range(qdot_res.shape[0]):
-        plt.plot(nodes_vec_res, np.array(qdot_res[dim, :]))
-
-    for dim in range(prev_q_dot.shape[0]):
-        plt.scatter(nodes_vec, np.array(prev_q_dot[dim, :]))
-    plt.title('qdot')
-
-    plt.figure()
-    for dim in range(qddot_res.shape[0]):
-        plt.plot(nodes_vec_res[:-1], np.array(qddot_res[dim, :]))
-
-    for dim in range(prev_q_ddot.shape[0]):
-        plt.scatter(nodes_vec[:-1], np.array(prev_q_ddot[dim, :]))
-    plt.title('q_ddot')
-
-    plt.figure()
-    for dim in range(6):
-        plt.plot(nodes_vec_res[:-1], np.array(tau_sol_res[dim, :]))
-    for dim in range(6):
-        plt.scatter(nodes_vec[:-1], np.array(prev_tau[dim, :]))
-    plt.title('tau on base')
-
-    plt.figure()
-    for dim in range(tau_sol_res.shape[0] - 6):
-        plt.plot(nodes_vec_res[:-1], np.array(tau_sol_res[6 + dim, :]))
-    for dim in range(prev_tau.shape[0] - 6):
-        plt.scatter(nodes_vec[:-1], np.array(prev_tau[6 + dim, :]))
-    plt.title('tau')
-    plt.show()
 
 tau_sol_base = tau_sol_res[:6, :]
 
@@ -282,73 +413,20 @@ print('n_nodes', n_nodes)
 
 # print('prev_dt_vec', prev_dt)
 # print('new_dt_vec', new_dt_vec)
+
+# if dt is variable:
+#     make_parametric(dt)
+
 # ======================================================================================================================
 # SET PROBLEM STATE AND INPUT VARIABLES
-prb = problem.Problem(n_nodes)
-q = prb.createStateVariable('q', n_q)
-q_dot = prb.createStateVariable('q_dot', n_v)
-q_ddot = prb.createInputVariable('q_ddot', n_v)
+prb.setNNodes(n_nodes)
 
-f_list = list()
-for i in range(n_c):
-    f_list.append(prb.createInputVariable(f'f{i}', n_f))
+for cnsrt in prb.getConstraints():
+    cnsrt.getNodes()
 
-# SET CONTACTS MAP
-contact_map = dict(zip(contacts_name, f_list))
+exit()
+# dt = prb.createParameter("dt", 1, nodes=range(1, n_nodes+1))  # variable dt as input
 
-# SET DYNAMICS
-# dt = prb.createParameter("dt", 1)  # variable dt as input
-dt = prb.createParameter("dt", 1, nodes=range(1, n_nodes+1))  # variable dt as input
-# dt = prb.createInputVariable("dt", 1)  # variable dt as input
-# dt = 0.01
-# Computing dynamics
-x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
-prb.setDynamics(x_dot)
-
-# SET BOUNDS
-# q bounds
-q_min = [-10., -10., -10., -1., -1., -1., -1.]  # floating base
-q_min.extend(kindyn.q_min()[7:])
-q_min = np.array(q_min)
-
-q_max = [10., 10., 10., 1., 1., 1., 1.]  # floating base
-q_max.extend(kindyn.q_max()[7:])
-q_max = np.array(q_max)
-
-q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                   0.0, 0.9, -1.5238505,
-                   0.0, 0.9, -1.5202315,
-                   0.0, 0.9, -1.5300265,
-                   0.0, 0.9, -1.5253125])
-
-# q_dot bounds
-q_dot_lim = 100. * np.ones(n_v)
-# q_ddot bounds
-q_ddot_lim = 100. * np.ones(n_v)
-# f bounds
-f_lim = 10000. * np.ones(n_f)
-
-# dt bounds
-dt_min = 0.01  # [s]
-dt_max = 0.1  # [s]
-
-# set bounds and of q
-q.setBounds(q_min, q_max)
-q.setBounds(q_init, q_init, 0)
-# set bounds of q_dot
-q_dot_init = np.zeros(n_v)
-q_dot.setBounds(-q_dot_lim, q_dot_lim)
-q_dot.setBounds(q_dot_init, q_dot_init, 0)
-# set bounds of q_ddot
-q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
-# set bounds of f
-# for f in f_list:
-#     f.setBounds(-f_lim, f_lim)
-
-f_min = [-10000., -10000., -10.]
-f_max = [10000., 10000., 10000.]
-for f in f_list:
-    f.setBounds(f_min, f_max)
 
 # SET INITIAL GUESS
 k = 0
@@ -383,6 +461,7 @@ for i_f in range(len(f_list)):
             k += 1
         if node in zip_indices_new.keys():
             f_list[i_f].setInitialGuess(f_res_list[i_f][:, zip_indices_new[node]], node)
+
 
 plot_ig = True
 if plot_ig:
@@ -449,47 +528,8 @@ if plot_ig:
     # ========================================================================================================
     plt.show()
 
-# SET TRANSCRIPTION METHOD
-th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
 
-# SET INVERSE DYNAMICS CONSTRAINTS
-tau_lim = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
-                    1000., 1000., 1000.,  # Contact 1
-                    1000., 1000., 1000.,  # Contact 2
-                    1000., 1000., 1000.,  # Contact 3
-                    1000., 1000., 1000.])  # Contact 4
-
-tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, q_dot,
-                                                                                                             q_ddot,
-                                                                                                             contact_map)
-prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
-
-# SET FINAL VELOCITY CONSTRAINT
 prb.createFinalConstraint('final_velocity', q_dot)
-
-# SET CONTACT POSITION CONSTRAINTS
-active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
-
-mu = 1
-R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
-
-# base_link stays at the same position
-# FK = cs.Function.deserialize(kindyn.fk('base_link'))
-# p_base = FK(q=q)['ee_pos']
-# p_base_start = FK(q=q_init)['ee_pos']
-
-# prb.createCostFunction(f"base_link_pos", 1000*cs.sumsqr(p_base[0:2] - p_base_start[0:2]))
-
-# DFK = cs.Function.deserialize(kindyn.frameVelocity('base_link', cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
-# v_base = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-# 2. velocity of each base_link must be zero
-# prb.createConstraint(f"base_link_vel_before_step", v_base, nodes=range(0, node_start_step))
-# prb.createConstraint(f"base_link_vel_after_step", v_base, nodes=range(node_end_step, n_nodes + 1))
-# COM = cs.Function.deserialize(kindyn.centerOfMass())
-# p_com = COM(q=q_init)['com']
-# exit()
-fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
-q_final = q_init
 
 for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
@@ -516,10 +556,6 @@ for frame, f in contact_map.items():
     prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
 
 
-# SET COST FUNCTIONS
-# prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
-# prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-# prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 

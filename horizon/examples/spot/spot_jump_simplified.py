@@ -9,19 +9,12 @@ from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 from scipy.io import loadmat
-
-def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
-    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
-    traj_z = np.full(traj_len_before, 0.)
-    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
-    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
-    return traj_z
-
+# import rospkg
 
 # =========================================
 ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
 
-transcription_method = 'multiple_shooting'  # direct_collocation
+transcription_method = 'multiple_shooting'  # direct_collocation # multiple_shooting
 transcription_opts = dict(integrator='RK4')
 
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
@@ -33,21 +26,17 @@ joint_names = kindyn.joint_names()
 if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
-
-
 n_nodes = 50
 
 node_start_step = 20
 node_end_step = 40
 node_peak = 30
-jump_height = 0.3
+jump_height = 0.2
 
 n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
-
-
 
 # SET PROBLEM STATE AND INPUT VARIABLES
 prb = problem.Problem(n_nodes)
@@ -72,7 +61,7 @@ if load_initial_guess:
     q_dot_ig = prev_solution['q_dot']
     q_ddot_ig = prev_solution['q_ddot']
     f_ig_list = list()
-    for f in f_list:
+    for i in range(n_c):
         f_ig_list.append(prev_solution[f'f{i}'])
 
     dt_ig = prev_solution['dt']
@@ -111,22 +100,22 @@ dt_min = 0.01  # [s]
 dt_max = 0.1  # [s]
 
 # set bounds and of q
-q.setBounds(q_min, q_max)
+# q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, 0)
 # set bounds of q_dot
 q_dot_init = np.zeros(n_v)
-q_dot.setBounds(-q_dot_lim, q_dot_lim)
+# q_dot.setBounds(-q_dot_lim, q_dot_lim)
 q_dot.setBounds(q_dot_init, q_dot_init, 0)
 # set bounds of q_ddot
-q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
+# q_ddot.setBounds(-q_ddot_lim, q_ddot_lim)
 # set bounds of f
 # for f in f_list:
 #     f.setBounds(-f_lim, f_lim)
 
 f_min = [-10000., -10000., -10.]
 f_max = [10000., 10000., 10000.]
-for f in f_list:
-    f.setBounds(f_min, f_max)
+# for f in f_list:
+#     f.setBounds(f_min, f_max)
 # set bounds of dt
 if isinstance(dt, cs.SX):
     dt.setBounds(dt_min, dt_max)
@@ -173,57 +162,62 @@ tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinD
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
 
 # SET FINAL VELOCITY CONSTRAINT
-# prb.createFinalConstraint('final_velocity', q_dot)
+prb.createFinalConstraint('final_velocity', q_dot)
 
 # SET CONTACT POSITION CONSTRAINTS
-active_leg = list()
 active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
-
 q_final = q_init
-q_final[0] = q_final[0] + 0.3
 
 for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
+    FK = cs.Function.deserialize(kindyn.fk(frame))
+    p = FK(q=q)['ee_pos']
+    p_start = FK(q=q_init)['ee_pos']
+    p_goal = p_start + [0., 0., jump_height]
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
+    DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
+    a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
-    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step + 1))
+    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
     prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-
     prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
     prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
-
     prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
+    prb.createConstraint(f"start_{frame}_leg", p - p_start, nodes=node_start_step)
+    prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
+    prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
 
-prb.createFinalConstraint(f"final_nominal_fb", q - q_final)
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 5 * cs.sumsqr(q_dot))
-# prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
-
+prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
 for f in f_list:
-    prb.createIntermediateCost(f"min_{f.getName()}", 0.001 * cs.sumsqr(f))
+    prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
+# prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
 
 # =============
 # SOLVE PROBLEM
 # =============
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 2000}
-# 'ipopt.linear_solver': 'ma57'}
+        'ipopt.max_iter': 2000,
+        'ipopt.linear_solver': 'ma57'}
 
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
+tic = time.time()
 solver.solve()
-
+toc = time.time() - tic
+print(f'time to solve: {toc}')
 solution = solver.getSolutionDict()
 solution_constraints = solver.getConstraintSolutionDict()
 

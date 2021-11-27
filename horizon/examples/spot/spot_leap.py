@@ -37,10 +37,11 @@ if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint
 
 n_nodes = 50
 
-node_start_step = 20
-node_end_step = 40
-node_peak = 30
-jump_height = 0.3
+node_start_leap_front = 15
+node_end_leap_front = 35
+
+node_start_leap_hind = 25
+node_end_leap_hind = 45
 
 n_c = 4
 n_q = kindyn.nq()
@@ -182,33 +183,43 @@ active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-q_final = q_init
-q_final[0] = q_final[0] + 0.3
+q_flight = q_init.copy()
+q_flight[2] = q_flight[2] + 0.3
+
+q_final = q_init.copy()
+q_final[0] = q_final[0] + 0.5
+q_final[2] = q_final[2] + 0.3
 
 for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-
-    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step + 1))
-    prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
-
-    # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
 
-    prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
-    prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
+    if frame in ['lf_foot', 'rf_foot']:
+        prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_leap_front + 1))
+        prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_leap_front, n_nodes + 1))
+
+        prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_leap_front, node_end_leap_front))
+
+        # prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_end_leap_front), bounds=dict(lb=fc_lb, ub=fc_ub))
+        # prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_leap_front, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
+
+    if frame in ['lh_foot', 'rh_foot']:
+        prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_leap_hind + 1))
+        prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_leap_hind, n_nodes + 1))
+    #
+        prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_leap_hind, node_end_leap_hind))
+    #
+        # prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_end_leap_hind), bounds=dict(lb=fc_lb, ub=fc_ub))
+        # prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_leap_hind, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
 
-    prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
-
-
-prb.createFinalConstraint(f"final_nominal_fb", q - q_final)
+prb.createFinalConstraint(f"final_nominal_fb", q[0:3] - q_final[0:3])
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 5 * cs.sumsqr(q_dot))
-# prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
-
+prb.createCostFunction("min_q_dot", 1 * cs.sumsqr(q_dot))
+prb.createCostFunction("fb", 1 * cs.sumsqr(q[2] - q_flight[2]))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.001 * cs.sumsqr(f))
 
@@ -234,69 +245,17 @@ for name, item in prb.getConstraints().items():
     ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
     solution_constraints_dict[name] = dict(val=solution_constraints[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
 
-info_dict = dict(n_nodes=n_nodes, node_start_step=node_start_step, node_end_step=node_end_step, node_peak=node_peak, jump_height=jump_height)
+info_dict = dict(n_nodes=n_nodes,
+                 node_start_leap_front=node_start_leap_front,
+                 node_start_leap_hind=node_start_leap_hind,
+                 node_end_leap_front=node_end_leap_front,
+                 node_end_leap_hind=node_end_leap_hind)
 
 if isinstance(dt, cs.SX):
     ms.store({**solution, **solution_constraints_dict, **info_dict})
 else:
     dt_dict = dict(dt=dt)
     ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})
-
-
-# ========================================================
-plot_all = False
-plot_fun = False
-plot_forces = False
-
-if plot_forces:
-    for f in [f'f{i}' for i in range(len(contacts_name))]:
-        plt.figure()
-        for dim in range(solution[f].shape[0]):
-            plt.plot(np.array(range(solution[f].shape[1])), solution[f][dim, :])
-
-        plt.title(f'force {f}')
-
-    plt.show()
-
-if plot_fun:
-
-    hplt = plotter.PlotterHorizon(prb, solution)
-    # hplt.plotVariables(show_bounds=True, legend=False)
-    hplt.plotFunctions(show_bounds=True)
-    # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
-    plt.show()
-
-if plot_all:
-    pos_contact_list = list()
-    for contact in contacts_name:
-        FK = cs.Function.deserialize(kindyn.fk(contact))
-        pos = FK(q=solution['q'])['ee_pos']
-        plt.figure()
-        plt.title(contact)
-        for dim in range(n_f):
-            plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3, linestyle='dotted')
-
-        plt.vlines([node_start_step, node_end_step], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
-
-    plt.figure()
-    for contact in contacts_name:
-        FK = cs.Function.deserialize(kindyn.fk(contact))
-        pos = FK(q=solution['q'])['ee_pos']
-
-        plt.title(f'plane_xy')
-        plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
-
-    plt.figure()
-    for contact in contacts_name:
-        FK = cs.Function.deserialize(kindyn.fk(contact))
-        pos = FK(q=solution['q'])['ee_pos']
-
-        plt.title(f'plane_xz')
-        plt.scatter(np.array(pos[0, :]), np.array(pos[2, :]), linewidth=0.1)
-
-    plt.show()
-# ======================================================
-
 
 contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))

@@ -170,9 +170,8 @@ active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0, 0, 0.8509035, 0.525322])
 q_final = q_init
-q_final[3:7] = [0, 0, 0.8509035, 0.525322]
+q_final[3:7] = [0, 0, 0.8509035, 0.525322] #0, 0, 0.8509035, 0.525322 0, 0, 0.7071068, 0.7071068 # 0, 0, 0.7071068, 0.7071068
 
 for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
@@ -185,7 +184,7 @@ for frame, f in contact_map.items():
     DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
-    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
+    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step + 1))
     prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
@@ -195,22 +194,16 @@ for frame, f in contact_map.items():
 
     prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
-    # prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
-    prb.createConstraint(f"land_{frame}_leg", p[2] - p_start[2], nodes=node_end_step)
-
-    # this is useful?
-    # prb.createConstraint(f"subterrain_{frame}_leg", p[2] - p_start[2], bounds=dict(lb=-0.0001))
 
 # SET COST FUNCTIONS
-# pose of the robot during jump
-prb.createCostFunction(f"jump_fb", 1000 * cs.sumsqr(q[0:7] - fb_during_jump), nodes=range(node_start_step, node_end_step)) #nodes_end_step
 # minimum joint velocity
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+prb.createCostFunction("min_q_dot", 3 * cs.sumsqr(q_dot))
 # final pose of the robot
-prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q - q_final))
+# prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q - q_final))
+prb.createFinalConstraint(f"final_nominal_pos", q - q_final)
 # forces
 for f in f_list:
-    prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
+    prb.createIntermediateCost(f"min_{f.getName()}", 0.02 * cs.sumsqr(f))
 
 # prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
 
@@ -219,8 +212,8 @@ for f in f_list:
 # =============
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 2000}
-# 'ipopt.linear_solver': 'ma57'}
+        'ipopt.max_iter': 5000,
+        'ipopt.linear_solver': 'ma57'}
 
 solver = solver.Solver.make_solver('ipopt', prb, dt, opts)
 solver.solve()
@@ -235,11 +228,13 @@ for name, item in prb.getConstraints().items():
     ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
     solution_constraints_dict[name] = dict(val=solution_constraints[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
 
+info_dict = dict(n_nodes=n_nodes, node_start_step=node_start_step, node_end_step=node_end_step, node_peak=node_peak, jump_height=jump_height)
+
 if isinstance(dt, cs.SX):
-    ms.store({**solution, **solution_constraints_dict})
+    ms.store({**solution, **solution_constraints_dict, **info_dict})
 else:
-    dt_dict = dict(constant_dt=dt)
-    ms.store({**solution, **solution_constraints_dict, **dt_dict})
+    dt_dict = dict(dt=dt)
+    ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})
 
 
 # ========================================================
