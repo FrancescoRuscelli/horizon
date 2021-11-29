@@ -158,6 +158,7 @@ class MultipleShooting(Transcriptor):
             ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
         # if dt is an array of elements, that may be values or parameters or variables:
         elif hasattr(self.dt, '__iter__'):
+            print('EXPERIMENTAL: be careful')
             for node_n in range(1, len(self.dt)):
                 state_int = self.__integrate(self.state_prev, self.input_prev, self.dt[node_n-1])
                 ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=node_n)
