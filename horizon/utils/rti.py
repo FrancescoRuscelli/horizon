@@ -9,9 +9,10 @@ class RealTimeIteration:
         # define integrator to simulate the system (should be optional)
         x = prb.getState().getVars()
         u = prb.getInput().getVars()
+        self.dt = dt
         xdot = prb.getDynamics()
         dae = {'x': x, 'p': u, 'ode': xdot, 'quad': 0}
-        self.integrator = integrators.RK4(dae, {'tf': dt})
+        self.integrator = integrators.RK4(dae)
         
         self.solution = None
         self.state = prb.getState()
@@ -34,5 +35,5 @@ class RealTimeIteration:
 
     def integrate(self, stateread: np.array, u_opt: np.array):
         # integrate input and return
-        stateint = self.integrator(x0=stateread, p=u_opt)['xf'].toarray().flatten()
+        stateint = self.integrator(x0=stateread, p=u_opt, time=self.dt)['xf'].toarray().flatten()
         return stateint

@@ -7,11 +7,12 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 
-def make_integrator(x, xdot, u, l, dt):
+def make_integrator(x, xdot, u, l):
     """A trivial Euler integrator"""
+    dt = cs.SX.sym('dt', 1)
     xnext = x + xdot*dt
     lint = l*dt 
-    return cs.Function('F_int', [x, u], [xnext, lint], ['x0', 'p'], ['xf', 'qf'])
+    return cs.Function('F_int', [x, u, dt], [xnext, lint], ['x0', 'p', 'dt'], ['xf', 'qf'])
 
 N = 10
 dt = 0.1
@@ -33,14 +34,15 @@ if use_transcription_methods:
 
     xdot = cs.vertcat(v, F)
     prob.setDynamics(xdot)
+    prob.setDt(dt)
     l = cs.sumsqr(F)  # useless
 
     use_ms = True
     if use_ms:  # multiple shooting
-        my_integrator = make_integrator(x, xdot, F, l, dt)
-        th = Transcriptor.make_method('multiple_shooting', prob, dt, opts=dict(integrator=my_integrator))
+        my_integrator = make_integrator(x, xdot, F, l)
+        th = Transcriptor.make_method('multiple_shooting', prob, opts=dict(integrator=my_integrator))
     else:
-        th = Transcriptor.make_method('direct_collocation', prob, dt)
+        th = Transcriptor.make_method('direct_collocation', prob)
 
 
 else:
@@ -73,7 +75,7 @@ prob.createCostFunction('cost', cs.sumsqr(F), nodes=range(N))  # TODO: intermedi
 
 # solve
 opts={'ipopt.max_iter': 10}
-solver = solver.Solver.make_solver('ipopt', prob, dt, opts)
+solver = solver.Solver.make_solver('ipopt', prob, opts)
 solver.solve()
 
 solution = solver.getSolutionDict()

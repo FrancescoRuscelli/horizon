@@ -133,27 +133,42 @@ class MultipleShooting(Transcriptor):
         else:
             self.integrator = integrator
 
-        # todo if the dt is a variable, the integrator requires it (its offset)
-        dt = prob.getDt()
+        # todo add support for dt that is not a variable/parameter of the problem but depends on problem variables/parameters
+        # if dt is a single SX (which means that it involves ALL nodes):
+        if isinstance(self.dt, cs.SX):
+            # for var in self.problem.getVariables().values():
+            #     if cs.depends_on(self.dt, var):
+            #         if var.getNodes() != -1 or len(var.getNodes()) != self.problem.getNNodes():
+            #             raise Exception('dt must depend on variables that are defined over all the nodes.')
+            #         else:
+            if isinstance(self.dt, Variable) or isinstance(self.dt, SingleVariable):
+                if isinstance(self.dt, Variable) or isinstance(self.dt, SingleVariable):
+                    self.dt_prev = self.dt.getVarOffset(-1)
+                elif isinstance(self.dt, Parameter) or isinstance(self.dt, SingleParameter):
+                    self.dt_prev = self.dt
 
-        if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
-            state_int = self.__integrate(self.state_prev, self.input_prev, self.dt_prev)
-        elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
+                state_int = self.__integrate(self.state_prev, self.input_prev, self.dt_prev)
+            else:
+                raise Exception('dt not supported: not a variable/parameter of the problem. Please build your own transcriptor.')
+
+            ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
+        # if dt is a single value (which means that it involves ALL nodes):
+        elif isinstance(self.dt, (float, int)):
             state_int = self.__integrate(self.state_prev, self.input_prev, self.dt)
-        else:
-            state_int = self.__integrate(self.state_prev, self.input_prev)
-
-        ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
+            ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
+        # if dt is an array of elements, that may be values or parameters or variables:
+        elif hasattr(self.dt, '__iter__'):
+            for node_n in range(1, len(self.dt)):
+                state_int = self.__integrate(self.state_prev, self.input_prev, self.dt[node_n-1])
+                ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=node_n)
 
     def setDefaultIntegrator(self, integrator_type):
 
         # todo if the dt is not a abstract value, add option['tf']
         #  the integrator should be refactored a bit
         opts = dict()
-        if not isinstance(self.dt, AbstractVariable):
-            opts['tf'] = self.dt
-
         dae = dict()
+
         dae['x'] = self.state
         dae['p'] = self.input
         dae['ode'] = self.state_dot
@@ -161,16 +176,12 @@ class MultipleShooting(Transcriptor):
 
         self.integrator = integ.__dict__[integrator_type](dae=dae, opts=opts, casadi_type=cs.SX)
 
-    def __integrate(self, state, input, dt=None):
+    def __integrate(self, state, input, dt):
 
         if self.state_dot is None:
             raise Exception('Dynamics of the system is not specified. Missing "state_dot"')
 
-        # todo if dt is none, it means that dt is constant (float) and not a variable of the problem
-        if dt is None:
-            state_int = self.integrator(state, input)[0]
-        else:
-            state_int = self.integrator(state, input, dt)[0]
+        state_int = self.integrator(state, input, dt)[0]
         return state_int
 
 

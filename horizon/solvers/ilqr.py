@@ -39,27 +39,21 @@ class SolverILQR(Solver):
 
         # handle parametric time
         integrator_opt = {}
+
+        self.int = integrators.__dict__[integrator_name](dae, integrator_opt)
         if isinstance(self.dt, float):
-            integrator_opt['tf'] = self.dt
+            # integrator_opt['tf'] = self.dt
+            x_int = self.int(self.x, self.u, self.dt)[0]
+            dt_name = 'dt'
+            time = cs.SX.sym(dt_name, 0)
+
         elif isinstance(self.dt, Parameter):
+            time = cs.SX.sym(self.dt.getName(), 1)
+            x_int = self.int(self.x, self.u, time)[0]
+            dt_name = self.dt.getName()
             pass
         else:
             raise TypeError('ilqr supports only float and Parameter dt')
-
-        self.int = integrators.__dict__[integrator_name](dae, integrator_opt)
-
-        # handle possible parametric time 
-        dt_name = 'dt'
-        if self.int.n_in() == 3:
-            time = cs.SX.sym(self.dt.getName(), 1)
-            dt_name = self.dt.getName()
-            x_int = self.int(self.x, self.u, time)[0]
-        elif self.int.n_in() == 2:
-            time = cs.SX.sym(dt_name, 0)
-            x_int = self.int(self.x, self.u)[0]
-        else:
-            raise IndexError('integrated dynamics should either have 2 or 3 inputs')
-
 
         self.dyn = cs.Function('f', 
                                {'x': self.x, 'u': self.u, dt_name: time, 'f': x_int},

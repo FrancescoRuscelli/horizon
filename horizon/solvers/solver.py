@@ -100,7 +100,25 @@ class Solver(ABC):
         Returns:
             bool: success flag
         """
-        pass 
+        pass
+
+    def getSolutionDict(self):
+        """
+        Get the horizon's solution
+
+        Returns:
+            dict: dictionary of variable optimized
+        """
+        pass
+
+    def getDt(self):
+        """
+        Get the horizon's dt as a vector of dt for each node.
+
+        Returns:
+            array: array of dt values for each node
+        """
+        pass
 
     def configure_rti(self) -> bool:
         """

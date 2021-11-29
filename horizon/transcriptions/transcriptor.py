@@ -61,8 +61,4 @@ class Transcriptor(ABC):
         self.input = cs.vertcat(*input_list)
         self.input_prev = cs.vertcat(*input_prev_list)
 
-        # todo if the dt is a variable, then compute also the dt_prev, which is used by the RK4 integrator
-        if isinstance(self.dt, Variable) or isinstance(self.dt, SingleVariable):
-            self.dt_prev = self.dt.getVarOffset(-1)
-
 

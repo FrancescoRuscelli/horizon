@@ -10,8 +10,8 @@ import os
 import time
 from horizon.ros import utils as horizon_ros_utils
 
-horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
-time.sleep(3.)
+# horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
+# time.sleep(3.)
 
 # Switch between suspended and free fall
 FREE_FALL = True
@@ -64,8 +64,7 @@ prb.setDt(dt)
 
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
-opts = {'tf': dt}
-F_integrator = integrators.RK4(dae, opts, cs.SX)
+F_integrator = integrators.RK4(dae)
 
 # Add bounds to STATE and CONTROL variables
 q_min = [-10.0, -10.0, -10.0, -1.0, -1.0, -1.0, -1.0,  # Floating base

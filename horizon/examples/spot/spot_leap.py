@@ -234,6 +234,7 @@ opts = {'ipopt.tol': 0.001,
 
 solver = solver.Solver.make_solver('ipopt', prb, opts)
 solver.solve()
+sol_dt = solver.getDt()
 
 solution = solver.getSolutionDict()
 solution_constraints = solver.getConstraintSolutionDict()

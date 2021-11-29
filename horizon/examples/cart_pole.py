@@ -110,6 +110,9 @@ solver.solve()
 toc = time.time()
 print('time elapsed solving:', toc - tic)
 solution = solver.getSolutionDict()
+dt_sol = solver.getDt()
+
+print(dt_sol)
 q_hist = solution["q"]
 
 time = np.arange(0.0, tf+1e-6, tf/ns)

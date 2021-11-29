@@ -34,8 +34,7 @@ prb.setDt(dt)
 
 print(f'xdot: {xdot}')
 dae = {'x': dx, 'p': du, 'ode': xdot, 'quad': []}
-opts = {'tf': T/N}
-F_integrator = integrators.RK4(dae, opts, cs.SX)
+F_integrator = integrators.RK4(dae)
 print(f"F_integrator: {F_integrator}")
 
 # Cost function
@@ -46,7 +45,7 @@ prb.createCostFunction('min_dx_prev', dx_prev, nodes=list(range(N, N+1)))
 
 # Constraints
 du_prev = du.getVarOffset(-1)
-x_int = F_integrator(x0=dx_prev, p=du_prev)
+x_int = F_integrator(x0=dx_prev, p=du_prev, time=dt)
 prb.createConstraint("multiple_shooting", x_int["xf"] - dx, nodes=list(range(1, N+1)))
 
 # SQP solver requires cost function in form of residual!

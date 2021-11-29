@@ -26,12 +26,13 @@ x = state.getVars()
 
 xdot = cs.vertcat(v, F) #- mu*grav*np.sign(v)
 prob.setDynamics(xdot)
+prob.setDt(dt)
 
 use_ms = False
 if use_ms:
-    th = Transcriptor.make_method('multiple_shooting', prob, dt)
+    th = Transcriptor.make_method('multiple_shooting', prob)
 else:
-    th = Transcriptor.make_method('direct_collocation', prob, dt) # opts=dict(degree=5)
+    th = Transcriptor.make_method('direct_collocation', prob) # opts=dict(degree=5)
 
 # set initial state (rest in zero)
 p.setBounds(lb=[0, 0], ub=[0, 0], nodes=0)
@@ -52,7 +53,7 @@ obs_cnsrt.setUpperBounds(np.inf)
 prob.createIntermediateCost('cost', cs.sumsqr(F))
 
 # solve
-solver = solver.Solver.make_solver('ipopt', prob, dt)
+solver = solver.Solver.make_solver('ipopt', prob)
 solver.solve()
 solution = solver.getSolutionDict()
 

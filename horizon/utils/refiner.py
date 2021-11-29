@@ -29,7 +29,6 @@ class Refiner:
         prev_dt = prev_solution['dt'].flatten()
 
         self.nodes_vec = self.get_nodes_dt_constant(prev_dt)
-
         self.new_n_nodes = self.new_nodes_vec.shape[0]
         new_dt_vec = np.diff(self.new_nodes_vec)
 

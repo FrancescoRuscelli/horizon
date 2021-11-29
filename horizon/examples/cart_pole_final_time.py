@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from casadi_kin_dyn import pycasadi_kin_dyn
+from horizon.transcriptions.transcriptor import Transcriptor
 import casadi as cs
 import numpy as np
 from horizon import problem
@@ -16,8 +17,6 @@ import os
 import time
 from horizon.ros import utils as horizon_ros_utils
 
-horizon_ros_utils.roslaunch("horizon_examples", "cart_pole.launch")
-time.sleep(3.)
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
@@ -95,6 +94,7 @@ prb.setDt(dt)
 
 x_int = F_integrator(x0=x_prev, p=u_prev, time=dt)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))
+# th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='RK4')) # should not work
 prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
 

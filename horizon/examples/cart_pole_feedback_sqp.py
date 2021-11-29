@@ -53,8 +53,7 @@ x_prev = cs.vertcat(q_prev, qdot_prev)
 tf = ns * dt  # [s]
 L = 0.5 * cs.dot(u, u)  # Objective term
 dae = {'x': x, 'p': u, 'ode': xdot, 'quad': L}
-opts = {'tf': dt}
-F_integrator = integrators.EULER(dae, opts)
+F_integrator = integrators.EULER(dae)
 
 # Limits
 q_min = np.array([-1, -2.*np.pi])
@@ -89,7 +88,7 @@ prb.createFinalConstraint("final_qdot", qdot)
 
 # Dynamics
 if use_ms:
-    x_int = F_integrator(x0=x_prev, p=u_prev)
+    x_int = F_integrator(x0=x_prev, p=u_prev, time=dt)
     prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns + 1))
 else:
     prb.setDynamics(xdot)
@@ -124,7 +123,8 @@ solver.set_iteration_callback()
 class RealTimeIteration:
 
     def __init__(self, dt: float) -> None:
-        self.integrator = integrators.RK4(dae, {'tf': dt})
+        self.integrator = integrators.RK4(dae)
+        self.dt = dt
 
     def run(self, stateread: np.array):
         # set initial state
@@ -141,9 +141,8 @@ class RealTimeIteration:
         u_opt = solution['u'][:, 0]
 
         # integrate input
-        stateint = self.integrator(x0=stateread, p=u_opt)['xf'].toarray().flatten()
+        stateint = self.integrator(x0=stateread, p=u_opt, time=self.dt)['xf'].toarray().flatten()
         return stateint, u_opt
-
 
 # the rti loop
 rti = RealTimeIteration(dt=0.01)

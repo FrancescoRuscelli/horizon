@@ -49,9 +49,8 @@ prb.setDt(dt)
 
 L = 0.5 * cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
-opts = {'tf': tf / ns}
-F_integrator_LEAPFROG = integrators.LEAPFROG(dae, opts, cs.SX)
-F_integrator = integrators.RK4(dae, opts, cs.SX)
+F_integrator_LEAPFROG = integrators.LEAPFROG(dae)
+F_integrator = integrators.RK4(dae)
 
 # Bounds and initial guess
 q_min = [-10.0, -10.0, -10.0, -1.0, -1.0, -1.0, -1.0,  # Floating base
@@ -110,7 +109,7 @@ q_prev = q.getVarOffset(-1)
 qdot_prev = qdot.getVarOffset(-1)
 qddot_prev = qddot.getVarOffset(-1)
 x_prev, _ = utils.double_integrator_with_floating_base(q_prev, qdot_prev, qddot_prev)
-x_int = F_integrator(x0=x_prev, p=qddot_prev)
+x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt)
 
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, 2)))
 
@@ -118,7 +117,7 @@ q_pprev = q.getVarOffset(-2)
 qdot_pprev = qdot.getVarOffset(-2)
 qddot_pprev = qddot.getVarOffset(-2)
 x_pprev, _ = utils.double_integrator_with_floating_base(q_pprev, qdot_pprev, qddot_pprev)
-x_int2 = F_integrator_LEAPFROG(x0=x_prev, x0_prev=x_pprev, p=qddot_prev)
+x_int2 = F_integrator_LEAPFROG(x0=x_prev, x0_prev=x_pprev, p=qddot_prev, time=dt)
 prb.createConstraint("multiple_shooting2", x_int2["xf"] - x, nodes=list(range(2, ns + 1)))
 
 # INVERSE DYNAMICS

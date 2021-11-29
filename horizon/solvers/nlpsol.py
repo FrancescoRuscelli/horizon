@@ -1,5 +1,6 @@
 from horizon.solvers import Solver
 from horizon.problem import Problem
+from horizon.variables import AbstractVariable
 from typing import Dict
 import casadi as cs
 import numpy as np
@@ -13,6 +14,7 @@ class NlpsolSolver(Solver):
         
         self.var_solution: Dict[str:np.array] = None
         self.cnstr_solution: Dict[str:np.array] = None
+        self.dt_solution: np.array = None
         
         # generate problem to be solved
         self.var_container = self.prb.var_container
@@ -54,7 +56,7 @@ class NlpsolSolver(Solver):
         var_list = list()
         for var in self.var_container.getVarList(offset=False):
             var_list.append(var.getImpl())
-        w = cs.vertcat(*var_list) #
+        w = cs.vertcat(*var_list)
 
 
         # build parameters
@@ -239,7 +241,47 @@ class NlpsolSolver(Solver):
                 pass
             pos = pos + var.shape[0] * len(var.getNodes())
 
+        # build dt_solution as an array
+        self.dt_solution = np.zeros(self.prb.getNNodes()-1)
+        dt = self.prb.getDt()
 
+        # fill dt_solution
+
+        # if it is a symbolic variable, its corresponding solution must be retrieved.
+        # if dt is directly an optimization variable, that's ok, I get it from the var_solution
+        # if dt is a function of some other optimization variables, get all of them and compute the optimized dt
+        #   I do this by using a Function to wrap everything
+
+        if isinstance(dt, cs.SX):
+            var_depend = list()
+            for var in self.prb.getVariables().values():
+                if cs.depends_on(dt, var):
+                    var_depend.append(var)
+
+            temp_dt = cs.Function('temp_dt', var_depend, [dt])
+
+            # fill the self.dt_solution with all the dt values
+            for node_n in range(self.prb.getNNodes()-1):
+                self.dt_solution[node_n] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])[node_n]
+
+        # if dt is a value, set it to each element of dt_solution
+        elif isinstance(dt, (float, int)):
+            for node_n in range(self.prb.getNNodes() - 1):
+                self.dt_solution[node_n] = dt
+        # if dt is a a list, get each dt separately
+        # TODO WIP
+        elif len(dt) == self.prb.getNNodes():
+            print('WARNING: work in progress.')
+            sol_n = 0
+            for node_n in range(self.prb.getNNodes()-1):
+                dt_val = dt[node_n]
+                if isinstance(dt_val, AbstractVariable):
+                    self.dt_solution[node_n] = self.var_solution[dt_val.getName()][sol_n]
+                    sol_n += 1
+                else:
+                    self.dt_solution[node_n] = dt[node_n]
+
+        # print(self.dt_solution)
         # print(f'{self.x_opt.shape}:, {self.x_opt}')
         # print(f'{self.u_opt.shape}:, {self.u_opt}')
 
@@ -250,6 +292,9 @@ class NlpsolSolver(Solver):
 
     def getConstraintSolutionDict(self):
         return self.cnstr_solution
+
+    def getDt(self):
+        return self.dt_solution
 
 if __name__ == '__main__':
 
