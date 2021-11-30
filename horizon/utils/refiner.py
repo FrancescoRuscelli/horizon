@@ -12,25 +12,29 @@ from horizon.solvers import Solver
 from itertools import groupby
 from operator import itemgetter
 
-
 class Refiner:
-    def __init__(self, prb: problem.Problem, new_nodes_vec, prev_solution):
+    def __init__(self, prb: problem.Problem, new_nodes_vec, solver):
 
-        self.prev_solution = prev_solution
-
+        # self.prev_solution = solver.getSolutionDict()
+        self.prev_solution = solver
         self.prb = prb
         self.old_n_nodes = self.prb.getNNodes()
-        self.new_nodes_vec = new_nodes_vec
-        # todo
-        # dt = prb.getDt()
-        # print(dt)
-        ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
-        prev_solution = ms.load()
-        prev_dt = prev_solution['dt'].flatten()
 
-        self.nodes_vec = self.get_nodes_dt_constant(prev_dt)
+        # new array of vector.
+        #    Dimension: new n of nodes
+        #    Elements: cumulative dt
+        self.new_nodes_vec = new_nodes_vec
+
+        prev_dt = self.prev_solution['dt'].flatten()
+        # prev_dt = solver.getDt()
+
+        print(prev_dt)
+        self.nodes_vec = self.get_node_time(prev_dt)
+
+        print(self.nodes_vec)
+
         self.new_n_nodes = self.new_nodes_vec.shape[0]
-        new_dt_vec = np.diff(self.new_nodes_vec)
+        self.new_dt_vec = np.diff(self.new_nodes_vec)
 
         old_values = np.in1d(self.new_nodes_vec, nodes_vec)
         self.new_indices = np.arange(len(self.new_nodes_vec))[~old_values]
@@ -59,7 +63,7 @@ class Refiner:
 
         print('elem_and_expansion', self.elem_and_expansion)
 
-    def get_nodes_dt_constant(self, dt):
+    def get_node_time(self, dt):
         nodes_vec = np.zeros([self.old_n_nodes])
         for i in range(1, n_nodes + 1):
             nodes_vec[i] = nodes_vec[i - 1] + dt[i - 1]
@@ -191,6 +195,7 @@ class Refiner:
     #
     def solveProblem(self):
 
+
         # =============
         # SOLVE PROBLEM
         # =============
@@ -200,21 +205,16 @@ class Refiner:
                 'ipopt.linear_solver': 'ma57'}
 
         # parametric time
-        for i in range(len(new_dt_vec)):
-            dt.assign(new_dt_vec[i], nodes=i + 1)
+        for i in range(len(self.new_dt_vec)):
+            dt.assign(self.new_dt_vec[i], nodes=i + 1)
 
         sol = Solver.make_solver('ipopt', prb, opts)
-        sol.solve()
-
+        solver.solve()
         solution = sol.getSolutionDict()
 
 
 
-
-
 # =========================================
-ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
-
 transcription_method = 'multiple_shooting'  # direct_collocation # multiple_shooting
 transcription_opts = dict(integrator='RK4')
 
@@ -229,6 +229,7 @@ joint_names = kindyn.joint_names()
 if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
+
 n_nodes = 50
 
 node_start_step = 20
@@ -241,9 +242,7 @@ n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-# ============================================================================================================
-# ============================================ PROBLEM =======================================================
-# ============================================================================================================
+
 
 # SET PROBLEM STATE AND INPUT VARIABLES
 prb = problem.Problem(n_nodes)
@@ -258,6 +257,21 @@ for i in range(n_c):
 # SET CONTACTS MAP
 contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
+
+
+load_initial_guess = True
+# import initial guess if present
+if load_initial_guess:
+    ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
+    prev_prev_solution = ms.load()
+    q_ig = prev_prev_solution['q']
+    q_dot_ig = prev_prev_solution['q_dot']
+    q_ddot_ig = prev_prev_solution['q_ddot']
+    f_ig_list = list()
+    for i in range(n_c):
+        f_ig_list.append(prev_prev_solution[f'f{i}'])
+
+    dt_ig = prev_prev_solution['dt']
 
 # SET DYNAMICS
 dt = prb.createInputVariable("dt", 1)  # variable dt as input
@@ -314,6 +328,32 @@ for f in f_list:
 if isinstance(dt, cs.SX):
     dt.setBounds(dt_min, dt_max)
 
+# SET INITIAL GUESS
+if load_initial_guess:
+    for node in range(q_ig.shape[1]):
+        q.setInitialGuess(q_ig[:, node], node)
+
+    for node in range(q_dot_ig.shape[1]):
+        q_dot.setInitialGuess(q_dot_ig[:, node], node)
+
+    for node in range(q_ddot_ig.shape[1]):
+        q_ddot.setInitialGuess(q_ddot_ig[:, node], node)
+
+    for f, f_ig in zip(f_list, f_ig_list):
+        for node in range(f_ig.shape[1]):
+            f.setInitialGuess(f_ig[:, node], node)
+
+    if isinstance(dt, cs.SX):
+        for node in range(dt_ig.shape[1]):
+            dt.setInitialGuess(dt_ig[:, node], node)
+
+else:
+    q.setInitialGuess(q_init)
+    if isinstance(dt, cs.SX):
+        dt.setInitialGuess(dt_min)
+
+
+
 # SET TRANSCRIPTION METHOD
 th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
@@ -352,16 +392,13 @@ for frame, f in contact_map.items():
     DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
-    prb.createConstraint(f"{frame}_vel_before_lift", v,
-                         nodes=list(range(0, node_start_step)) + list(range(node_end_step, n_nodes + 1)))
-    # prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
+    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
+    prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-    prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step),
-                                     bounds=dict(lb=fc_lb, ub=fc_ub))
-    prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes),
-                                     bounds=dict(lb=fc_lb, ub=fc_ub))
+    prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
+    prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
     prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
@@ -369,14 +406,13 @@ for frame, f in contact_map.items():
     prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
     prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
 
+
 # SET COST FUNCTIONS
 # prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
 prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
 prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
-
-# prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
 
 # ===================================================================================================================
 # =============
@@ -468,8 +504,7 @@ nodes_vec_augmented.sort(kind='mergesort')
 # =============
 # SOLVE PROBLEM
 # =============
-
-
+#
 # opts = {'ipopt.tol': 0.001,
 #         'ipopt.constr_viol_tol': 0.001,
 #         'ipopt.max_iter': 2000,
