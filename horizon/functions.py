@@ -383,6 +383,9 @@ class Constraint(Function):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
+        if len(nodes) == 0:
+            return np.zeros((self.getDim(), 0))
+
         vals = np.hstack([np.atleast_2d(self.bounds['n' + str(i)][val_type]).T for i in nodes])
 
         return vals
