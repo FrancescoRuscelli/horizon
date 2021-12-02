@@ -214,6 +214,9 @@ class Refiner:
         # =============
         # SOLVE PROBLEM
         # =============
+
+        # print(self.prb.getConstraints().keys())
+        # exit()
         opts = {'ipopt.tol': 0.001,
                 'ipopt.constr_viol_tol': 0.001,
                 'ipopt.max_iter': 2000,
@@ -224,14 +227,22 @@ class Refiner:
         for i in range(len(self.new_dt_vec)):
             self.prb.getDt().assign(self.new_dt_vec[i], nodes=i + 1)
 
-        sol = Solver.make_solver('ipopt', prb, opts)
-        sol.solve()
-        solution = sol.getSolutionDict()
+        self.sol = Solver.make_solver('ipopt', prb, opts)
+        self.sol.solve()
 
-        print(self.new_dt_vec)
-        print(sol.getDt())
+    def getSoution(self):
 
+        # add check for the solving of the problem
+        sol_var = self.sol.getSolutionDict()
+        sol_cnsrt = self.sol.getConstraintSolutionDict()
+        sol_dt = self.sol.getDt()
 
+        return sol_var, sol_cnsrt, sol_dt
+
+    def getAugmentedProblem(self):
+
+        # todo add checks for the building of the problem
+        return self.prb
 
 # =========================================
 transcription_method = 'multiple_shooting'  # direct_collocation # multiple_shooting
@@ -624,7 +635,7 @@ nodes_vec_augmented.sort(kind='mergesort')
 
 ref = Refiner(prb, nodes_vec_augmented, prev_solution)
 
-plot_nodes = False
+plot_nodes = True
 if plot_nodes:
     plt.figure()
     # nodes old
@@ -638,3 +649,28 @@ ref.resetProblem()
 
 ref.resetBounds()
 ref.solveProblem()
+sol_var, sol_cnsrt, sol_dt = ref.getSoution()
+
+new_prb = ref.getAugmentedProblem()
+
+ms = mat_storer.matStorer(f'refiner_spot_jump.mat')
+sol_cnsrt_dict = dict()
+for name, item in new_prb.getConstraints().items():
+    lb, ub = item.getBounds()
+    lb_mat = np.reshape(lb, (item.getDim(), len(item.getNodes())), order='F')
+    ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
+    sol_cnsrt_dict[name] = dict(val=sol_cnsrt[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
+
+
+from horizon.variables import Variable, SingleVariable, Parameter, SingleParameter
+
+info_dict = dict(n_nodes=new_prb.getNNodes(), times=nodes_vec_augmented, dt=sol_dt)
+ms.store({**sol_var, **sol_cnsrt_dict, **info_dict})
+# if isinstance(new_prb.getDt(), Variable) or isinstance(new_prb.getDt(), SingleVariable):
+#     ms.store({**sol_var, **sol_cnsrt_dict, **info_dict})
+# elif isinstance(new_prb.getDt(), Parameter) or isinstance(new_prb.getDt(), SingleParameter):
+#     dt_dict = dict(param_dt=new_dt_vec)
+#     ms.store({**sol_var, **sol_cnsrt_dict, **info_dict, **dt_dict})
+# else:
+#     dt_dict = dict(constant_dt=dt)
+#     ms.store({**sol_var, **sol_cnsrt_dict, **info_dict, **dt_dict})
