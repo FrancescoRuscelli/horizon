@@ -47,16 +47,6 @@ auto set_final_constraint_wrapper(IterativeLQR& self, py::object pyfn)
     self.setFinalConstraint(to_cpp(pyfn));
 }
 
-auto set_inter_constraint_wrapper(IterativeLQR& self, std::vector<py::object> flist)
-{
-    std::vector<casadi::Function> flist_cpp;
-    for(auto pyfn : flist)
-    {
-        flist_cpp.push_back(to_cpp(pyfn));
-    }
-
-    self.setIntermediateConstraint(flist_cpp);
-}
 
 auto set_inter_constraint_wrapper_single(IterativeLQR& self,
                                          std::vector<int> k,

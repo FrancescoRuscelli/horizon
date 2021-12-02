@@ -1,7 +1,7 @@
 try:
     from horizon.solvers.pyilqr import IterativeLQR
-except ImportError:
-    print('failed to import pyilqr extension; did you compile it?')
+except ImportError as e:
+    print(f'failed to import pyilqr extension: {e}')
     exit(1)
 
 from horizon.variables import Parameter
@@ -124,6 +124,10 @@ class SolverILQR(Solver):
         # update bounds
         self._set_bounds()
 
+        # update nodes
+        self._update_nodes()
+
+        # solve
         ret = self.ilqr.solve(self.max_iter)
 
         # get solution
@@ -157,13 +161,27 @@ class SolverILQR(Solver):
         for k, v in prof_info.timings.items():
             if '_inner' not in k:
                 continue
-            print(f'{k[:-6]:30}{np.mean(v)*1e-3*self.N} ms')
+            print(f'{k[:-6]:30}{np.mean(v)} us')
 
         print('\ntimings (iter):')
         for k, v in prof_info.timings.items():
             if '_inner' in k:
                 continue
             print(f'{k:30}{np.mean(v)*1e-3} ms')
+
+    def _update_nodes(self):
+
+        print('updating nodes..')
+
+        for fname, f in self.prb.function_container.getCost().items():
+            print(f'{fname}: {f.getNodes()}')
+            self.ilqr.setIndices(fname, f.getNodes())
+
+        for fname, f in self.prb.function_container.getCnstr().items():
+            print(f'{fname}: {f.getNodes()}')
+            self.ilqr.setIndices(fname, f.getNodes())
+
+        self.ilqr.updateIndices()
     
     
     def _set_cost(self):
@@ -201,18 +219,6 @@ class SolverILQR(Solver):
             # save function value
             value = f.getFunction()(*input_list, *param_list)
 
-            # active nodes
-            nodes = f.getNodes()
-
-            tgt_values = list()
-
-            # in the case of constraints, check bound values
-            if isinstance(f, Constraint):
-                lb, ub = Constraint.getBounds(f)
-                if np.any(lb != ub):
-                    raise ValueError(f'[ilqr] constraint {fname} not an equality constraint')
-                tgt_values = np.hsplit(lb, len(nodes))
-
             # wrap function
             l = cs.Function(fname, 
                             [self.x, self.u] + param_list, [value], 
@@ -220,17 +226,13 @@ class SolverILQR(Solver):
                             [outname]
                             )
 
-            # set it to solver
-            if isinstance(f, Constraint):
-                set_to_ilqr(nodes, l, tgt_values)
-            else:
-                set_to_ilqr(nodes, l)
+
+            set_to_ilqr([], l)
         
     
     def _set_param_values(self):
 
         params = self.prb.var_container.getParList()
-
         for p in params:
             print(p.getName(), p.getValues())
             self.ilqr.setParameterValue(p.getName(), p.getValues())

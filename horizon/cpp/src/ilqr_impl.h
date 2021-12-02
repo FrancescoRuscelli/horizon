@@ -56,45 +56,10 @@ public:
 
 };
 
-struct IterativeLQR::Constraint
-{
-    std::list<ConstraintEntity> items;
-
-    // dh/dx
-    const Eigen::MatrixXd& C() const;
-
-    // dh/du
-    const Eigen::MatrixXd& D() const;
-
-    // constraint violation f(x, u)
-    VecConstRef h() const;
-
-    // size getter
-    int size() const;
-
-    // valid flag
-    bool is_valid() const;
-
-    Constraint(int nx, int nu);
-
-    void linearize(VecConstRef x, VecConstRef u, int k);
-
-    void evaluate(VecConstRef x, VecConstRef u, int k);
-
-    void addConstraint(casadi::Function h);
-
-    void addConstraint(const ConstraintEntity& h);
-
-private:
-
-    Eigen::MatrixXd _C;
-    Eigen::MatrixXd _D;
-    Eigen::VectorXd _h;
-
-};
-
 struct IterativeLQR::ConstraintEntity
 {
+    typedef std::shared_ptr<ConstraintEntity> Ptr;
+
     // constraint function
     casadi_utils::WrappedFunction f;
 
@@ -103,6 +68,9 @@ struct IterativeLQR::ConstraintEntity
 
     // parameter map
     ParameterMapPtr param;
+
+    // indices
+    std::vector<int> indices;
 
     // dh/dx
     const Eigen::MatrixXd& C() const;
@@ -140,8 +108,46 @@ private:
 
 };
 
+struct IterativeLQR::Constraint
+{
+    // dh/dx
+    const Eigen::MatrixXd& C() const;
+
+    // dh/du
+    const Eigen::MatrixXd& D() const;
+
+    // constraint violation f(x, u)
+    VecConstRef h() const;
+
+    // size getter
+    int size() const;
+
+    // valid flag
+    bool is_valid() const;
+
+    Constraint(int nx, int nu);
+
+    void linearize(VecConstRef x, VecConstRef u, int k);
+
+    void evaluate(VecConstRef x, VecConstRef u, int k);
+
+    void addConstraint(ConstraintEntity::Ptr h);
+
+    void clear();
+
+private:
+
+    std::vector<ConstraintEntity::Ptr> items;
+    Eigen::MatrixXd _C;
+    Eigen::MatrixXd _D;
+    Eigen::VectorXd _h;
+
+};
+
 struct IterativeLQR::IntermediateCostEntity
 {
+    typedef std::shared_ptr<IntermediateCostEntity> Ptr;
+
     // original cost
     casadi_utils::WrappedFunction l;
 
@@ -153,6 +159,9 @@ struct IterativeLQR::IntermediateCostEntity
 
     // parameters
     ParameterMapPtr param;
+
+    // indices
+    std::vector<int> indices;
 
     /* Quadratized cost */
     const Eigen::MatrixXd& Q() const;
@@ -176,7 +185,6 @@ struct IterativeLQR::IntermediateCostEntity
 
 struct IterativeLQR::IntermediateCost
 {
-    std::list<IntermediateCostEntity> items;
 
     /* Quadratized cost */
     const Eigen::MatrixXd& Q() const;
@@ -187,14 +195,16 @@ struct IterativeLQR::IntermediateCost
 
     IntermediateCost(int nx, int nu);
 
-    void addCost(const casadi::Function& cost);
-    void addCost(const IntermediateCostEntity& cost);
+    void addCost(IntermediateCostEntity::Ptr cost);
 
     double evaluate(VecConstRef x, VecConstRef u, int k);
     void quadratize(VecConstRef x, VecConstRef u, int k);
 
+    void clear();
+
 private:
 
+    std::vector<IntermediateCostEntity::Ptr> items;
     Eigen::MatrixXd _Q, _R, _P;
     Eigen::VectorXd _q, _r;
 };

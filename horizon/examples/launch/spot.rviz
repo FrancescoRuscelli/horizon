@@ -55,7 +55,7 @@ Visualization Manager:
       Offset:
         X: 0
         Y: 0
-        Z: -0.5
+        Z: 0
       Plane: XY
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
@@ -178,7 +178,6 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-      Marker Alpha: 1
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -197,7 +196,6 @@ Visualization Manager:
       Hide Small Values: false
       History Length: 1
       Name: WrenchStamped
-      Queue Size: 10
       Topic: /lf_foot_forces
       Torque Arrow Scale: 0.6000000238418579
       Torque Color: 204; 204; 51
@@ -212,7 +210,6 @@ Visualization Manager:
       Hide Small Values: false
       History Length: 1
       Name: WrenchStamped
-      Queue Size: 10
       Topic: /lh_foot_forces
       Torque Arrow Scale: 0.5
       Torque Color: 204; 204; 51
@@ -227,7 +224,6 @@ Visualization Manager:
       Hide Small Values: false
       History Length: 1
       Name: WrenchStamped
-      Queue Size: 10
       Topic: /rf_foot_forces
       Torque Arrow Scale: 0.5
       Torque Color: 204; 204; 51
@@ -242,7 +238,6 @@ Visualization Manager:
       Hide Small Values: false
       History Length: 1
       Name: WrenchStamped
-      Queue Size: 10
       Topic: /rh_foot_forces
       Torque Arrow Scale: 0
       Torque Color: 204; 204; 51
@@ -282,7 +277,6 @@ Visualization Manager:
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
-      Field of View: 0.7853981852531433
       Focal Point:
         X: -0.5376361608505249
         Y: -0.03023964911699295
@@ -292,9 +286,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: -0.26960110664367676
+      Pitch: -0.20460113883018494
       Target Frame: <Fixed Frame>
-      Yaw: 1.4803993701934814
+      Value: Orbit (rviz)
+      Yaw: 1.3453994989395142
     Saved: ~
 Window Geometry:
   Displays:

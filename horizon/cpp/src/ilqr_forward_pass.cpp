@@ -309,9 +309,13 @@ void IterativeLQR::line_search(int iter)
 
     if(!_fp_res->accepted)
     {
-        _fp_res->accepted = true;
         report_result(*_fp_res);
+        std::cout << "[ilqr] line search failed, increasing regularization..\n";
+        increase_regularization();
+        return;
     }
+
+    reduce_regularization();
 
     _xtrj = _fp_res->xtrj;
     _utrj = _fp_res->utrj;
@@ -336,13 +340,13 @@ bool IterativeLQR::should_stop()
 
     // exit if merit function directional derivative (normalized)
     // is too close to zero
-    if(_fp_res->merit_der/_fp_res->merit > -1e-9)
+    if(_fp_res->merit_der/_fp_res->merit > -1e-6)
     {
         return true;
     }
 
     // exit if step size (normalized) is too short
-    if(_fp_res->step_length/_utrj.norm() < 1e-9)
+    if(_fp_res->step_length/_utrj.norm() < 1e-6)
     {
         return true;
     }

@@ -80,6 +80,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     // set options
     _step_length = value_or(opt, "ilqr.step_length", 1.0);
     _hxx_reg = value_or(opt, "ilqr.hxx_reg", 0.0);
+    _huu_reg = value_or(opt, "ilqr.huu_reg", 1e-6);
+    _kkt_reg = value_or(opt, "ilqr.kkt_reg", 1e-6);
     _hxx_reg_growth_factor = value_or(opt, "ilqr.hxx_reg_growth_factor", 1e3);
     _line_search_accept_ratio = value_or(opt, "ilqr.line_search_accept_ratio", 1e-4);
     _alpha_min = value_or(opt, "ilqr.alpha_min", 1e-3);
@@ -172,13 +174,21 @@ void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& int
     add_param_to_map(inter_cost);
 
     // create cost entity
-    IntermediateCostEntity c;
-    c.param = _param_map;
+    auto c = std::make_shared<IntermediateCostEntity>();
+
+    // add to map
+    _cost_map[inter_cost.name()] = c;
+
+    // set param map
+    c->param = _param_map;
+
+    // set indices
+    c->indices = indices;
 
     // set cost and derivatives
     auto cost = inter_cost;
-    auto grad = c.Gradient(inter_cost);
-    auto hess = c.Hessian(grad);
+    auto grad = IntermediateCostEntity::Gradient(inter_cost);
+    auto hess = IntermediateCostEntity::Hessian(grad);
 
     // codegen if required (we skip it for quadratic costs)
     if(_codegen_enabled)
@@ -188,9 +198,9 @@ void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& int
         hess = utils::codegen(hess, _codegen_workdir);
     }
 
-    c.setCost(cost,
-              grad,
-              hess);
+    c->setCost(cost,
+               grad,
+               hess);
 
     std::cout << "adding cost '" << inter_cost << "' at k = ";
 
@@ -221,11 +231,20 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
     // add parameters to param_map
     add_param_to_map(inter_constraint);
 
-    ConstraintEntity c;
-    c.param = _param_map;
+    // create constr object
+    auto c = std::make_shared<ConstraintEntity>();
+
+    // add to map
+    _constr_map[inter_constraint.name()] = c;
+
+    // set param map
+    c->param = _param_map;
+
+    // set indices
+    c->indices = indices;
 
     auto ic_fn = inter_constraint;
-    auto ic_jac = c.Jacobian(inter_constraint);
+    auto ic_jac = ConstraintEntity::Jacobian(inter_constraint);
 
     if(_codegen_enabled)
     {
@@ -233,8 +252,8 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
         ic_jac = utils::codegen(ic_jac, _codegen_workdir);
     }
 
-    c.setConstraint(ic_fn,
-                    ic_jac);
+    c->setConstraint(ic_fn,
+                     ic_jac);
 
     std::cout << "adding constraint '" << inter_constraint << "' at k = ";
 
@@ -249,7 +268,7 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
 
         if(target_values.size() > 0)
         {
-            c.setTargetValue(target_values[i]);
+            c->setTargetValue(target_values[i]);
         }
 
         std::cout << k << " ";
@@ -260,22 +279,64 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
     std::cout << "\n";
 }
 
-void IterativeLQR::setIntermediateConstraint(const std::vector<casadi::Function> &inter_constraint)
-{
-    if(inter_constraint.size() != _N)
-    {
-        throw std::invalid_argument("wrong intermediate constraint length");
-    }
-
-    for(int i = 0; i < _N; i++)
-    {
-        _constraint[i].addConstraint(inter_constraint[i]);
-    }
-}
-
 void IterativeLQR::setFinalConstraint(const casadi::Function &final_constraint)
 {
     setConstraint({_N}, final_constraint);
+}
+
+void IterativeLQR::setIndices(const std::string& f_name, const std::vector<int>& indices)
+{
+    auto cost_it = _cost_map.find(f_name);
+
+    if(cost_it != _cost_map.end())
+    {
+        cost_it->second->indices = indices;
+        return;
+    }
+
+    auto constr_it = _constr_map.find(f_name);
+
+    if(constr_it != _constr_map.end())
+    {
+        constr_it->second->indices = indices;
+        return;
+    }
+
+    throw std::runtime_error("...");
+
+}
+
+void IterativeLQR::updateIndices()
+{
+    // clear costs
+    for(auto& c : _cost)
+    {
+        c.clear();
+    }
+
+    // set costs with updated indices
+    for(auto& item : _cost_map)
+    {
+        for(int i : item.second->indices)
+        {
+            _cost[i].addCost(item.second);
+        }
+    }
+
+    // clear constraints;
+    for(auto& c : _constraint)
+    {
+        c.clear();
+    }
+
+    // set constraints with updated indices
+    for(auto& item : _constr_map)
+    {
+        for(int i : item.second->indices)
+        {
+            _constraint[i].addConstraint(item.second);
+        }
+    }
 }
 
 void IterativeLQR::setParameterValue(const std::string& pname, const Eigen::MatrixXd& value)
@@ -400,6 +461,20 @@ void IterativeLQR::linearize_quadratize()
         _dyn[i].computeDefect(xi, ui, xnext, i, _dyn[i].d);
         _constraint[i].linearize(xi, ui, i);
         _cost[i].quadratize(xi, ui, i);
+
+        THROW_NAN(_dyn[i].A());
+        THROW_NAN(_dyn[i].B());
+        THROW_NAN(_dyn[i].d);
+
+        THROW_NAN(_constraint[i].C());
+        THROW_NAN(_constraint[i].D());
+        THROW_NAN(_constraint[i].h());
+
+        THROW_NAN(_cost[i].Q());
+        THROW_NAN(_cost[i].R());
+        THROW_NAN(_cost[i].P());
+        THROW_NAN(_cost[i].r());
+        THROW_NAN(_cost[i].q());
     }
 
     // handle final cost and constraint
@@ -694,17 +769,6 @@ IterativeLQR::IntermediateCost::IntermediateCost(int nx, int nu)
     _r.setZero(nu);
 }
 
-void IterativeLQR::IntermediateCost::addCost(const casadi::Function &cost)
-{
-    items.emplace_back();
-    items.back().setCost(cost);
-}
-
-void IterativeLQR::IntermediateCost::addCost(const IntermediateCostEntity &cost)
-{
-    items.emplace_back(cost);
-}
-
 double IterativeLQR::IntermediateCost::evaluate(VecConstRef x,
                                                 VecConstRef u,
                                                 int k)
@@ -715,7 +779,7 @@ double IterativeLQR::IntermediateCost::evaluate(VecConstRef x,
 
     for(auto& it : items)
     {
-        cost += it.evaluate(x, u, k);
+        cost += it->evaluate(x, u, k);
     }
 
     return cost;
@@ -740,14 +804,25 @@ void IterativeLQR::IntermediateCost::quadratize(VecConstRef x,
 
     for(auto& it : items)
     {
-        it.quadratize(x, u, k);
-        _Q += it.Q();
-        _R += it.R();
-        _P += it.P();
-        _q += it.q();
-        _r += it.r();
+        it->quadratize(x, u, k);
+        _Q += it->Q();
+        _R += it->R();
+        _P += it->P();
+        _q += it->q();
+        _r += it->r();
     }
 }
+
+void IterativeLQR::IntermediateCost::clear()
+{
+    items.clear();
+}
+
+void IterativeLQR::IntermediateCost::addCost(IntermediateCostEntity::Ptr cost)
+{
+    items.emplace_back(cost);
+}
+
 
 IterativeLQR::ValueFunction::ValueFunction(int nx)
 {
@@ -996,15 +1071,17 @@ IterativeLQR::Constraint::Constraint(int nx, int nu)
 
 void IterativeLQR::Constraint::linearize(VecConstRef x, VecConstRef u, int k)
 {
-    TIC(linearize_constraint_inner)
+    TIC(linearize_constraint_inner);
+
+    evaluate(x, u, k);
 
     int i = 0;
     for(auto& it : items)
     {
-        int nc = it.C().rows();
-        it.linearize(x, u, k);
-        _C.middleRows(i, nc) = it.C();
-        _D.middleRows(i, nc) = it.D();
+        int nc = it->C().rows();
+        it->linearize(x, u, k);
+        _C.middleRows(i, nc) = it->C();
+        _D.middleRows(i, nc) = it->D();
         i += nc;
     }
 }
@@ -1016,36 +1093,31 @@ void IterativeLQR::Constraint::evaluate(VecConstRef x, VecConstRef u, int k)
     int i = 0;
     for(auto& it : items)
     {
-        int nc = it.C().rows();
-        it.evaluate(x, u, k);
-        _h.segment(i, nc) = it.h();
+        int nc = it->C().rows();
+        it->evaluate(x, u, k);
+        _h.segment(i, nc) = it->h();
         i += nc;
     }
 }
 
-void IterativeLQR::Constraint::addConstraint(casadi::Function h)
+void IterativeLQR::Constraint::addConstraint(ConstraintEntity::Ptr h)
 {
-    items.emplace_back();
-    items.back().setConstraint(h);
+    items.emplace_back(h);
 
     int total_size = size();
-    total_size += h.size1_out(0);
+    total_size += h->f.function().size1_out(0);
 
     _C.setZero(total_size, _C.cols());
     _D.setZero(total_size, _D.cols());
     _h.setZero(total_size);
 }
 
-void IterativeLQR::Constraint::addConstraint(const ConstraintEntity &h)
+void IterativeLQR::Constraint::clear()
 {
-    items.emplace_back(h);
-
-    int total_size = size();
-    total_size += h.f.function().size1_out(0);
-
-    _C.setZero(total_size, _C.cols());
-    _D.setZero(total_size, _D.cols());
-    _h.setZero(total_size);
+    items.clear();
+    _C.setZero(0, _C.cols());
+    _D.setZero(0, _D.cols());
+    _h.setZero(0);
 }
 
 IterativeLQR::~IterativeLQR() = default;

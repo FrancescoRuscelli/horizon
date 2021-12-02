@@ -38,7 +38,6 @@ void IterativeLQR::backward_pass()
         }
     }
 
-    reduce_regularization();
 }
 
 void IterativeLQR::backward_pass_iter(int i)
@@ -95,6 +94,7 @@ void IterativeLQR::backward_pass_iter(int i)
     tmp.hu.noalias() = r + B.transpose()*tmp.s_plus_S_d;
     tmp.Huu.noalias() = R + B.transpose()*Snext*B;
     tmp.Hux.noalias() = P + B.transpose()*tmp.S_A;
+    tmp.Huu.diagonal().array() += _huu_reg;
     TOC(form_value_fn_inner);
 
     // todo: second-order terms from dynamics
@@ -105,6 +105,7 @@ void IterativeLQR::backward_pass_iter(int i)
     K.topLeftCorner(_nu, _nu) = tmp.Huu;
     K.topRightCorner(_nu, nc) = constr_feas.D.transpose();
     K.bottomLeftCorner(nc, _nu) = constr_feas.D;
+    K.bottomRightCorner(nc, nc).diagonal().array() -= _kkt_reg;
 
     kx0.resize(_nu + nc, _nx + 1);
     kx0.leftCols(_nx) << -tmp.Hux,
@@ -224,13 +225,13 @@ void IterativeLQR::increase_regularization()
 
     if(_hxx_reg > 1e12)
     {
-        throw std::runtime_error("maximum regularization exceeded");
+//        throw std::runtime_error("maximum regularization exceeded");
     }
 }
 
 void IterativeLQR::reduce_regularization()
 {
-    _hxx_reg /= std::sqrt(_hxx_reg_growth_factor);
+    _hxx_reg /= std::pow(_hxx_reg_growth_factor, 1./3.);
 }
 
 IterativeLQR::FeasibleConstraint IterativeLQR::handle_constraints(int i)
@@ -257,6 +258,7 @@ IterativeLQR::FeasibleConstraint IterativeLQR::handle_constraints(int i)
     // ..backward pass result
     auto& res = _bp_res[i];
 
+    TIC(constraint_prepare_inner);
     // back-propagate constraint to go from next step to current step
     _constraint_to_go->propagate_backwards(A, B, d);
 
@@ -283,9 +285,13 @@ IterativeLQR::FeasibleConstraint IterativeLQR::handle_constraints(int i)
     auto C = _constraint_to_go->C();
     auto D = _constraint_to_go->D();
     auto h = _constraint_to_go->h();
+    TOC(constraint_prepare_inner);
+    THROW_NAN(C);
+    THROW_NAN(D);
+    THROW_NAN(h);
 
     // cod of D
-    TIC(constraint_cod_inner);
+    TIC(constraint_decomp_inner);
     int rank = -1;
     switch(_constr_decomp_type)
     {
@@ -312,11 +318,13 @@ IterativeLQR::FeasibleConstraint IterativeLQR::handle_constraints(int i)
 
     }
 
+    THROW_NAN(tmp.codQ);
     MatConstRef codQ1 = tmp.codQ.leftCols(rank);
     MatConstRef codQ2 = tmp.codQ.rightCols(nc - rank);
-    TOC(constraint_cod_inner);
+    TOC(constraint_decomp_inner);
 
     // feasible part
+    TIC(constraint_upd_to_go_inner);
     Cf.noalias() = codQ1.transpose()*C;
     Df.noalias() = codQ1.transpose()*D;
     hf.noalias() = codQ1.transpose()*h;
