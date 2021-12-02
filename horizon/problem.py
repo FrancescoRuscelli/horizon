@@ -265,7 +265,7 @@ class Problem:
     def createConstraint(self, name: str,
                          g,
                          nodes: Union[int, Iterable] = None,
-                         bounds=None):
+                         bounds=None) -> fc.Constraint:
         """
         Create a Constraint Function of the optimization problem.
 
