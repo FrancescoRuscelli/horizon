@@ -240,7 +240,7 @@ ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.ma
 
 n_nodes = new_n_nodes - 1  # in new_n_nodes the last node is there already
 
-plot_nodes = True
+plot_nodes = False
 if plot_nodes:
     plt.figure()
     # nodes old
@@ -298,7 +298,7 @@ contact_map = dict(zip(contacts_name, f_list))
 
 # SET DYNAMICS
 # dt = prb.createParameter("dt", 1)  # variable dt as input
-dt = prb.createParameter("dt", 1, nodes=range(1, n_nodes+1))  # variable dt as input
+dt = prb.createParameter("dt", 1, nodes=range(0, n_nodes))  # parameter dt as input
 # dt = prb.createInputVariable("dt", 1)  # variable dt as input
 # dt = 0.01
 # Computing dynamics
@@ -384,7 +384,7 @@ for i_f in range(len(f_list)):
         if node in zip_indices_new.keys():
             f_list[i_f].setInitialGuess(f_res_list[i_f][:, zip_indices_new[node]], node)
 
-plot_ig = True
+plot_ig = False
 if plot_ig:
     # ========================================================================================================
     plt.figure()
@@ -551,7 +551,7 @@ opts = {'ipopt.tol': 0.001,
         'ipopt.linear_solver': 'ma57'}
 
 for i in range(len(new_dt_vec)):
-    dt.assign(new_dt_vec[i], nodes=i+1)
+    dt.assign(new_dt_vec[i], nodes=i)
 
 sol = Solver.make_solver('ipopt', prb, opts)
 sol.solve()

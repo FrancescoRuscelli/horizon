@@ -1,4 +1,6 @@
 import time
+import warnings
+
 import casadi as cs
 from numpy.core.fromnumeric import var
 from horizon import functions as fc
@@ -278,7 +280,7 @@ class Problem:
 
         """
         used_par = list()
-        for var in self.var_container.getParList():
+        for var in self.var_container.getParList(offset=True):
             if cs.depends_on(f, var):
                 used_par.append(var)
 
@@ -307,7 +309,7 @@ class Problem:
             nodes = misc.checkNodes(nodes, range(self.nodes))
 
         # get vars that constraint depends upon
-        used_var = self._getUsedVar(g)  # these now are fucking list!
+        used_var = self._getUsedVar(g)  # these now are fucking lists!
         used_par = self._getUsedPar(g)
 
         if self.debug_mode:
@@ -508,6 +510,20 @@ class Problem:
 
         return var
 
+    def getParameters(self, name: str = None):
+        """
+        Getter for a desired parameter of the optimization problem.
+
+        Args:
+            name: name of the desired parameter. If not specified, a dict with all the parameters is returned
+
+        Returns:
+            the desired parameter/s
+        """
+        par = self.var_container.getPar(name)
+
+        return par
+
     def getConstraints(self, name=None):
         """
         Getter for a desired constraint of the optimization problem.
@@ -579,6 +595,56 @@ class Problem:
 
         fun_evaluated = fun_to_evaluate(*(all_vars + all_pars)).toarray()
         return fun_evaluated
+
+
+    def toParameter(self, var_name):
+
+        warnings.warn('EXPERIMENTAL FUNCTION: toParameter')
+        # TODO isn't there a way to change just the variable and everything else changes accordingly?
+        # check if name of variable exists
+        if var_name not in self.getVariables().keys():
+            raise Exception(f'variable {var_name} not recognized.')
+
+        old_var = self.getVariables(var_name)
+        old_name = old_var.getName()
+        old_dim = old_var.getDim()
+        old_nodes = old_var.getNodes()
+        self.removeVariable(var_name)
+        par = self.createParameter(old_name, old_dim, old_nodes)
+
+        # if the variable is also the dt, set new dt
+        if var_name == self.getDt().getName():
+            self.setDt(par)
+
+        # transform variable to parameter (delete var and create a equal parameter)
+        # modify constraints on their core (correct?)
+        for fun in self.getConstraints().values():
+            for i in range(len(fun.vars)):
+                if fun.vars[i].getName() == var_name:
+                    fun.vars[i] = par
+
+                fun._project()
+
+        # modify constraints on their core (correct?)
+        for fun in self.getCosts().values():
+            for i in range(len(fun.vars)):
+                if fun.vars[i].getName() == var_name:
+                    fun.vars[i] = par
+
+                fun._project()
+
+
+        # for fun in self.getConstraints().values():
+        #     for fun_var in fun.getVariables():
+        #         if fun_var.getName() == var_name:
+        #             print(f'found reference of {var_name} in {fun.getName()}')
+        #             f_name = fun.getName()
+        #             f_nodes = fun.getNodes()
+        #             self.removeConstraint(fun.getName())
+        #             self.createConstraint(f_name, fun._f, f_nodes)
+
+
+
 
     def scopeNodeVars(self, node: int):
         """

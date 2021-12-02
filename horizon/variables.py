@@ -181,6 +181,84 @@ class OffsetVariable(AbstractVariable):
 
         return (self.__class__, (self.parent_name, self._tag, self._dim, self._offset, self._var_impl, ))
 
+class OffsetParameter(AbstractVariable):
+    def __init__(self, parent_name, tag, dim, offset, par_impl):
+        """
+        Initialize the Offset Parameter.
+
+        Args:
+            tag: name of the parameter
+            dim: dimension of the parameter
+            nodes: nodes the parameter is defined on
+            offset: offset of the parameter (which (previous/next) node it refers to
+            par_impl: implemented parameters it refers to (of base class Parameter)
+        """
+        self._tag = tag
+        self._dim = dim
+        super().__init__(tag, dim)
+
+        self.parent_name = parent_name
+        self._nodes = list()
+        self._offset = offset
+        self._par_impl = par_impl
+
+        for node in self._par_impl.keys():
+            self._nodes.append(int(node.split("n", 1)[1]))
+
+    def getImpl(self, nodes=None):
+        """
+        Getter for the implemented offset parameter.
+
+        Args:
+            node: node at which the parameter is retrieved
+
+        Returns:
+            implemented instances of the abstract offsetted parameter
+        """
+
+        # todo is this nice? to update nodes given the _par_impl
+        #   another possibility is sharing also the _nodes
+        self._nodes.clear()
+        for node in self._par_impl.keys():
+            self._nodes.append(int(node.split("n", 1)[1]))
+
+        if nodes is None:
+            nodes = self._nodes
+
+        # offset the node of self.offset
+        offset_nodes = [node + self._offset for node in nodes]
+        offset_nodes = misc.checkNodes(offset_nodes, self._nodes)
+
+        par_impl = cs.vertcat(*[self._par_impl['n' + str(i)]['par'] for i in offset_nodes])
+
+        return par_impl
+
+    def getName(self):
+        """
+        Get name of the parameter. Warning: not always same as the tag
+
+        Returns:
+            name of the parameter
+
+        """
+        return self.parent_name
+
+    def getNodes(self):
+        """
+        Getter for the active nodes.
+
+        Returns:
+            list of active nodes
+        """
+        return self._nodes
+
+    # def __reduce__(self):
+    #
+    #     for node in self._var_impl.keys():
+    #         self._par_impl[node]['par'] = self._par_impl[node]['par'].serialize()
+    #
+    #     return (self.__class__, (self.parent_name, self._tag, self._dim, self._offset, self._var_impl, ))
+
 class SingleParameter(AbstractVariable):
     """
     Single Parameter of Horizon Problem.
@@ -317,6 +395,7 @@ class Parameter(AbstractVariable):
         """
         super(Parameter, self).__init__(tag, dim)
 
+        self._par_offset = dict()
         self._par_impl = dict()
 
         self._nodes = nodes
@@ -420,6 +499,45 @@ class Parameter(AbstractVariable):
         """
         return self._tag
 
+    def getOffset(self, node):
+
+        """
+        Getter for the offset parameter. An offset parameter is used to point to the desired implemented instance of the abstract parameter.
+
+        Examples:
+            Abstract parameter "p". Horizon nodes are N.
+
+            Implemented parameter "p" --> p_0, p_1, ... p_N-1, p_N
+
+            Offset parameter "p-1" points FOR EACH NODE at variable "p" implemented at the PREVIOUS NODE.
+
+        Args:
+            nodes: offset of the node (shift to n node before or after)
+        """
+        if node > 0:
+            node = f'+{node}'
+
+        if node in self._par_offset:
+            return self._par_offset[node]
+        else:
+
+            createTag = lambda name, node: name + str(node) if node is not None else name
+
+            new_tag = createTag(self._tag, node)
+            par = OffsetParameter(self._tag, new_tag, self._dim, int(node), self._par_impl)
+
+            self._par_offset[node] = par
+        return par
+
+    def getOffsetDict(self):
+        """
+        Getter for the offset variables.
+
+        Returns:
+            dict with all the offset variables referring to this abstract variable
+        """
+        return self._par_offset
+
     def __getitem__(self, item):
         par_slice = super().__getitem__(item)
         view = ParameterView(self, par_slice, item)
@@ -459,6 +577,26 @@ class ParameterView(AbstractVariableView):
 
         for node in nodes:
             self._parent._par_impl['n' + str(node)]['val'][self._indices] = vals
+
+    def getValues(self, nodes):
+        """
+                Getter for the value of the parameter.
+
+                Args:
+                    node: node at which the value of the parameter is retrieved. If not specified, this function returns a matrix with all the values of the parameter along the nodes.
+
+                Returns:
+                    value/s of the parameter
+                """
+        if nodes is None:
+            nodes = self._parent._nodes
+
+        nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        par_impl = cs.horzcat(*[self._parent._par_impl['n' + str(i)]['val'][self._indices] for i in nodes])
+
+        return par_impl.toarray()
+
 
 class SingleVariable(AbstractVariable):
     """
@@ -832,6 +970,7 @@ class Variable(AbstractVariable):
             self._var_impl['n' + str(node)]['w0'] = val
 
     def getVarOffset(self, node):
+
         """
         Getter for the offset variable. An offset variable is used to point to the desired implemented instance of the abstract variable.
 
@@ -843,9 +982,11 @@ class Variable(AbstractVariable):
             Offset variable "x-1" points FOR EACH NODE at variable "x" implemented at the PREVIOUS NODE.
 
         Args:
-            val: desired initial guess of the variable
-            nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
+            nodes: offset of the node (shift to n node before or after)
         """
+
+        # todo call it .getOffset()
+
         if node > 0:
             node = f'+{node}'
 
@@ -1626,7 +1767,7 @@ class VariablesContainer:
 
         return var_abstr_list
 
-    def getParList(self):
+    def getParList(self, offset=True):
         """
         Getter for the abstract parameters in the Variable Container. Used by the Horizon Problem.
 
@@ -1634,8 +1775,11 @@ class VariablesContainer:
             a list with all the abstract parameters
         """
         par_abstr_list = list()
-        for name, var in self._pars.items():
-            par_abstr_list.append(var)
+        for name, par in self._pars.items():
+            par_abstr_list.append(par)
+            if offset:
+                for par_offset in par.getOffsetDict().values():
+                    par_abstr_list.append(par_offset)
 
         return par_abstr_list
 
@@ -1734,12 +1878,31 @@ class VariablesContainer:
 if __name__ == '__main__':
     pass
     ## PARAMETER
-    # a = Parameter('p', 6, [0, 1, 2, 3, 4, 5])
-    # print(a[2:4], f'type: {type(a[2:4])}')
-    # a.assign([1, 1, 1, 1, 1, 1])
-    # a[1:3].assign([2, 3])
-    # print(a.getValues())
-    # exit()
+    a = Parameter('p', 6, [0, 1, 2, 3, 4, 5])
+    print(a[2:4], f'type: {type(a[2:4])}')
+    a.assign([1, 1, 1, 1, 1, 1])
+    a.assign([7, 7, 7, 7, 7, 7], nodes=3)
+    a[1:3].assign([2, 3])
+    print(a.getValues())
+
+    print(a[2].getValues(3))
+
+    a_prev = a.getOffset(-1)
+    print(a.getImpl())
+    print(a_prev.getImpl())
+    print(a_prev.get)
+    exit()
+    print(a_prev[0])
+
+
+
+    x = Variable('x', 4, [0, 1, 2, 3, 4, 5])
+
+    x_prev = x.getVarOffset(-2)
+    print(x.getImpl())
+    print(x_prev.getImpl())
+
+    exit()
     ## INPUT
     # i = InputVariable('u', 6, [0, 1, 2, 3, 4, 5])
     # print(i[2:4], f'type: {type(i[2:4])}')

@@ -1,6 +1,7 @@
 import time
 
 from horizon import problem
+from horizon.variables import Variable, SingleVariable
 from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_storer
 from horizon.transcriptions import integrators
 from horizon.transcriptions.transcriptor import Transcriptor
@@ -28,10 +29,7 @@ class Refiner:
         prev_dt = self.prev_solution['dt'].flatten()
         # prev_dt = solver.getDt()
 
-        print(prev_dt)
         self.nodes_vec = self.get_node_time(prev_dt)
-
-        print(self.nodes_vec)
 
         self.new_n_nodes = self.new_nodes_vec.shape[0]
         self.new_dt_vec = np.diff(self.new_nodes_vec)
@@ -115,7 +113,25 @@ class Refiner:
 
         self.prb.setNNodes(self.new_n_nodes-1)
 
-        print(self.prb.getNNodes())
+        # check for dt (if it is a symbolic variable, transform it to a parameter)
+
+        # if combination of state/input variable but NOT a variable itself:
+            # i don't know
+        # if value:
+            # ok no prob
+        # if single variable (one for each node):
+            # remove variable and add parameter
+        # if single parameter (one for each node):
+            # keep the parameter
+        # if a mixed array of values/variable/parameters:
+            # for each variable, remove the variable and add the parameter
+        # if a variable defined only on certain nodes
+            # ... dunno, I have to change the logic a bit
+
+
+        old_dt = self.prb.getDt()
+        if isinstance(old_dt, (Variable, SingleVariable)):
+            prb.toParameter(old_dt.getName())
 
         # set constraints
         for name, cnsrt in self.prb.getConstraints().items():
@@ -195,7 +211,6 @@ class Refiner:
     #
     def solveProblem(self):
 
-
         # =============
         # SOLVE PROBLEM
         # =============
@@ -205,12 +220,16 @@ class Refiner:
                 'ipopt.linear_solver': 'ma57'}
 
         # parametric time
+        # assign to
         for i in range(len(self.new_dt_vec)):
-            dt.assign(self.new_dt_vec[i], nodes=i + 1)
+            self.prb.getDt().assign(self.new_dt_vec[i], nodes=i + 1)
 
         sol = Solver.make_solver('ipopt', prb, opts)
-        solver.solve()
+        sol.solve()
         solution = sol.getSolutionDict()
+
+        print(self.new_dt_vec)
+        print(sol.getDt())
 
 
 
@@ -613,54 +632,9 @@ if plot_nodes:
     plt.scatter(nodes_vec, np.zeros([nodes_vec.shape[0]]), edgecolors='blue', facecolor='none')
     plt.show()
 
-# print('prev_dt_vec', prev_dt)
-# print('new_dt_vec', new_dt_vec)
-
-# if dt is variable:
-#     make_parametric(dt)
 
 # ======================================================================================================================
-# SET PROBLEM STATE AND INPUT VARIABLES
 ref.resetProblem()
 
 ref.resetBounds()
 ref.solveProblem()
-exit()
-# dt = prb.createParameter("dt", 1, nodes=range(1, n_nodes+1))  # variable dt as input
-
-# =============
-# SOLVE PROBLEM
-# =============
-opts = {'ipopt.tol': 0.001,
-        'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 2000,
-        'ipopt.linear_solver': 'ma57'}
-
-for i in range(len(new_dt_vec)):
-    dt.assign(new_dt_vec[i], nodes=i + 1)
-
-sol = Solver.make_solver('ipopt', prb, dt, opts)
-sol.solve()
-
-solution = sol.getSolutionDict()
-solution_constraints = sol.getConstraintSolutionDict()
-
-solution_constraints_dict = dict()
-for name, item in prb.getConstraints().items():
-    lb, ub = item.getBounds()
-    lb_mat = np.reshape(lb, (item.getDim(), len(item.getNodes())), order='F')
-    ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
-    solution_constraints_dict[name] = dict(val=solution_constraints[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
-
-from horizon.variables import Variable, SingleVariable, Parameter, SingleParameter
-
-info_dict = dict(n_nodes=n_nodes, times=nodes_vec_augmented, node_start_step=node_start_step,
-                 node_end_step=node_end_step, node_peak=node_peak, jump_height=jump_height)
-if isinstance(dt, Variable) or isinstance(dt, SingleVariable):
-    ms.store({**solution, **solution_constraints_dict, **info_dict})
-elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
-    dt_dict = dict(param_dt=new_dt_vec)
-    ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})
-else:
-    dt_dict = dict(constant_dt=dt)
-    ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})

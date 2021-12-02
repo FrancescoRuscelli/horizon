@@ -1,6 +1,6 @@
 from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.variables import AbstractVariable
+from horizon.variables import AbstractVariable, Variable, Parameter
 from typing import Dict
 import casadi as cs
 import numpy as np
@@ -61,9 +61,8 @@ class NlpsolSolver(Solver):
 
         # build parameters
         par_list = list()
-        for par in self.var_container.getParList():
+        for par in self.var_container.getParList(offset=False):
             par_list.append(par.getImpl())
-
         p = cs.vertcat(*par_list)
 
         # this is good but the problem is that, without some tampering, i get the variables repeated
@@ -179,7 +178,7 @@ class NlpsolSolver(Solver):
 
         # update parameters
         p_list = list()
-        for par in self.var_container.getParList():
+        for par in self.var_container.getParList(offset=False):
             pval = par.getValues().flatten(order='F')
             p_list.append(pval)
 
@@ -247,12 +246,12 @@ class NlpsolSolver(Solver):
 
         # fill dt_solution
 
-        # if it is a symbolic variable, its corresponding solution must be retrieved.
+        # if it is a variable, its corresponding solution must be retrieved.
         # if dt is directly an optimization variable, that's ok, I get it from the var_solution
         # if dt is a function of some other optimization variables, get all of them and compute the optimized dt
         #   I do this by using a Function to wrap everything
 
-        if isinstance(dt, cs.SX):
+        if isinstance(dt, Variable):
             var_depend = list()
             for var in self.prb.getVariables().values():
                 if cs.depends_on(dt, var):
@@ -265,10 +264,16 @@ class NlpsolSolver(Solver):
                 self.dt_solution[node_n] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])[node_n]
 
         # if dt is a value, set it to each element of dt_solution
+        elif isinstance(dt, Parameter):
+            for node_n in range(self.prb.getNNodes()-1):
+                # get only the nodes where the dt is selected
+                # here dt at node 0 is not defined
+                self.dt_solution[node_n] = dt.getValues(node_n)
+        # if dt is a value, set it to each element of dt_solution
         elif isinstance(dt, (float, int)):
             for node_n in range(self.prb.getNNodes() - 1):
                 self.dt_solution[node_n] = dt
-        # if dt is a a list, get each dt separately
+        # if dt is a list, get each dt separately
         # TODO WIP
         elif len(dt) == self.prb.getNNodes():
             print('WARNING: work in progress.')
