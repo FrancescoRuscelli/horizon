@@ -499,7 +499,7 @@ class Parameter(AbstractVariable):
         """
         return self._tag
 
-    def getOffset(self, node):
+    def getParOffset(self, node):
 
         """
         Getter for the offset parameter. An offset parameter is used to point to the desired implemented instance of the abstract parameter.
@@ -1878,10 +1878,10 @@ class VariablesContainer:
 if __name__ == '__main__':
     pass
     ## PARAMETER
-    a = Parameter('p', 6, [0, 1, 2, 3, 4, 5])
+    a = Parameter('p', 3, [0, 1, 2, 3, 4, 5])
     print(a[2:4], f'type: {type(a[2:4])}')
-    a.assign([1, 1, 1, 1, 1, 1])
-    a.assign([7, 7, 7, 7, 7, 7], nodes=3)
+    a.assign([1, 1, 1])
+    a.assign([7, 7, 7], nodes=3)
     a[1:3].assign([2, 3])
     print(a.getValues())
 
@@ -1889,8 +1889,13 @@ if __name__ == '__main__':
 
     a_prev = a.getOffset(-1)
     print(a.getImpl())
-    print(a_prev.getImpl())
-    print(a_prev.get)
+    print(a_prev.getImpl([2]))
+
+    fun = a_prev + a
+
+    print(fun)
+
+
     exit()
     print(a_prev[0])
 

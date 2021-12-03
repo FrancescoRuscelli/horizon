@@ -173,14 +173,24 @@ class Function:
         # If the number of nodes changes, also the variables change. That is when this reprojection is required.
         self._project()
 
-    def getVariables(self) -> list:
+    def getVariables(self, offset=True) -> list:
         """
         Getter for the variables used in the function.
 
         Returns:
             a dictionary of all the used variable. {name: cs.SX}
         """
-        return self.vars
+
+        if offset:
+            ret = self.vars
+        else:
+            ret = list()
+            for var in self.vars:
+                if var.getOffset() == 0:
+                    ret.append(var)
+
+
+        return ret
 
     def getParameters(self) -> list:
         """
@@ -611,14 +621,16 @@ class FunctionsContainer:
             # I change the nodes to [0, 1, 2, 3]. The function must be updated accordingly: [0, 1, 2]
             # I change the nodes to [0, 1, 2, 3, 4, 5]. The function must be updated accordingly: [0, 1, 2, 4]
             available_nodes = set(range(n_nodes))
-            for var in cnstr.getVariables():
+            # get only the variable it depends (not all the offsetted variables)
+            for var in cnstr.getVariables(offset=False):
                 if not var.getNodes() == [-1]:  # todo very bad hack to check if the variable is a SingleVariable (i know it returns [-1]
                     available_nodes.intersection_update(var.getNodes())
+
             cnstr.setNodes([i for i in cnstr.getNodes() if i in available_nodes], erasing=True)
 
         for cost in self._costfun_container.values():
             available_nodes = set(range(n_nodes))
-            for var in cost.getVariables():
+            for var in cost.getVariables(offset=False):
                 if not var.getNodes() == [-1]:
                     available_nodes.intersection_update(var.getNodes())
             cost.setNodes([i for i in cost.getNodes() if i in range(n_nodes)], erasing=True)

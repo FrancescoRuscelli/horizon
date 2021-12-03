@@ -621,7 +621,8 @@ class Problem:
         for fun in self.getConstraints().values():
             for i in range(len(fun.vars)):
                 if fun.vars[i].getName() == var_name:
-                    fun.vars[i] = par
+                    # get the right offset, if present
+                    fun.vars[i] = par.getParOffset(fun.vars[i].getOffset())
 
                 fun._project()
 

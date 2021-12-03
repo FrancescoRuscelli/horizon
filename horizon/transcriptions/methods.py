@@ -144,13 +144,12 @@ class MultipleShooting(Transcriptor):
             if isinstance(self.dt, Variable) or isinstance(self.dt, SingleVariable):
                 self.dt_prev = self.dt.getVarOffset(-1)
             elif isinstance(self.dt, Parameter) or isinstance(self.dt, SingleParameter):
-                self.dt_prev = self.dt.getOffset(-1)
-
-                state_int = self.__integrate(self.state_prev, self.input_prev, self.dt_prev)
-                ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
+                self.dt_prev = self.dt.getParOffset(-1)
             else:
                 raise Exception('dt not supported: not a variable/parameter of the problem. Please build your own transcriptor.')
 
+            state_int = self.__integrate(self.state_prev, self.input_prev, self.dt_prev)
+            ms = self.problem.createConstraint('multiple_shooting', state_int - self.state, nodes=range(1, self.problem.getNNodes()))
         # if dt is a single value (which means that it involves ALL nodes):
         elif isinstance(self.dt, (float, int)):
             state_int = self.__integrate(self.state_prev, self.input_prev, self.dt)
