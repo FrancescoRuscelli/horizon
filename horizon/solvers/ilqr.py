@@ -80,6 +80,8 @@ class SolverILQR(Solver):
         self.plot_iter = False
         self.xax = None 
         self.uax = None
+        self.dax = None
+        self.hax = None
 
         # empty solution dict
         self.solution_dict = dict()
@@ -171,14 +173,10 @@ class SolverILQR(Solver):
 
     def _update_nodes(self):
 
-        print('updating nodes..')
-
         for fname, f in self.prb.function_container.getCost().items():
-            print(f'{fname}: {f.getNodes()}')
             self.ilqr.setIndices(fname, f.getNodes())
 
         for fname, f in self.prb.function_container.getCnstr().items():
-            print(f'{fname}: {f.getNodes()}')
             self.ilqr.setIndices(fname, f.getNodes())
 
         self.ilqr.updateIndices()
@@ -234,19 +232,19 @@ class SolverILQR(Solver):
 
         params = self.prb.var_container.getParList()
         for p in params:
-            print(p.getName(), p.getValues())
             self.ilqr.setParameterValue(p.getName(), p.getValues())
 
     
     def _iter_callback(self, fpres):
         if not fpres.accepted:
             return
+
         fpres.print()
 
         if self.plot_iter and fpres.accepted:
 
             if self.xax is None:
-                _, (self.xax, self.uax) = plt.subplots(1, 2)
+                _, (self.xax, self.uax, self.dax, self.hax) = plt.subplots(2, 2)
             
             plt.sca(self.xax)
             plt.cla()
@@ -265,6 +263,24 @@ class SolverILQR(Solver):
             plt.xlabel('Node [-]')
             plt.ylabel('Input')
             plt.legend([f'u{i}' for i in range(self.nu)])
+
+            plt.sca(self.dax)
+            plt.cla()
+            plt.plot(fpres.defect_values.T)
+            plt.grid()
+            plt.title(f'Dynamics gaps (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('Gap')
+            plt.legend([f'd{i}' for i in range(self.nx)])
+
+            plt.sca(self.hax)
+            plt.cla()
+            plt.plot(fpres.constraint_values)
+            plt.grid()
+            plt.title(f'Constraint violation (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('Constraint 1-norm')
+
             plt.draw()
             print("Press a button!")
             plt.waitforbuttonpress()
