@@ -80,8 +80,8 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     // set options
     _step_length = value_or(opt, "ilqr.step_length", 1.0);
     _hxx_reg = value_or(opt, "ilqr.hxx_reg", 0.0);
-    _huu_reg = value_or(opt, "ilqr.huu_reg", 1e-6);
-    _kkt_reg = value_or(opt, "ilqr.kkt_reg", 1e-6);
+    _huu_reg = value_or(opt, "ilqr.huu_reg", 0.0);
+    _kkt_reg = value_or(opt, "ilqr.kkt_reg", 0.0);
     _hxx_reg_growth_factor = value_or(opt, "ilqr.hxx_reg_growth_factor", 1e3);
     _line_search_accept_ratio = value_or(opt, "ilqr.line_search_accept_ratio", 1e-4);
     _alpha_min = value_or(opt, "ilqr.alpha_min", 1e-3);
