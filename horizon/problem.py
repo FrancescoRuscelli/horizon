@@ -616,6 +616,14 @@ class Problem:
         if var_name == self.getDt().getName():
             self.setDt(par)
 
+        if var_name in [input_var.getName() for input_var in self.getInput()]:
+            self.getInput().removeVariable(var_name)
+            self.getInput().addVariable(par)
+
+        if var_name in [state_var.getName() for state_var in self.getState()]:
+            self.getState().removeVariable(var_name)
+            self.getState().addVariable(par)
+
         # transform variable to parameter (delete var and create a equal parameter)
         # modify constraints on their core (correct?)
         for fun in self.getConstraints().values():

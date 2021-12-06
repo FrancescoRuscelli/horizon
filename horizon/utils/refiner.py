@@ -1,7 +1,7 @@
 import time
 
 from horizon import problem
-from horizon.variables import Variable, SingleVariable
+from horizon.variables import Variable, SingleVariable, Parameter, SingleParameter
 from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_storer
 from horizon.transcriptions import integrators
 from horizon.transcriptions.transcriptor import Transcriptor
@@ -65,11 +65,11 @@ class Refiner:
         node_peak = 30
         jump_height = 0.2
 
-        print(f'node_start_step: {node_start_step} -->  {self.old_to_new[node_start_step]}')
-        print(f'node_end_step {node_end_step} --> {self.old_to_new[node_end_step]}')
-        print(f'node_peak {node_peak} -->  {self.old_to_new[node_peak]}')
-
-        print(f'nodes_vec shape {nodes_vec.shape} --> {nodes_vec_augmented.shape}')
+        # print(f'node_start_step: {node_start_step} -->  {self.old_to_new[node_start_step]}')
+        # print(f'node_end_step {node_end_step} --> {self.old_to_new[node_end_step]}')
+        # print(f'node_peak {node_peak} -->  {self.old_to_new[node_peak]}')
+        #
+        # print(f'nodes_vec shape {nodes_vec.shape} --> {nodes_vec_augmented.shape}')
 
     def get_node_time(self, dt):
         nodes_vec = np.zeros([self.old_n_nodes])
@@ -89,14 +89,13 @@ class Refiner:
 
     def expand_nodes(self, vec_to_expand):
 
-        # fill new_samples_nodes with corresponding new_nodes
+        # fill new_samples_nodes with corresponding new_nodes (convert old nodes to new nodes)
         new_nodes_vec = [self.old_to_new[elem] for elem in vec_to_expand]
-        # print()
-        # print(new_nodes_vec)
-        # exit()
 
+        # search for the nodes couples and expand them: return elements detected in self.elem_and_expansion
         elem_and_expansion_masked = self.find_nodes_to_inject(vec_to_expand)
 
+        # expand self.elem_and_expansion (which is made of ranges)
         for elem in elem_and_expansion_masked:
             if len(list(elem[1])) == 2:
                 nodes_to_inject = list(range(elem[1][0], elem[1][1] + 1))
@@ -110,13 +109,22 @@ class Refiner:
         return new_nodes_vec
 
     def find_nodes_to_inject(self, vec_to_expand):
+
+        # search for the nodes couples and expand if necessary
         recipe_vec = self.elem_and_expansion
+
         recipe_vec_masked = list()
         # expand couples of nodes
-        for i in range(len(vec_to_expand) - 1):
+        # for each element in vector, check if couples to expand are present
+        for i in range(len(vec_to_expand)):
             for j in range(len(recipe_vec)):
                 if vec_to_expand[i] == recipe_vec[j][0]:
-                    if vec_to_expand[i + 1] == vec_to_expand[i] + 1:
+                    # if last element:
+                    if i == len(vec_to_expand) - 1:
+                        print(f'last element detected: {vec_to_expand[i]}: injecting {recipe_vec[j][1]}')
+                        recipe_vec_masked.append(recipe_vec[j])
+
+                    elif vec_to_expand[i + 1] == vec_to_expand[i] + 1:
                         print(f'couple detected: {vec_to_expand[i], vec_to_expand[i] + 1}: injecting {recipe_vec[j][1]}')
                         recipe_vec_masked.append(recipe_vec[j])
 
@@ -124,15 +132,22 @@ class Refiner:
 
     def resetProblem(self):
 
+        # get every node, bounds for old functions and variables
         self.old_var_bounds = dict()
+        self.old_var_nodes = dict()
         for name, var in self.prb.getVariables().items():
             self.old_var_bounds[name] = deepcopy(var.getBounds())
+            self.old_var_nodes[name] = var.getNodes().copy()
 
         self.old_cnrst_bounds = dict()
         self.old_cnsrt_nodes = dict()
         for name, cnsrt in self.prb.getConstraints().items():
             self.old_cnrst_bounds[name] = deepcopy(cnsrt.getBounds())
             self.old_cnsrt_nodes[name] = cnsrt.getNodes().copy()
+
+        self.old_cost_nodes = dict()
+        for name, cost in self.prb.getCosts().items():
+            self.old_cost_nodes[name] = cost.getNodes().copy()
 
         self.prb.setNNodes(self.new_n_nodes-1)
 
@@ -161,63 +176,68 @@ class Refiner:
         # set constraints
         for name, cnsrt in self.prb.getConstraints().items():
             print(f'========================== constraint {name} =========================================')
-            cnsrt_nodes_old = cnsrt.getNodes().copy()
-            cnsrt_lb_old, cnsrt_ub_old = cnsrt.getBounds()
-            print('old nodes:', cnsrt_nodes_old)
-            cnsrt_nodes_new = ref.expand_nodes(cnsrt_nodes_old)
+            old_n = self.old_cnsrt_nodes[name]
+            old_lb, old_ub = self.old_cnrst_bounds[name]
+
+            print('old nodes:', old_n)
+            cnsrt_nodes_new = ref.expand_nodes(old_n)
             cnsrt.setNodes(cnsrt_nodes_new, erasing=True)
             print('new nodes:', cnsrt.getNodes())
 
             # manage bounds
 
-            # old nodes get their old bounds
-            k = 0
+            # old nodes: set their old bounds
             for node in cnsrt.getNodes():
                 if node in self.base_indices:
-                    cnsrt.setBounds(cnsrt_lb_old[:, k], cnsrt_ub_old[:, k], node)
-                    k += 1
+                    old_node_index = old_n.index(self.new_to_old[node])
+                    cnsrt.setBounds(old_lb[:, old_node_index], old_ub[:, old_node_index], node)
 
-            elem_and_expansion_masked = self.find_nodes_to_inject(cnsrt_nodes_old)
+            elem_and_expansion_masked = self.find_nodes_to_inject(old_n)
 
+            # injected nodes: set the bounds of the previous node
             for elem in elem_and_expansion_masked:
                 if len(list(elem[1])) == 2:
                     nodes_to_inject = list(range(elem[1][0], elem[1][1] + 1))
                 else:
                     nodes_to_inject = elem[1][0]
 
-                cnsrt.setBounds(cnsrt_lb_old[:, elem[0]], cnsrt_ub_old[:, elem[0]], nodes=nodes_to_inject)
+                # setting bounds using old bound index!
+                # careful: retrieved old bounds corresponds to the nodes where the constraint is defined.
+                # If the constraint is defined over [20, 21, 22, 23], and I want to set the bounds in node 23 (= elem[0]), I need to use the index 4 of old_bound_index
+                old_bound_index = old_n.index(elem[0])
+                cnsrt.setBounds(old_lb[:, old_bound_index], old_ub[:, old_bound_index], nodes=nodes_to_inject)
 
 
         plot_bounds = False
         if plot_bounds:
             for name, cnsrt in self.prb.getConstraints().items():
-                cnsrt_lb, cnsrt_ub = cnsrt.getBounds()
-                old_cnsrt_lb, old_cnsrt_ub = self.old_cnrst_bounds[name]
+                old_lb, old_ub = self.old_cnrst_bounds[name]
+                lb, ub = cnsrt.getBounds()
 
                 cnsrt_nodes = cnsrt.getNodes()
-                old_cnsrt_t = self.nodes_vec[self.old_cnsrt_nodes[name]]
-                cnsrt_t = self.new_nodes_vec[cnsrt_nodes]
+                old_t = self.nodes_vec[self.old_cnsrt_nodes[name]]
+                t = self.new_nodes_vec[cnsrt_nodes]
 
                 plt.figure()
                 plt.title(f'lower bounds: {name}')
-                for dim in range(cnsrt_lb.shape[0]):
-                    plt.scatter(old_cnsrt_t, old_cnsrt_lb[dim, :], color='red')
-                    plt.scatter(cnsrt_t, cnsrt_lb[dim, :], edgecolors='blue', facecolor='none')
+                for dim in range(lb.shape[0]):
+                    plt.scatter(old_t, old_lb[dim, :], color='red')
+                    plt.scatter(t, lb[dim, :], edgecolors='blue', facecolor='none')
 
                 plt.figure()
                 plt.title(f'upper bounds: {name}')
-                for dim in range(cnsrt_lb.shape[0]):
-                    plt.scatter(old_cnsrt_t, old_cnsrt_ub[dim, :], color='orange')
-                    plt.scatter(cnsrt_t, cnsrt_ub[dim, :], edgecolors='green', facecolor='none')
+                for dim in range(lb.shape[0]):
+                    plt.scatter(old_t, old_ub[dim, :], color='orange')
+                    plt.scatter(t, ub[dim, :], edgecolors='green', facecolor='none')
 
             plt.show()
 
         # set cost functions
         for name, cost in self.prb.getCosts().items():
             print(f'============================ cost {name} =======================================')
-            cost_nodes_old = cost.getNodes()
-            print('old nodes:', cost_nodes_old)
-            cost_nodes_new = ref.expand_nodes(cost_nodes_old)
+            old_n = self.old_cost_nodes[name]
+            print('old nodes:', old_n)
+            cost_nodes_new = ref.expand_nodes(old_n)
             cost.setNodes(cost_nodes_new, erasing=True)
             print('new nodes:', cost.getNodes())
 
@@ -227,14 +247,13 @@ class Refiner:
 
         # manage bounds
         for name_var, var in self.prb.getVariables().items():
-            var_nodes_old = var.getNodes().copy()
-            var_lb, var_ub = var.getBounds()
+            var_nodes_old = self.old_var_nodes[name_var]
+            var_lb, var_ub = self.old_var_bounds[name_var]
 
-            k = 0
             for node in var.getNodes():
                 if node in self.base_indices:
-                    var.setBounds(var_lb[:, k], var_ub[:, k], node)
-                    k += 1
+                    old_node_index = var_nodes_old.index(self.new_to_old[node])
+                    var.setBounds(var_lb[:, old_node_index], var_ub[:, old_node_index], node)
 
             elem_and_expansion_masked = self.find_nodes_to_inject(var_nodes_old)
 
@@ -278,13 +297,15 @@ class Refiner:
         plot_ig = False
 
         # variables
-        for name, var in self.prb.getVariables().items():
-            print(f'============================ var {name} =======================================')
-            k = 0
+        for name_var, var in self.prb.getVariables().items():
+
+            var_nodes_old = self.old_var_nodes[name_var]
+            print(f'============================ var {name_var} =======================================')
             for node in var.getNodes():
                 if node in self.base_indices:
-                    var.setInitialGuess(self.prev_solution[f'{name}'][:, k], node)
-                    k += 1
+                    old_node_index = var_nodes_old.index(self.new_to_old[node])
+                    var.setInitialGuess(self.prev_solution[name_var][:, old_node_index], node)
+
                 if node in self.new_indices:
                     print(f'node {node} requires an interpolated value to be initialized.')
                     var.setInitialGuess(np.zeros([var.shape[0], var.shape[1]]), node)
@@ -292,14 +313,13 @@ class Refiner:
 
         if plot_ig:
             for name, var in self.prb.getVariables().items():
-
-                for dim in range(self.prev_solution[f'{name}'].shape[0]):
+                for dim in range(self.prev_solution[name].shape[0]):
                     from horizon.variables import InputVariable
                     nodes_vec_vis = self.nodes_vec
                     if isinstance(var, InputVariable):
                         nodes_vec_vis = self.nodes_vec[:-1]
 
-                    plt.scatter(nodes_vec_vis, self.prev_solution[f'{name}'][dim, :], color='red')
+                    plt.scatter(nodes_vec_vis, self.prev_solution[name][dim, :], color='red')
 
                 var_to_print = var.getInitialGuess()
 
@@ -349,7 +369,7 @@ class Refiner:
         self.sol = Solver.make_solver('ipopt', self.prb, opts)
         self.sol.solve()
 
-    def getSoution(self):
+    def getSolution(self):
 
         # add check for the solving of the problem
         sol_var = self.sol.getSolutionDict()
@@ -363,6 +383,30 @@ class Refiner:
         # plt.show()
 
         return sol_var, sol_cnsrt, sol_dt
+
+    def addProximalCosts(self):
+        proximal_cost_state = 1e5
+
+        prb.removeCostFunction('min_q_dot')
+
+        for state_var in self.prb.getState().getVars(abstr=True):
+            for node in range(self.new_n_nodes):
+                if node in self.base_indices:
+                    old_sol = self.prev_solution[state_var.getName()]
+                    old_n = self.new_to_old[node]
+                    print(f'Creating proximal cost for variable {state_var.getName()} at node {node}')
+                    prb.createCostFunction(f"{state_var.getName()}_proximal_{node}", proximal_cost_state * cs.sumsqr(state_var - old_sol[:, old_n]), nodes=node)
+                if node in self.new_indices:
+                    print(f'Proximal cost not created for node {node}: required a value')
+                    # prb.createCostFunction(f"q_close_to_res_node_{node}", 1e5 * cs.sumsqr(q - q_res[:, zip_indices_new[node]]), nodes=node)
+
+        proximal_cost_input = 1
+
+        for input_var in self.prb.getInput().getVars(abstr=True):
+
+            if not isinstance(input_var, (Parameter, SingleParameter)):
+                prb.createIntermediateCost(f"minimize_{input_var.getName()}", proximal_cost_input * cs.sumsqr(input_var))
+
 
     def getAugmentedProblem(self):
 
@@ -386,7 +430,6 @@ if __name__ == '__main__':
     if 'universe' in joint_names: joint_names.remove('universe')
     if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
-
     n_nodes = 50
 
     node_start_step = 20
@@ -398,8 +441,6 @@ if __name__ == '__main__':
     n_q = kindyn.nq()
     n_v = kindyn.nv()
     n_f = 3
-
-
 
     # SET PROBLEM STATE AND INPUT VARIABLES
     prb = problem.Problem(n_nodes)
@@ -415,20 +456,19 @@ if __name__ == '__main__':
     contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
     contact_map = dict(zip(contacts_name, f_list))
 
-
     load_initial_guess = True
     # import initial guess if present
     if load_initial_guess:
         ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
-        prev_prev_solution = ms.load()
-        q_ig = prev_prev_solution['q']
-        q_dot_ig = prev_prev_solution['q_dot']
-        q_ddot_ig = prev_prev_solution['q_ddot']
+        prev_solution = ms.load()
+        q_ig = prev_solution['q']
+        q_dot_ig = prev_solution['q_dot']
+        q_ddot_ig = prev_solution['q_ddot']
         f_ig_list = list()
         for i in range(n_c):
-            f_ig_list.append(prev_prev_solution[f'f{i}'])
+            f_ig_list.append(prev_solution[f'f{i}'])
 
-        dt_ig = prev_prev_solution['dt']
+        dt_ig = prev_solution['dt']
 
     # SET DYNAMICS
     dt = prb.createInputVariable("dt", 1)  # variable dt as input
@@ -509,13 +549,9 @@ if __name__ == '__main__':
         if isinstance(dt, cs.SX):
             dt.setInitialGuess(dt_min)
 
-
-
     # SET TRANSCRIPTION METHOD
     th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
-    print(prb.getConstraints('multiple_shooting').getNodes())
-    print(len(prb.getConstraints('multiple_shooting').getNodes()))
     # SET INVERSE DYNAMICS CONSTRAINTS
     tau_lim = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
                         1000., 1000., 1000.,  # Contact 1
@@ -523,7 +559,8 @@ if __name__ == '__main__':
                         1000., 1000., 1000.,  # Contact 3
                         1000., 1000., 1000.])  # Contact 4
 
-    tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, q_dot,
+    tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q,
+                                                                                                                 q_dot,
                                                                                                                  q_ddot,
                                                                                                                  contact_map)
     prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
@@ -556,15 +593,16 @@ if __name__ == '__main__':
 
         # friction cones must be satisfied
         fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
-        prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
-        prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
+        prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step),
+                                         bounds=dict(lb=fc_lb, ub=fc_ub))
+        prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes),
+                                         bounds=dict(lb=fc_lb, ub=fc_ub))
 
         prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
         prb.createConstraint(f"start_{frame}_leg", p - p_start, nodes=node_start_step)
         prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
         prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
-
 
     # SET COST FUNCTIONS
     # prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
@@ -573,6 +611,26 @@ if __name__ == '__main__':
     for f in f_list:
         prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
+    # prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
+
+    # =============
+    # SOLVE PROBLEM
+    # =============
+    #
+    # opts = {'ipopt.tol': 0.001,
+    #         'ipopt.constr_viol_tol': 0.001,
+    #         'ipopt.max_iter': 2000,
+    #         'ipopt.linear_solver': 'ma57'}
+    #
+    # solver = solver.Solver.make_solver('ipopt', prb, opts)
+    # solver.solve()
+    #
+    # prev_solution = solver.getSolutionDict()
+    # prev_solution_constraints = solver.getConstraintSolutionDict()
+    #
+    # n_nodes = prb.getNNodes() - 1
+    # prev_tau = prev_solution_constraints['inverse_dynamics']
+    # prev_dt = solver.getDt().flatten()
     # ===================================================================================================================
     # =============
     # FAKE SOLVE PROBLEM
@@ -580,13 +638,13 @@ if __name__ == '__main__':
 
     ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
     prev_solution = ms.load()
-
+    #
     n_nodes = prev_solution['n_nodes'][0][0]
-
-    node_start_step = prev_solution['node_start_step'][0][0]
-    node_end_step = prev_solution['node_end_step'][0][0]
-    node_peak = prev_solution['node_peak'][0][0]
-    jump_height = prev_solution['jump_height'][0][0]
+    prev_tau = prev_solution['inverse_dynamics']['val'][0][0]
+    prev_dt = prev_solution['dt'].flatten()
+    # =========================================
+    # =========================================
+    # =========================================
 
     prev_q = prev_solution['q']
     prev_q_dot = prev_solution['q_dot']
@@ -596,20 +654,13 @@ if __name__ == '__main__':
     for i in range(n_c):
         prev_f_list.append(prev_solution[f'f{i}'])
 
-    prev_tau = prev_solution['inverse_dynamics']['val'][0][0]
+
     contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
     prev_contact_map = dict(zip(contacts_name, prev_f_list))
 
     joint_names = kindyn.joint_names()
     if 'universe' in joint_names: joint_names.remove('universe')
     if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
-
-    if 'dt' in prev_solution:
-        prev_dt = prev_solution['dt'].flatten()
-    elif 'constant_dt' in prev_solution:
-        prev_dt = prev_solution['constant_dt'].flatten()[0]
-    elif 'param_dt' in prev_solution:
-        prev_dt = prev_solution['param_dt'].flatten()
 
     dt_res = 0.001
 
@@ -659,21 +710,7 @@ if __name__ == '__main__':
 
     # ===================================================================================================================
 
-    # =============
-    # SOLVE PROBLEM
-    # =============
-    #
-    # opts = {'ipopt.tol': 0.001,
-    #         'ipopt.constr_viol_tol': 0.001,
-    #         'ipopt.max_iter': 2000,
-    #         'ipopt.linear_solver': 'ma57'}
-    #
-    # solver = solver.Solver.make_solver('ipopt', prb, opts)
-    # solver.solve()
-    #
-    # solution = solver.getSolutionDict()
-    # solution_constraints = solver.getConstraintSolutionDict()
-    # ===========================================================================================
+
     ref = Refiner(prb, nodes_vec_augmented, prev_solution)
 
     plot_nodes = False
@@ -689,8 +726,9 @@ if __name__ == '__main__':
     ref.resetProblem()
     ref.resetVarBounds()
     ref.resetInitialGuess()
+    ref.addProximalCosts()
     ref.solveProblem()
-    sol_var, sol_cnsrt, sol_dt = ref.getSoution()
+    sol_var, sol_cnsrt, sol_dt = ref.getSolution()
 
     new_prb = ref.getAugmentedProblem()
 

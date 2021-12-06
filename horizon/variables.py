@@ -145,7 +145,7 @@ class OffsetVariable(AbstractVariable):
             self._nodes.append(int(node.split("n", 1)[1]))
 
         if nodes is None:
-            nodes = self._nodes
+            nodes = list(self._nodes)
 
         # offset the node of self.offset
         offset_nodes = [node + self._offset for node in nodes]
@@ -223,7 +223,7 @@ class OffsetParameter(AbstractVariable):
             self._nodes.append(int(node.split("n", 1)[1]))
 
         if nodes is None:
-            nodes = self._nodes
+            nodes = list(self._nodes)
 
         # offset the node of self.offset
         offset_nodes = [node + self._offset for node in nodes]
@@ -398,7 +398,7 @@ class Parameter(AbstractVariable):
         self._par_offset = dict()
         self._par_impl = dict()
 
-        self._nodes = nodes
+        self._nodes = list(nodes)
         self._project()
 
     def _project(self):
@@ -887,7 +887,7 @@ class Variable(AbstractVariable):
         if isinstance(nodes, list):
             nodes.sort()
 
-        self._nodes = nodes
+        self._nodes = list(nodes)
 
         self.var_offset = dict()
         self._var_impl = dict()
@@ -1018,7 +1018,7 @@ class Variable(AbstractVariable):
         Args:
             n_nodes: the desired number of nodes to be set
         """
-        self._nodes = n_nodes
+        self._nodes = list(n_nodes)
         self._project()
 
     def _project(self):
@@ -1322,14 +1322,19 @@ class AbstractAggregate(ABC):
         """
         self.var_list : List[AbstractVariable] = [item for item in args]
 
-    def getVars(self) -> cs.SX:
+    def getVars(self, abstr=False) -> cs.SX:
         """
         Getter for the variable stored in the aggregate.
 
         Returns:
             a SX vector of all the variables stored
         """
-        return cs.vertcat(*self.var_list)
+
+        if abstr:
+            aggr_vars = self.var_list
+        else:
+            aggr_vars = cs.vertcat(*self.var_list)
+        return aggr_vars
 
     def __iter__(self):
         """
@@ -1428,6 +1433,25 @@ class Aggregate(AbstractAggregate):
             var: variable to be added to the aggregate
         """
         self.var_list.append(var)
+
+    def removeVariable(self, var_name):
+        """
+        Remove a Variable from the Aggregate.
+
+        Todo:
+            Should check if variable type belongs to the aggregate type (no mixing!)
+
+        Args:
+            var: variable to be removed from the aggregate
+        """
+
+        # todo make this a little better
+        for i in range(len(self.var_list)):
+            if var_name == self.var_list[i].getName():
+
+                del self.var_list[i]
+                break
+
 
     def setBounds(self, lb, ub, nodes=None):
         """
