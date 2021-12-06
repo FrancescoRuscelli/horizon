@@ -140,6 +140,9 @@ public:
         int iter;
         bool accepted;
 
+        Eigen::VectorXd constraint_values;
+        Eigen::MatrixXd defect_values;
+
         ForwardPassResult(int nx, int nu, int N);
         void print() const;
     };

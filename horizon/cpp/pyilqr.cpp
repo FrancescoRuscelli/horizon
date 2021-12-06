@@ -10,6 +10,8 @@ PYBIND11_MODULE(pyilqr, m) {
             .def_readonly("alpha", &IterativeLQR::ForwardPassResult::alpha)
             .def_readonly("hxx_reg", &IterativeLQR::ForwardPassResult::hxx_reg)
             .def_readonly("constraint_violation", &IterativeLQR::ForwardPassResult::constraint_violation)
+            .def_readonly("constraint_values", &IterativeLQR::ForwardPassResult::constraint_values)
+            .def_readonly("defect_values", &IterativeLQR::ForwardPassResult::defect_values)
             .def_readonly("cost", &IterativeLQR::ForwardPassResult::cost)
             .def_readonly("defect_norm", &IterativeLQR::ForwardPassResult::defect_norm)
             .def_readonly("merit", &IterativeLQR::ForwardPassResult::merit)

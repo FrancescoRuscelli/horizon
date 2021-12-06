@@ -200,7 +200,8 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         }
 
         _constraint[i].evaluate(xtrj.col(i), utrj.col(i), i);
-        constr += _constraint[i].h().lpNorm<1>();
+        _fp_res->constraint_values[i] = _constraint[i].h().lpNorm<1>();
+        constr += _fp_res->constraint_values[i];
 
     }
 
@@ -215,8 +216,8 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
     {
         // note: u not used
         // todo: enforce this!
-        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
-        constr += _constraint[_N].h().lpNorm<1>();
+        _fp_res->constraint_values[_N] = _constraint[_N].h().lpNorm<1>();
+        constr += _fp_res->constraint_values[_N];
     }
 
     return constr / _N;
@@ -237,7 +238,9 @@ double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::Ma
                               i,
                               _tmp[i].defect);
 
-        defect += _tmp[i].defect.cwiseAbs().sum();
+        defect += _tmp[i].defect.lpNorm<1>();
+
+        _fp_res->defect_values.col(i) = _tmp[i].defect;
     }
 
     return defect / _N;
@@ -279,6 +282,8 @@ void IterativeLQR::line_search(int iter)
 
     _fp_res->merit_der = merit_der;
 
+    // cache last forward pass outcome
+    bool last_fp_accepted = _fp_res->accepted;
 
     // run line search
     while(alpha >= alpha_min)
@@ -315,7 +320,10 @@ void IterativeLQR::line_search(int iter)
         return;
     }
 
-    reduce_regularization();
+    if(last_fp_accepted)
+    {
+        reduce_regularization();
+    }
 
     _xtrj = _fp_res->xtrj;
     _utrj = _fp_res->utrj;

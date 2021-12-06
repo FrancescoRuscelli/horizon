@@ -845,6 +845,8 @@ IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N):
     utrj.setZero(nu, N);
     merit = 0.0;
     step_length = 0.0;
+    constraint_values.setZero(N+1);
+    defect_values.setZero(nx, N);
 }
 
 void IterativeLQR::ForwardPassResult::print() const
