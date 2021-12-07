@@ -22,6 +22,9 @@ public:
     // dynamics jacobian
     casadi_utils::WrappedFunction df;
 
+    // parameters
+    ParameterMapPtr param;
+
     // df/dx
     const Eigen::MatrixXd& A() const;
 
@@ -33,24 +36,80 @@ public:
 
     Dynamics(int nx, int nu);
 
-    VecConstRef integrate(VecConstRef x, VecConstRef u);
+    VecConstRef integrate(VecConstRef x,
+                          VecConstRef u,
+                          int k);
 
-    void linearize(VecConstRef x, VecConstRef u);
+    void linearize(VecConstRef x,
+                   VecConstRef u,
+                   int k);
 
-    void computeDefect(VecConstRef x, VecConstRef u, VecConstRef xnext, Eigen::VectorXd& d);
+    void computeDefect(VecConstRef x,
+                       VecConstRef u,
+                       VecConstRef xnext,
+                       int k,
+                       Eigen::VectorXd& d);
 
     void setDynamics(casadi::Function f);
 
+    static casadi::Function Jacobian(const casadi::Function& f);
+
 };
 
-struct IterativeLQR::Constraint
+struct IterativeLQR::ConstraintEntity
 {
+    typedef std::shared_ptr<ConstraintEntity> Ptr;
+
     // constraint function
     casadi_utils::WrappedFunction f;
 
     // constraint jacobian
     casadi_utils::WrappedFunction df;
 
+    // parameter map
+    ParameterMapPtr param;
+
+    // indices
+    std::vector<int> indices;
+
+    // dh/dx
+    const Eigen::MatrixXd& C() const;
+
+    // dh/du
+    const Eigen::MatrixXd& D() const;
+
+    // constraint violation h(x, u) - hdes
+    VecConstRef h() const;
+
+    // valid flag
+    bool is_valid() const;
+
+    ConstraintEntity();
+
+    void linearize(VecConstRef x, VecConstRef u, int k);
+
+    void evaluate(VecConstRef x, VecConstRef u, int k);
+
+    void setConstraint(casadi::Function h);
+
+    void setConstraint(casadi::Function h, casadi::Function dh);
+
+    void setTargetValue(const Eigen::VectorXd& hdes);
+
+    static casadi::Function Jacobian(const casadi::Function& h);
+
+private:
+
+    // desired value
+    Eigen::VectorXd _hdes;
+
+    // computed value
+    Eigen::VectorXd _hvalue;
+
+};
+
+struct IterativeLQR::Constraint
+{
     // dh/dx
     const Eigen::MatrixXd& C() const;
 
@@ -60,21 +119,35 @@ struct IterativeLQR::Constraint
     // constraint violation f(x, u)
     VecConstRef h() const;
 
+    // size getter
+    int size() const;
+
     // valid flag
     bool is_valid() const;
 
-    Constraint();
+    Constraint(int nx, int nu);
 
-    void linearize(VecConstRef x, VecConstRef u);
+    void linearize(VecConstRef x, VecConstRef u, int k);
 
-    void evaluate(VecConstRef x, VecConstRef u);
+    void evaluate(VecConstRef x, VecConstRef u, int k);
 
-    void setConstraint(casadi::Function h);
+    void addConstraint(ConstraintEntity::Ptr h);
+
+    void clear();
+
+private:
+
+    std::vector<ConstraintEntity::Ptr> items;
+    Eigen::MatrixXd _C;
+    Eigen::MatrixXd _D;
+    Eigen::VectorXd _h;
 
 };
 
-struct IterativeLQR::IntermediateCost
+struct IterativeLQR::IntermediateCostEntity
 {
+    typedef std::shared_ptr<IntermediateCostEntity> Ptr;
+
     // original cost
     casadi_utils::WrappedFunction l;
 
@@ -83,6 +156,35 @@ struct IterativeLQR::IntermediateCost
 
     // cost hessian
     casadi_utils::WrappedFunction ddl;
+
+    // parameters
+    ParameterMapPtr param;
+
+    // indices
+    std::vector<int> indices;
+
+    /* Quadratized cost */
+    const Eigen::MatrixXd& Q() const;
+    VecConstRef q() const;
+    const Eigen::MatrixXd& R() const;
+    VecConstRef r() const;
+    const Eigen::MatrixXd& P() const;
+
+    void setCost(const casadi::Function& cost);
+
+    void setCost(const casadi::Function& f,
+                 const casadi::Function& df,
+                 const casadi::Function& ddf);
+
+    double evaluate(VecConstRef x, VecConstRef u, int k);
+    void quadratize(VecConstRef x, VecConstRef u, int k);
+
+    static casadi::Function Gradient(const casadi::Function& f);
+    static casadi::Function Hessian(const casadi::Function& df);
+};
+
+struct IterativeLQR::IntermediateCost
+{
 
     /* Quadratized cost */
     const Eigen::MatrixXd& Q() const;
@@ -93,10 +195,18 @@ struct IterativeLQR::IntermediateCost
 
     IntermediateCost(int nx, int nu);
 
-    void setCost(const casadi::Function& cost);
+    void addCost(IntermediateCostEntity::Ptr cost);
 
-    double evaluate(VecConstRef x, VecConstRef u);
-    void quadratize(VecConstRef x, VecConstRef u);
+    double evaluate(VecConstRef x, VecConstRef u, int k);
+    void quadratize(VecConstRef x, VecConstRef u, int k);
+
+    void clear();
+
+private:
+
+    std::vector<IntermediateCostEntity::Ptr> items;
+    Eigen::MatrixXd _Q, _R, _P;
+    Eigen::VectorXd _q, _r;
 };
 
 struct IterativeLQR::Temporaries
@@ -109,61 +219,47 @@ struct IterativeLQR::Temporaries
     // temporary for S*A
     Eigen::MatrixXd S_A;
 
-    // quadratized value function (after constraints, if any)
-    // note: 'u' is actually 'z' in this context!
+    // feasible constraint
+    Eigen::MatrixXd Cf, Df;
+    Eigen::VectorXd hf;
+
+    // cod of constraint
+    Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> ccod;
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> cqr;
+    Eigen::BDCSVD<Eigen::MatrixXd> csvd;
+    Eigen::MatrixXd codQ;
+
+    // quadratized value function
     Eigen::MatrixXd Huu;
     Eigen::MatrixXd Hux;
     Eigen::MatrixXd Hxx;
-
     Eigen::VectorXd hx;
     Eigen::VectorXd hu;
 
-    // quadratized value function (free)
-    Eigen::MatrixXd Huuf;
-    Eigen::MatrixXd Huxf;
-    Eigen::VectorXd huf;
+    // temporary for kkt rhs
+    Eigen::MatrixXd kkt;
+    Eigen::MatrixXd kx0;
 
-    // temporary for [hu Hux]
-    // note: it is used to store gains as well, take care!
-    Eigen::MatrixXd huHux;
+    // lu for kkt matrix
+    Eigen::PartialPivLU<Eigen::MatrixXd> lu;
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr;
+    Eigen::LDLT<Eigen::MatrixXd> ldlt;
 
-    // cholesky for Huu
-    Eigen::LLT<Eigen::MatrixXd> llt;
+    // kkt solution
+    Eigen::MatrixXd u_lam;
 
     // linearized constraint to go (C*x + D*u + h = 0)
     Eigen::MatrixXd C;
     Eigen::MatrixXd D;
     Eigen::VectorXd h;
 
-    // svd of D
-    Eigen::BDCSVD<Eigen::MatrixXd> svd;
-
     // rotated constraint according to left singular vectors of D
     Eigen::MatrixXd rotC;
     Eigen::VectorXd roth;
 
-    // temporary that is used to compute lagrange multipliers
-    Eigen::MatrixXd UrSinvVrT;
-
-    // input component due to constraint (u = lc + Lc*x + Bz*z)
-    Eigen::MatrixXd Lc;
-    Eigen::VectorXd lc;
-    Eigen::MatrixXd Bz;
-
-    // modified dynamics and cost due to
-    // constraints
-    Eigen::MatrixXd Ac;
-    Eigen::MatrixXd Bc;
-    Eigen::VectorXd dc;
-    Eigen::MatrixXd Qc;
-    Eigen::MatrixXd Rc;
-    Eigen::MatrixXd Pc;
-    Eigen::VectorXd qc;
-    Eigen::VectorXd rc;
-
-
     /* Forward pass */
     Eigen::VectorXd dx;
+    Eigen::VectorXd du;
     Eigen::VectorXd defect;
 
 };
@@ -179,6 +275,8 @@ struct IterativeLQR::ConstraintToGo
     void propagate_backwards(MatConstRef A, MatConstRef B, VecConstRef d);
 
     void add(const Constraint& constr);
+
+    void add(MatConstRef C, MatConstRef D, VecConstRef h);
 
     void clear();
 
@@ -229,20 +327,25 @@ struct IterativeLQR::BackwardPassResult
     BackwardPassResult(int nx, int nu);
 };
 
-struct IterativeLQR::ConstrainedDynamics
+struct IterativeLQR::FeasibleConstraint
 {
-    MatConstRef A;
-    MatConstRef B;
-    VecConstRef d;
+    MatConstRef C;
+    MatConstRef D;
+    VecConstRef h;
 };
 
-struct IterativeLQR::ConstrainedCost
-{
-    MatConstRef Q;
-    MatConstRef R;
-    MatConstRef P;
-    VecConstRef q;
-    VecConstRef r;
-};
+static void set_param_inputs(std::shared_ptr<std::map<std::string, Eigen::MatrixXd>> params, int k,
+                             casadi_utils::WrappedFunction& f);
+
+#define THROW_NAN(mat) \
+    if((mat).hasNaN()) \
+    { \
+        throw std::runtime_error("[" + std::string(__func__) + "] NaN value detected in " #mat); \
+    } \
+    if(!mat.allFinite()) \
+    { \
+        throw std::runtime_error("[" + std::string(__func__) + "] Inf value detected in " #mat); \
+    }
+
 
 #endif // ILQR_IMPL_H

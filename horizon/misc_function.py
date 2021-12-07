@@ -53,7 +53,13 @@ def checkValueEntry(val):
     if isinstance(val, (int, float)):
         val = np.array([val])
     else:
-        val = np.array(val).flatten()
+        val = np.array(val)
+
+        # if single value, flatten
+        # note: dont flatten matrix of values!
+        multiple_vals = val.ndim == 2 and val.shape[1] != 1
+        if not multiple_vals:
+            val = val.flatten()
 
     return val
 

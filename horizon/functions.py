@@ -38,7 +38,10 @@ class Function:
         self.pars = used_pars
 
         # create function of CASADI, dependent on (in order) [all_vars, all_pars]
-        self._fun = cs.Function(name, self.vars + self.pars, [self._f])
+        all_input = self.vars + self.pars
+        all_names = [i.getName() for i in all_input]
+        self._fun = cs.Function(name, self.vars + self.pars, [self._f], 
+            all_names, ['f'])
         self._fun_impl = dict()
         self.setNodes(nodes)
 
@@ -380,7 +383,10 @@ class Constraint(Function):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
-        vals = np.hstack([self.bounds['n' + str(i)][val_type] for i in nodes])
+        if len(nodes) == 0:
+            return np.zeros((self.getDim(), 0))
+
+        vals = np.hstack([np.atleast_2d(self.bounds['n' + str(i)][val_type]).T for i in nodes])
 
         return vals
 

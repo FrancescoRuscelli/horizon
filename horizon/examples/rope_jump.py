@@ -5,7 +5,7 @@ import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
+from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter
 from horizon.ros.replay_trajectory import *
 from horizon.transcriptions import integrators
 from horizon.solvers import solver
@@ -142,7 +142,7 @@ tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
             0., 0., 0.,  # rope_anchor
             0.0]  # rope
 dd = {'Contact1': f1, 'Contact2': f2, 'rope_anchor2': frope}
-tau = casadi_kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
+tau = kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
 prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
 
 FKRope = cs.Function.deserialize(kindyn.fk('rope_anchor2'))
@@ -171,7 +171,7 @@ for frame, f in zip(contact_names, forces):
     # STANCE PHASE
     prb.createConstraint(f"{frame}_before_jump", p - pd, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
-    fc, fc_lb, fc_ub = casadi_kin_dyn.linearized_friciton_cone(f, mu, R_wall)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R_wall)
     prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=list(range(0, lift_node)), bounds=dict(lb=fc_lb, ub=fc_ub))
     
 
@@ -189,7 +189,7 @@ for frame, f in zip(contact_names, forces):
                          bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
 
     surface_dict = {'a': 1., 'd': -x_foot}
-    c, lb, ub = casadi_kin_dyn.surface_point_contact(surface_dict, q, kindyn, frame)
+    c, lb, ub = kin_dyn.surface_point_contact(surface_dict, q, kindyn, frame)
     prb.createConstraint(f"{frame}_on_wall", c, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=lb, ub=ub))
 
 # Creates problem
@@ -212,7 +212,7 @@ frope_hist = solution["frope"]
 dt_hist = solution["dt"]
 
 tau_hist = np.zeros(qddot_hist.shape)
-ID = casadi_kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+ID = kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 for i in range(ns):
     frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'rope_anchor2': frope_hist[:, i]}
     tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()

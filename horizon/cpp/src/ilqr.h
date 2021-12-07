@@ -1,6 +1,10 @@
+#ifndef __HORIZON__ILQR__H__
+#define __HORIZON__ILQR__H__
+
 #include <casadi/casadi.hpp>
 #include <Eigen/Dense>
 #include <memory>
+#include <variant>
 
 #include "profiling.h"
 
@@ -39,35 +43,32 @@ public:
      */
     typedef std::function<bool(const ForwardPassResult& res)> CallbackType;
 
+    typedef std::variant<int, double, bool, std::string> OptionTypes;
+    typedef std::map<std::string, OptionTypes> OptionDict;
+
 
     /**
      * @brief Class constructor
      * @param fdyn is a function mapping state and control to the integrated state;
-     * required signature is (x, u) -> (f)
+     * required signature is (x, u, p) -> (f)
      * @param N is the number of shooting intervals
      */
     IterativeLQR(casadi::Function fdyn,
-                 int N);
+                 int N,
+                 OptionDict opt = OptionDict());
+
+
+    void setStateBounds(const Eigen::MatrixXd& lb, const Eigen::MatrixXd& ub);
+
+    void setInputBounds(const Eigen::MatrixXd& lb, const Eigen::MatrixXd& ub);
 
     /**
-     * @brief setStepLength
-     * @param alpha
+     * @brief set an intermediate cost term for the k-th intermediate state,
+     * as specificed by a vector of indices
+     * @param indices: the nodes that the cost refers to
+     * @param inter_cost: a function with required signature (x, u, p) -> (l)
      */
-    void setStepLength(double alpha);
-
-    /**
-     * @brief set an intermediate cost term for each intermediate state
-     * @param inter_cost: a vector of N entries, each of which is a function with
-     * required signature (x, u) -> (l)
-     */
-    void setIntermediateCost(const std::vector<casadi::Function>& inter_cost);
-
-    /**
-     * @brief set an intermediate cost term for the k-th intermediate state
-     * @param k: the node that the cost refers to
-     * @param inter_cost: a function with required signature (x, u) -> (l)
-     */
-    void setIntermediateCost(int k, const casadi::Function& inter_cost);
+    void setCost(std::vector<int> indices, const casadi::Function& inter_cost);
 
     /**
      * @brief set the final cost
@@ -77,16 +78,26 @@ public:
     void setFinalCost(const casadi::Function& final_cost);
 
     /**
-     * @brief  set an intermediate constraint term for the k-th intermediate state
-     * @param k: the node that the cost refers to
-     * @param inter_constraint: a function with required signature (x, u) -> (h),
+     * @brief  set an intermediate constraint term for the k-th intermediate state,
+     * as specificed by a vector of indices
+     * @param indices: the nodes that the cost refers to
+     * @param inter_constraint: a function with required signature (x, u, p) -> (h),
      * where the constraint is h(x, u) = 0
+     * @param target_values: if specified, the i-th entry is used as target value
+     * for the constraint function at the indices[i]
      */
-    void setIntermediateConstraint(int k, const casadi::Function& inter_constraint);
-
-    void setIntermediateConstraint(const std::vector<casadi::Function>& inter_constraint);
+    void setConstraint(std::vector<int> indices,
+                       const casadi::Function& inter_constraint,
+                       std::vector<Eigen::VectorXd> target_values = std::vector<Eigen::VectorXd>());
 
     void setFinalConstraint(const casadi::Function& final_constraint);
+
+    void setIndices(const std::string& f_name,
+                    const std::vector<int>& indices);
+
+    void updateIndices();
+
+    void setParameterValue(const std::string& pname, const Eigen::MatrixXd& value);
 
     void setInitialState(const Eigen::VectorXd& x0);
 
@@ -116,6 +127,7 @@ public:
     {
         Eigen::MatrixXd xtrj;
         Eigen::MatrixXd utrj;
+        double hxx_reg;
         double alpha;
         double cost;
         double merit;
@@ -128,7 +140,11 @@ public:
         int iter;
         bool accepted;
 
+        Eigen::VectorXd constraint_values;
+        Eigen::MatrixXd defect_values;
+
         ForwardPassResult(int nx, int nu, int N);
+        void print() const;
     };
 
 
@@ -137,23 +153,45 @@ protected:
 
 private:
 
+    static constexpr double inf = std::numeric_limits<double>::infinity();
+
     struct ConstrainedDynamics;
     struct ConstrainedCost;
+    struct FeasibleConstraint;
     struct Dynamics;
     struct Constraint;
     struct IntermediateCost;
+    struct ConstraintEntity;
+    struct IntermediateCostEntity;
     struct Temporaries;
     struct ConstraintToGo;
     struct BackwardPassResult;
     struct ValueFunction;
 
-    typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost> HandleConstraintsRetType;
+    typedef std::tuple<int, ConstrainedDynamics, ConstrainedCost>
+        HandleConstraintsRetType;
 
+    typedef std::shared_ptr<std::map<std::string, Eigen::MatrixXd>>
+        ParameterMapPtr;
+
+    typedef std::map<std::string, std::shared_ptr<IntermediateCostEntity>>
+        CostPtrMap;
+
+    typedef std::map<std::string, std::shared_ptr<ConstraintEntity>>
+        ConstraintPtrMap;
+
+    void add_param_to_map(const casadi::Function& f);
     void linearize_quadratize();
     void report_result(const ForwardPassResult& fpres);
     void backward_pass();
     void backward_pass_iter(int i);
-    HandleConstraintsRetType handle_constraints(int i);
+    void increase_regularization();
+    void reduce_regularization();
+    FeasibleConstraint handle_constraints(int i);
+    void add_bounds(int i);
+    void compute_constrained_input(Temporaries& tmp, BackwardPassResult& res);
+    void compute_constrained_input_svd(Temporaries& tmp, BackwardPassResult& res);
+    void compute_constrained_input_qr(Temporaries& tmp, BackwardPassResult& res);
     double compute_merit_value(double mu_f, double mu_c, double cost, double defect_norm, double constr_viol);
     double compute_merit_slope(double mu_f, double mu_c, double defect_norm, double constr_viol);
     std::pair<double, double> compute_merit_weights();
@@ -164,17 +202,41 @@ private:
     void forward_pass_iter(int i, double alpha);
     void line_search(int iter);
     bool should_stop();
-
     void set_default_cost();
+
+    enum DecompositionType
+    {
+        Ldlt, Qr, Lu, Cod, Svd
+    };
+
+    static DecompositionType str_to_decomp_type(const std::string& dt_str);
 
     const int _nx;
     const int _nu;
     const int _N;
 
     double _step_length;
+    double _hxx_reg;
+    double _hxx_reg_growth_factor;
+    double _huu_reg;
+    double _kkt_reg;
+    double _line_search_accept_ratio;
+    double _alpha_min;
+    double _svd_threshold;
+    bool _closed_loop_forward_pass;
+    std::string _codegen_workdir;
+    bool _codegen_enabled;
+    DecompositionType _kkt_decomp_type;
+    DecompositionType _constr_decomp_type;
+
+    ParameterMapPtr _param_map;
+    CostPtrMap _cost_map;
+    ConstraintPtrMap _constr_map;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;
+    Eigen::MatrixXd _x_lb, _x_ub;
+    Eigen::MatrixXd _u_lb, _u_ub;
     std::vector<ValueFunction> _value;
     std::vector<Dynamics> _dyn;
 
@@ -187,7 +249,6 @@ private:
     std::vector<Eigen::VectorXd> _lam_g;
     Eigen::MatrixXd _lam_x;
 
-
     std::vector<Temporaries> _tmp;
 
     CallbackType _iter_cb;
@@ -197,3 +258,5 @@ private:
 
 
 }
+
+#endif

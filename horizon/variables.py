@@ -262,7 +262,7 @@ class SingleParameter(AbstractVariable):
         else:
             nodes = misc.checkNodes(nodes)
             par_impl = cs.vertcat(*[self._par_impl['val'] for i in nodes])
-        return par_impl
+        return par_impl.toarray()
 
     def getName(self):
         """
@@ -407,9 +407,9 @@ class Parameter(AbstractVariable):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
-        par_impl = cs.vertcat(*[self._par_impl['n' + str(i)]['val'] for i in nodes])
+        par_impl = cs.horzcat(*[self._par_impl['n' + str(i)]['val'] for i in nodes])
 
-        return par_impl
+        return par_impl.toarray()
 
     def getName(self):
         """
@@ -828,8 +828,20 @@ class Variable(AbstractVariable):
         if val.shape[0] != self._dim:
             raise Exception('Wrong dimension of initial guess inserted.')
 
-        for node in nodes:
-            self._var_impl['n' + str(node)]['w0'] = val
+        # if a matrix of values is being provided, check cols match len(nodes)
+        multiple_vals = val.ndim == 2 and val.shape[1] != 1
+    
+        if multiple_vals and val.shape[1] != len(nodes):
+            raise Exception('Wrong dimension of initial guess inserted.')
+        
+        for i, node in enumerate(nodes):
+
+            if multiple_vals:
+                v = val[:, i]
+            else:
+                v = val 
+
+            self._var_impl['n' + str(node)]['w0'] = v
 
     def getVarOffset(self, node):
         """
@@ -939,7 +951,7 @@ class Variable(AbstractVariable):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
-        vals = np.hstack([self._var_impl['n' + str(i)][val_type] for i in nodes])
+        vals = np.hstack([np.atleast_2d(self._var_impl['n' + str(i)][val_type]).T for i in nodes])
 
         return vals
 
@@ -1330,8 +1342,6 @@ class Aggregate(AbstractAggregate):
 
     def setInitialGuess(self, v0, nodes=None):
         """
-        
-
         Args:
             v0 ([type]): [description]
             nodes ([type], optional): [description]. Defaults to None.
@@ -1342,7 +1352,7 @@ class Aggregate(AbstractAggregate):
             var.setInitialGuess(v0[idx:idx+nv], nodes)
             idx += nv    
     
-    def getBounds(self, node):
+    def getBounds(self, node=None):
         """
         Getter for the bounds of the variables in the aggregate.
 
@@ -1373,7 +1383,7 @@ class Aggregate(AbstractAggregate):
         todo:
             test this!
         """
-        return np.hstack([var.getLowerBounds(node) for var in self])
+        return np.vstack([var.getLowerBounds(node) for var in self])
 
     def getUpperBounds(self, node):
         """
@@ -1388,7 +1398,7 @@ class Aggregate(AbstractAggregate):
         todo:
             test this!
         """
-        return np.hstack([var.getUpperBounds(node) for var in self])
+        return np.vstack([var.getUpperBounds(node) for var in self])
 
     def getInitialGuess(self, node=None) -> np.array:
         """
@@ -1400,7 +1410,16 @@ class Aggregate(AbstractAggregate):
         Returns:
             [type]: [description]
         """
-        return np.vstack([var.getInitialGuess(node) for var in self])
+
+        ig_list = list()
+
+        for var in self:
+            num_nodes = len(var.getNodes()) if node is None else len(node)
+            ig = var.getInitialGuess(node)
+            ig = ig.reshape((var.getDim(), num_nodes), order='F')
+            ig_list.append(ig)
+
+        return np.vstack(ig_list)
 
 class StateAggregate(Aggregate):
     """

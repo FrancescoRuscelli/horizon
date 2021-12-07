@@ -54,6 +54,7 @@ opts = {#SQP
         'sparse': True, 'hessian_type': 'posdef', 'printLevel': 'none', 'linsol_plugin': 'ma57'}
 
 solver = solver.Solver.make_solver('gnsqp', prb, None, opts)
+solver.set_iteration_callback()
 solver.solve()
 
 t = time.time()

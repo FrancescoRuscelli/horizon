@@ -1,9 +1,10 @@
 try:
     from horizon.solvers.pyilqr import IterativeLQR
-except ImportError:
-    print('failed to import pyilqr extension; did you compile it?')
+except ImportError as e:
+    print(f'failed to import pyilqr extension: {e}')
     exit(1)
 
+from horizon.variables import Parameter
 from horizon.solvers import Solver
 from horizon.problem import Problem
 from horizon.functions import Function, Constraint
@@ -20,34 +21,80 @@ class SolverILQR(Solver):
                  dt: float, 
                  opts: Dict = None) -> None:
 
+        filtered_opts = None 
+        if opts is not None:
+            filtered_opts = {k: opts[k] for k in opts.keys() if k.startswith('ilqr.')}
+
         # init base class
-        super().__init__(prb, dt, opts)
+        super().__init__(prb, dt, filtered_opts)
 
         # save max iter if any
-        self.max_iter = self.opts.get('max_iter', 10)
+        self.max_iter = self.opts.get('ilqr.max_iter', 100)
         
         # num shooting interval
         self.N = prb.getNNodes() - 1  
 
-        # get integrator and compute discrete dynamics in the form (x, u) -> f
-        integrator_name = self.opts.get('ilqr.integrator', 'EULER')
+        # get integrator and compute discrete dynamics in the form (x, u, p) -> f
+        integrator_name = self.opts.get('ilqr.integrator', 'RK4')
         dae = {'ode': self.xdot, 'x': self.x, 'p': self.u, 'quad': 0}
-        self.int = integrators.__dict__[integrator_name](dae, {'tf': dt})
-        self.dyn = cs.Function('f', {'x': self.x, 'u': self.u, 'f': self.int(self.x, self.u)[0]},
-                               ['x', 'u'], ['f'])
+
+        # handle parametric time
+        integrator_opt = {}
+        if isinstance(dt, float):
+            integrator_opt['tf'] = dt 
+        elif isinstance(dt, Parameter):
+            pass
+        else:
+            raise TypeError('ilqr supports only float and Parameter dt')
+
+        self.int = integrators.__dict__[integrator_name](dae, integrator_opt)
+
+        # handle possible parametric time 
+        dt_name = 'dt'
+        if self.int.n_in() == 3:
+            time = cs.SX.sym(dt.getName(), 1)
+            dt_name = dt.getName()
+            x_int = self.int(self.x, self.u, time)[0]
+        elif self.int.n_in() == 2:
+            time = cs.SX.sym(dt_name, 0)
+            x_int = self.int(self.x, self.u)[0]
+        else:
+            raise IndexError('integrated dynamics should either have 2 or 3 inputs')
+
+
+        self.dyn = cs.Function('f', 
+                               {'x': self.x, 'u': self.u, dt_name: time, 'f': x_int},
+                               ['x', 'u', dt_name], ['f']
+                               )
 
         # create ilqr solver
-        self.ilqr = IterativeLQR(self.dyn, self.N)
+        self.ilqr = IterativeLQR(self.dyn, self.N, self.opts)
 
-        # set costs and constraints
-        for k in range(self.N + 1):
-            self._set_cost_k(k)
-            self._set_constraint_k(k)
+        # set constraints, costs, bounds
+        self._set_constraint()
+        self._set_cost()
+        self._set_bounds()
+        
 
         # set a default iteration callback
         self.plot_iter = False
         self.xax = None 
         self.uax = None
+        self.dax = None
+        self.hax = None
+
+        # empty solution dict
+        self.solution_dict = dict()
+
+    def save(self):
+        data = self.prb.save()
+        data['solver'] = dict()
+        if isinstance(self.dt, float):
+            data['solver']['dt'] = self.dt
+        data['solver']['name'] = 'ilqr'
+        data['solver']['opt'] = self.opts
+        data['dynamics'] = self.dyn.serialize()
+        return data
 
     
     def set_iteration_callback(self, cb=None):
@@ -61,16 +108,49 @@ class SolverILQR(Solver):
         self.opts['max_iter'] = 1
     
     def solve(self):
-        x0 = self.prb.getInitialState().reshape((self.nx, 1))
-        self.x_opt = np.hstack(([x0]*(self.N+1)))
-        self.ilqr.setStateInitialGuess(self.x_opt)
+        
+        # set initial state
+        x0 = self.prb.getInitialState()
+        xinit = self.prb.getState().getInitialGuess()
+        uinit = self.prb.getInput().getInitialGuess()
+        xinit[:, 0] = x0.flatten()
+
+        # update initial guess
+        self.ilqr.setStateInitialGuess(xinit)
+        self.ilqr.setInputInitialGuess(uinit)
         self.ilqr.setIterationCallback(self._iter_callback)
-        self.ilqr.solve(self.max_iter)
+        
+        # update parameters
+        self._set_param_values()
+
+        # update bounds
+        self._set_bounds()
+
+        # update nodes
+        self._update_nodes()
+
+        # solve
+        ret = self.ilqr.solve(self.max_iter)
 
         # get solution
         self.x_opt = self.ilqr.getStateTrajectory()
         self.u_opt = self.ilqr.getInputTrajectory()
-        
+
+        # populate solution dict
+        for var in self.prb.getState().var_list:
+            vname = var.getName()
+            off, dim = self.prb.getState().getVarIndex(vname)
+            self.solution_dict[vname] = self.x_opt[off:off+dim, :]
+            
+        for var in self.prb.getInput().var_list:
+            vname = var.getName()
+            off, dim = self.prb.getInput().getVarIndex(vname)
+            self.solution_dict[vname] = self.u_opt[off:off+dim, :]
+
+        return ret
+    
+    def getSolutionDict(self):
+        return self.solution_dict
 
     def print_timings(self):
 
@@ -89,111 +169,82 @@ class SolverILQR(Solver):
         for k, v in prof_info.timings.items():
             if '_inner' in k:
                 continue
-            print(f'{k:30}{np.mean(v)} us')
+            print(f'{k:30}{np.mean(v)*1e-3} ms')
+
+    def _update_nodes(self):
+
+        for fname, f in self.prb.function_container.getCost().items():
+            self.ilqr.setIndices(fname, f.getNodes())
+
+        for fname, f in self.prb.function_container.getCnstr().items():
+            self.ilqr.setIndices(fname, f.getNodes())
+
+        self.ilqr.updateIndices()
     
     
-    def _set_cost_k(self, k):
+    def _set_cost(self):
         
-        self._set_fun_k(k, 
-                container=self.prb.function_container.getCost(),
+        self._set_fun(container=self.prb.function_container.getCost(),
                 set_to_ilqr=self.ilqr.setIntermediateCost, 
-                combine_elements=sum,
                 outname='l')
 
     
-    def _set_constraint_k(self, k):
-        
-        def vertcat_list(l: List):
-            return cs.vertcat(*l)
+    def _set_constraint(self):
 
-        self._set_fun_k(k, 
-                container=self.prb.function_container.getCnstr(),
+        self._set_fun(container=self.prb.function_container.getCnstr(),
                 set_to_ilqr=self.ilqr.setIntermediateConstraint,
-                combine_elements=vertcat_list,
                 outname='h')
-    
-    
-    def _set_fun_k(self, k, container, set_to_ilqr, combine_elements, outname):
 
-        value_list = list()
+    def _set_bounds(self):
 
-        # check state and input bounds
-        if outname == 'h':
+        xlb, xub = self.prb.getState().getBounds(node=None)
+        ulb, uub = self.prb.getInput().getBounds(node=None)
+        self.ilqr.setStateBounds(xlb, xub)
+        self.ilqr.setInputBounds(ulb, uub)
 
-            # state
-            xlb, xub = self.prb.getState().getBounds(node=k)
-            if np.all(xlb == xub) and k > 0:  # note: skip initial condition
-                value_list.append(self.x - xlb)
+    def _set_fun(self, container, set_to_ilqr, outname):
 
-            # input
-            if k < self.N:
-                ulb, uub = self.prb.getInput().getBounds(node=k)
-                if np.all(ulb == uub):
-                    value_list.append(self.u - ulb)
-
-        
-        # check constraints    
+        # check fn in container    
         for fname, f in container.items():
             
             # give a type to f
             f: Function = f
 
-            # if f does not act on node k, skip
-            if k not in f.getNodes():
-                continue
-                
             # get input variables for this function
             input_list = f.getVariables()
+            param_list = f.getParameters()
 
-            # save function value to list
-            value = f.getFunction()(*input_list)
+            # save function value
+            value = f.getFunction()(*input_list, *param_list)
 
-            # in the case of constraints, check bound values
-            if isinstance(f, Constraint):
-                lb, ub = Constraint.getBounds(f, nodes=k)
-                if np.any(lb != ub):
-                    raise ValueError(f'[ilqr] constraint {fname} not an equality constraint')
-                value -= lb
+            # wrap function
+            l = cs.Function(fname, 
+                            [self.x, self.u] + param_list, [value], 
+                            ['x', 'u'] + [p.getName() for p in param_list], 
+                            [outname]
+                            )
 
-            value_list.append(value)
+
+            set_to_ilqr([], l)
         
-        # if empty, skip
-        if len(value_list) == 0:
-            return 
-        
-        # compute overall value
-        total_value = combine_elements(value_list)
     
-        # wrap function
-        l = cs.Function(f'{outname}_{k}', [self.x, self.u], [total_value], 
-                            ['x', 'u'], [outname])
+    def _set_param_values(self):
 
-        # set it to solver
-        set_to_ilqr(k, l)
-
+        params = self.prb.var_container.getParList()
+        for p in params:
+            self.ilqr.setParameterValue(p.getName(), p.getValues())
 
     
     def _iter_callback(self, fpres):
-        # if not fpres.accepted:
-        #     return
-        fmt = ' <#010.3e'
-        fmtf = ' <#06.3f'
-        star = '*' if fpres.accepted else ' '
-        print(f'{star}\
-alpha={fpres.alpha:{fmtf}}  \
-merit={fpres.merit:{fmt}}  \
-dm={fpres.merit_der:{fmt}}  \
-mu_f={fpres.mu_f:{fmt}}  \
-mu_c={fpres.mu_c:{fmt}}  \
-cost={fpres.cost:{fmt}}  \
-delta_u={fpres.step_length:{fmt}}  \
-constr={fpres.constraint_violation:{fmt}}  \
-gap={fpres.defect_norm:{fmt}}')
+        if not fpres.accepted:
+            return
+
+        fpres.print()
 
         if self.plot_iter and fpres.accepted:
 
             if self.xax is None:
-                _, (self.xax, self.uax) = plt.subplots(1, 2)
+                _, (self.xax, self.uax, self.dax, self.hax) = plt.subplots(2, 2)
             
             plt.sca(self.xax)
             plt.cla()
@@ -212,6 +263,24 @@ gap={fpres.defect_norm:{fmt}}')
             plt.xlabel('Node [-]')
             plt.ylabel('Input')
             plt.legend([f'u{i}' for i in range(self.nu)])
+
+            plt.sca(self.dax)
+            plt.cla()
+            plt.plot(fpres.defect_values.T)
+            plt.grid()
+            plt.title(f'Dynamics gaps (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('Gap')
+            plt.legend([f'd{i}' for i in range(self.nx)])
+
+            plt.sca(self.hax)
+            plt.cla()
+            plt.plot(fpres.constraint_values)
+            plt.grid()
+            plt.title(f'Constraint violation (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('Constraint 1-norm')
+
             plt.draw()
             print("Press a button!")
             plt.waitforbuttonpress()

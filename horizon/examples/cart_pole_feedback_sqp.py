@@ -4,8 +4,8 @@ from casadi_kin_dyn import pycasadi_kin_dyn
 import casadi as cs
 import numpy as np
 import time
+
 from horizon import problem
-from horizon.utils import utils, casadi_kin_dyn, resampler_trajectory, plotter
 from horizon.transcriptions import integrators
 from horizon.solvers import solver, pysqp
 import matplotlib.pyplot as plt
@@ -98,12 +98,11 @@ else:
 
 
 opts = dict()
-qp_solver = "qpoases"
+qp_solver = "osqp"
 
 opts['gnsqp.qp_solver'] = qp_solver
 
 if qp_solver == "qpoases":
-    opts = pysqp.SQPGaussNewtonSX.getQPOasesOptionsMPC()
     opts['sparse'] = True
     opts['hessian_type'] = 'posdef'
     opts['printLevel'] = 'none'
@@ -118,6 +117,7 @@ opts['max_iter'] = 1
 
 
 solver = solver.Solver.make_solver('gnsqp', prb, None, opts)
+solver.set_iteration_callback()
 
 
 class RealTimeIteration:

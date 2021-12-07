@@ -37,7 +37,7 @@ x_tgt = np.array([1.0, 0.0, 0.0])
 lf = cs.Function('lf', [x, u], [cs.sumsqr(x - x_tgt)], ['x', 'u'], ['l'])
 cf = cs.Function('cf', [x, u], [x - x_tgt], ['x', 'u'], ['h'])
 
-ilqr = pyilqr.IterativeLQR(fdyn, N)
+ilqr = pyilqr.IterativeLQR(fdyn, N, {})
 ilqr.setIntermediateCost([l]*N)
 ilqr.setFinalConstraint(cf)
 

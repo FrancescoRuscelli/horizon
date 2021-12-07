@@ -27,25 +27,14 @@ casadi::Function to_cpp(py::object pyfn)
     return casadi::Function::deserialize(fstr);
 }
 
-auto construct(py::object fdyn, int N)
+auto construct(py::object fdyn, int N, IterativeLQR::OptionDict opt)
 {
-    return std::make_unique<IterativeLQR>(to_cpp(fdyn), N);
+    return std::make_unique<IterativeLQR>(to_cpp(fdyn), N, opt);
 }
 
-auto set_inter_cost_wrapper(IterativeLQR& self, std::vector<py::object> flist)
+auto set_inter_cost_wrapper_single(IterativeLQR& self, std::vector<int> k, py::object f)
 {
-    std::vector<casadi::Function> flist_cpp;
-    for(auto pyfn : flist)
-    {
-        flist_cpp.push_back(to_cpp(pyfn));
-    }
-
-    self.setIntermediateCost(flist_cpp);
-}
-
-auto set_inter_cost_wrapper_single(IterativeLQR& self, int k, py::object f)
-{
-    self.setIntermediateCost(k, to_cpp(f));
+    self.setCost(k, to_cpp(f));
 }
 
 auto set_final_cost_wrapper(IterativeLQR& self, py::object pyfn)
@@ -58,20 +47,13 @@ auto set_final_constraint_wrapper(IterativeLQR& self, py::object pyfn)
     self.setFinalConstraint(to_cpp(pyfn));
 }
 
-auto set_inter_constraint_wrapper(IterativeLQR& self, std::vector<py::object> flist)
-{
-    std::vector<casadi::Function> flist_cpp;
-    for(auto pyfn : flist)
-    {
-        flist_cpp.push_back(to_cpp(pyfn));
-    }
 
-    self.setIntermediateConstraint(flist_cpp);
-}
-
-auto set_inter_constraint_wrapper_single(IterativeLQR& self, int k, py::object f)
+auto set_inter_constraint_wrapper_single(IterativeLQR& self,
+                                         std::vector<int> k,
+                                         py::object f,
+                                         std::vector<Eigen::VectorXd> tgt)
 {
-    self.setIntermediateConstraint(k, to_cpp(f));
+    self.setConstraint(k, to_cpp(f), tgt);
 }
 
 #endif // PYILQR_HELPERS_H
