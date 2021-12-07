@@ -966,8 +966,20 @@ class Variable(AbstractVariable):
         if val.shape[0] != self._dim:
             raise Exception('Wrong dimension of initial guess inserted.')
 
-        for node in nodes:
-            self._var_impl['n' + str(node)]['w0'] = val
+        # if a matrix of values is being provided, check cols match len(nodes)
+        multiple_vals = val.ndim == 2 and val.shape[1] != 1
+    
+        if multiple_vals and val.shape[1] != len(nodes):
+            raise Exception('Wrong dimension of initial guess inserted.')
+        
+        for i, node in enumerate(nodes):
+
+            if multiple_vals:
+                v = val[:, i]
+            else:
+                v = val 
+
+            self._var_impl['n' + str(node)]['w0'] = v
 
     def getVarOffset(self, node):
 
@@ -1495,8 +1507,6 @@ class Aggregate(AbstractAggregate):
 
     def setInitialGuess(self, v0, nodes=None):
         """
-        
-
         Args:
             v0 ([type]): [description]
             nodes ([type], optional): [description]. Defaults to None.

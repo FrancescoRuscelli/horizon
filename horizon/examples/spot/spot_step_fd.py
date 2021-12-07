@@ -174,7 +174,7 @@ for frame, f in contact_map.items():
         # prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step + 2)
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 100. * cs.sumsqr(q_dot))
+prb.createCost("min_q_dot", 100. * cs.sumsqr(q_dot))
 q_final = q_init
 # prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_final))
 # don't know why this is not working

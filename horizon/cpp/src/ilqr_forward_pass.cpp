@@ -99,7 +99,7 @@ double IterativeLQR::compute_merit_slope(double mu_f, double mu_c,
 
     for(int i = 0; i < _N; i++)
     {
-        auto& hu = _tmp[i].huf;
+        auto& hu = _tmp[i].hu;
         auto& lu = _bp_res[i].lu;
 
         der += lu.dot(hu);
@@ -142,7 +142,6 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
     for(int i = 0; i < _N; i++)
     {
         auto& res = _bp_res[i];
-        auto& l = res.lu;
 
         // compute largest multiplier..
         // ..for dynamics (lam_x = S*dx + s)
@@ -152,7 +151,7 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
         // ..for constraints (lam_g = TBD)
         if(res.nc > 0)
         {
-            _lam_g[i] = res.glam + res.Gu*l;
+            _lam_g[i] = res.glam;
             lam_g_max = std::max(lam_g_max, _lam_g[i].cwiseAbs().maxCoeff());
         }
     }
@@ -201,7 +200,8 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
         }
 
         _constraint[i].evaluate(xtrj.col(i), utrj.col(i), i);
-        constr += _constraint[i].h().lpNorm<1>();
+        _fp_res->constraint_values[i] = _constraint[i].h().lpNorm<1>();
+        constr += _fp_res->constraint_values[i];
 
     }
 
@@ -216,8 +216,8 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
     {
         // note: u not used
         // todo: enforce this!
-        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
-        constr += _constraint[_N].h().lpNorm<1>();
+        _fp_res->constraint_values[_N] = _constraint[_N].h().lpNorm<1>();
+        constr += _fp_res->constraint_values[_N];
     }
 
     return constr / _N;
@@ -238,7 +238,9 @@ double IterativeLQR::compute_defect(const Eigen::MatrixXd& xtrj, const Eigen::Ma
                               i,
                               _tmp[i].defect);
 
-        defect += _tmp[i].defect.cwiseAbs().sum();
+        defect += _tmp[i].defect.lpNorm<1>();
+
+        _fp_res->defect_values.col(i) = _tmp[i].defect;
     }
 
     return defect / _N;
@@ -280,6 +282,8 @@ void IterativeLQR::line_search(int iter)
 
     _fp_res->merit_der = merit_der;
 
+    // cache last forward pass outcome
+    bool last_fp_accepted = _fp_res->accepted;
 
     // run line search
     while(alpha >= alpha_min)
@@ -310,8 +314,15 @@ void IterativeLQR::line_search(int iter)
 
     if(!_fp_res->accepted)
     {
-        _fp_res->accepted = true;
         report_result(*_fp_res);
+        std::cout << "[ilqr] line search failed, increasing regularization..\n";
+        increase_regularization();
+        return;
+    }
+
+    if(last_fp_accepted)
+    {
+        reduce_regularization();
     }
 
     _xtrj = _fp_res->xtrj;
@@ -337,13 +348,13 @@ bool IterativeLQR::should_stop()
 
     // exit if merit function directional derivative (normalized)
     // is too close to zero
-    if(_fp_res->merit_der/_fp_res->merit > -1e-9)
+    if(_fp_res->merit_der/_fp_res->merit > -1e-6)
     {
         return true;
     }
 
     // exit if step size (normalized) is too short
-    if(_fp_res->step_length/_utrj.norm() < 1e-9)
+    if(_fp_res->step_length/_utrj.norm() < 1e-6)
     {
         return true;
     }

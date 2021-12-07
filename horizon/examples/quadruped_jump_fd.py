@@ -121,15 +121,15 @@ lift_node = 10
 touch_down_node = 30
 q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.9, 0.0, 0.0, 0.0, 1.0]).tolist()
 
-prb.createCostFunction("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes=list(range(lift_node, touch_down_node)))
-prb.createCostFunction("min_qdot", 50.*cs.dot(qdot, qdot))
-#prb.createCostFunction("min_f", 0.0001*cs.sumsqr(f1+f2+f3+f4), nodes=list(range(0, ns)))
-prb.createCostFunction("min_u", 0.0001*cs.sumsqr(u), nodes=list(range(0, ns)))
+prb.createCost("jump", 10.*cs.dot(q[0:3] - q_fb_trg[0:3], q[0:3] - q_fb_trg[0:3]), nodes=list(range(lift_node, touch_down_node)))
+prb.createCost("min_qdot", 50.*cs.dot(qdot, qdot))
+#prb.createCost("min_f", 0.0001*cs.sumsqr(f1+f2+f3+f4), nodes=list(range(0, ns)))
+prb.createCost("min_u", 0.0001*cs.sumsqr(u), nodes=list(range(0, ns)))
 #f1_prev = f1.getVarOffset(-1)
 #f2_prev = f2.getVarOffset(-1)
 #f3_prev = f3.getVarOffset(-1)
 #f4_prev = f4.getVarOffset(-1)
-#prb.createCostFunction("min_df", 0.001*cs.sumsqr(f1-f1_prev+f2-f2_prev+f3-f3_prev+f4-f4_prev), nodes=list(range(1, ns)))
+#prb.createCost("min_df", 0.001*cs.sumsqr(f1-f1_prev+f2-f2_prev+f3-f3_prev+f4-f4_prev), nodes=list(range(1, ns)))
 
 # Constraints
 q_prev = q.getVarOffset(-1)

@@ -206,7 +206,7 @@ for frame, f in contact_map.items():
 prb.createFinalConstraint(f"final_nominal_fb", q - q_final)
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 5 * cs.sumsqr(q_dot))
+prb.createCost("min_q_dot", 5 * cs.sumsqr(q_dot))
 # prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
 
 for f in f_list:

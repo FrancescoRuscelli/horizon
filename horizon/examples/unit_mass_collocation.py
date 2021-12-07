@@ -71,7 +71,7 @@ p.setBounds(lb=1, ub=1, nodes=N)
 v.setBounds(lb=0, ub=0, nodes=N)
 
 # interediate cost
-prob.createCostFunction('cost', cs.sumsqr(F), nodes=range(N))  # TODO: intermediate vs final cost
+prob.createCost('cost', cs.sumsqr(F), nodes=range(N))  # TODO: intermediate vs final cost
 
 # solve
 opts={'ipopt.max_iter': 10}

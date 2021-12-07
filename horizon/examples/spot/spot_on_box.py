@@ -223,11 +223,11 @@ for frame, f in contact_map.items():
         prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=80)
         # prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step + 2)
 
-        # prb.createCostFunction(f"lift_{frame}_leg", 100000 * cs.sumsqr(p - p_goal), nodes=range(node_start_step, node_end_step))
-        # prb.createCostFunction(f"land_{frame}_leg", 10000000 * cs.sumsqr(p - p_start), nodes=range(node_end_step, n_nodes+1))
+        # prb.createCost(f"lift_{frame}_leg", 100000 * cs.sumsqr(p - p_goal), nodes=range(node_start_step, node_end_step))
+        # prb.createCost(f"land_{frame}_leg", 10000000 * cs.sumsqr(p - p_start), nodes=range(node_end_step, n_nodes+1))
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 1000. * cs.sumsqr(q_dot))
+prb.createCost("min_q_dot", 1000. * cs.sumsqr(q_dot))
 # prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
 
 # don't know why this is not working
@@ -235,9 +235,9 @@ for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
 q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.1, 0.0, 0.0, 0.0, 1.0])
-# prb.createCostFunction("floating_base_orientation", 1000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]), nodes=list(range(node_start_step, node_end_step)))
-# prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[0:7] - q_fb_trg))
-# prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]))
+# prb.createCost("floating_base_orientation", 1000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]), nodes=list(range(node_start_step, node_end_step)))
+# prb.createCost("floating_base_position", 100000.*cs.sumsqr(q[0:7] - q_fb_trg))
+# prb.createCost("floating_base_position", 100000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]))
 # =============
 # SOLVE PROBLEM
 # =============

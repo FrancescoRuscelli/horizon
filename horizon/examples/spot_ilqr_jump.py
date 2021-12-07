@@ -17,6 +17,7 @@ ms = mat_storer.matStorer(f'{filename}.mat')
 
 # options
 solver_type = 'ilqr'
+
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
@@ -135,22 +136,24 @@ for leg in lifted_legs:
 
 
 # cost
-# prb.createCostFunction("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
-# prb.createCostFunction("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
-prb.createCostFunction("min_q", residual_to_cost(1e-1 * (q[7:] - q_init[7:])))
-# prb.createCostFunction("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
+# prb.createCost("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
+# prb.createCost("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
+prb.createCost("min_q", residual_to_cost(1e-1 * (q[7:] - q_init[7:])))
+# prb.createCost("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
 prb.createIntermediateCost("min_q_ddot", residual_to_cost(1e-3* (q_ddot)))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", residual_to_cost(1e-3 * (f)))
+
+
 
 
 # =============
 # SOLVE PROBLEM
 # =============
 opts = dict()
-if solver_type == 'ipopt':
+if solver_type == 'ilqr':
     opts['ipopt.tol'] = 0.001
-    opts['ipopt.constr_viol_tol'] = 0.001
+    opts['ipopt.constr_viol_tol'] = n_nodes * 1e-12
     opts['ipopt.max_iter'] = 2000
     opts['ipopt.linear_solver'] = 'ma57'
 
@@ -160,7 +163,8 @@ if solver_type == 'ilqr':
         'ilqr.closed_loop_forward_pass': True,
         'ilqr.line_search_accept_ratio': 1e-9,
         'ilqr.svd_threshold': 1e-12,
-        'ilqr.decomp_type': 'qr',
+        'ilqr.kkt_decomp_type': 'lu',
+        'ilqr.constr_decomp_type': 'qr',
         'ilqr.codegen_enabled': False,
         'ilqr.codegen_workdir': '/tmp/ilqr_spot_jump',
         }
@@ -171,8 +175,8 @@ if solver_type == 'gnsqp':
         opts['gnsqp.qp_solver'] = 'osqp'
         opts['warm_start_primal'] = True
         opts['warm_start_dual'] = True
-        opts['merit_derivative_tolerance'] = 1e-10
-        opts['constraint_violation_tolerance'] = 1e-11
+        opts['merit_derivative_tolerance'] = 1e-6
+        opts['constraint_violation_tolerance'] = n_nodes * 1e-12
         opts['osqp.polish'] = True # without this
         opts['osqp.delta'] = 1e-9 # and this, it does not converge!
         opts['osqp.verbose'] = False

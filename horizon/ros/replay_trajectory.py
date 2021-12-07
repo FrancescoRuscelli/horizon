@@ -47,6 +47,7 @@ class replay_trajectory:
         self.force_pub = []
         self.frame_force_mapping = {}
         self.slow_down_rate = 1.
+        self.frame_fk = dict()
 
         if frame_force_mapping:
             self.frame_force_mapping = deepcopy(frame_force_mapping)
@@ -57,6 +58,7 @@ class replay_trajectory:
                 raise Exception('kindyn input can not be None if force_reference_frame is LOCAL_WORLD_ALIGNED!')
             for frame in self.frame_force_mapping: # WE LOOP ON FRAMES
                 FK = cs.Function.deserialize(kindyn.fk(frame))
+                self.frame_fk[frame] = FK
                 w_all = self.frame_force_mapping[frame]
                 for k in range(0, w_all.shape[1]):
                     w_R_f = FK(q=self.q_replay[:, k])['ee_rot']
@@ -68,15 +70,33 @@ class replay_trajectory:
                         A[0:3, 0:3] = A[3:6, 3:6] = w_R_f.T
                         self.frame_force_mapping[frame][:, k] = np.dot(A,  w).T
 
+        rospy.init_node('joint_state_publisher')
+        self.pub = rospy.Publisher('joint_states', JointState, queue_size=10)
+        self.br = ros_tf.TransformBroadcaster()
 
-    def publishContactForces(self, time, k):
+        if self.frame_force_mapping:
+            for key in self.frame_force_mapping:
+                self.force_pub.append(rospy.Publisher(key+'_forces', geometry_msgs.msg.WrenchStamped, queue_size=10))
+
+
+    def publishContactForces(self, time, qk, k):
         i = 0
         for frame in self.frame_force_mapping:
+
             f_msg = geometry_msgs.msg.WrenchStamped()
             f_msg.header.stamp = time
             f_msg.header.frame_id = frame
 
             f = self.frame_force_mapping[frame][:, k]
+
+            w_R_f = self.frame_fk[frame](q=qk)['ee_rot'].toarray()
+            
+            if f.shape[0] == 3:
+                f = np.dot(w_R_f.T,  f).T
+            else:
+                A = np.zeros((6, 6))
+                A[0:3, 0:3] = A[3:6, 3:6] = w_R_f.T
+                f = np.dot(A,  f).T
 
             f_msg.wrench.force.x = f[0]
             f_msg.wrench.force.y = f[1]
@@ -110,17 +130,48 @@ class replay_trajectory:
         '''
         self.slow_down_rate = 1./slow_down_factor
 
+    def publish_joints(self, qk, is_floating_base=True):
+
+        joint_state_pub = JointState()
+        joint_state_pub.header = Header()
+        joint_state_pub.name = self.joint_list
+        t = rospy.Time.now()
+        br = self.br
+        nq = len(qk)
+
+        if is_floating_base:
+            
+            qk = normalize_quaternion(qk)
+            
+            m = geometry_msgs.msg.TransformStamped()
+            m.header.frame_id = 'world'
+            m.child_frame_id = 'base_link'
+            m.transform.translation.x = qk[0]
+            m.transform.translation.y = qk[1]
+            m.transform.translation.z = qk[2]
+            m.transform.rotation.x = qk[3]
+            m.transform.rotation.y = qk[4]
+            m.transform.rotation.z = qk[5]
+            m.transform.rotation.w = qk[6]
+
+            br.sendTransform((m.transform.translation.x, m.transform.translation.y, m.transform.translation.z),
+                                (m.transform.rotation.x, m.transform.rotation.y, m.transform.rotation.z,
+                                m.transform.rotation.w),
+                                t, m.child_frame_id, m.header.frame_id)
+
+        
+        joint_state_pub.header.stamp = t
+        joint_state_pub.position = qk[7:nq] if is_floating_base else qk
+        joint_state_pub.velocity = []
+        joint_state_pub.effort = []
+        self.pub.publish(joint_state_pub)
+
+
     def replay(self, is_floating_base=True):
-        pub = rospy.Publisher('joint_states', JointState, queue_size=10)
-        rospy.init_node('joint_state_publisher')
         rate = rospy.Rate(self.slow_down_rate / self.dt)
         joint_state_pub = JointState()
         joint_state_pub.header = Header()
         joint_state_pub.name = self.joint_list
-
-        if self.frame_force_mapping:
-            for key in self.frame_force_mapping:
-                self.force_pub.append(rospy.Publisher(key+'_forces', geometry_msgs.msg.WrenchStamped, queue_size=10))
 
         if is_floating_base:
             br = ros_tf.TransformBroadcaster()
@@ -158,12 +209,13 @@ class replay_trajectory:
                 joint_state_pub.position = qk[7:nq] if is_floating_base else qk
                 joint_state_pub.velocity = []
                 joint_state_pub.effort = []
-                pub.publish(joint_state_pub)
+                self.pub.publish(joint_state_pub)
                 if self.frame_force_mapping:
                     if k != ns-1:
-                        self.publishContactForces(t, k)
+                        self.publishContactForces(t, qk, k)
                 rate.sleep()
                 k += 1
+
             if self.__sleep > 0.:
                 time.sleep(self.__sleep)
                 print('replaying traj ...')

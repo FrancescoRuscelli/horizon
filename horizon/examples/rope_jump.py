@@ -111,16 +111,16 @@ q_trg = np.array([-.4, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                   0.3]).tolist()
 
 x_distance = -0.4
-prb.createCostFunction("wall_distance", 100.*cs.sumsqr(q[0] - x_distance), nodes=list(range(lift_node, ns+1)))
-prb.createCostFunction("min_qdot", cs.sumsqr(qdot))
-#prb.createCostFunction("min_legs_vel", cs.sumsqr(qdot[6:12]), nodes=list(range(lift_node, touch_down_node)))
-#prb.createCostFunction("min_base_vel", cs.sumsqr(qdot[0:6]), nodes=list(range(lift_node, ns+1)))
+prb.createCost("wall_distance", 100.*cs.sumsqr(q[0] - x_distance), nodes=list(range(lift_node, ns+1)))
+prb.createCost("min_qdot", cs.sumsqr(qdot))
+#prb.createCost("min_legs_vel", cs.sumsqr(qdot[6:12]), nodes=list(range(lift_node, touch_down_node)))
+#prb.createCost("min_base_vel", cs.sumsqr(qdot[0:6]), nodes=list(range(lift_node, ns+1)))
 f1_prev = f1.getVarOffset(-1)
 f2_prev = f2.getVarOffset(-1)
-prb.createCostFunction("min_df", 0.0001*cs.sumsqr(f1-f1_prev + f2-f2_prev), nodes=list(range(1, ns)))
+prb.createCost("min_df", 0.0001*cs.sumsqr(f1-f1_prev + f2-f2_prev), nodes=list(range(1, ns)))
 
 qddot_prev = qddot.getVarOffset(-1)
-#prb.createCostFunction("min_jerk", 0.0003*cs.sumsqr(qddot-qddot_prev), nodes=list(range(1, ns)))
+#prb.createCost("min_jerk", 0.0003*cs.sumsqr(qddot-qddot_prev), nodes=list(range(1, ns)))
 
 # Constraints
 state = prb.getState()

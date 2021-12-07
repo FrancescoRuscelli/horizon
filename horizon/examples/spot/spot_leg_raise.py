@@ -145,6 +145,7 @@ p = FK(q=q)['ee_pos']
 p_start = FK(q=q_init)['ee_pos']
 p_goal = p_start + [0., 0., -0.1]
 prb.createFinalCost(f"lift_{frame}_leg", cs.sumsqr(p - p_start))
+
 # prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
 
 # don't know why this is not working
@@ -152,9 +153,9 @@ for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
 
 # q_fb_trg = np.array([q_init[0], q_init[1], q_init[2] + 0.1, 0.0, 0.0, 0.0, 1.0])
-# prb.createCostFunction("floating_base_orientation", 1000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]), nodes=list(range(node_start_step, node_end_step)))
-# prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[0:7] - q_fb_trg))
-# prb.createCostFunction("floating_base_position", 100000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]))
+# prb.createCost("floating_base_orientation", 1000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]), nodes=list(range(node_start_step, node_end_step)))
+# prb.createCost("floating_base_position", 100000.*cs.sumsqr(q[0:7] - q_fb_trg))
+# prb.createCost("floating_base_position", 100000.*cs.sumsqr(q[3:7] - q_fb_trg[3:7]))
 # =============
 # SOLVE PROBLEM
 # =============

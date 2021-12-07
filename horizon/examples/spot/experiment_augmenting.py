@@ -432,8 +432,8 @@ for frame, f in contact_map.items():
 
 
 # SET COST FUNCTIONS
-# prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+# prb.createCost(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
+prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
 prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
@@ -444,13 +444,13 @@ for f in f_list:
 k = 0
 for node in range(n_nodes):
     if node in base_indices:
-        prb.createCostFunction(f"q_close_to_old_node_{node}", 1000. * cs.sumsqr(q - prev_q[:, k]), nodes=node)
+        prb.createCost(f"q_close_to_old_node_{node}", 1000. * cs.sumsqr(q - prev_q[:, k]), nodes=node)
         k = k+1
-        # prb.createCostFunction(f"qdot_close_to_old_node_{node}", 1000. * cs.sumsqr(q_dot - prev_q_dot[:, node]), nodes=node)
+        # prb.createCost(f"qdot_close_to_old_node_{node}", 1000. * cs.sumsqr(q_dot - prev_q_dot[:, node]), nodes=node)
 
 # for node in range(n_nodes-1):
 #     if node in base_indices:
-#         prb.createCostFunction(f"qddot_close_to_old_node_{node}", 1000. * cs.sumsqr(q_ddot - prev_q_ddot[:, node]), nodes=node)
+#         prb.createCost(f"qddot_close_to_old_node_{node}", 1000. * cs.sumsqr(q_ddot - prev_q_ddot[:, node]), nodes=node)
 
 
 

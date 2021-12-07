@@ -90,9 +90,12 @@ public:
                        const casadi::Function& inter_constraint,
                        std::vector<Eigen::VectorXd> target_values = std::vector<Eigen::VectorXd>());
 
-    void setIntermediateConstraint(const std::vector<casadi::Function>& inter_constraint);
-
     void setFinalConstraint(const casadi::Function& final_constraint);
+
+    void setIndices(const std::string& f_name,
+                    const std::vector<int>& indices);
+
+    void updateIndices();
 
     void setParameterValue(const std::string& pname, const Eigen::MatrixXd& value);
 
@@ -137,6 +140,9 @@ public:
         int iter;
         bool accepted;
 
+        Eigen::VectorXd constraint_values;
+        Eigen::MatrixXd defect_values;
+
         ForwardPassResult(int nx, int nu, int N);
         void print() const;
     };
@@ -151,6 +157,7 @@ private:
 
     struct ConstrainedDynamics;
     struct ConstrainedCost;
+    struct FeasibleConstraint;
     struct Dynamics;
     struct Constraint;
     struct IntermediateCost;
@@ -167,6 +174,12 @@ private:
     typedef std::shared_ptr<std::map<std::string, Eigen::MatrixXd>>
         ParameterMapPtr;
 
+    typedef std::map<std::string, std::shared_ptr<IntermediateCostEntity>>
+        CostPtrMap;
+
+    typedef std::map<std::string, std::shared_ptr<ConstraintEntity>>
+        ConstraintPtrMap;
+
     void add_param_to_map(const casadi::Function& f);
     void linearize_quadratize();
     void report_result(const ForwardPassResult& fpres);
@@ -174,7 +187,7 @@ private:
     void backward_pass_iter(int i);
     void increase_regularization();
     void reduce_regularization();
-    HandleConstraintsRetType handle_constraints(int i);
+    FeasibleConstraint handle_constraints(int i);
     void add_bounds(int i);
     void compute_constrained_input(Temporaries& tmp, BackwardPassResult& res);
     void compute_constrained_input_svd(Temporaries& tmp, BackwardPassResult& res);
@@ -193,8 +206,10 @@ private:
 
     enum DecompositionType
     {
-        Svd, Qr
+        Ldlt, Qr, Lu, Cod, Svd
     };
+
+    static DecompositionType str_to_decomp_type(const std::string& dt_str);
 
     const int _nx;
     const int _nu;
@@ -203,15 +218,20 @@ private:
     double _step_length;
     double _hxx_reg;
     double _hxx_reg_growth_factor;
+    double _huu_reg;
+    double _kkt_reg;
     double _line_search_accept_ratio;
     double _alpha_min;
     double _svd_threshold;
     bool _closed_loop_forward_pass;
     std::string _codegen_workdir;
     bool _codegen_enabled;
-    DecompositionType _decomp_type;
+    DecompositionType _kkt_decomp_type;
+    DecompositionType _constr_decomp_type;
 
     ParameterMapPtr _param_map;
+    CostPtrMap _cost_map;
+    ConstraintPtrMap _constr_map;
 
     std::vector<IntermediateCost> _cost;
     std::vector<Constraint> _constraint;

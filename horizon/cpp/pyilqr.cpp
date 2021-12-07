@@ -10,6 +10,8 @@ PYBIND11_MODULE(pyilqr, m) {
             .def_readonly("alpha", &IterativeLQR::ForwardPassResult::alpha)
             .def_readonly("hxx_reg", &IterativeLQR::ForwardPassResult::hxx_reg)
             .def_readonly("constraint_violation", &IterativeLQR::ForwardPassResult::constraint_violation)
+            .def_readonly("constraint_values", &IterativeLQR::ForwardPassResult::constraint_values)
+            .def_readonly("defect_values", &IterativeLQR::ForwardPassResult::defect_values)
             .def_readonly("cost", &IterativeLQR::ForwardPassResult::cost)
             .def_readonly("defect_norm", &IterativeLQR::ForwardPassResult::defect_norm)
             .def_readonly("merit", &IterativeLQR::ForwardPassResult::merit)
@@ -25,7 +27,6 @@ PYBIND11_MODULE(pyilqr, m) {
     py::class_<IterativeLQR>(m, "IterativeLQR")
             .def(py::init(&construct))
             .def("setIntermediateCost", set_inter_cost_wrapper_single)
-            .def("setIntermediateConstraint", set_inter_constraint_wrapper)
             .def("setIntermediateConstraint",
                  set_inter_constraint_wrapper_single,
                  py::arg("indices"), py::arg("h"), py::arg("target") = py::list())
@@ -34,6 +35,8 @@ PYBIND11_MODULE(pyilqr, m) {
             .def("setStateBounds", &IterativeLQR::setStateBounds)
             .def("setInputBounds", &IterativeLQR::setInputBounds)
             .def("setParameterValue", &IterativeLQR::setParameterValue)
+            .def("setIndices", &IterativeLQR::setIndices)
+            .def("updateIndices", &IterativeLQR::updateIndices)
             .def("solve", &IterativeLQR::solve)
             .def("state", &IterativeLQR::state)
             .def("input", &IterativeLQR::input)

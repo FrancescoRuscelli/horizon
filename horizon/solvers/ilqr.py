@@ -1,13 +1,13 @@
 try:
     from horizon.solvers.pyilqr import IterativeLQR
-except ImportError:
-    print('failed to import pyilqr extension; did you compile it?')
+except ImportError as e:
+    print(f'failed to import pyilqr extension: {e}')
     exit(1)
 
 from horizon.variables import Parameter
 from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.functions import Function, Constraint
+from horizon.functions import Function, Constraint, ResidualFunction
 from typing import Dict, List
 from horizon.transcriptions import integrators
 import casadi as cs
@@ -73,6 +73,8 @@ class SolverILQR(Solver):
         self.plot_iter = False
         self.xax = None 
         self.uax = None
+        self.dax = None
+        self.hax = None
 
         # empty solution dict
         self.solution_dict = dict()
@@ -117,6 +119,10 @@ class SolverILQR(Solver):
         # update bounds
         self._set_bounds()
 
+        # update nodes
+        self._update_nodes()
+
+        # solve
         ret = self.ilqr.solve(self.max_iter)
 
         # get solution
@@ -150,13 +156,23 @@ class SolverILQR(Solver):
         for k, v in prof_info.timings.items():
             if '_inner' not in k:
                 continue
-            print(f'{k[:-6]:30}{np.mean(v)*1e-3*self.N} ms')
+            print(f'{k[:-6]:30}{np.mean(v)} us')
 
         print('\ntimings (iter):')
         for k, v in prof_info.timings.items():
             if '_inner' in k:
                 continue
             print(f'{k:30}{np.mean(v)*1e-3} ms')
+
+    def _update_nodes(self):
+
+        for fname, f in self.prb.function_container.getCost().items():
+            self.ilqr.setIndices(fname, f.getNodes())
+
+        for fname, f in self.prb.function_container.getCnstr().items():
+            self.ilqr.setIndices(fname, f.getNodes())
+
+        self.ilqr.updateIndices()
     
     
     def _set_cost(self):
@@ -192,19 +208,10 @@ class SolverILQR(Solver):
             param_list = f.getParameters()
 
             # save function value
-            value = f.getFunction()(*input_list, *param_list)
-
-            # active nodes
-            nodes = f.getNodes()
-
-            tgt_values = list()
-
-            # in the case of constraints, check bound values
-            if isinstance(f, Constraint):
-                lb, ub = Constraint.getBounds(f)
-                if np.any(lb != ub):
-                    raise ValueError(f'[ilqr] constraint {fname} not an equality constraint')
-                tgt_values = np.hsplit(lb, len(nodes))
+            if isinstance(f, ResidualFunction):
+                value = cs.sumsqr(f.getFunction()(*input_list, *param_list))
+            else:
+                value = f.getFunction()(*input_list, *param_list)
 
             # wrap function
             l = cs.Function(fname, 
@@ -213,31 +220,27 @@ class SolverILQR(Solver):
                             [outname]
                             )
 
-            # set it to solver
-            if isinstance(f, Constraint):
-                set_to_ilqr(nodes, l, tgt_values)
-            else:
-                set_to_ilqr(nodes, l)
+
+            set_to_ilqr([], l)
         
     
     def _set_param_values(self):
 
         params = self.prb.var_container.getParList()
-
         for p in params:
-            print(p.getName(), p.getValues())
             self.ilqr.setParameterValue(p.getName(), p.getValues())
 
     
     def _iter_callback(self, fpres):
         if not fpres.accepted:
             return
+
         fpres.print()
 
         if self.plot_iter and fpres.accepted:
 
             if self.xax is None:
-                _, (self.xax, self.uax) = plt.subplots(1, 2)
+                _, (self.xax, self.uax, self.dax, self.hax) = plt.subplots(2, 2)
             
             plt.sca(self.xax)
             plt.cla()
@@ -256,6 +259,24 @@ class SolverILQR(Solver):
             plt.xlabel('Node [-]')
             plt.ylabel('Input')
             plt.legend([f'u{i}' for i in range(self.nu)])
+
+            plt.sca(self.dax)
+            plt.cla()
+            plt.plot(fpres.defect_values.T)
+            plt.grid()
+            plt.title(f'Dynamics gaps (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('Gap')
+            plt.legend([f'd{i}' for i in range(self.nx)])
+
+            plt.sca(self.hax)
+            plt.cla()
+            plt.plot(fpres.constraint_values)
+            plt.grid()
+            plt.title(f'Constraint violation (iter {fpres.iter})')
+            plt.xlabel('Node [-]')
+            plt.ylabel('Constraint 1-norm')
+
             plt.draw()
             print("Press a button!")
             plt.waitforbuttonpress()

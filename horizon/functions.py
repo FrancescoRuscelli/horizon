@@ -393,6 +393,9 @@ class Constraint(Function):
 
         nodes = misc.checkNodes(nodes, self._nodes)
 
+        if len(nodes) == 0:
+            return np.zeros((self.getDim(), 0))
+
         vals = np.hstack([np.atleast_2d(self.bounds['n' + str(i)][val_type]).T for i in nodes])
 
         return vals
@@ -470,8 +473,8 @@ class CostFunction(Function):
         Initialize the Cost Function.
 
         Args:
-            name: name of the constraint function
-            f: constraint SX function
+            name: name of the function
+            f: SX function
             used_vars: variable used in the function
             used_pars: parameters used in the function
             nodes: nodes the function is active on
@@ -486,6 +489,32 @@ class CostFunction(Function):
             a string describing the type of the function
         """
         return 'costfunction'
+
+class ResidualFunction(Function):
+    """
+    Residual Function of Horizon.
+    """
+    def __init__(self, name, f, used_vars, used_pars, nodes):
+        """
+        Initialize the Residual Function.
+
+        Args:
+            name: name of the function
+            f: SX function
+            used_vars: variable used in the function
+            used_pars: parameters used in the function
+            nodes: nodes the function is active on
+        """
+        super().__init__(name, f, used_vars, used_pars, nodes)
+
+    def getType(self):
+        """
+        Getter for the type of the Cost Function.
+
+        Returns:
+            a string describing the type of the function
+        """
+        return 'residualfunction'
 
 class FunctionsContainer:
     """
@@ -504,11 +533,15 @@ class FunctionsContainer:
         """
         self._logger = logger
 
-        # containers for the constraints
+        # containers for the constraint functions
         self._cnstr_container = OrderedDict()
 
-        # containers for the cost function
-        self._costfun_container = OrderedDict()
+        # containers for the cost functions
+        self._cost_container = OrderedDict()
+
+        # containers for the cost functions
+        self._residual_container = OrderedDict()
+
 
     def addFunction(self, fun: Function):
         """
@@ -517,18 +550,26 @@ class FunctionsContainer:
         Args:
             fun: a Function (can be Constraint or Cost Function) o add
         """
+        # todo refactor this using types
         if fun.getType() == 'constraint':
             if fun.getName() not in self._cnstr_container:
                 self._cnstr_container[fun.getName()] = fun
             else:
                 raise Exception(f'Function name "{fun.getName()}" already inserted.')
         elif fun.getType() == 'costfunction':
-            if fun.getName() not in self._costfun_container:
-                self._costfun_container[fun.getName()] = fun
+            if fun.getName() not in self._cost_container:
+                self._cost_container[fun.getName()] = fun
+            else:
+                raise Exception(f'Function name "{fun.getName()}" already inserted.')
+        elif fun.getType() == 'residualfunction':
+            if fun.getName() not in self._residual_container:
+                self._cost_container[fun.getName()] = fun
             else:
                 raise Exception(f'Function name "{fun.getName()}" already inserted.')
         elif fun.getType() == 'generic':
             print('functions.py: generic not implemented')
+        else:
+            raise Exception('Function type not implemented')
 
     def removeFunction(self, fun_name: str):
         """
@@ -540,8 +581,8 @@ class FunctionsContainer:
         if fun_name in self._cnstr_container:
             del self._cnstr_container[fun_name]
             return True
-        elif fun_name in self._costfun_container:
-            del self._costfun_container[fun_name]
+        elif fun_name in self._cost_container:
+            del self._cost_container[fun_name]
             return True
         else:
             return False
@@ -554,8 +595,8 @@ class FunctionsContainer:
         """
         if fun_name in self._cnstr_container:
             return self._cnstr_container[fun_name]
-        elif fun_name in self._costfun_container:
-            return self._costfun_container[fun_name]
+        elif fun_name in self._cost_container:
+            return self._cost_container[fun_name]
         else:
             return None
 
@@ -588,9 +629,9 @@ class FunctionsContainer:
             ordered dict of the functions {name: fun}
         """
         if name is None:
-            cost_dict = self._costfun_container
+            cost_dict = self._cost_container
         else:
-            cost_dict = self._costfun_container[name]
+            cost_dict = self._cost_container[name]
         return cost_dict
 
     def getCnstrDim(self) -> int:
@@ -628,7 +669,7 @@ class FunctionsContainer:
 
             cnstr.setNodes([i for i in cnstr.getNodes() if i in available_nodes], erasing=True)
 
-        for cost in self._costfun_container.values():
+        for cost in self._cost_container.values():
             available_nodes = set(range(n_nodes))
             for var in cost.getVariables(offset=False):
                 if not var.getNodes() == [-1]:
@@ -648,8 +689,8 @@ class FunctionsContainer:
             self._cnstr_container[name] = item.serialize()
 
 
-        for name, item in self._costfun_container.items():
-            self._costfun_container[name] = item.serialize()
+        for name, item in self._cost_container.items():
+            self._cost_container[name] = item.serialize()
 
 
 
@@ -677,8 +718,8 @@ class FunctionsContainer:
 
 
         # these are CASADI functions
-        for name, item in self._costfun_container.items():
-            self._costfun_container[name] = item.deserialize()
+        for name, item in self._cost_container.items():
+            self._cost_container[name] = item.deserialize()
 
 
 

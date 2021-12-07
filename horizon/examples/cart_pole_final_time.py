@@ -81,7 +81,7 @@ tf.setInitialGuess(tf_init)
 
 # Cost function
 prb.createIntermediateCost("tau", cs.sumsqr(tau))
-prb.createCostFunction("min_tf", 100.*cs.sumsqr(tf))
+prb.createCost("min_tf", 100.*cs.sumsqr(tf))
 
 # Constraints
 q_prev = q.getVarOffset(-1)
