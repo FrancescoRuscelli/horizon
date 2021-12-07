@@ -16,7 +16,7 @@ filename, _ = os.path.splitext(filename_with_ext)
 ms = mat_storer.matStorer(f'{filename}.mat')
 
 # options
-solver_type = 'ilqr'
+solver_type = 'ipopt'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
@@ -143,13 +143,15 @@ for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", residual_to_cost(1e-3 * (f)))
 
 
+
+
 # =============
 # SOLVE PROBLEM
 # =============
 opts = dict()
-if solver_type == 'ipopt':
+if solver_type == 'ilqr':
     opts['ipopt.tol'] = 0.001
-    opts['ipopt.constr_viol_tol'] = 0.001
+    opts['ipopt.constr_viol_tol'] = n_nodes * 1e-12
     opts['ipopt.max_iter'] = 2000
     opts['ipopt.linear_solver'] = 'ma57'
 
@@ -171,8 +173,8 @@ if solver_type == 'gnsqp':
         opts['gnsqp.qp_solver'] = 'osqp'
         opts['warm_start_primal'] = True
         opts['warm_start_dual'] = True
-        opts['merit_derivative_tolerance'] = 1e-10
-        opts['constraint_violation_tolerance'] = 1e-11
+        opts['merit_derivative_tolerance'] = 1e-6
+        opts['constraint_violation_tolerance'] = n_nodes * 1e-12
         opts['osqp.polish'] = True # without this
         opts['osqp.delta'] = 1e-9 # and this, it does not converge!
         opts['osqp.verbose'] = False
