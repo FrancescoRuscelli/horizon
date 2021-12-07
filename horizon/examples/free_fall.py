@@ -110,13 +110,13 @@ f2.setInitialGuess(f_init)
 frope.setInitialGuess(f_init)
 
 # Cost function
-prb.createCostFunction("min_joint_vel", 100.*cs.dot(qdot[6:-1], qdot[6:-1]))
-prb.createCostFunction("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]), list(range(1, ns)))
-prb.createCostFunction("min_f1", 1000.*cs.dot(f1, f1), list(range(1, ns)))
-prb.createCostFunction("min_f2", 1000.*cs.dot(f2, f2), list(range(1, ns)))
+prb.createCost("min_joint_vel", 100.*cs.dot(qdot[6:-1], qdot[6:-1]))
+prb.createCost("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]), list(range(1, ns)))
+prb.createCost("min_f1", 1000.*cs.dot(f1, f1), list(range(1, ns)))
+prb.createCost("min_f2", 1000.*cs.dot(f2, f2), list(range(1, ns)))
 
 frope_prev = frope.getVarOffset(-1)
-prb.createCostFunction("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), list(range(1, ns)))
+prb.createCost("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), list(range(1, ns)))
 
 # Constraints
 prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))

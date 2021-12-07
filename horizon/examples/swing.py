@@ -95,7 +95,7 @@ frope.setBounds(f_minRope, f_maxRope)
 frope.setInitialGuess(np.zeros(nf).tolist())
 
 # Cost function
-prb.createCostFunction("min_joint_vel", 1. * cs.dot(qdot, qdot))
+prb.createCost("min_joint_vel", 1. * cs.dot(qdot, qdot))
 
 # Constraints
 # Initial State

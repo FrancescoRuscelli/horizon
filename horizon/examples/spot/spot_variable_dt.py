@@ -159,7 +159,7 @@ R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 # p_base = FK(q=q)['ee_pos']
 # p_base_start = FK(q=q_init)['ee_pos']
 
-# prb.createCostFunction(f"base_link_pos", 10 * cs.sumsqr(p_base - p_base_start))
+# prb.createCost(f"base_link_pos", 10 * cs.sumsqr(p_base - p_base_start))
 
 # without this, variable dt sucks
 DFK = cs.Function.deserialize(kindyn.frameVelocity('base_link', cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
@@ -185,7 +185,7 @@ for frame, f in contact_map.items():
 
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
 # prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
 
 # for f in f_list:

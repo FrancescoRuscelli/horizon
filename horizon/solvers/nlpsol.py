@@ -1,5 +1,6 @@
 from horizon.solvers import Solver
 from horizon.problem import Problem
+from horizon.functions import CostFunction, ResidualFunction
 from typing import Dict
 import casadi as cs
 import numpy as np
@@ -147,9 +148,17 @@ class NlpsolSolver(Solver):
         g = cs.vertcat(*fun_list)
 
         # build cost functions list
+
+        # treat differently cost and residual (residual must be quadratized)
         fun_list = list()
         for fun in self.fun_container.getCost().values():
-            fun_list.append(fun.getImpl())
+            if isinstance(fun, CostFunction):
+                fun_list.append(fun.getImpl())
+            elif isinstance(fun, ResidualFunction):
+                fun_list.append(cs.sumsqr(fun.getImpl()))
+            else:
+                raise Exception('wrong type of function found in fun_container')
+
         j = cs.sum1(cs.vertcat(*fun_list))
 
         return j, w, g, p

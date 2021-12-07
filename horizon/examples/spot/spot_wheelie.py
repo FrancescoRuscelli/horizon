@@ -187,14 +187,14 @@ for frame, f in contact_map.items():
         # terrain constraint
         prb.createConstraint(f"subterrain_{frame}_leg", p[2] - p_start[2], bounds=dict(lb=0., ub=100000))
         # suggestion to lift leg
-        # prb.createCostFunction(f"lift_{frame}_leg", 10000 * cs.sumsqr(p[2] - p_goal[2]), nodes=node_start_wheelie)
+        # prb.createCost(f"lift_{frame}_leg", 10000 * cs.sumsqr(p[2] - p_goal[2]), nodes=node_start_wheelie)
 
 # SET COST FUNCTIONS
 
-# prb.createCostFunction("min_q_ddot", 10000. * cs.sumsqr(q_ddot), nodes=range(node_start_wheelie, n_nodes))
+# prb.createCost("min_q_ddot", 10000. * cs.sumsqr(q_ddot), nodes=range(node_start_wheelie, n_nodes))
 
 # minimize the joint velocities
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
 
 # minimize the forces
 for f in f_list:
@@ -204,7 +204,7 @@ for f in f_list:
 # fb_rot_wheelie = np.array([0, -0.5, 0, 0.8660254]) # pi/3 pitch
 fb_rot_wheelie = np.array([0, -0.8509035, 0, 0.525322])  # pi/2 pitch
 # prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q[3:7] - fb_rot_wheelie))
-prb.createCostFunction(f"wheelie_fb", 10000 * cs.sumsqr(q[3:7] - fb_rot_wheelie), nodes=node_start_wheelie)
+prb.createCost(f"wheelie_fb", 10000 * cs.sumsqr(q[3:7] - fb_rot_wheelie), nodes=node_start_wheelie)
 # prb.createFinalCost(f"final_nominal_pos", 10 * cs.sumsqr(q[3:7] - fb_rot_wheelie))
 prb.createFinalCost(f"final_nominal_pos", 10000. * cs.sumsqr(q[4] - fb_rot_wheelie[2]))
 # prb.createFinalCost(f"final_nominal_pos", 10000. * cs.sumsqr(q[4] - fb_rot_wheelie[2]))

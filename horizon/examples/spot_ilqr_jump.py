@@ -134,10 +134,10 @@ for leg in lifted_legs:
 
 
 # cost
-# prb.createCostFunction("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
-# prb.createCostFunction("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
-prb.createCostFunction("min_q", residual_to_cost(1e-1 * (q[7:] - q_init[7:])))
-# prb.createCostFunction("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
+# prb.createCost("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
+# prb.createCost("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
+prb.createCost("min_q", residual_to_cost(1e-1 * (q[7:] - q_init[7:])))
+# prb.createCost("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
 prb.createIntermediateCost("min_q_ddot", residual_to_cost(1e-3* (q_ddot)))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", residual_to_cost(1e-3 * (f)))

@@ -121,6 +121,7 @@ for frame, f in contact_map.items():
     a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
     prb.createConstraint(f"{frame}_vel", v, nodes=list(nodes))
+
     prb.createIntermediateCost(f'{frame}_fn', barrier(f[2] - 25.0)) #, nodes=nodes)
 
 # swing force is zero
@@ -129,10 +130,14 @@ for leg in lifted_legs:
     contact_map[leg].setBounds(fzero, fzero, nodes=k_swing)
 
 # cost
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-for f in f_list:
-    prb.createIntermediateCost(f"min_{f.getName()}", 1e-6 * cs.sumsqr(f))
+# prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
+# for f in f_list:
+#     prb.createIntermediateCost(f"min_{f.getName()}", 1e-6 * cs.sumsqr(f))
+#
 
+prb.createResidual("min_q_dot", q_dot)
+for f in f_list:
+    prb.createIntermediateResidual(f"min_{f.getName()}", cs.sqrt(1e-6) * f)
 
 # =============
 # SOLVE PROBLEM

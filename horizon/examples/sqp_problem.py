@@ -37,9 +37,9 @@ F_integrator = integrators.RK4(dae, opts, cs.SX)
 print(f"F_integrator: {F_integrator}")
 
 # Cost function
-prb.createCostFunction('min_v', cs.vertcat(dx, du), nodes=list(range(0, N)))
+prb.createCost('min_v', cs.vertcat(dx, du), nodes=list(range(0, N)))
 dx_prev = dx.getVarOffset(-1)
-prb.createCostFunction('min_dx_prev', dx_prev, nodes=list(range(N, N+1)))
+prb.createCost('min_dx_prev', dx_prev, nodes=list(range(N, N+1)))
 
 
 # Constraints

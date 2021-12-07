@@ -339,7 +339,7 @@ class Problem:
             nodes = range(self.nodes - 1)
         return self.createConstraint(name, g, nodes=nodes, bounds=bounds)
 
-    def createCostFunction(self, name: str,
+    def createCost(self, name: str,
                            j,
                            nodes: Union[int, Iterable] = None):
         """
@@ -386,7 +386,7 @@ class Problem:
         u = self.getInput().getVars()
         if cs.depends_on(j, u):
             raise RuntimeError(f'final cost "{name}" must not depend on the input')
-        return self.createCostFunction(name, j, nodes=self.nodes - 1, )
+        return self.createCost(name, j, nodes=self.nodes - 1)
 
     def createIntermediateCost(self,
                                name: str,
@@ -396,19 +396,90 @@ class Problem:
         Create a Cost Function that can be active on all the nodes except the last one.
 
         Args:
-            name: name of the cost function
-            j: cost function
-            nodes: nodes the cost function is active on. If not specified, the cost function is active on all the nodes except the last one
+            name: name of the function
+            j: function
+            nodes: nodes the function is active on. If not specified, the cost function is active on all the nodes except the last one
 
         Returns:
-            instance of Cost Function
+            instance of Function
 
         """
 
         if nodes is None:
             nodes = range(self.nodes - 1)
 
-        return self.createCostFunction(name, j, nodes=nodes)
+        return self.createCost(name, j, nodes=nodes)
+
+    def createResidual(self, name: str,
+                       j,
+                       nodes: Union[int, Iterable] = None):
+        """
+        Create a Residual Function of the optimization problem.
+
+        Args:
+            name: name of the function
+            j: function
+            nodes: nodes the function is active on. If not specified, it is active on ALL the nodes.
+
+        Returns:
+            instance of Residual Function
+
+        """
+        if nodes is None:
+            nodes = list(range(self.nodes))
+        else:
+            nodes = misc.checkNodes(nodes, range(self.nodes))
+
+        used_var = self._getUsedVar(j)
+        used_par = self._getUsedPar(j)
+
+        if self.debug_mode:
+            self.logger.debug(f'Creating Residual Function "{name}": active in nodes: {nodes}')
+
+        fun = fc.ResidualFunction(name, j, used_var, used_par, nodes)
+
+        self.function_container.addFunction(fun)
+
+        return fun
+
+    def createFinalResidual(self, name: str, j):
+        """
+        Create a Residual Function only active on the last node of the optimization problem.
+
+        Args:
+            name: name of the residual function
+            j: function
+
+        Returns:
+            instance of Residual Function
+
+        """
+        u = self.getInput().getVars()
+        if cs.depends_on(j, u):
+            raise RuntimeError(f'final residual "{name}" must not depend on the input')
+        return self.createResidual(name, j, nodes=self.nodes - 1)
+
+    def createIntermediateResidual(self,
+                                   name: str,
+                                   j,
+                                   nodes: Union[int, Iterable] = None):
+        """
+        Create a Residual Function that can be active on all the nodes except the last one.
+
+        Args:
+            name: name of the function
+            j: function
+            nodes: nodes the function is active on. If not specified, the function is active on all the nodes except the last one
+
+        Returns:
+            instance of Function
+
+        """
+
+        if nodes is None:
+            nodes = range(self.nodes - 1)
+
+        return self.createResidual(name, j, nodes=nodes)
 
     def removeVariable(self, name: str) -> bool:
         """

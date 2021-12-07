@@ -197,7 +197,7 @@ for frame, f in contact_map.items():
 
 # SET COST FUNCTIONS
 # minimum joint velocity
-prb.createCostFunction("min_q_dot", 3 * cs.sumsqr(q_dot))
+prb.createCost("min_q_dot", 3 * cs.sumsqr(q_dot))
 # final pose of the robot
 # prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q - q_final))
 prb.createFinalConstraint(f"final_nominal_pos", q - q_final)

@@ -198,7 +198,7 @@ for frame, f in contact_map.items():
 
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
 prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))

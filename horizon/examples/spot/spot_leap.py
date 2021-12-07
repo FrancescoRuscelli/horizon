@@ -218,8 +218,8 @@ for frame, f in contact_map.items():
 prb.createFinalConstraint(f"final_nominal_fb", q[0:3] - q_final[0:3])
 
 # SET COST FUNCTIONS
-prb.createCostFunction("min_q_dot", 1 * cs.sumsqr(q_dot))
-prb.createCostFunction("fb", 1 * cs.sumsqr(q[2] - q_flight[2]))
+prb.createCost("min_q_dot", 1 * cs.sumsqr(q_dot))
+prb.createCost("fb", 1 * cs.sumsqr(q[2] - q_flight[2]))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.001 * cs.sumsqr(f))
 

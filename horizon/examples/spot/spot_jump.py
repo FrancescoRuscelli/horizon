@@ -201,7 +201,7 @@ R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 # p_base = FK(q=q)['ee_pos']
 # p_base_start = FK(q=q_init)['ee_pos']
 
-# prb.createCostFunction(f"base_link_pos", 1000*cs.sumsqr(p_base[0:2] - p_base_start[0:2]))
+# prb.createCost(f"base_link_pos", 1000*cs.sumsqr(p_base[0:2] - p_base_start[0:2]))
 
 # DFK = cs.Function.deserialize(kindyn.frameVelocity('base_link', cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
 # v_base = DFK(q=q, qdot=q_dot)['ee_vel_linear']
@@ -241,11 +241,17 @@ for frame, f in contact_map.items():
 
 
 # SET COST FUNCTIONS
-# prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
-prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
+
+# prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
+# prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
+# for f in f_list:
+#     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
+
+prb.createResidual("min_q_dot", q_dot)
+prb.createFinalResidual(f"final_nominal_pos", cs.sqrt(1000) * (q - q_init))
 for f in f_list:
-    prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
+    prb.createIntermediateResidual(f"min_{f.getName()}", cs.sqrt(0.01) * f)
+
 
 # prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
 

@@ -307,10 +307,10 @@ for frame, f in contact_map.items():
 
 # SET COST FUNCTIONS
 # pose of the robot during jump
-prb.createCostFunction(f"jump_fb", 1000 * cs.sumsqr(q[0:7] - fb_during_jump),
+prb.createCost(f"jump_fb", 1000 * cs.sumsqr(q[0:7] - fb_during_jump),
                        nodes=range(node_start_step, node_end_step))  # nodes_end_step
 # minimum joint velocity
-prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
 # final pose of the robot
 prb.createFinalCost(f"final_nominal_pos", 10000 * cs.sumsqr(q - q_final))
 # forces
