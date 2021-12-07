@@ -284,7 +284,7 @@ public:
             _conic_dict.input["uba"] = ubg - g_;
             _conic_dict.input["lbx"] = lbx - x0_;
             _conic_dict.input["ubx"] = ubx - x0_;
-//            _conic_dict.input["x0"] = x0_;
+            _conic_dict.input["x0"] = x0_;
 //            if(_lam_a.size() > 0)
 //            {
 //                casadi::DM lama;
@@ -334,7 +334,7 @@ public:
 
             ///BREAK CRITERIA #2
             if(fabs(_fpr.constraint_violation) <= _constraint_violation_tolerance &&
-               fabs(_fpr.merit_der) <= _merit_derivative_tolerance)
+               fabs(_fpr.merit_der/_fpr.merit) <= _merit_derivative_tolerance)
                 break;
 
             /// BREAK CRITERIA #3
