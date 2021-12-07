@@ -225,7 +225,7 @@ class SolverILQR(Solver):
                             )
 
 
-            set_to_ilqr([], l)
+            set_to_ilqr(f.getNodes(), l)
         
     
     def _set_param_values(self):
