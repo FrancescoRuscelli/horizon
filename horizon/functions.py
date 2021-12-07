@@ -529,10 +529,6 @@ class FunctionsContainer:
         # containers for the cost functions
         self._cost_container = OrderedDict()
 
-        # containers for the cost functions
-        self._residual_container = OrderedDict()
-
-
     def addFunction(self, fun: Function):
         """
         Add a function to the Function Container.
@@ -552,7 +548,7 @@ class FunctionsContainer:
             else:
                 raise Exception(f'Function name "{fun.getName()}" already inserted.')
         elif fun.getType() == 'residualfunction':
-            if fun.getName() not in self._residual_container:
+            if fun.getName() not in self._cost_container:
                 self._cost_container[fun.getName()] = fun
             else:
                 raise Exception(f'Function name "{fun.getName()}" already inserted.')
