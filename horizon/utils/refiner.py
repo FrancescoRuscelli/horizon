@@ -41,7 +41,7 @@ class Refiner:
         # map from base_indices to expanded indices: [0, 1, 2, 3, 4] ---> [0, 1, [2new, 3new, 4new], 2, 3, 4]
         self.old_to_new = dict(zip(range(self.old_n_nodes + 1), self.base_indices))
         self.new_to_old = {v: k for k, v in self.old_to_new.items()}
-        # group elements
+        # group elements (collapses lists to ranges)
         ranges_base_indices = self.group_elements(self.base_indices)
         ranges_new_indices = self.group_elements(self.new_indices)
 
@@ -58,20 +58,8 @@ class Refiner:
 
         print('elem_and_expansion', self.elem_and_expansion)
 
-        # n_nodes = 50
-        #
-        node_start_step = 20
-        node_end_step = 40
-        node_peak = 30
-        jump_height = 0.2
-
-        # print(f'node_start_step: {node_start_step} -->  {self.old_to_new[node_start_step]}')
-        # print(f'node_end_step {node_end_step} --> {self.old_to_new[node_end_step]}')
-        # print(f'node_peak {node_peak} -->  {self.old_to_new[node_peak]}')
-        #
-        # print(f'nodes_vec shape {nodes_vec.shape} --> {nodes_vec_augmented.shape}')
-
     def get_node_time(self, dt):
+        # get cumulative list of times
         nodes_vec = np.zeros([self.old_n_nodes])
         for i in range(1, n_nodes + 1):
             nodes_vec[i] = nodes_vec[i - 1] + dt[i - 1]
@@ -109,7 +97,10 @@ class Refiner:
         return new_nodes_vec
 
     def find_nodes_to_inject(self, vec_to_expand):
-
+        # the rationale behind this. Given 'augmented nodes':
+            # if augmented nodes in between two nodes: inject
+            # if augmented nodes after the last nodes: inject
+            
         # search for the nodes couples and expand if necessary
         recipe_vec = self.elem_and_expansion
 
