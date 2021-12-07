@@ -149,7 +149,7 @@ for f in f_list:
 # SOLVE PROBLEM
 # =============
 opts = dict()
-if solver_type == 'ilqr':
+if solver_type == 'ipopt':
     opts['ipopt.tol'] = 0.001
     opts['ipopt.constr_viol_tol'] = n_nodes * 1e-12
     opts['ipopt.max_iter'] = 2000
