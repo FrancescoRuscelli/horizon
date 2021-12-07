@@ -386,7 +386,7 @@ class Refiner:
                     old_sol = self.prev_solution[state_var.getName()]
                     old_n = self.new_to_old[node]
                     print(f'Creating proximal cost for variable {state_var.getName()} at node {node}')
-                    prb.createCostFunction(f"{state_var.getName()}_proximal_{node}", proximal_cost_state * cs.sumsqr(state_var - old_sol[:, old_n]), nodes=node)
+                    prb.createCost(f"{state_var.getName()}_proximal_{node}", proximal_cost_state * cs.sumsqr(state_var - old_sol[:, old_n]), nodes=node)
                 if node in self.new_indices:
                     print(f'Proximal cost not created for node {node}: required a value')
                     # prb.createCostFunction(f"q_close_to_res_node_{node}", 1e5 * cs.sumsqr(q - q_res[:, zip_indices_new[node]]), nodes=node)
@@ -597,7 +597,7 @@ if __name__ == '__main__':
 
     # SET COST FUNCTIONS
     # prb.createCostFunction(f"jump_fb", 10000 * cs.sumsqr(q[2] - fb_during_jump[2]), nodes=node_start_step)
-    prb.createCostFunction("min_q_dot", 1. * cs.sumsqr(q_dot))
+    prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
     prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
     for f in f_list:
         prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
