@@ -2,6 +2,25 @@ from scipy.io import savemat, loadmat
 import numpy as np
 import argparse
 
+"""
+setInitialGuess assign initial guesses given a solution guess
+Args:
+    variables: a dictionary containing the variables. The keys in the dict should be the same used to store a solution
+    solution: a solution dict
+"""
+def setInitialGuess(variables: dict, solution: dict):
+    for variable_name, variable in variables.items():
+        if variable_name in solution.keys():
+            if len(variable.getNodes()) == 1: #this is to handle a special case, e.g. final time optimization
+                variable.setInitialGuess(solution[variable_name].T)
+            else:
+                node = 0
+                for guess in solution[variable_name].T:
+                    variable.setInitialGuess(guess, node)
+                    node += 1
+        else:
+            print(f"variable {variable_name} not in solution dict, skipped")
+
 class matStorerIO:
     def __init__(self):
         self.__parser = argparse.ArgumentParser(description="Save and Load solutions")
@@ -9,6 +28,7 @@ class matStorerIO:
         self.__parser.add_argument("--load", help="enable load of solution", type=str)
 
         self.dict_values = dict()
+        self.argParse()
 
     def argParse(self):
         self.__args = self.__parser.parse_args()
