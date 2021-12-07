@@ -348,7 +348,8 @@ bool IterativeLQR::should_stop()
 
     // exit if merit function directional derivative (normalized)
     // is too close to zero
-    if(_fp_res->merit_der/_fp_res->merit > -1e-6)
+    if(_fp_res->merit_der < 0 &&
+            _fp_res->merit_der/_fp_res->merit > -1e-6)
     {
         return true;
     }
