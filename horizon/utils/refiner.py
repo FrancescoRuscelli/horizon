@@ -372,6 +372,10 @@ class Refiner:
         return sol_var, sol_cnsrt, sol_dt
 
     def addProximalCosts(self):
+
+        # todo work on this:
+        #    what to do with costs?
+        # one strategy is adding a "regularization" term
         proximal_cost_state = 1e5
 
         prb.removeCostFunction('min_q_dot')
