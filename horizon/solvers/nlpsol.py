@@ -253,6 +253,7 @@ class NlpsolSolver(Solver):
         self.dt_solution = np.zeros(self.prb.getNNodes()-1)
         dt = self.prb.getDt()
 
+        # todo make this better
         # fill dt_solution
 
         # if it is a variable, its corresponding solution must be retrieved.
