@@ -149,7 +149,7 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
         lam_x_max = std::max(lam_x_max, _lam_x.col(i).cwiseAbs().maxCoeff());
 
         // ..for constraints (lam_g = TBD)
-        if(res.nc > 0)
+        if(res.glam.size() > 0)
         {
             _lam_g[i] = res.glam;
             lam_g_max = std::max(lam_g_max, _lam_g[i].cwiseAbs().maxCoeff());
