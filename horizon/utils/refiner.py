@@ -174,27 +174,23 @@ class Refiner:
             print('new nodes:', cnsrt.getNodes())
 
             # manage bounds
-
             # old nodes: set their old bounds
             for node in cnsrt.getNodes():
                 if node in self.base_indices:
                     old_node_index = old_n.index(self.new_to_old[node])
+                    print(f'setting bounds at old nodes: {node}')
                     cnsrt.setBounds(old_lb[:, old_node_index], old_ub[:, old_node_index], node)
 
             elem_and_expansion_masked = self.find_nodes_to_inject(old_n)
 
             # injected nodes: set the bounds of the previous node
             for elem in elem_and_expansion_masked:
-                if len(list(elem[1])) == 2:
-                    nodes_to_inject = list(range(elem[1][0], elem[1][1] + 1))
-                else:
-                    nodes_to_inject = elem[1][0]
-
                 # setting bounds using old bound index!
                 # careful: retrieved old bounds corresponds to the nodes where the constraint is defined.
                 # If the constraint is defined over [20, 21, 22, 23], and I want to set the bounds in node 23 (= elem[0]), I need to use the index 4 of old_bound_index
+                print(f'setting bounds at injected nodes: {elem[1]}')
                 old_bound_index = old_n.index(elem[0])
-                cnsrt.setBounds(old_lb[:, old_bound_index], old_ub[:, old_bound_index], nodes=nodes_to_inject)
+                cnsrt.setBounds(old_lb[:, old_bound_index], old_ub[:, old_bound_index], nodes=elem[1])
 
 
         plot_bounds = False
@@ -240,19 +236,17 @@ class Refiner:
             var_lb, var_ub = self.old_var_bounds[name_var]
 
             for node in var.getNodes():
+                # set bounds for old nodes
                 if node in self.base_indices:
                     old_node_index = var_nodes_old.index(self.new_to_old[node])
                     var.setBounds(var_lb[:, old_node_index], var_ub[:, old_node_index], node)
 
             elem_and_expansion_masked = self.find_nodes_to_inject(var_nodes_old)
 
+            # set bounds for injected nodes (using the bounds of old nodes)
             for elem in elem_and_expansion_masked:
-                if len(list(elem[1])) == 2:
-                    nodes_to_inject = list(range(elem[1][0], elem[1][1] + 1))
-                else:
-                    nodes_to_inject = elem[1][0]
-
-                var.setBounds(var_lb[:, elem[0]], var_ub[:, elem[0]], nodes=nodes_to_inject)
+                print(elem[1])
+                var.setBounds(var_lb[:, elem[0]], var_ub[:, elem[0]], nodes=elem[1])
 
         if plot_bounds:
             for name, var in self.prb.getVariables().items():
@@ -381,7 +375,7 @@ class Refiner:
         proximal_cost_state = 1e5
 
         prb.removeCostFunction('min_q_dot')
-
+        # minimize states
         for state_var in self.prb.getState().getVars(abstr=True):
             for node in range(self.new_n_nodes):
                 if node in self.base_indices:
@@ -390,15 +384,21 @@ class Refiner:
                     print(f'Creating proximal cost for variable {state_var.getName()} at node {node}')
                     prb.createCost(f"{state_var.getName()}_proximal_{node}", proximal_cost_state * cs.sumsqr(state_var - old_sol[:, old_n]), nodes=node)
                 if node in self.new_indices:
-                    print(f'Proximal cost not created for node {node}: required a value')
+                    print(f'Proximal cost of {state_var} not created for node {node}: required a value')
                     # prb.createCostFunction(f"q_close_to_res_node_{node}", 1e5 * cs.sumsqr(q - q_res[:, zip_indices_new[node]]), nodes=node)
 
         proximal_cost_input = 1
-
+        # minimize inputs
         for input_var in self.prb.getInput().getVars(abstr=True):
-
-            if not isinstance(input_var, (Parameter, SingleParameter)):
-                prb.createIntermediateCost(f"minimize_{input_var.getName()}", proximal_cost_input * cs.sumsqr(input_var))
+            for node in range(self.new_n_nodes-1):
+                if not isinstance(input_var, (Parameter, SingleParameter)):
+                    if node in self.base_indices:
+                        old_sol = self.prev_solution[input_var.getName()]
+                        old_n = self.new_to_old[node]
+                        prb.createCost(f"minimize_{input_var.getName()}_node_{node}", proximal_cost_input * cs.sumsqr(input_var - old_sol[:, old_n]), nodes=node)
+                    if node in self.new_indices:
+                        print(f'Proximal cost of {input_var} created for node {node}: without any value, it is just minimized w.r.t zero')
+                        prb.createCost(f"minimize_{input_var.getName()}_node_{node}", proximal_cost_input * cs.sumsqr(input_var), nodes=node)
 
 
     def getAugmentedProblem(self):
