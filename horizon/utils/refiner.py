@@ -42,19 +42,19 @@ class Refiner:
         self.old_to_new = dict(zip(range(self.old_n_nodes + 1), self.base_indices))
         self.new_to_old = {v: k for k, v in self.old_to_new.items()}
         # group elements (collapses lists to ranges)
-        ranges_base_indices = self.group_elements(self.base_indices)
-        ranges_new_indices = self.group_elements(self.new_indices)
+        group_base_indices = self.group_elements(self.base_indices)
+        group_new_indices = self.group_elements(self.new_indices)
 
         # each first indices in ranges_base_indices
-        first_indices = [item[1] for item in ranges_base_indices[:-1]]
+        first_indices = [item[-1] for item in group_base_indices[:-1]]
         indices_to_expand = [self.new_to_old[elem] for elem in first_indices]
 
         # zip couples to expand with expanded nodes
-        couples_to_inject = list()
-        for base_elem, new_elem in zip(first_indices, ranges_new_indices):
-            couples_to_inject.append((base_elem, base_elem + 1))
+        # couples_to_inject = list()
+        # for base_elem, new_elem in zip(first_indices, ranges_new_indices):
+        #     couples_to_inject.append((base_elem, base_elem + 1))
 
-        self.elem_and_expansion = list(zip(indices_to_expand, ranges_new_indices))
+        self.elem_and_expansion = list(zip(indices_to_expand, group_new_indices))
 
         print('elem_and_expansion', self.elem_and_expansion)
 
@@ -71,7 +71,10 @@ class Refiner:
         for k, g in groupby(enumerate(vec), lambda x: x[0] - x[1]):
             group = (map(itemgetter(1), g))
             group = list(map(int, group))
-            ranges_vec.append((group[0], group[-1]))
+            # all elements:
+            ranges_vec.append(group)
+            # ranges:
+            # ranges_vec.append((group[0], group[-1]))
 
         return ranges_vec
 
@@ -83,17 +86,11 @@ class Refiner:
         # search for the nodes couples and expand them: return elements detected in self.elem_and_expansion
         elem_and_expansion_masked = self.find_nodes_to_inject(vec_to_expand)
 
-        # expand self.elem_and_expansion (which is made of ranges)
+        # add nodes of elem_and_expansion to new_nodes_vec
         for elem in elem_and_expansion_masked:
-            if len(list(elem[1])) == 2:
-                nodes_to_inject = list(range(elem[1][0], elem[1][1] + 1))
-                new_nodes_vec.extend(nodes_to_inject)
-            else:
-                nodes_to_inject = elem[1][0]
-                new_nodes_vec.append(nodes_to_inject)
+            new_nodes_vec.extend(elem[1])
 
         new_nodes_vec.sort()
-
         return new_nodes_vec
 
     def find_nodes_to_inject(self, vec_to_expand):
@@ -164,6 +161,7 @@ class Refiner:
         if isinstance(old_dt, (Variable, SingleVariable)):
             self.prb.toParameter(old_dt.getName())
 
+    def resetFunctions(self):
         # set constraints
         for name, cnsrt in self.prb.getConstraints().items():
             print(f'========================== constraint {name} =========================================')
@@ -298,9 +296,13 @@ class Refiner:
                     var.setInitialGuess(self.prev_solution[name_var][:, old_node_index], node)
 
                 if node in self.new_indices:
-                    print(f'node {node} requires an interpolated value to be initialized.')
+                    for elem in self.elem_and_expansion:
+                        if node in elem[1]:
+                            prev_node = elem[0]
+
+                    print(f'node {node} initialized with old node {prev_node}.')
                     var.setInitialGuess(np.zeros([var.shape[0], var.shape[1]]), node)
-                    # var.setInitialGuess(q_res[:, zip_indices_new[node]], node)
+                    # var.setInitialGuess(self.prev_solution[name_var][:, prev_node], node)
 
         if plot_ig:
             for name, var in self.prb.getVariables().items():
@@ -699,7 +701,7 @@ if __name__ == '__main__':
     nodes_vec_augmented = np.concatenate((nodes_vec, values_exceed))
     nodes_vec_augmented.sort(kind='mergesort')
 
-    plot_tau_base = True
+    plot_tau_base = False
     if plot_tau_base:
         plt.figure()
         for dim in range(6):
@@ -715,7 +717,7 @@ if __name__ == '__main__':
 
     ref = Refiner(prb, nodes_vec_augmented, prev_solution)
 
-    plot_nodes = True
+    plot_nodes = False
     if plot_nodes:
         plt.figure()
         # nodes old
@@ -725,6 +727,7 @@ if __name__ == '__main__':
 
     # ======================================================================================================================
     ref.resetProblem()
+    ref.resetFunctions()
     ref.resetVarBounds()
     ref.resetInitialGuess()
     ref.addProximalCosts()
