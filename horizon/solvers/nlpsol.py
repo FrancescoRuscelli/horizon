@@ -1,6 +1,6 @@
 from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.variables import AbstractVariable, Variable, Parameter
+from horizon.variables import AbstractVariable, Variable, Parameter, SingleVariable, SingleParameter
 from horizon.functions import CostFunction, ResidualFunction
 from typing import Dict
 import casadi as cs
@@ -256,6 +256,7 @@ class NlpsolSolver(Solver):
         # fill dt_solution
 
         # if it is a variable, its corresponding solution must be retrieved.
+        # if it is a singleVariable or a singleParameter?
         # if dt is directly an optimization variable, that's ok, I get it from the var_solution
         # if dt is a function of some other optimization variables, get all of them and compute the optimized dt
         #   I do this by using a Function to wrap everything
@@ -266,14 +267,28 @@ class NlpsolSolver(Solver):
                 if cs.depends_on(dt, var):
                     var_depend.append(var)
 
+            # create a function with all the variable dt depends on, and return dt
             temp_dt = cs.Function('temp_dt', var_depend, [dt])
 
             # fill the self.dt_solution with all the dt values
             for node_n in range(self.prb.getNNodes()-1):
                 self.dt_solution[node_n] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])[node_n]
 
+        # fill the self.dt_solution with the same dt solution
+        elif isinstance(dt, SingleVariable):
+            var_depend = list()
+            for var in self.prb.getVariables().values():
+                if cs.depends_on(dt, var):
+                    var_depend.append(var)
+
+            # create a function with all the variable dt depends on, and return dt
+            temp_dt = cs.Function('temp_dt', var_depend, [dt])
+
+            for node_n in range(self.prb.getNNodes()-1):
+                self.dt_solution[node_n] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])
+
         # if dt is a value, set it to each element of dt_solution
-        elif isinstance(dt, Parameter):
+        elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
             for node_n in range(self.prb.getNNodes()-1):
                 # get only the nodes where the dt is selected
                 # here dt at node 0 is not defined

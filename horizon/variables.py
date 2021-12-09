@@ -343,6 +343,16 @@ class SingleParameter(AbstractVariable):
 
         return par_impl
 
+    def getParOffset(self, node):
+
+        """
+        Getter for the offset parameter. Since the parameter is the same along the horizon, it will point to itself.
+
+        Args:
+            nodes: offset of the node (shift to n node before or after)
+        """
+        return self
+
     def getParOffsetDict(self):
         """
         Getter for the offset parameter. Useless, since this parameter is node-independent.
@@ -774,6 +784,16 @@ class SingleVariable(AbstractVariable):
         """
         # todo what if I return all the nodes?
         return [-1]
+
+    def getVarOffset(self, node):
+
+        """
+        Getter for the offset variable. Since the variable is the same along the horizon, it will point to itself.
+
+        Args:
+            nodes: offset of the node (shift to n node before or after)
+        """
+        return self
 
     def getVarOffsetDict(self):
         """
@@ -1967,11 +1987,11 @@ if __name__ == '__main__':
     # print(p.getUpperBounds())
 
     # VARIABLE
-    x = Variable('x', 3, [0,1,2,3,4,5,6])
-    print(x, f'type: {type(x)}')
-    print(x[0:2], f'type: {type(x[0:2])}')
-    print(x[0:2]+2)
-    print(f'type: {type(x[-1])}')
+    # x = Variable('x', 3, [0,1,2,3,4,5,6])
+    # print(x, f'type: {type(x)}')
+    # print(x[0:2], f'type: {type(x[0:2])}')
+    # print(x[0:2]+2)
+    # print(f'type: {type(x[-1])}')
     # x.setUpperBounds([2,2,2,2,2,2])
 
     # ub = np.array([[1,2,3], [1,2,3]])
@@ -1981,8 +2001,29 @@ if __name__ == '__main__':
     # print(x.getLowerBounds())
     # print(x.getUpperBounds())
 
-    ig = np.array([[1,2,3], [1,2,3], [1,2,4]])
-    ig = np.array([1,2,3])
+    # ig = np.array([[1,2,3], [1,2,3], [1,2,4]])
+    # ig = np.array([1,2,3])
     # x.setInitialGuess(ig, [2,5,6])
-    x.setInitialGuess(ig)
-    print(x.getInitialGuess())
+    # x.setInitialGuess(ig)
+    # print(x.getInitialGuess())
+
+    #### SINGLE VARIABLE
+    x = SingleVariable('x', 3, [0, 1, 2, 3, 4, 5, 6])
+    print(x)
+    print(x.getImpl(0))
+    print(x.getImpl(1))
+    print(x.getImpl(2))
+    x_prev = x.getVarOffset(-3)
+
+
+
+    # VARIABLE
+    x = Variable('x', 3, [0, 1, 2, 3, 4, 5, 6])
+    print(x)
+    print(x.getImpl(0))
+    print(x.getImpl(1))
+    print(x.getImpl(2))
+    x_prev = x.getVarOffset(-3)
+
+
+
