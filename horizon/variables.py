@@ -339,8 +339,18 @@ class SingleParameter(AbstractVariable):
             par_impl = self._par_impl['val']
         else:
             nodes = misc.checkNodes(nodes)
-            par_impl = cs.vertcat(*[self._par_impl['val'] for i in nodes])
-        return par_impl.toarray()
+            par_impl = cs.vertcat(*[self._par_impl['val'] for i in nodes]).toarray()
+
+        return par_impl
+
+    def getParOffsetDict(self):
+        """
+        Getter for the offset parameter. Useless, since this parameter is node-independent.
+
+        Returns:
+            empty dict
+        """
+        return dict()
 
     def getName(self):
         """
@@ -485,10 +495,9 @@ class Parameter(AbstractVariable):
             nodes = self._nodes
 
         nodes = misc.checkNodes(nodes, self._nodes)
+        par_impl = cs.horzcat(*[self._par_impl['n' + str(i)]['val'] for i in nodes]).toarray()
 
-        par_impl = cs.horzcat(*[self._par_impl['n' + str(i)]['val'] for i in nodes])
-
-        return par_impl.toarray()
+        return par_impl
 
     def getName(self):
         """
@@ -529,7 +538,7 @@ class Parameter(AbstractVariable):
             self._par_offset[node] = par
         return par
 
-    def getOffsetDict(self):
+    def getParOffsetDict(self):
         """
         Getter for the offset variables.
 
@@ -593,9 +602,9 @@ class ParameterView(AbstractVariableView):
 
         nodes = misc.checkNodes(nodes, self._parent._nodes)
 
-        par_impl = cs.horzcat(*[self._parent._par_impl['n' + str(i)]['val'][self._indices] for i in nodes])
+        par_impl = cs.horzcat(*[self._parent._par_impl['n' + str(i)]['val'][self._indices] for i in nodes]).toarray()
 
-        return par_impl.toarray()
+        return par_impl
 
 
 class SingleVariable(AbstractVariable):
@@ -623,6 +632,15 @@ class SingleVariable(AbstractVariable):
         self._var_impl['ub'] = np.full(self._dim, np.inf)
         self._var_impl['w0'] = np.zeros(self._dim)
 
+    def _setVals(self, val_type, input_val):
+
+        val = misc.checkValueEntry(input_val)
+
+        if val.shape[0] != self._dim:
+            raise Exception(f'Wrong dimension of {val_type} inserted.')
+
+        self._var_impl[val_type] = val
+
     def setLowerBounds(self, bounds):
         """
         Setter for the lower bounds of the variable.
@@ -630,12 +648,7 @@ class SingleVariable(AbstractVariable):
         Args:
             bounds: value of the lower bounds
         """
-        bounds = misc.checkValueEntry(bounds)
-
-        if bounds.shape[0] != self._dim:
-            raise Exception('Wrong dimension of lower bounds inserted.')
-
-        self._var_impl['lb'] = bounds
+        self._setVals('lb', bounds)
 
     def setUpperBounds(self, bounds):
         """
@@ -644,12 +657,7 @@ class SingleVariable(AbstractVariable):
         Args:
             bounds: value of the upper bounds
         """
-        bounds = misc.checkValueEntry(bounds)
-
-        if bounds.shape[0] != self._dim:
-            raise Exception('Wrong dimension of upper bounds inserted.')
-
-        self._var_impl['ub'] = bounds
+        self._setVals('ub', bounds)
 
     def setBounds(self, lb, ub):
         """
@@ -669,12 +677,7 @@ class SingleVariable(AbstractVariable):
         Args:
             val: value of the initial guess
         """
-        val = misc.checkValueEntry(val)
-
-        if val.shape[0] != self._dim:
-            raise Exception('Wrong dimension of initial guess inserted.')
-
-        self._var_impl['w0'] = val
+        self._setVals('w0', val)
 
     def getImpl(self, nodes=None):
         """
@@ -692,7 +695,6 @@ class SingleVariable(AbstractVariable):
             nodes = misc.checkNodes(nodes)
             var_impl = cs.vertcat(*[self._var_impl['var'] for i in nodes])
         return var_impl
-
 
     def _getVals(self, val_type, nodes):
         """
@@ -809,6 +811,15 @@ class SingleVariableView(AbstractVariableView):
     def __init__(self, parent: SingleVariable, var_slice, indices):
         super().__init__(parent, var_slice, indices)
 
+    def _setVals(self, val_type, input_val):
+
+        val = misc.checkValueEntry(input_val)
+
+        if val.shape[0] != self._dim:
+            raise Exception(f'Wrong dimension of {val_type} inserted.')
+
+        self._parent._var_impl[val_type][self._indices] = val
+
     def setLowerBounds(self, bounds):
         """
         Setter for the lower bounds of the variable.
@@ -816,12 +827,7 @@ class SingleVariableView(AbstractVariableView):
         Args:
             bounds: value of the lower bounds
         """
-        bounds = misc.checkValueEntry(bounds)
-
-        if bounds.shape[0] != self._dim:
-            raise Exception('Wrong dimension of lower bounds inserted.')
-
-        self._parent._var_impl['lb'][self._indices] = bounds
+        self._setVals('lb', bounds)
 
     def setUpperBounds(self, bounds):
         """
@@ -830,12 +836,7 @@ class SingleVariableView(AbstractVariableView):
         Args:
             bounds: value of the upper bounds
         """
-        bounds = misc.checkValueEntry(bounds)
-
-        if bounds.shape[0] != self._dim:
-            raise Exception('Wrong dimension of upper bounds inserted.')
-
-        self._var_impl['ub'][self._indices] = bounds
+        self._setVals('ub', bounds)
 
     def setBounds(self, lb, ub):
         """
@@ -855,12 +856,7 @@ class SingleVariableView(AbstractVariableView):
         Args:
             val: value of the initial guess
         """
-        val = misc.checkValueEntry(val)
-
-        if val.shape[0] != self._dim:
-            raise Exception('Wrong dimension of initial guess inserted.')
-
-        self._var_impl['w0'][self._indices] = val
+        self._setVals('w0', val)
 
 class Variable(AbstractVariable):
     """
@@ -895,6 +891,39 @@ class Variable(AbstractVariable):
         # i project the variable over the optimization nodes
         self._project()
 
+    def _setVals(self, val_type, val, nodes=None):
+        """
+        Generic setter.
+
+        Args:
+            bounds: desired values to set
+            nodes: which nodes the values are applied on
+        """
+        if nodes is None:
+            nodes = self._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._nodes)
+
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self._dim:
+            raise Exception(f'Wrong dimension of {val_type} inserted.')
+
+        # if a matrix of values is being provided, check cols match len(nodes)
+        multiple_vals = val.ndim == 2 and val.shape[1] != 1
+
+        if multiple_vals and val.shape[1] != len(nodes):
+            raise Exception(f'Wrong dimension of {val_type} inserted.')
+
+        for i, node in enumerate(nodes):
+
+            if multiple_vals:
+                v = val[:, i]
+            else:
+                v = val
+
+            self._var_impl['n' + str(node)][val_type] = v
+
     def setLowerBounds(self, bounds, nodes=None):
         """
         Setter for the lower bounds of the variable.
@@ -903,17 +932,7 @@ class Variable(AbstractVariable):
             bounds: desired bounds of the variable
             nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
         """
-        if nodes is None:
-            nodes = self._nodes
-        else:
-            nodes = misc.checkNodes(nodes, self._nodes)
-
-        bounds = misc.checkValueEntry(bounds)
-        if bounds.shape[0] != self._dim:
-            raise Exception('Wrong dimension of lower bounds inserted.')
-
-        for node in nodes:
-            self._var_impl['n' + str(node)]['lb'] = bounds
+        self._setVals('lb', bounds, nodes)
 
     def setUpperBounds(self, bounds, nodes=None):
         """
@@ -923,18 +942,7 @@ class Variable(AbstractVariable):
             bounds: desired bounds of the variable
             nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
         """
-        if nodes is None:
-            nodes = self._nodes
-        else:
-            nodes = misc.checkNodes(nodes, self._nodes)
-
-        bounds = misc.checkValueEntry(bounds)
-
-        if bounds.shape[0] != self._dim:
-            raise Exception('Wrong dimension of upper bounds inserted.')
-
-        for node in nodes:
-            self._var_impl['n' + str(node)]['ub'] = bounds
+        self._setVals('ub', bounds, nodes)
 
     def setBounds(self, lb, ub, nodes=None):
         """
@@ -956,30 +964,7 @@ class Variable(AbstractVariable):
             val: desired initial guess of the variable
             nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
         """
-        if nodes is None:
-            nodes = self._nodes
-        else:
-            nodes = misc.checkNodes(nodes, self._nodes)
-
-        val = misc.checkValueEntry(val)
-
-        if val.shape[0] != self._dim:
-            raise Exception('Wrong dimension of initial guess inserted.')
-
-        # if a matrix of values is being provided, check cols match len(nodes)
-        multiple_vals = val.ndim == 2 and val.shape[1] != 1
-    
-        if multiple_vals and val.shape[1] != len(nodes):
-            raise Exception('Wrong dimension of initial guess inserted.')
-        
-        for i, node in enumerate(nodes):
-
-            if multiple_vals:
-                v = val[:, i]
-            else:
-                v = val 
-
-            self._var_impl['n' + str(node)]['w0'] = v
+        self._setVals('w0', val, nodes)
 
     def getVarOffset(self, node):
 
@@ -1193,6 +1178,39 @@ class VariableView(AbstractVariableView):
     def __init__(self, parent: Variable, var_slice, indices):
         super().__init__(parent, var_slice, indices)
 
+    def _setVals(self, val_type, val, nodes=None):
+        """
+        Generic setter.
+
+        Args:
+            bounds: desired values to set
+            nodes: which nodes the values are applied on
+        """
+        if nodes is None:
+            nodes = self._parent._nodes
+        else:
+            nodes = misc.checkNodes(nodes, self._parent._nodes)
+
+        val = misc.checkValueEntry(val)
+
+        if val.shape[0] != self._dim:
+            raise Exception(f'Wrong dimension of {val_type} inserted.')
+
+        # if a matrix of values is being provided, check cols match len(nodes)
+        multiple_vals = val.ndim == 2 and val.shape[1] != 1
+
+        if multiple_vals and val.shape[1] != len(nodes):
+            raise Exception(f'Wrong dimension of {val_type} inserted.')
+
+        for i, node in enumerate(nodes):
+
+            if multiple_vals:
+                v = val[:, i]
+            else:
+                v = val
+
+            self._parent._var_impl['n' + str(node)][val_type][self._indices] = v
+
     def setLowerBounds(self, bounds, nodes=None):
         """
         Setter for the lower bounds of the variable.
@@ -1201,17 +1219,7 @@ class VariableView(AbstractVariableView):
             bounds: desired bounds of the variable
             nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
         """
-        if nodes is None:
-            nodes = self._parent._nodes
-        else:
-            nodes = misc.checkNodes(nodes, self._parent._nodes)
-
-        bounds = misc.checkValueEntry(bounds)
-        if bounds.shape[0] != self._dim:
-            raise Exception('Wrong dimension of lower bounds inserted.')
-
-        for node in nodes:
-            self._parent._var_impl['n' + str(node)]['lb'][self._indices] = bounds
+        self._setVals('lb', bounds, nodes)
 
     def setUpperBounds(self, bounds, nodes=None):
         """
@@ -1221,18 +1229,7 @@ class VariableView(AbstractVariableView):
             bounds: desired bounds of the variable
             nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
         """
-        if nodes is None:
-            nodes = self._parent._nodes
-        else:
-            nodes = misc.checkNodes(nodes, self._parent._nodes)
-
-        bounds = misc.checkValueEntry(bounds)
-
-        if bounds.shape[0] != self._dim:
-            raise Exception('Wrong dimension of upper bounds inserted.')
-
-        for node in nodes:
-            self._parent._var_impl['n' + str(node)]['ub'][self._indices] = bounds
+        self._setVals('ub', bounds, nodes)
 
     def setBounds(self, lb, ub, nodes=None):
         """
@@ -1254,18 +1251,7 @@ class VariableView(AbstractVariableView):
             val: desired initial guess of the variable
             nodes: which nodes the bounds are applied on. If not specified, the variable is bounded along ALL the nodes
         """
-        if nodes is None:
-            nodes = self._parent._nodes
-        else:
-            nodes = misc.checkNodes(nodes, self._parent._nodes)
-
-        val = misc.checkValueEntry(val)
-
-        if val.shape[0] != self._dim:
-            raise Exception('Wrong dimension of initial guess inserted.')
-
-        for node in nodes:
-            self._parent._var_impl['n' + str(node)]['w0'][self._indices] = val
+        self._setVals('w0', val, nodes)
 
 class InputVariable(Variable):
     """
@@ -1812,7 +1798,7 @@ class VariablesContainer:
         for name, par in self._pars.items():
             par_abstr_list.append(par)
             if offset:
-                for par_offset in par.getOffsetDict().values():
+                for par_offset in par.getParOffsetDict().values():
                     par_abstr_list.append(par_offset)
 
         return par_abstr_list
@@ -1910,38 +1896,40 @@ class VariablesContainer:
     #     return (self.__class__, (self.nodes, self.logger, ))
 
 if __name__ == '__main__':
-    pass
+
+    ####
+
     ## PARAMETER
-    a = Parameter('p', 3, [0, 1, 2, 3, 4, 5])
-    print(a[2:4], f'type: {type(a[2:4])}')
-    a.assign([1, 1, 1])
-    a.assign([7, 7, 7], nodes=3)
-    a[1:3].assign([2, 3])
-    print(a.getValues())
-
-    print(a[2].getValues(3))
-
-    a_prev = a.getOffset(-1)
-    print(a.getImpl())
-    print(a_prev.getImpl([2]))
-
-    fun = a_prev + a
-
-    print(fun)
-
-
-    exit()
-    print(a_prev[0])
-
-
-
-    x = Variable('x', 4, [0, 1, 2, 3, 4, 5])
-
-    x_prev = x.getVarOffset(-2)
-    print(x.getImpl())
-    print(x_prev.getImpl())
-
-    exit()
+    # a = Parameter('p', 3, [0, 1, 2, 3, 4, 5])
+    # print(a[2:4], f'type: {type(a[2:4])}')
+    # a.assign([1, 1, 1])
+    # a.assign([7, 7, 7], nodes=3)
+    # a[1:3].assign([2, 3])
+    # print(a.getValues())
+    #
+    # print(a[2].getValues(3))
+    #
+    # a_prev = a.getOffset(-1)
+    # print(a.getImpl())
+    # print(a_prev.getImpl([2]))
+    #
+    # fun = a_prev + a
+    #
+    # print(fun)
+    #
+    #
+    # exit()
+    # print(a_prev[0])
+    #
+    #
+    #
+    # x = Variable('x', 4, [0, 1, 2, 3, 4, 5])
+    #
+    # x_prev = x.getVarOffset(-2)
+    # print(x.getImpl())
+    # print(x_prev.getImpl())
+    #
+    # exit()
     ## INPUT
     # i = InputVariable('u', 6, [0, 1, 2, 3, 4, 5])
     # print(i[2:4], f'type: {type(i[2:4])}')
@@ -1965,11 +1953,36 @@ if __name__ == '__main__':
     # print(p.getLowerBounds())
     # print(p[0].setInitialGuess(10, [1]))
     # print(p.getInitialGuess())
+
     # SINGLE VARIABLE
     # p = SingleVariable('x', 6, [0, 1, 2])
     # print(p, f'type: {type(p)}')
     # print(p[0:2], f'type: {type(p[0:2])}')
     # print(p[0:2]+2)
     # print(f'type: {type(p[-1])}')
+    # p.setUpperBounds([2,2,2,2,2,2])
     # p[-1].setLowerBounds(0)
+    # p[2].setUpperBounds(3)
     # print(p.getLowerBounds())
+    # print(p.getUpperBounds())
+
+    # VARIABLE
+    x = Variable('x', 3, [0,1,2,3,4,5,6])
+    print(x, f'type: {type(x)}')
+    print(x[0:2], f'type: {type(x[0:2])}')
+    print(x[0:2]+2)
+    print(f'type: {type(x[-1])}')
+    # x.setUpperBounds([2,2,2,2,2,2])
+
+    # ub = np.array([[1,2,3], [1,2,3]])
+    # print(ub)
+    # x[0:2].setUpperBounds(ub, [2,3,4])
+    # # x[2].setUpperBounds(3)
+    # print(x.getLowerBounds())
+    # print(x.getUpperBounds())
+
+    ig = np.array([[1,2,3], [1,2,3], [1,2,4]])
+    ig = np.array([1,2,3])
+    # x.setInitialGuess(ig, [2,5,6])
+    x.setInitialGuess(ig)
+    print(x.getInitialGuess())

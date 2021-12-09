@@ -15,12 +15,13 @@ def test_singleParameter():
     p = prb.createSingleParameter('p', 6)
 
     prb.setDynamics(x)
+    prb.setDt(dt)
     x.setBounds([1, 1, 1, 1, 1, 1], [2, 2, 2, 2, 2, 2])
 
     constr1 = prb.createIntermediateConstraint('constr', x[2:4] ** 2 + p[2:4] - u)
 
     constr1.setBounds([1, 1], [1, 1])
-    solver = Solver.make_solver('ipopt', prb, dt)
+    solver = Solver.make_solver('ipopt', prb)
 
     all_sol = dict()
     for i in range(100):
@@ -40,11 +41,12 @@ def test_parameters():
     u = prb.createInputVariable('u', 2)
     p = prb.createParameter('p', 1)
     prb.setDynamics(x)
+    prb.setDt(dt)
     constr1 = prb.createIntermediateConstraint('constr', x[2] ** 2 + p - u[1])
 
     constr1.setBounds(1, 1)
 
-    solver = Solver.make_solver('ipopt', prb, dt)
+    solver = Solver.make_solver('ipopt', prb)
 
     x.setBounds([1, 1, 1, 1, 1, 1], [2, 2, 2, 2, 2, 2])
 
@@ -64,11 +66,12 @@ def test_singleVariable():
     x = prb.createStateVariable('x', 6)
     u = prb.createSingleVariable('u', 2)
     prb.setDynamics(x)
+    prb.setDt(dt)
     constr1 = prb.createIntermediateConstraint('constr', x[2] ** 2 + u[1:3])
 
     constr1.setBounds(1, 1)
 
-    solver = Solver.make_solver('ipopt', prb, dt)
+    solver = Solver.make_solver('ipopt', prb)
 
     x.setBounds([1, 1, 1, 1, 1, 1], [2, 2, 2, 2, 2, 2])
 
@@ -85,11 +88,12 @@ def test_constraintBounds():
     x = prb.createStateVariable('x', 2)
     u = prb.createSingleVariable('u', 2)
     prb.setDynamics(x)
+    prb.setDt(dt)
     constr1 = prb.createIntermediateConstraint('constr1', x+u, bounds=dict(lb=[0, 0]))
     constr2 = prb.createIntermediateConstraint('constr2', x + u, bounds=dict(ub=[0, 0]))
     constr3 = prb.createIntermediateConstraint('constr3', x + u, bounds=dict(lb=[0, 0], ub=[0, 0]))
 
-    solver = Solver.make_solver('ipopt', prb, dt)
+    solver = Solver.make_solver('ipopt', prb)
     solver.solve()
     sol = solver.getSolutionDict()
 
@@ -99,10 +103,11 @@ def test_intermediateConstraint():
     prb = Problem(nodes, logging_level=logging.DEBUG)
     x = prb.createStateVariable('x', 2)
     prb.setDynamics(x)
+    prb.setDt(dt)
 
     cnsrt = prb.createIntermediateConstraint('cnsrt', x)
 
-    solver = Solver.make_solver('ipopt', prb, dt)
+    solver = Solver.make_solver('ipopt', prb)
     solver.solve()
     sol = solver.getSolutionDict()
 
@@ -151,9 +156,9 @@ def test_prev():
     dt = 0.01
     state_dot = cs.vertcat(v, u)
     prb.setDynamics(state_dot)
-
-    th = Transcriptor.make_method('multiple_shooting', prb, dt, opts=dict(integrator='RK4'))
-    solver = Solver.make_solver('ipopt', prb, dt, opts)
+    prb.setDt(dt)
+    th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='RK4'))
+    solver = Solver.make_solver('ipopt', prb, opts)
     solver.solve()
     sol = solver.getSolutionDict()
 
@@ -166,10 +171,11 @@ def test_bounds_input():
     z = prb.createInputVariable('z', 2)
     cnsrt = prb.createConstraint('cnsrt', x + y, range(4, 10))
     prb.setDynamics(cs.vertcat(x,y))
+    prb.setDt(dt)
     x.setBounds([2, 2], [2, 2])
     cnsrt.setBounds([12, 12], [12, 12], list(range(4, 10)))
 
-    solver = Solver.make_solver('ipopt', prb, dt)
+    solver = Solver.make_solver('ipopt', prb)
     solver.solve()
 
 def test_bounds_2():
@@ -180,8 +186,9 @@ def test_bounds_2():
     y = prb.createStateVariable('y', 2)
     cnsrt = prb.createConstraint('cnsrt', x+y)
     prb.setDynamics(cs.vertcat(x,y))
+    prb.setDt(dt)
     cnsrt.setBounds([12, 12],[12, 12], 4)
-    solver = Solver.make_solver('ipopt', prb, dt)
+    solver = Solver.make_solver('ipopt', prb)
     solver.solve()
 
 def test_boundsarray():
@@ -255,16 +262,16 @@ def test_view():
 
 
 if __name__ == '__main__':
-    # test_singleParameter()
-    # test_parameters()
-    # test_singleVariable()
-    # test_constraintBounds()
-    # test_intermediateConstraint()
-    # test_variables()
-    # test_prev()
-    # test_bounds_input()
-    # test_bounds_2()
-    # test_boundsarray()
+    test_singleParameter()
+    test_parameters()
+    test_singleVariable()
+    test_constraintBounds()
+    test_intermediateConstraint()
+    test_variables()
+    test_prev()
+    test_bounds_input()
+    test_bounds_2()
+    test_boundsarray()
     test_view()
 
 
