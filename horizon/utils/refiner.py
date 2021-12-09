@@ -300,7 +300,7 @@ class Refiner:
                 if node in self.new_indices:
                     print(f'node {node} requires an interpolated value to be initialized.')
                     var.setInitialGuess(np.zeros([var.shape[0], var.shape[1]]), node)
-                    # q.setInitialGuess(q_res[:, zip_indices_new[node]], node)
+                    # var.setInitialGuess(q_res[:, zip_indices_new[node]], node)
 
         if plot_ig:
             for name, var in self.prb.getVariables().items():
@@ -699,19 +699,29 @@ if __name__ == '__main__':
     nodes_vec_augmented = np.concatenate((nodes_vec, values_exceed))
     nodes_vec_augmented.sort(kind='mergesort')
 
+    plot_tau_base = True
+    if plot_tau_base:
+        plt.figure()
+        for dim in range(6):
+            plt.plot(nodes_vec_res[:-1], np.array(tau_sol_res[dim, :]))
+        for dim in range(6):
+            plt.scatter(nodes_vec[:-1], np.array(prev_tau[dim, :]))
+        plt.title('tau on base')
+
+        plt.hlines([threshold], nodes_vec[0], nodes_vec[-1], linestyles='dashed', colors='k', linewidth=0.4)
+        plt.hlines([-threshold], nodes_vec[0], nodes_vec[-1], linestyles='dashed', colors='k', linewidth=0.4)
     # ===================================================================================================================
 
 
     ref = Refiner(prb, nodes_vec_augmented, prev_solution)
 
-    plot_nodes = False
+    plot_nodes = True
     if plot_nodes:
         plt.figure()
         # nodes old
         plt.scatter(nodes_vec_augmented, np.zeros([nodes_vec_augmented.shape[0]]), edgecolors='red', facecolor='none')
         plt.scatter(nodes_vec, np.zeros([nodes_vec.shape[0]]), edgecolors='blue', facecolor='none')
         plt.show()
-
 
     # ======================================================================================================================
     ref.resetProblem()
