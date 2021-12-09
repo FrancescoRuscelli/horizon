@@ -39,7 +39,6 @@ if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 # parameters
-n_c = 4
 n_q = kindyn.nq()
 n_v = kindyn.nv()
 dt = tf/n_nodes
@@ -49,19 +48,19 @@ prb = problem.Problem(n_nodes)
 q = prb.createStateVariable('q', n_q)
 q_dot = prb.createStateVariable('q_dot', n_v)
 q_ddot = prb.createInputVariable('q_ddot', n_v)
-x = cs.vertcat(q, q_ddot)
-x_dot = cs.vertcat(q_ddot, q_ddot)
+x = cs.vertcat(q, q_dot)
+x_dot = cs.vertcat(q_dot, q_ddot)
 prb.setDynamics(x_dot)
 
 # initial state and initial guess
-q_init = np.array([0, 1.0, 1.0, 0, 0])
+q_init = np.array([1.0, 1.0, 1.0, 0, 0])
 q.setBounds(q_init, q_init, 0)
 q_dot.setBounds(np.zeros(n_v), np.zeros(n_v), 0)
 q.setInitialGuess(q_init)
 
 # bounds
-q_dot.setBounds(lb=np.full(n_v, -1), ub=np.full(n_v, 1), nodes=range(1, n_nodes))
-q_ddot.setBounds(lb=np.full(n_v, -10), ub=np.full(n_v, 10), nodes=range(1, n_nodes))
+# q_dot.setBounds(lb=np.full(n_v, -1), ub=np.full(n_v, 1), nodes=range(1, n_nodes))
+# q_ddot.setBounds(lb=np.full(n_v, -10), ub=np.full(n_v, 10), nodes=range(1, n_nodes))
 
 # barrier
 def barrier(x):
@@ -82,24 +81,32 @@ else:
 fk = cs.Function.deserialize(kindyn.fk('TCP'))
 p = fk(q=q)['ee_pos']
 
-p0 = np.array([0.5, 0.6, 0.0])
-pick = prb.createConstraint('pick', (p - p0), nodes=[n_nodes//2])
+pf = fk(q=q_init)['ee_pos'].toarray()
+prb.createConstraint('place', q - q_init, nodes=[n_nodes])
+prb.createConstraint('placev', q_dot, nodes=[n_nodes])
 
-pf = np.array([0.5, -0.6, 0.0])
-place = prb.createConstraint('place', (p - pf), nodes=[n_nodes-1])
+q0 = q_init.copy()
+q0[0] *= -1
+prb.createConstraint('pick', q - q0, nodes=[n_nodes//2])
+prb.createConstraint('pickv', q_dot, nodes=[n_nodes//2])
 
 # regularize
-prb.createIntermediateCost('reg', residual_to_cost(1e-3*q_ddot))
+prb.createIntermediateCost('rega', residual_to_cost(1e-2*q_ddot))
+prb.createIntermediateCost('regv', residual_to_cost(1e-2*q_dot))
+# prb.createIntermediateCost('regq', residual_to_cost(1e-2*(q - q_init)[1:n_q]))
 
 # collision
 from urdf_parser_py import urdf as upp
-g1 = upp.Cylinder(length=4.90, radius=0.20)
-c1 = upp.Collision(geometry=g1, origin=upp.Pose(xyz=[0.40, 0, 0.0], rpy=[0, 0, 0]))
+g1 = upp.Cylinder(length=10.0, radius=0.10)
+c1 = upp.Collision(geometry=g1, origin=upp.Pose(xyz=[0.70, 0, 0.0], rpy=[0, 0, 0]))
 ch.world['world/caps'] = c1 
 d = ch.compute_distances(q=q)
 nd = d.size1()
-# prb.createIntermediateConstraint('coll', d, nodes=range(50, 101), bounds=dict(lb=np.zeros(nd), ub=np.full(nd, np.inf)))
-prb.createIntermediateCost('coll', 0.1*residual_to_cost(barrier(d)), nodes=range(50, 101))
+# prb.createIntermediateConstraint('coll', d, bounds=dict(lb=np.zeros(nd), ub=np.full(nd, np.inf)))
+coll_w = prb.createParameter('coll_w', 1)
+coll_w.assign(100)
+prb.createIntermediateCost('coll', coll_w*residual_to_cost(barrier(d-0.05)))
+# prb.createConstraint('coll', cs.sum1(barrier(d)), bounds=dict(lb=0, ub=np.inf))
 
 # =============
 # SOLVE PROBLEM
@@ -180,8 +187,9 @@ except:
 
 solution = solver.getSolutionDict()
 solution_constraints_dict = dict()
+coll = ch.get_function()(solution['q']).toarray()
 
-plt.plot(solution['q_ddot'].T)
+plt.plot(coll.T)
 plt.show()
 
 if isinstance(dt, cs.SX):
