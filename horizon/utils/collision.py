@@ -18,6 +18,10 @@ class CollisionHandler:
                 self.capsules[l.name] = caps
                 self.fk[l.name] = cs.Function.deserialize(self.kindyn.fk(l.name))
 
+    def get_function(self):
+        q = cs.SX.sym('q', self.kindyn.nq())
+        d = self.compute_distances(q)
+        return cs.Function('collision', [q], [d], ['q'], ['d'])
     
     def compute_distances(self, q):
 
