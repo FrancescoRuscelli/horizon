@@ -36,18 +36,20 @@ def checkNodes(nodes, nodes_self=None):
         if nodes_self is None:
             pass
         else:
-            nodes = [node for node in nodes if node in nodes_self]
+            checked_nodes = [node for node in nodes if node in nodes_self]
     elif isinstance(nodes, (int, np.integer)):
         if nodes_self is None:
-            nodes = [nodes]
+            checked_nodes = [nodes]
         else:
-            nodes = [nodes] if nodes in nodes_self else []
+            checked_nodes = [nodes] if nodes in nodes_self else []
     else:
         raise Exception('Type {} is not supported to specify nodes.'.format(type(nodes)))
 
+    if not checked_nodes:
+        raise Exception(f'Invalid nodes inserted: {nodes}')
     # todo ADD WARNING if node (or nodes) are NOT present in own nodes.
     #  (basically, when setting bounds for some node, it is left out because the var/fun does not exist in that node
-    return nodes
+    return checked_nodes
 
 def checkValueEntry(val):
     if isinstance(val, (int, float)):
