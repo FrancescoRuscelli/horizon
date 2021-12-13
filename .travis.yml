@@ -48,13 +48,13 @@ script:
   - cd $BUILD_DIR
   - cmake -DCMAKE_BUILD_TYPE=Release ../horizon/cpp
   - make -j2
-  - cd $SRCDIR
+  - cd $SRC_DIR
   - sudo pip3 install .
   - python3 horizon/tests/test_get_set.py
   - python3 horizon/tests/solver_lq_test.py
   - cd $BUILD_DIR
   - make generate_python_package
-  - cd $SRCDIR
+  - cd $SRC_DIR
   - if [ -z $TRAVIS_TAG ]; then echo "Not a tag build, will not upload to pypi"; else twine upload -u __token__ -p $PYPI_TOKEN dist/*.whl; fi
 
 
