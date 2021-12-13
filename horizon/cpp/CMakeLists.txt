@@ -52,12 +52,34 @@ target_link_libraries(pyilqr PUBLIC ilqr)
 pybind11_add_module(pysqp pysqp.cpp)
 target_link_libraries(pysqp PUBLIC sqp Eigen3::Eigen casadi)
 
-install(TARGETS pyilqr
-    DESTINATION horizon/solvers)
+add_custom_command(TARGET pyilqr POST_BUILD
+    COMMAND cp $<TARGET_FILE:pyilqr> ../solvers
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Copying $<TARGET_FILE:pyilqr> to pkg dir"
+)
 
-install(TARGETS pysqp
-    DESTINATION horizon/solvers)
+add_custom_command(TARGET pysqp POST_BUILD
+    COMMAND cp $<TARGET_FILE:pysqp> ../solvers
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Copying $<TARGET_FILE:pysqp> to pkg dir"
+)
 
+# python package deployment
+add_custom_target(generate_python_package
+    COMMAND ./copy_external_dependencies.py $<TARGET_FILE:pyilqr> -c -d horizon/external_libs --solib-dst horizon/solvers --solib-rpath ../external_libs
+    COMMAND ./copy_external_dependencies.py $<TARGET_FILE:pysqp> -c -d horizon/external_libs --solib-dst horizon/solvers --solib-rpath ../external_libs
+    COMMAND python3 -m build
+    DEPENDS pysqp pyilqr
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/../..
+    COMMENT "Generating package ${MODULE_NAME}"
+    )
+
+add_custom_target(upload_python_package
+    COMMAND twine upload dist/*
+    DEPENDS generate_python_package
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/../..
+    COMMENT "Uploading package ${MODULE_NAME}"
+    )
 
 # test executable
 add_executable(ilqr_test src/ilqr_test.cpp)
