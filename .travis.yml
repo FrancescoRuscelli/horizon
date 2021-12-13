@@ -11,7 +11,7 @@ jobs:
 
 branches:
   only:
-    - pypi
+    - devel
     - /^v\d+\.\d+\.\d+.*$/  # version tags
 
 notifications:
