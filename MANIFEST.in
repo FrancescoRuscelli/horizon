@@ -1,1 +1,2 @@
 recursive-include horizon/solvers *.so
+recursive-include horizon/examples *.urdf
