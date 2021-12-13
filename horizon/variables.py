@@ -1993,6 +1993,9 @@ if __name__ == '__main__':
     # print(x[0:2]+2)
     # print(f'type: {type(x[-1])}')
     # x.setUpperBounds([2,2,2,2,2,2])
+    x = Variable('x', 3, [0,1,2,3,4,5,6])
+    x.setBounds([-1,-1,-1], [1,1,1], nodes=6)
+    print(x.getBounds())
 
     # ub = np.array([[1,2,3], [1,2,3]])
     # print(ub)
@@ -2008,22 +2011,22 @@ if __name__ == '__main__':
     # print(x.getInitialGuess())
 
     #### SINGLE VARIABLE
-    x = SingleVariable('x', 3, [0, 1, 2, 3, 4, 5, 6])
-    print(x)
-    print(x.getImpl(0))
-    print(x.getImpl(1))
-    print(x.getImpl(2))
-    x_prev = x.getVarOffset(-3)
+    # x = SingleVariable('x', 3, [0, 1, 2, 3, 4, 5, 6])
+    # print(x)
+    # print(x.getImpl(0))
+    # print(x.getImpl(1))
+    # print(x.getImpl(2))
+    # x_prev = x.getVarOffset(-3)
 
 
 
     # VARIABLE
-    x = Variable('x', 3, [0, 1, 2, 3, 4, 5, 6])
-    print(x)
-    print(x.getImpl(0))
-    print(x.getImpl(1))
-    print(x.getImpl(2))
-    x_prev = x.getVarOffset(-3)
+    # x = Variable('x', 3, [0, 1, 2, 3, 4, 5, 6])
+    # print(x)
+    # print(x.getImpl(0))
+    # print(x.getImpl(1))
+    # print(x.getImpl(2))
+    # x_prev = x.getVarOffset(-3)
 
 
 
