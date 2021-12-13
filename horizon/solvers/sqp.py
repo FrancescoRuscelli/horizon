@@ -59,17 +59,7 @@ class GNSQPSolver(Solver):
             fmt = ' <#09.3e'
             fmtf = ' <#04.2f'
             star = '*' if fpres.accepted else ' '
-            print(f'{star}\
-    alpha={fpres.alpha:{fmtf}}  \
-    reg={fpres.hxx_reg:{fmt}}  \
-    merit={fpres.merit:{fmt}}  \
-    dm={fpres.merit_der:{fmt}}  \
-    mu_f={fpres.mu_f:{fmt}}  \
-    mu_c={fpres.mu_c:{fmt}}  \
-    cost={fpres.cost:{fmt}}  \
-    delta_u={fpres.step_length:{fmt}}  \
-    constr={fpres.constraint_violation:{fmt}}  \
-    gap={fpres.defect_norm:{fmt}}')
+            fpres.print()
 
     def solve(self) -> bool:
         # update bounds and initial guess
