@@ -35,7 +35,7 @@ before_script:
 
 script: 
   - cd $BUILD_DIR
-  - cmake -DCMAKE_BUILD_TYPE=Release ..
+  - cmake -DCMAKE_BUILD_TYPE=Release ../horizon/cpp
   - make -j2
   - cd $SRCDIR
   - sudo pip3 install .
