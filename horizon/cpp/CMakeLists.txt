@@ -15,8 +15,6 @@ find_package(yaml-cpp REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(CMAKE_CXX_STANDARD 20)
 
-
-
 # ilqr library
 add_library(horizon STATIC
     src/horizon_parser.cpp)
@@ -41,6 +39,10 @@ add_library(sqp STATIC
 
 target_link_libraries(ilqr Eigen3::Eigen casadi)
 target_link_libraries(sqp Eigen3::Eigen casadi ilqr)
+
+install(TARGETS horizon ilqr sqp
+    DESTINATION lib)
+
 
 # python binding
 set(PYBIND11_PYTHON_VERSION 3)

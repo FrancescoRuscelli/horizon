@@ -1,0 +1,47 @@
+os: linux
+language: cpp
+compiler: g++
+
+jobs:
+  include:
+    - os: linux
+      dist: focal
+    - os: linux
+      dist: bionic
+
+branches:
+  only:
+    - pypi
+    - /^v\d+\.\d+\.\d+.*$/  # version tags
+
+notifications:
+  email:
+    recipients:
+      - francesco.ruscelli@iit.it
+      - arturo.laurenzi@iit.it
+      - enrico.mingo@pal-robotics.com
+    on_success: never
+    on_failure: never
+
+before_script:
+  - echo "Travis tag is $TRAVIS_TAG"
+  - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
+  - curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
+  - sudo apt update && sudo apt install python3-pip python3-setuptools liburdfdom-dev cmake libeigen3-dev libboost-filesystem-dev libboost-serialization-dev libblas-dev liblapack-dev patchelf python3-venv
+  - sudo pip3 install build twine hhcm-forest==0.0.26
+  - SRC_FOLDER=$PWD
+  - cd .. && mkdir forest_ws && cd forest_ws && forest --init  # create forest ws for building
+  - ln -s $SRC_FOLDER src/$(basename $SRC_FOLDER)  # symlink original source folder
+  - forest -a git@github.com:advrhumanoids/multidof_recipes.git master -u --clone-protocol https  # get recipes
+
+script: 
+  - source setup.bash
+  - FOREST_ARGS="--default-build-type Release --clone-protocol https --verbose -j2"
+  - forest horizon $FOREST_ARGS
+  - cd build/horizon
+  - make generate_python_package
+  - cd ../../src/horizon
+  - if [ -z $TRAVIS_TAG ]; then echo "Not a tag build, will not upload to pypi"; else twine upload -u __token__ -p $PYPI_TOKEN dist/*.whl; fi
+  - python3 horizon/tests/test_get_set.py
+  - python3 horizon/tests/solver_lq_test.py
+
