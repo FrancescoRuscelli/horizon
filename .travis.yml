@@ -51,7 +51,6 @@ script:
   - cd $SRC_DIR
   - sudo pip3 install .
   - python3 horizon/tests/test_get_set.py
-  - python3 horizon/tests/solver_lq_test.py
   - cd $BUILD_DIR
   - make generate_python_package
   - cd $SRC_DIR
