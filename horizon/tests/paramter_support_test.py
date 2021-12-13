@@ -55,6 +55,7 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     u2 = prob.createInputVariable('u2', dim=2)
     p1 = prob.createParameter('p1', dim=2)
     time = prob.createParameter('t', dim=1)
+    prob.setDt(time)
     x = prob.getState().getVars()
 
     xdot = cs.vertcat(
@@ -86,19 +87,19 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
 
     # solve first with ilqr
     if solver_type == 'ilqr':
-        ilqrsol = Solver.make_solver('ilqr', prob, time, 
+        ilqrsol = Solver.make_solver('ilqr', prob, 
                 opts={'max_iter': 3, 'ilqr.integrator': 'EULER'})
         return ilqrsol
 
     # solver with sqp or ipopt need a dynamic constraint
-    th = Transcriptor.make_method('multiple_shooting', prob, dt, opts=dict(integrator='EULER'))
+    Transcriptor.make_method('multiple_shooting', prob, opts=dict(integrator='EULER'))
 
     # blocksqp needs exact hessian to be accurate
     opts = None 
     if solver_type == 'blocksqp':
         opts = {'hess_update': 4}
         
-    bsqpsol = Solver.make_solver(solver_type, prob, dt, opts)
+    bsqpsol = Solver.make_solver(solver_type, prob, opts)
     return bsqpsol
 
 if __name__ == '__main__':

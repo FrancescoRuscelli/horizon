@@ -24,6 +24,7 @@ class EqualityConstrained(unittest.TestCase):
         f = prb.createInputVariable('f', 1)
         xdot = cs.vertcat(v, a) 
         prb.setDynamics(xdot)
+        prb.setDt(dt)
 
         x0 = np.array([0, 0, 0, 0])
         prb.setInitialState(x0)
@@ -43,7 +44,6 @@ class EqualityConstrained(unittest.TestCase):
 
         solver = Solver.make_solver('ilqr', 
             prb, 
-            dt, 
             opts={
                 'ilqr.integrator': 'RK4',
                 'ilqr.line_search_accept_ratio': 1e-9,

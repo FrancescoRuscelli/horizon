@@ -40,6 +40,7 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     N = 5
     dt = 0.1
     prob = Problem(N)
+    prob.setDt(dt)
 
     # a random linear dynamics
     x1 = prob.createStateVariable('x1', dim=2)
@@ -74,19 +75,19 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
 
     # solve first with ilqr
     if solver_type == 'ilqr':
-        ilqrsol = Solver.make_solver('ilqr', prob, dt, 
+        ilqrsol = Solver.make_solver('ilqr', prob,  
                 opts={'max_iter': 3, 'ilqr.integrator': 'EULER'})
         return ilqrsol
 
     # solver with sqp or ipopt need a dynamic constraint
-    th = Transcriptor.make_method('multiple_shooting', prob, dt, opts=dict(integrator='EULER'))
+    th = Transcriptor.make_method('multiple_shooting', prob, opts=dict(integrator='EULER'))
 
     # blocksqp needs exact hessian to be accurate
     opts = None 
     if solver_type == 'blocksqp':
         opts = {'hess_update': 4}
         
-    bsqpsol = Solver.make_solver(solver_type, prob, dt, opts)
+    bsqpsol = Solver.make_solver(solver_type, prob, opts)
     return bsqpsol
 
 if __name__ == '__main__':
