@@ -6,4 +6,6 @@ build/
 *.user
 dist
 venv
-*.so
+*.so*
+*.mat
+
