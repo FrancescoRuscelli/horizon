@@ -34,7 +34,7 @@ def checkNodes(nodes, nodes_self=None):
 
     if hasattr(nodes, "__iter__") and not isinstance(nodes, str):
         if nodes_self is None:
-            pass
+            checked_nodes = nodes
         else:
             checked_nodes = [node for node in nodes if node in nodes_self]
     elif isinstance(nodes, (int, np.integer)):
