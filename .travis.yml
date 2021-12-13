@@ -44,6 +44,7 @@ script:
   - FOREST_ARGS="--default-build-type Release --clone-protocol https --verbose -j2"
   - cd $FOREST_DIR
   - forest casadi $FOREST_ARGS
+  - forest pybind11 $FOREST_ARGS
   - cd $BUILD_DIR
   - cmake -DCMAKE_BUILD_TYPE=Release ../horizon/cpp
   - make -j2
