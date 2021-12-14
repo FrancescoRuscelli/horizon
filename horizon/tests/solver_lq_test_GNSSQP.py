@@ -47,19 +47,14 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
 
     # a random linear dynamics
     x1 = prob.createStateVariable('x1', dim=2)
-    x1.setBounds([-100, -100], [100, 100])
 
     x2 = prob.createStateVariable('x2', dim=2)
-    x2.setBounds([-100, -100], [100, 100])
 
     x3 = prob.createStateVariable('x3', dim=2)
-    x3.setBounds([-100, -100], [100, 100])
 
     u1 = prob.createInputVariable('u1', dim=2)
-    u1.setBounds([-100, -100], [100, 100])
 
     u2 = prob.createInputVariable('u2', dim=2)
-    u2.setBounds([-100, -100], [100, 100])
 
     x = prob.getState().getVars()
 
@@ -89,10 +84,17 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     Transcriptor.make_method('multiple_shooting', prob, opts=dict(integrator='EULER'))
 
     # blocksqp needs exact hessian to be accurate
-    opts = None
+    opts = dict()
 
     if solver_type == "gnsqp":
-        opts = {"max_iter": 10, "printLevel": "none"}
+        opts['gnsqp.qp_solver'] = 'osqp'
+        opts['merit_derivative_tolerance'] = 1e-6
+        opts['constraint_violation_tolerance'] = 1e-12
+        opts['osqp.polish'] = True # without this
+        opts['osqp.delta'] = 1e-9 # and this, it does not converge!
+        opts['osqp.verbose'] = False
+        opts['osqp.rho'] = 0.02
+        opts['osqp.scaled_termination'] = False
 
     bsqpsol = Solver.make_solver(solver_type, prob, opts)
     return bsqpsol
