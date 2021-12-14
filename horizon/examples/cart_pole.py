@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import rospy
 from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
@@ -16,6 +16,8 @@ from horizon.ros import utils as horizon_ros_utils
 try:
     from horizon.ros.replay_trajectory import *
     do_replay = True
+    horizon_ros_utils.roslaunch("horizon_examples", "cart_pole.launch")
+    rospy.sleep(3)
 except ImportError:
     do_replay = False
 

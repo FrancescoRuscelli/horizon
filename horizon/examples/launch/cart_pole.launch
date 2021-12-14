@@ -1,6 +1,6 @@
 <launch>
      <!-- send the cogimon robot XML to param server -->
-     <param name="robot_description" textfile="/home/francesco/hhcm_workspace/src/horizon_gui/horizon/examples/urdf/cart_pole.urdf" />
+     <param name="robot_description" textfile="$(find horizon_examples)/urdf/cart_pole.urdf" />
         
     <!-- start robot state publisher -->
     <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" >
@@ -13,6 +13,6 @@
 
     <!-- node pkg="robot_inertia_publisher" type="robot_inertia_publisher" name="robot_inertia_publisher" output="screen" / -->
 
-    <node type="rviz" name="rviz" pkg="rviz" args="-d /home/francesco/hhcm_workspace/src/horizon_gui/horizon/examples/rviz/cart_pole.rviz" output="screen"/>
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find horizon_examples)/rviz/cart_pole.rviz" output="screen"/>
 
 </launch>
