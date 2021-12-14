@@ -227,6 +227,14 @@ class Problem:
         Args:
             dt: dt of the system
         """
+
+        # checks on dt
+        # todo check that each dt in list has one dimension only
+        if not isinstance(dt, cs.SX) and hasattr(dt, '__iter__'):
+            print('EXPERIMENTAL: you are setting a vector of dt. Be careful!')
+            if len(dt) != self.getNNodes() - 1:
+                raise Exception('Wrong dimension of dt vector.')
+
         self.dt = dt
 
     def getDt(self):

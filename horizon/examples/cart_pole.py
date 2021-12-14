@@ -26,6 +26,7 @@ urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'car
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
+kindyn.frameVelocity()
 nq = kindyn.nq()
 nv = kindyn.nv()
 

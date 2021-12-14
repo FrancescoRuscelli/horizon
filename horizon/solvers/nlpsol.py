@@ -250,7 +250,7 @@ class NlpsolSolver(Solver):
             pos = pos + var.shape[0] * len(var.getNodes())
 
         # build dt_solution as an array
-        self.dt_solution = np.zeros(self.prb.getNNodes()-1)
+        self.dt_solution = np.zeros(self.prb.getNNodes() - 1)
         dt = self.prb.getDt()
 
         # todo make this better
@@ -300,14 +300,16 @@ class NlpsolSolver(Solver):
                 self.dt_solution[node_n] = dt
         # if dt is a list, get each dt separately
         # TODO WIP
-        elif len(dt) == self.prb.getNNodes():
+        elif len(dt) == self.prb.getNNodes() - 1:
             print('WARNING: work in progress.')
-            sol_n = 0
             for node_n in range(self.prb.getNNodes()-1):
                 dt_val = dt[node_n]
-                if isinstance(dt_val, AbstractVariable):
-                    self.dt_solution[node_n] = self.var_solution[dt_val.getName()][sol_n]
-                    sol_n += 1
+                if isinstance(dt_val, SingleVariable):
+                    self.dt_solution[node_n] = self.var_solution[dt_val.getName()]
+                elif isinstance(dt_val, Variable):
+                    current_node = dt_val.getNodes().index(node_n)
+                    sol_var = self.var_solution[dt_val.getName()].flatten()[current_node]
+                    self.dt_solution[node_n] = sol_var
                 else:
                     self.dt_solution[node_n] = dt[node_n]
 
