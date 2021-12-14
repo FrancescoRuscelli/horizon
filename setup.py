@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="casadi_horizon",
-    version="0.0.3",
+    version="0.2.0",
     author="Francesco Ruscelli",
     author_email="francesco.ruscelli@iit.it",
     description="Library for Trajectory Optimization based on CasADi",
@@ -13,10 +13,10 @@ setuptools.setup(
     python_requires=">=3.6",
     ext_modules=[
         setuptools.Extension(
-            name="pyilqr", sources=[]
+            name="ilqrext", sources=[]
         ),
         setuptools.Extension(
-            name="pysqp", sources=[]
+            name="sqpext", sources=[]
         )
     ]
 )
