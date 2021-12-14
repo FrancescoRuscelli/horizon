@@ -1,4 +1,4 @@
-# horizon
+# horizon ![travis](https://app.travis-ci.com/ADVRHumanoids/horizon.svg?branch=devel&status=passed)
 A framework for trajectory optimization and optimal control for robotics based on CasADi
 
 ## Install
