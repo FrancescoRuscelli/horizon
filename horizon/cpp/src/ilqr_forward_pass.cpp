@@ -216,6 +216,7 @@ double IterativeLQR::compute_constr(const Eigen::MatrixXd& xtrj, const Eigen::Ma
     {
         // note: u not used
         // todo: enforce this!
+        _constraint[_N].evaluate(xtrj.col(_N), utrj.col(_N-1), _N);
         _fp_res->constraint_values[_N] = _constraint[_N].h().lpNorm<1>();
         constr += _fp_res->constraint_values[_N];
     }
@@ -267,6 +268,13 @@ void IterativeLQR::line_search(int iter)
             _fp_res->defect_norm,
             _fp_res->constraint_violation);
 
+    // compute merit function directional derivative
+    double merit_der = compute_merit_slope(mu_f, mu_c,
+            _fp_res->defect_norm,
+            _fp_res->constraint_violation);
+
+    _fp_res->merit_der = merit_der;
+
     if(iter == 0)
     {
         _fp_res->alpha = 0;
@@ -274,13 +282,6 @@ void IterativeLQR::line_search(int iter)
         _fp_res->merit = merit;
         report_result(*_fp_res);
     }
-
-    // compute merit function directional derivative
-    double merit_der = compute_merit_slope(mu_f, mu_c,
-            _fp_res->defect_norm,
-            _fp_res->constraint_violation);
-
-    _fp_res->merit_der = merit_der;
 
     // cache last forward pass outcome
     bool last_fp_accepted = _fp_res->accepted;
