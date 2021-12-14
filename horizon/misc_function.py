@@ -45,7 +45,7 @@ def checkNodes(nodes, nodes_self=None):
     else:
         raise Exception('Type {} is not supported to specify nodes.'.format(type(nodes)))
 
-    if not checked_nodes:
+    if checked_nodes is None:
         raise Exception(f'Invalid nodes inserted: {nodes}')
     # todo ADD WARNING if node (or nodes) are NOT present in own nodes.
     #  (basically, when setting bounds for some node, it is left out because the var/fun does not exist in that node
