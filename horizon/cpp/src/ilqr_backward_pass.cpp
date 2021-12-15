@@ -32,7 +32,7 @@ void IterativeLQR::backward_pass()
         catch(HessianIndefinite&)
         {
             increase_regularization();
-            std::cout << "increasing reg at k = " << i << ", hxx_reg = " << _hxx_reg << "\n";
+            if(_verbose) std::cout << "increasing reg at k = " << i << ", hxx_reg = " << _hxx_reg << "\n";
             // retry with increased reg
             return backward_pass();
         }

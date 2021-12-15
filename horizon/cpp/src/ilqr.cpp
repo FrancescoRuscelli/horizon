@@ -78,6 +78,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _tmp(_N)
 {
     // set options
+    _verbose = value_or(opt, "ilqr.verbose", 0);
     _step_length = value_or(opt, "ilqr.step_length", 1.0);
     _hxx_reg = value_or(opt, "ilqr.hxx_reg", 0.0);
     _huu_reg = value_or(opt, "ilqr.huu_reg", 0.0);
@@ -202,7 +203,7 @@ void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& int
                grad,
                hess);
 
-    std::cout << "adding cost '" << inter_cost << "' at k = ";
+    if(_verbose) std::cout << "adding cost '" << inter_cost << "' at k = ";
 
     for(int k : indices)
     {
@@ -211,12 +212,12 @@ void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& int
             throw std::invalid_argument("wrong intermediate cost node index");
         }
 
-        std::cout << k << " ";
+        if(_verbose) std::cout << k << " ";
 
         _cost[k].addCost(c);
     }
 
-    std::cout << "\n";
+    if(_verbose) std::cout << "\n";
 }
 
 void IterativeLQR::setFinalCost(const casadi::Function &final_cost)
@@ -255,7 +256,7 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
     c->setConstraint(ic_fn,
                      ic_jac);
 
-    std::cout << "adding constraint '" << inter_constraint << "' at k = ";
+    if(_verbose) std::cout << "adding constraint '" << inter_constraint << "' at k = ";
 
     for(size_t i = 0; i < indices.size(); i++)
     {
@@ -271,12 +272,12 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
             c->setTargetValue(target_values[i]);
         }
 
-        std::cout << k << " ";
+        if(_verbose) std::cout << k << " ";
 
         _constraint[k].addConstraint(c);
     }
 
-    std::cout << "\n";
+    if(_verbose) std::cout << "\n";
 }
 
 void IterativeLQR::setFinalConstraint(const casadi::Function &final_constraint)
@@ -580,7 +581,7 @@ void IterativeLQR::add_param_to_map(const casadi::Function& f)
                                          std::numeric_limits<double>::quiet_NaN()
                                          );
 
-        std::cout << "adding parameter '" << f.name_in(i) << "', " <<
+        if(_verbose) std::cout << "adding parameter '" << f.name_in(i) << "', " <<
                      "size = " << param_size << "\n";
     }
 }
