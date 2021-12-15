@@ -232,15 +232,16 @@ class SolverILQR(Solver):
 
     
     def _iter_callback(self, fpres):
+        
         if not fpres.accepted:
             return
 
         fpres.print()
 
-        if self.plot_iter and fpres.accepted:
+        if self.plot_iter:
 
             if self.xax is None:
-                _, (self.xax, self.uax, self.dax, self.hax) = plt.subplots(2, 2)
+                _, ((self.xax, self.uax), (self.dax, self.hax)) = plt.subplots(2, 2)
             
             plt.sca(self.xax)
             plt.cla()
@@ -262,7 +263,7 @@ class SolverILQR(Solver):
 
             plt.sca(self.dax)
             plt.cla()
-            plt.plot(fpres.defect_values.T)
+            plt.plot(np.linalg.norm(fpres.defect_values, axis=1))
             plt.grid()
             plt.title(f'Dynamics gaps (iter {fpres.iter})')
             plt.xlabel('Node [-]')
