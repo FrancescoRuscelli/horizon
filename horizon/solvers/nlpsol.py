@@ -300,10 +300,8 @@ class NlpsolSolver(Solver):
             for node_n in range(self.prb.getNNodes() - 1):
                 self.dt_solution[node_n] = dt
         # if dt is a list, get each dt separately
-        # TODO WIP
         elif isinstance(dt, List):
             if len(dt) == self.prb.getNNodes() - 1:
-                print('WARNING: work in progress.')
                 for node_n in range(self.prb.getNNodes()-1):
                     dt_val = dt[node_n]
                     if isinstance(dt_val, SingleVariable):
