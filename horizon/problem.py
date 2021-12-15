@@ -10,7 +10,7 @@ import logging
 import sys
 import pickle
 import horizon.misc_function as misc
-from typing import Union, Dict
+from typing import Union, Dict, List
 # from horizon.type_doc import BoundsDict
 from collections.abc import Iterable
 import inspect
@@ -230,10 +230,14 @@ class Problem:
 
         # checks on dt
         # todo check that each dt in list has one dimension only
-        if not isinstance(dt, cs.SX) and hasattr(dt, '__iter__'):
+        if isinstance(dt, List):
             print('EXPERIMENTAL: you are setting a vector of dt. Be careful!')
             if len(dt) != self.getNNodes() - 1:
                 raise Exception('Wrong dimension of dt vector.')
+        elif isinstance(dt, (cs.SX, int, float)):
+            pass
+        else:
+            raise ValueError(f'dt of type: {type(dt)} is not supported.')
 
         self.dt = dt
 

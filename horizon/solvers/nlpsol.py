@@ -2,10 +2,11 @@ from horizon.solvers import Solver
 from horizon.problem import Problem
 from horizon.variables import AbstractVariable, Variable, Parameter, SingleVariable, SingleParameter
 from horizon.functions import CostFunction, ResidualFunction
-from typing import Dict
+from typing import Dict, List
 import casadi as cs
 import numpy as np
 import pprint
+
 
 class NlpsolSolver(Solver):
     
@@ -300,18 +301,23 @@ class NlpsolSolver(Solver):
                 self.dt_solution[node_n] = dt
         # if dt is a list, get each dt separately
         # TODO WIP
-        elif len(dt) == self.prb.getNNodes() - 1:
-            print('WARNING: work in progress.')
-            for node_n in range(self.prb.getNNodes()-1):
-                dt_val = dt[node_n]
-                if isinstance(dt_val, SingleVariable):
-                    self.dt_solution[node_n] = self.var_solution[dt_val.getName()]
-                elif isinstance(dt_val, Variable):
-                    current_node = dt_val.getNodes().index(node_n)
-                    sol_var = self.var_solution[dt_val.getName()].flatten()[current_node]
-                    self.dt_solution[node_n] = sol_var
-                else:
-                    self.dt_solution[node_n] = dt[node_n]
+        elif isinstance(dt, List):
+            if len(dt) == self.prb.getNNodes() - 1:
+                print('WARNING: work in progress.')
+                for node_n in range(self.prb.getNNodes()-1):
+                    dt_val = dt[node_n]
+                    if isinstance(dt_val, SingleVariable):
+                        self.dt_solution[node_n] = self.var_solution[dt_val.getName()]
+                    elif isinstance(dt_val, Variable):
+                        current_node = dt_val.getNodes().index(node_n)
+                        sol_var = self.var_solution[dt_val.getName()].flatten()[current_node]
+                        self.dt_solution[node_n] = sol_var
+                    else:
+                        self.dt_solution[node_n] = dt[node_n]
+            else:
+                raise Exception(f'wrong dt list length: ({len(dt)}) != ({self.prb.getNNodes()-1})')
+        else:
+            raise ValueError(f'dt of type: {type(dt)} is not supported.')
 
         # print(self.dt_solution)
         # print(f'{self.x_opt.shape}:, {self.x_opt}')
