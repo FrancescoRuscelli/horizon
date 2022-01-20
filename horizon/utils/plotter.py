@@ -144,10 +144,10 @@ class PlotterHorizon:
         fig, ax = plt.subplots()
         if grid:
             ax.grid(axis='x')
-        self._plotVar(val, ax, prb.getVariables(name), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
+        self._plotVar(val, ax, self.prb.getVariables(name), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
 
         ax.set_title('{}'.format(name))
-        plt.xticks(list(range(val.shape[1])))
+        # plt.xticks(list(range(val.shape[1])))
         ax.set(xlabel='nodes', ylabel='vals')
 
     def plotFunctions(self, grid=False, same_fig=False, markers=None, show_bounds=None, legend=None, dim=None):

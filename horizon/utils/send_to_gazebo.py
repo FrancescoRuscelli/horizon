@@ -14,7 +14,7 @@ from horizon.ros.replay_trajectory import *
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = '../examples/urdf/spot.urdf'
+urdffile = '../playground/urdf/spot.urdf'
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -31,7 +31,7 @@ n_v = kindyn.nv()
 n_f = 3
 
 
-ms = mat_storer.matStorer('../examples/spot/spot_jump_refined_local.mat')
+ms = mat_storer.matStorer('../playground/spot/spot_jump_refined_local.mat')
 solution = ms.load()
 
 tau = solution['inverse_dynamics']['val'][0][0]

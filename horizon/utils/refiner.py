@@ -418,7 +418,7 @@ if __name__ == '__main__':
 
     # rospack = rospkg.RosPack()
     # rospack.get_path('spot_urdf')
-    urdffile = '../examples/urdf/spot.urdf'
+    urdffile = '../playground/urdf/spot.urdf'
     urdf = open(urdffile, 'r').read()
     kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -456,7 +456,7 @@ if __name__ == '__main__':
     load_initial_guess = True
     # import initial guess if present
     if load_initial_guess:
-        ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
+        ms = mat_storer.matStorer('../playground/spot/spot_jump.mat')
         prev_solution = ms.load()
         q_ig = prev_solution['q']
         q_dot_ig = prev_solution['q_dot']
@@ -633,7 +633,7 @@ if __name__ == '__main__':
     # FAKE SOLVE PROBLEM
     # =============
 
-    ms = mat_storer.matStorer('../examples/spot/spot_jump.mat')
+    ms = mat_storer.matStorer('../playground/spot/spot_jump.mat')
     prev_solution = ms.load()
     #
     n_nodes = prev_solution['n_nodes'][0][0]

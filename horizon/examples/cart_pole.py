@@ -10,34 +10,39 @@ from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
-import time
-from horizon.ros import utils as horizon_ros_utils
+import argparse
 
-try:
+parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
+parser.add_argument('--rviz', '-d', required=False, help='visualize the robot trajectory in rviz')
+
+args = parser.parse_args()
+
+rviz_replay = False
+plot_sol = True
+
+if args.rviz:
+    from horizon.ros import utils as horizon_ros_utils
     from horizon.ros.replay_trajectory import *
-    do_replay = True
-except ImportError:
-    do_replay = False
+    rviz_replay = True
 
 
-
-# Loading URDF model in pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
+# Load URDF model in Pinocchio
+urdffile = os.path.join(os.getcwd(), 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
-kindyn.frameVelocity()
+# Get dimension of pos and vel
 nq = kindyn.nq()
 nv = kindyn.nv()
-
-print("nq: ", nq)
-print("nv: ", nv)
 
 # OPTIMIZATION PARAMETERS
 tf = 5.0  # [s]
 ns = 100  # number of shooting nodes
 dt = tf/ns
-use_ms = True
+
+# options for horizon transcription
+transcription_method = 'multiple_shooting'  # can choose between 'multiple_shooting' and 'direct_collocation'
+transcription_opts = dict(integrator='RK4') # integrator used by the multiple_shooting
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -51,87 +56,89 @@ qddot = prb.createInputVariable("qddot", nv)
 
 # Creates double integrator
 x, xdot = utils.double_integrator(q, qdot, qddot)
+
+# Set dynamics of the system and the relative dt
 prb.setDynamics(xdot)
 prb.setDt(dt)
 
-# Limits
+# Define LIMITS and INITIAL GUESS
+
+# joint limits + initial pos
 q_min = [-0.5, -2.*np.pi]
 q_max = [0.5, 2.*np.pi]
 q_init = [0., 0.]
 
+# velocity limits + initial vel
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
 
+# acceleration limits
 qddot_lims = np.array([1000., 1000.])
 qddot_init = [0., 0.]
 
+# Set limits
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, nodes=0)
-qdot.setBounds((-qdot_lims).tolist(), qdot_lims.tolist())
+qdot.setBounds(-qdot_lims, qdot_lims)
 qdot.setBounds(qdot_init, qdot_init, nodes=0)
-qddot.setBounds((-qddot_lims).tolist(), qddot_lims.tolist())
+qddot.setBounds(-qddot_lims, qddot_lims)
 
+# Set initial guess
 q.setInitialGuess(q_init)
 qdot.setInitialGuess(qdot_init)
 qddot.setInitialGuess(qddot_init)
 
-# Cost function
-prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
+# Set transcription method
+th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
-# Dynamics
-if use_ms:
-    th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='RK4'))
-else:
-    th = Transcriptor.make_method('direct_collocation', prb) # opts=dict(degree=5)
-
-prb.createFinalConstraint("up", q[1] - np.pi)
-prb.createFinalConstraint("final_qdot", qdot)
-
-
+# Set dynamic feasibility:
+# the cart can apply a torque, the joint connecting the cart to the pendulum is UNACTUATED
 tau_lims = np.array([1000., 0.])
 tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 iv = prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
-# Creates problem
-tic = time.time()
+# Set desired constraints
+# at the last node, the pendulum is upright
+prb.createFinalConstraint("up", q[1] - np.pi)
+
+# at the last node, the pendulum velocity is zero
+prb.createFinalConstraint("final_qdot", qdot)
+
+# Set cost functions
+# minimize the acceleration of system (regularization of the input)
+prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
+
+# Create solver with IPOPT and some desired option
 solver = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
-toc = time.time()
-print('time elapsed loading:', toc - tic)
 
-# new_nodes = 100
-# prb.setNNodes(new_nodes)
-#
-# for cnsrt_name, cnsrt_fun in prb.getConstraints().items():
-#     print(cnsrt_fun.getNodes())
-#
-# exit()
-
-tic = time.time()
+# Solve the problem
 solver.solve()
-toc = time.time()
-print('time elapsed solving:', toc - tic)
+
+# Get the solution as a dictionary
 solution = solver.getSolutionDict()
+
+# Get the array of dt, one for each interval between the nodes
 dt_sol = solver.getDt()
 
-print(dt_sol)
-q_hist = solution["q"]
 
-time = np.arange(0.0, tf+1e-6, tf/ns)
-plt.figure()
-plt.plot(time, q_hist[0,:])
-plt.plot(time, q_hist[1,:])
-plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
-plt.xlabel('$\mathrm{[sec]}$', size = 20)
-plt.ylabel('$\mathrm{[m]}$', size = 20)
 
-plot_all = True
-if plot_all:
+if plot_sol:
+    time = np.arange(0.0, tf+1e-6, tf/ns)
+    plt.figure()
+    plt.plot(time, solution['q'][0,:])
+    plt.plot(time, solution['q'][1,:])
+    plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
+    plt.xlabel('$\mathrm{[sec]}$', size = 20)
+    plt.ylabel('$\mathrm{[m]}$', size = 20)
+
+
     hplt = PlotterHorizon(prb, solution)
-    # hplt.plotVariables()
+    # hplt.plotVariable('q', show_bounds=False)
+    # hplt.plotVariable('q_dot', show_bounds=False)
     hplt.plotFunction('inverse_dynamics', dim=[1], show_bounds=True)
     plt.show()
 
-if do_replay:
+if rviz_replay:
     joint_list=["cart_joint", "pole_joint"]
     replay_trajectory(tf/ns, joint_list, q_hist).replay(is_floating_base=False)
 
