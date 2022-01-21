@@ -41,6 +41,9 @@ class PlotterHorizon:
             else:
                 var_dim_select = dim
 
+        if val.shape[1] == 1:
+            markers = True
+
         baseline = None
         legend_list = list()
         if isinstance(abstract_var, InputVariable):
@@ -156,7 +159,6 @@ class PlotterHorizon:
             raise Exception('Solution not set. Cannot plot functions.')
 
         if self.prb.getConstraints():
-
             if same_fig:
                 fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
 

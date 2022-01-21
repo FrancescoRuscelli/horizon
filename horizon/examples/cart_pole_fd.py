@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 An example of the cart-pole problem: find the trajectory of the cart so that the pole reaches the upright position.
+(difference from 'cart_pole.py': system inputs are the torques, not the accelerations)
 '''
 
 from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
@@ -59,16 +60,16 @@ prb = problem.Problem(ns)
 q = prb.createStateVariable("q", nq)
 qdot = prb.createStateVariable("qdot", nv)
 # CONTROL variables
-qddot = prb.createInputVariable("qddot", nv)
-
-# Creates double integrator
-x, xdot = utils.double_integrator(q, qdot, qddot)
+# cart joint is actuated, while the pole joint is unactuated
+tau = prb.createInputVariable("u", 2)
 
 # Set dynamics of the system and the relative dt
+fd = kindyn.aba()  # this is the forward dynamics function
+xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
 prb.setDynamics(xdot)
 prb.setDt(dt)
 
-# Define BOUNDS and INITIAL GUESS
+# Define LIMITS and INITIAL GUESS
 # joint limits + initial pos
 q_min = [-0.5, -2.*np.pi]
 q_max = [0.5, 2.*np.pi]
@@ -76,31 +77,24 @@ q_init = [0., 0.]
 # velocity limits + initial vel
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
-# acceleration limits
-qddot_lims = np.array([1000., 1000.])
-qddot_init = [0., 0.]
+# torque limits
+tau_lims = np.array([3000, 0])
+tau_init = [0, 0]
 
-# Set bounds
+# Set limits
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, nodes=0)
 qdot.setBounds(-qdot_lims, qdot_lims)
 qdot.setBounds(qdot_init, qdot_init, nodes=0)
-qddot.setBounds(-qddot_lims, qddot_lims)
+tau.setBounds(-tau_lims, tau_lims)
 
 # Set initial guess
 q.setInitialGuess(q_init)
 qdot.setInitialGuess(qdot_init)
-qddot.setInitialGuess(qddot_init)
+tau.setInitialGuess(tau_init)
 
 # Set transcription method
 th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
-
-# Set dynamic feasibility:
-# the cart can apply a torque, the joint connecting the cart to the pendulum is UNACTUATED
-# the torques are computed using the inverse dynamics, as the input of the problem is the cart acceleration
-tau_lims = np.array([1000., 0.])
-tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-iv = prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Set desired constraints
 # at the last node, the pendulum is upright
@@ -110,10 +104,10 @@ prb.createFinalConstraint("final_qdot", qdot)
 
 # Set cost functions
 # minimize the acceleration of system (regularization of the input)
-prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
+prb.createIntermediateCost("tau", cs.sumsqr(tau))
 
 # Create solver with IPOPT and some desired option
-solv = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
+solv = solver.Solver.make_solver('ipopt', prb)
 
 # Solve the problem
 solv.solve()
@@ -135,9 +129,8 @@ if plot_sol:
     plt.ylabel('$\mathrm{[m]}$', size = 20)
 
     hplt = PlotterHorizon(prb, solution)
-    # hplt.plotVariable('q', show_bounds=False)
-    # hplt.plotVariable('q_dot', show_bounds=False)
-    hplt.plotFunction('inverse_dynamics', dim=[1], show_bounds=True)
+    hplt.plotVariables()
+    hplt.plotFunctions()
     plt.show()
 
 if rviz_replay:
@@ -150,7 +143,7 @@ if rviz_replay:
     roslaunch.configure_logging(uuid)
     launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])
     launch.start()
-    rospy.loginfo("'cart_pole' visualization started.")
+    rospy.loginfo("'cart_pole_fd' visualization started.")
 
     # visualize the robot in RVIZ
     joint_list=["cart_joint", "pole_joint"]
@@ -158,10 +151,3 @@ if rviz_replay:
 
 else:
     print("To visualize the robot trajectory, start the script with the '--replay' option.")
-
-
-
-
-
-
-
