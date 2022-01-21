@@ -9,10 +9,12 @@ from horizon.transcriptions import integrators
 from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, rospkg
 
 # Loading URDF model in pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 
 # Create casadi interface to pinocchio
@@ -83,13 +85,11 @@ blocksqp_opts = {'hess_update': 1,  # 2 = BFGS, 4 = exact
     'print_header': False,
     'verbose_init': False,
     'print_time': 0,
-    'opttol': 1e-4,
-    'linsol': 'ma27',
+    'opttol': 1e-4
     }
 
 # Creates problem
 solver = solver.Solver.make_solver('blocksqp', prb, opts=blocksqp_opts)
-# prb.createProblem(solver_plugin='blocksqp', opts=blocksqp_opts)
 
 
 class RealTimeIteration:

@@ -8,10 +8,12 @@ from horizon.solvers import Solver
 from horizon.transcriptions.transcriptor import Transcriptor
 
 import matplotlib.pyplot as plt
-import os
+import os, rospkg
 
 # Loading URDF model in pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 
 # Create casadi interface to pinocchio

@@ -9,16 +9,26 @@ from horizon.utils import utils
 from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import replay_trajectory
-
 import matplotlib.pyplot as plt
-import os
-
-import os
-import time
-from horizon.ros import utils as horizon_ros_utils
+import os, argparse
 
 
-# Loading URDF model in pinocchio
+parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
+parser.add_argument('-replay', help='visualize the robot trajectory in rviz', action='store_true')
+
+args = parser.parse_args()
+
+rviz_replay = False
+plot_sol = True
+
+if args.replay:
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospkg, rospy
+    rviz_replay = True
+    plot_sol = False
+
+
+# Create CasADi interface to Pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 
@@ -81,7 +91,7 @@ tf.setInitialGuess(tf_init)
 
 # Cost function
 prb.createIntermediateCost("tau", cs.sumsqr(tau))
-prb.createCost("min_tf", 100.*cs.sumsqr(tf))
+prb.createCost("min_tf", 1000.*cs.sumsqr(tf))
 
 # Constraints
 q_prev = q.getVarOffset(-1)
@@ -94,7 +104,7 @@ prb.setDt(dt)
 
 x_int = F_integrator(x0=x_prev, p=u_prev, time=dt)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))
-# th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='RK4')) # should not work
+
 prb.createFinalConstraint("up", q[1] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
 
@@ -107,20 +117,37 @@ solution = solver.getSolutionDict()
 q_hist = solution["q"]
 Tf = solution["tf"]
 
-print(f"Tf: {Tf}")
+print(f"Tf: {Tf.flatten()}")
 
-time = np.arange(0.0, Tf+1e-6, Tf/ns)
-plt.figure()
-plt.plot(time, q_hist[0,:])
-plt.plot(time, q_hist[1,:])
-plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
-plt.xlabel('$\mathrm{[sec]}$', size = 20)
-plt.ylabel('$\mathrm{[m]}$', size = 20)
+if plot_sol:
+
+    time = np.arange(0.0, Tf+1e-6, Tf/ns)
+    plt.figure()
+    plt.plot(time, q_hist[0,:])
+    plt.plot(time, q_hist[1,:])
+    plt.suptitle('$\mathrm{Base \ Position}$', size = 20)
+    plt.xlabel('$\mathrm{[sec]}$', size = 20)
+    plt.ylabel('$\mathrm{[m]}$', size = 20)
 
 
-joint_list=["cart_joint", "pole_joint"]
-replay_trajectory(Tf/ns, joint_list, q_hist).replay(is_floating_base=False)
+if rviz_replay:
 
+    # set ROS stuff and launchfile
+    r = rospkg.RosPack()
+    path_to_examples = r.get_path('horizon_examples')
+
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])
+    launch.start()
+    rospy.loginfo("'cart_pole_fd' visualization started.")
+
+    # visualize the robot in RVIZ
+    joint_list=["cart_joint", "pole_joint"]
+    replay_trajectory(tf/ns, joint_list, solution['q']).replay(is_floating_base=False)
+
+else:
+    print("To visualize the robot trajectory, start the script with the '--replay' option.")
 
 
 

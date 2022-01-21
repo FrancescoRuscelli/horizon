@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
 
-from casadi_kin_dyn import pycasadi_kin_dyn
+from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import casadi as cs
 import numpy as np
-import time
-
 from horizon import problem
 from horizon.transcriptions import integrators
 from horizon.solvers import solver, pysqp
 import matplotlib.pyplot as plt
-import os
+import os, rospkg, time
 
 # Loading URDF model in pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
+urdffile = os.path.join(os.getcwd(), 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
+kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
-# Create casadi interface to pinocchio
-kindyn = pycasadi_kin_dyn.CasadiKinDyn(urdf)
 nq = kindyn.nq()
 nv = kindyn.nv()
 

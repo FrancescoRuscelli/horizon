@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 An example of the cart-pole problem: find the trajectory of the cart so that the pole reaches the upright position.
@@ -105,7 +105,7 @@ iv = prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-t
 # Set desired constraints
 # at the last node, the pendulum is upright
 prb.createFinalConstraint("up", q[1] - np.pi)
-# at the last node, the pendulum velocity is zero
+# at the last node, the system velocity is zero
 prb.createFinalConstraint("final_qdot", qdot)
 
 # Set cost functions

@@ -240,7 +240,7 @@ class SolverILQR(Solver):
         if self.plot_iter and fpres.accepted:
 
             if self.xax is None:
-                _, (self.xax, self.uax, self.dax, self.hax) = plt.subplots(2, 2)
+                _, ((self.xax, self.uax), (self.dax, self.hax)) = plt.subplots(2, 2)
             
             plt.sca(self.xax)
             plt.cla()

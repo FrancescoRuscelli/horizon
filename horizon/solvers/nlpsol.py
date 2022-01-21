@@ -262,32 +262,44 @@ class NlpsolSolver(Solver):
         # if dt is directly an optimization variable, that's ok, I get it from the var_solution
         # if dt is a function of some other optimization variables, get all of them and compute the optimized dt
         #   I do this by using a Function to wrap everything
-
-        if isinstance(dt, Variable):
+        if isinstance(dt, cs.SX) and not isinstance(dt, Variable) and not isinstance(dt, SingleVariable):
             var_depend = list()
             for var in self.prb.getVariables().values():
                 if cs.depends_on(dt, var):
                     var_depend.append(var)
+
+            single_var_flag = False
+            # check type of variable
+            if all([isinstance(var, Variable) for var in var_depend]):
+                pass
+            elif all([isinstance(var, SingleVariable) for var in var_depend]):
+                single_var_flag = True
+            else:
+                raise NotImplementedError('Yet to be done.')
 
             # create a function with all the variable dt depends on, and return dt
             temp_dt = cs.Function('temp_dt', var_depend, [dt])
 
             # fill the self.dt_solution with all the dt values
+            node_n_out = 0
             for node_n in range(self.prb.getNNodes()-1):
-                self.dt_solution[node_n] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])[node_n]
+                node_n_in = node_n
+
+                # if the variable is a SingleVariable, fill dt_solution with the only value of the variable (node_n_out = 0)
+                if not single_var_flag:
+                    node_n_out = node_n
+
+                self.dt_solution[node_n_in] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])[node_n_out]
+
+        # fill the self.dt_solution with all the dt values
+        elif isinstance(dt, Variable):
+            for node_n in range(self.prb.getNNodes()-1):
+                self.dt_solution[node_n] = self.var_solution[dt.getName()][node_n]
 
         # fill the self.dt_solution with the same dt solution
         elif isinstance(dt, SingleVariable):
-            var_depend = list()
-            for var in self.prb.getVariables().values():
-                if cs.depends_on(dt, var):
-                    var_depend.append(var)
-
-            # create a function with all the variable dt depends on, and return dt
-            temp_dt = cs.Function('temp_dt', var_depend, [dt])
-
             for node_n in range(self.prb.getNNodes()-1):
-                self.dt_solution[node_n] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])
+                self.dt_solution[node_n] =  self.var_solution[dt.getName()]
 
         # if dt is a value, set it to each element of dt_solution
         elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
