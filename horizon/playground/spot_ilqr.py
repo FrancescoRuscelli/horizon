@@ -7,7 +7,7 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, rospkg
 from scipy.io import loadmat
 from itertools import filterfalse
 
@@ -27,7 +27,9 @@ ilqr_plot_iter = False
 t_jump = (1.0, tf)
 
 # load urdf
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+urdffile = os.path.join(path_to_examples, 'urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 

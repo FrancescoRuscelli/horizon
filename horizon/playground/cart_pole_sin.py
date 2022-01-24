@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
+from casadi_kin_dyn import pycasadi_kin_dyn
 import casadi as cs
 import numpy as np
 from horizon import problem
@@ -18,18 +18,19 @@ try:
 except ImportError:
     do_replay = False
 
-import os
+import os, rospkg
 import time
 from horizon.ros import utils as horizon_ros_utils
 
-horizon_ros_utils.roslaunch("horizon_examples", "cart_pole_xy.launch")
-time.sleep(3.)
 
 # Loading URDF model in pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole_xy.urdf')
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole_xy.urdf')
 urdf = open(urdffile, 'r').read()
-kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
+# Create casadi interface to pinocchio
+kindyn = pycasadi_kin_dyn.CasadiKinDyn(urdf)
 nq = kindyn.nq()
 nv = kindyn.nv()
 
@@ -104,6 +105,7 @@ prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_li
 solver = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4, 'ipopt.max_iter': 2000})
 
 cos_fun = 1/3 * np.cos(np.linspace(np.pi/2, 4*2*np.pi, ns+1))
+cos_fun = np.atleast_2d(cos_fun)
 
 for n in range(ns+1):
     q_ref.assign(cos_fun[n], n)
