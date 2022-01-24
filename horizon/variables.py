@@ -448,13 +448,13 @@ class Parameter(AbstractVariable):
         """
         return self._nodes
 
-    def assign(self, vals, nodes=None):
+    def assign(self, val, nodes=None):
         """
        Assign a value to the parameter at a desired node. Can be assigned also after the problem is built, before solving the problem.
        If not assigned, its default value is zero.
 
        Args:
-           vals: value of the parameter
+           val: value of the parameter
            nodes: nodes at which the parameter is assigned
        """
         if nodes is None:
@@ -462,13 +462,25 @@ class Parameter(AbstractVariable):
         else:
             nodes = misc.checkNodes(nodes, self._nodes)
 
-        vals = misc.checkValueEntry(vals)
+        val = misc.checkValueEntry(val)
 
-        if vals.shape[0] != self._dim:
+        if val.shape[0] != self._dim:
             raise Exception('Wrong dimension of parameter values inserted.')
 
-        for node in nodes:
-            self._par_impl['n' + str(node)]['val'] = vals
+        # if a matrix of values is being provided, check cols match len(nodes)
+        multiple_vals = val.ndim == 2 and val.shape[1] != 1
+
+        if multiple_vals and val.shape[1] != len(nodes):
+            raise Exception(f'Wrong dimension of {val_type} inserted.')
+
+        for i, node in enumerate(nodes):
+
+            if multiple_vals:
+                v = val[:, i]
+            else:
+                v = val
+
+            self._par_impl['n' + str(node)]['val'] = v
 
     def getImpl(self, nodes=None):
         """

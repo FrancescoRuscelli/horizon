@@ -106,9 +106,8 @@ solver = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4, 'ipopt
 
 cos_fun = 1/3 * np.cos(np.linspace(np.pi/2, 4*2*np.pi, ns+1))
 cos_fun = np.atleast_2d(cos_fun)
+q_ref.assign(cos_fun)
 
-for n in range(ns+1):
-    q_ref.assign(cos_fun[n], n)
 
 solver.solve()
 solution = solver.getSolutionDict()

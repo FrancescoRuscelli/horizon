@@ -18,19 +18,20 @@ import os, argparse
 
 
 parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
-parser.add_argument('-replay', help='visualize the robot trajectory in rviz', action='store_true')
-
+parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
 args = parser.parse_args()
+
 # ipopt, gnsqp, ilqr, blocksqp
 solver_type = 'ipopt' # todo fails with 'ilqr', 'blocksqp', 'gnsqp'
 rviz_replay = False
 plot_sol = True
 torque_input = False
-optimize_final_time = False
+optimize_time = False
+y_reference = True
 
-if solver_type and optimize_final_time:
+if solver_type == 'ilqr' and optimize_time:
     input("'ilqr' solver supports only float and Parameter dt. Press a button to continue.")
-    optimize_final_time = False
+    optimize_time = False
 
 if args.replay:
     from horizon.ros.replay_trajectory import *
@@ -67,13 +68,14 @@ prb = problem.Problem(ns)
 q = prb.createStateVariable("q", nq)
 qdot = prb.createStateVariable("qdot", nv)
 
-# send reference as a parameter
-# q_ref = prb.createParameter('q_ref', 1)
+if y_reference:
+    # send reference as a parameter
+    q_ref = prb.createParameter('q_ref', 1)
 
 # CONTROL variables
 if torque_input:
     # cart joint is actuated, while the pole joint is unactuated
-    tau = prb.createInputVariable("tau", 2)
+    tau = prb.createInputVariable("tau", nv)
 else:
     qddot = prb.createInputVariable("qddot", nv)
 
@@ -86,7 +88,7 @@ else:
     x, xdot = utils.double_integrator(q, qdot, qddot)
 
 
-if optimize_final_time:
+if optimize_time:
     # Create final time variable
     dt_min = 0.005
     dt_max = 0.1
@@ -120,7 +122,7 @@ qdot.setInitialGuess(qdot_init)
 # input limits
 if torque_input:
     tau_lims = np.array([3000, 3000, 0])
-    tau_init = [0, 0]
+    tau_init = [0, 0, 0]
     tau.setBounds(-tau_lims, tau_lims)
 else:
     qddot_lims = np.array([1000., 1000., 1000.])
@@ -147,8 +149,10 @@ if not torque_input:
 prb.createFinalConstraint("up", q[2] - np.pi)
 # at the last node, the system velocity is zero
 prb.createFinalConstraint("final_qdot", qdot)
-# impose a reference to follow for the cart
-# cnrst_ref = prb.createConstraint('sinusoidal_ref', q[1] - q_ref, range(10, ns+1))
+
+if y_reference:
+    # impose a reference to follow for the cart
+    cnrst_ref = prb.createConstraint('sinusoidal_ref', q[1] - q_ref, range(10, ns+1))
 
 # Set cost functions
 # regularization of the input
@@ -160,7 +164,7 @@ else:
 # minimize the velocity
 # prb.createIntermediateCost("damp", 0.01*cs.sumsqr(qdot))
 
-if optimize_final_time:
+if optimize_time:
     prb.createCost("min_dt", ns * 1e5 * cs.sumsqr(dt))
 
 # ======================================================================================================================
@@ -185,10 +189,11 @@ if solver_type == 'gnsqp':
 
 solv = solver.Solver.make_solver(solver_type, prb, opts=opts)
 
-# choose the reference for the cart. Notice that this can be done even AFTER the problem is built.
-# cos_fun = 1/3 * np.cos(np.linspace(np.pi/2, 4*2*np.pi, ns+1))
-# for n in range(ns+1):
-#     q_ref.assign(cos_fun[n], n)
+if y_reference:
+    # choose the reference for the cart. Notice that this can be done even AFTER the problem is built.
+    cos_fun = 1/3 * np.cos(np.linspace(np.pi/2, 2*np.pi, ns+1))
+    for n in range(ns+1):
+        q_ref.assign(cos_fun[n], n)
 
 # Solve the problem
 if solver_type == 'gnsqp':
@@ -202,7 +207,6 @@ solution = solv.getSolutionDict()
 dt_sol = solv.getDt()
 
 total_time = sum(dt_sol)
-print(dt_sol)
 print(f"total trajectory time: {total_time}")
 ########################################################################################################################
 

@@ -6,18 +6,19 @@ from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
-import os
+import os, argparse
 import time
 from horizon.ros import utils as horizon_ros_utils
 
-# horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
-# time.sleep(3.)
 
+parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
+parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+args = parser.parse_args()
 # Switch between suspended and free fall
-FREE_FALL = True
+free_fall = True
 
 # Loading URDF model in pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')
+urdffile = os.path.join(os.getcwd(), 'urdf', 'roped_template.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -28,15 +29,12 @@ FKL = cs.Function.deserialize(kindyn.fk('Contact2'))
 FKRope = cs.Function.deserialize(kindyn.fk('rope_anchor2'))
 
 # OPTIMIZATION PARAMETERS
-ns = 30  # number of shooting nodes
+ns = 30  # number of nodes
 nc = 3  # number of contacts
 nq = kindyn.nq()  # number of DoFs - NB: 7 DoFs floating base (quaternions)
 DoF = nq - 7  # Contacts + anchor_rope + rope
 nv = kindyn.nv()  # Velocity DoFs
 nf = 3  # 2 feet contacts + rope contact with wall, Force DOfs
-
-
-
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -59,71 +57,67 @@ dt = tf / ns
 
 prb.setDynamics(xdot)
 prb.setDt(dt)
+
+
 # Formulate discrete time dynamics
-
-
 L = 0.5*cs.dot(qdot, qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
 F_integrator = integrators.RK4(dae)
 
-# Add bounds to STATE and CONTROL variables
-q_min = [-10.0, -10.0, -10.0, -1.0, -1.0, -1.0, -1.0,  # Floating base
-                  -0.3, -0.1, -0.1,  # Contact 1
-                  -0.3, -0.05, -0.1,  # Contact 2
-                  -1.57, -1.57, -3.1415,  # rope_anchor
-                  0.0]  # rope
-q_max = [10.0,  10.0,  10.0,  1.0,  1.0,  1.0,  1.0,  # Floating base
-                  0.3, 0.05, 0.1,  # Contact 1
-                  0.3, 0.1, 0.1,  # Contact 2
-                  1.57, 1.57, 3.1415,  # rope_anchor
-                  10.0]  # rope
-if not FREE_FALL:
+# limits
+q_min = kindyn.q_min()
+q_max = kindyn.q_max()
+q_min[:3] = [-10.0, -10.0, -10.0]
+q_max[:3] = [10.0, 10.0, 10.0]
+
+if not free_fall:
     q_min[-1] = 0.1
     q_max[-1] = 0.1
 
 q.setBounds(q_min, q_max)
 
-qdot_min = (-100.*np.ones(nv)).tolist()
-qdot_max = (100.*np.ones(nv)).tolist()
+
+qdot_min = -100.*np.ones(nv)
+qdot_max = -qdot_min
 qdot.setBounds(qdot_min, qdot_max)
 
-qddot_min = (-100.*np.ones(nv)).tolist()
-qddot_max = (100.*np.ones(nv)).tolist()
+qddot_min = -100.*np.ones(nv)
+qddot_max = -qddot_min
 qddot.setBounds(qddot_min, qddot_max)
 
-f_min = (-10000.*np.ones(nf)).tolist()
-f_max = (10000.*np.ones(nf)).tolist()
+f_min = -10000.*np.ones(nf)
+f_max = -f_min
 f1.setBounds(f_min, f_max)
 f2.setBounds(f_min, f_max)
 frope.setBounds(f_min, f_max)
 
-# Add initial guess to STATE and CONTROL variables
-q_init = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                   0., 0., 0.,
-                   0., 0., 0.,
-                   0., 0., 0.,
-                   0.1]
+q_init = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # floating base
+          0., 0., 0., # contact 1
+          0., 0., 0., # contact 2
+          0., 0., 0., # rope_anchor
+          0.1] # rope
+
 q.setInitialGuess(q_init)
 
-qdot_init = np.zeros(nv).tolist()
+qdot_init = np.zeros(nv)
 qdot.setInitialGuess(qdot_init)
 
-qddot_init = np.zeros(nv).tolist()
+qddot_init = np.zeros(nv)
 qddot.setInitialGuess(qdot_init)
 
-f_init = np.zeros(nf).tolist()
+f_init = np.zeros(nf)
 f1.setInitialGuess(f_init)
 f2.setInitialGuess(f_init)
 frope.setInitialGuess(f_init)
 
 # Cost function
 prb.createCost("min_joint_vel", 100.*cs.dot(qdot[6:-1], qdot[6:-1]))
-prb.createCost("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]), list(range(1, ns)))
-prb.createCost("min_f1", 1000.*cs.dot(f1, f1), list(range(1, ns)))
-prb.createCost("min_f2", 1000.*cs.dot(f2, f2), list(range(1, ns)))
+prb.createCost("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]), range(1, ns))
+prb.createCost("min_f1", 1000.*cs.dot(f1, f1), range(1, ns))
+prb.createCost("min_f2", 1000.*cs.dot(f2, f2), range(1, ns))
 
 frope_prev = frope.getVarOffset(-1)
-prb.createCost("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), list(range(1, ns)))
+prb.createCost("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), range(1, ns))
 
 # Constraints
 prb.createConstraint("qinit", q, nodes=0, bounds=dict(lb=q_init, ub=q_init))
@@ -135,21 +129,18 @@ input = prb.getInput()
 input_prev = input.getVarOffset(-1)
 
 x_prev, _ = utils.double_integrator_with_floating_base(state_prev[0], state_prev[1], input_prev[0])
-x_int = F_integrator(x0=x_prev, p=input_prev[0])
+x_int = F_integrator(x0=x_prev, p=input_prev[0], time=dt)
 
-prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
+prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns+1), bounds=dict(lb=np.zeros(nv+nq).tolist(), ub=np.zeros(nv+nq).tolist()))
 
-tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
-                    -1000., -1000., -1000.,  # Contact 1
-                    -1000., -1000., -1000.,  # Contact 2
-                    0., 0., 0.,  # rope master point
-                    0.]  # rope
-tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
-                        1000., 1000., 1000.,  # Contact 1
-                        1000., 1000., 1000.,  # Contact 2
-                        0., 0., 0.,  # rope master point
-                        0.0]  # rope
-if not FREE_FALL:
+tau_min = np.array([0., 0., 0., 0., 0., 0.,  # floating base
+           -1000., -1000., -1000.,  # contact 1
+           -1000., -1000., -1000.,  # contact 2
+           0., 0., 0.,  # rope anchor point
+           0.])  # rope
+tau_max = - tau_min
+
+if not free_fall:
     tau_min[-1] = -10000.0
 
 frame_force_mapping = {'rope_anchor2': frope}
