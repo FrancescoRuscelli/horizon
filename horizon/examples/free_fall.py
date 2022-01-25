@@ -168,10 +168,10 @@ prb.createConstraint("qdot_init", qdot - qdot_init, nodes=0)
 
 
 tau_min = np.array([0., 0., 0., 0., 0., 0.,  # floating base
-           -1000., -1000., -1000.,  # contact 1
-           -1000., -1000., -1000.,  # contact 2
-           0., 0., 0.,  # rope anchor point
-           0.])  # rope
+                    -1000., -1000., -1000.,  # contact 1
+                    -1000., -1000., -1000.,  # contact 2
+                    0., 0., 0.,  # rope anchor point
+                    0.])  # rope
 
 tau_max = - tau_min
 
@@ -192,12 +192,12 @@ prb.createConstraint("rope_anchor_point", p_rope - p_rope_init)
 
 
 # Cost function
-if rope_mode != 'swing':
-    weigth_joint_vel = 100.
-else:
+if rope_mode == 'swing':
     weigth_joint_vel = 1.
+else:
+    weigth_joint_vel = 100.
 
-prb.createCost("min_joint_vel", weigth_joint_vel*cs.sumsqr(qdot)) #1.  #
+prb.createCost("min_joint_vel", weigth_joint_vel*cs.sumsqr(qdot))
 
 if rope_mode != 'swing':
     prb.createCost("min_joint_acc", 1000.*cs.sumsqr(qddot[6:-1]), range(1, ns))
@@ -210,7 +210,7 @@ if rope_mode != 'swing':
 # Creates problem
 opts = {'ipopt.tol': 1e-3,
         'ipopt.constr_viol_tol': 1e-3,
-        'ipopt.max_iter': 2000} #         'ipopt.linear_solver': 'ma57'
+        'ipopt.max_iter': 2000} #
 
 solver = solver.Solver.make_solver('ipopt', prb, opts)
 solver.solve()
