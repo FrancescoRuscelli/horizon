@@ -26,8 +26,8 @@ solver_type = 'ipopt' # todo fails with 'ilqr', 'blocksqp', 'gnsqp'
 rviz_replay = False
 plot_sol = True
 torque_input = False
-optimize_time = False
-y_reference = True
+optimize_time = True
+y_reference = False
 
 if solver_type == 'ilqr' and optimize_time:
     input("'ilqr' solver supports only float and Parameter dt. Press a button to continue.")
@@ -93,7 +93,7 @@ if optimize_time:
     dt_min = 0.005
     dt_max = 0.1
     dt_init = 0.01
-    dt = prb.createSingleVariable("dt", 1)
+    dt = prb.createVariable("dt", 1)
     dt.setBounds(dt_min, dt_max)
     dt.setInitialGuess(dt_init)
 
@@ -234,7 +234,7 @@ if rviz_replay:
     roslaunch.configure_logging(uuid)
     launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])
     launch.start()
-    rospy.loginfo("'cart_pole_fd' visualization started.")
+    rospy.loginfo("'cart_pole' visualization started.")
 
     # visualize the robot in RVIZ
     # joint_list=["cart_joint", "pole_joint"]

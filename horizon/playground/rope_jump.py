@@ -14,9 +14,6 @@ import os
 import time
 from horizon.ros import utils as horizon_ros_utils
 
-horizon_ros_utils.roslaunch("horizon_examples", "roped_template.launch")
-time.sleep(3.)
-
 # Loading URDF model in pinocchio
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')
 urdf = open(urdffile, 'r').read()
@@ -111,13 +108,13 @@ q_trg = np.array([-.4, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                   0.3]).tolist()
 
 x_distance = -0.4
-prb.createCost("wall_distance", 100.*cs.sumsqr(q[0] - x_distance), nodes=list(range(lift_node, ns+1)))
+prb.createCost("wall_distance", 100.*cs.sumsqr(q[0] - x_distance), nodes=range(lift_node, ns+1))
 prb.createCost("min_qdot", cs.sumsqr(qdot))
 #prb.createCost("min_legs_vel", cs.sumsqr(qdot[6:12]), nodes=list(range(lift_node, touch_down_node)))
 #prb.createCost("min_base_vel", cs.sumsqr(qdot[0:6]), nodes=list(range(lift_node, ns+1)))
 f1_prev = f1.getVarOffset(-1)
 f2_prev = f2.getVarOffset(-1)
-prb.createCost("min_df", 0.0001*cs.sumsqr(f1-f1_prev + f2-f2_prev), nodes=list(range(1, ns)))
+prb.createCost("min_df", 0.0001*cs.sumsqr(f1-f1_prev + f2-f2_prev), nodes=range(1, ns))
 
 qddot_prev = qddot.getVarOffset(-1)
 #prb.createCost("min_jerk", 0.0003*cs.sumsqr(qddot-qddot_prev), nodes=list(range(1, ns)))
@@ -128,7 +125,7 @@ state_prev = state.getVarOffset(-1)
 x_prev, _ = utils.double_integrator_with_floating_base(state_prev[0], state_prev[1], qddot_prev)
 dt_prev = dt.getVarOffset(-1)
 x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt_prev)
-prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=list(range(1, ns+1)), bounds=dict(lb=np.zeros(nv+nq), ub=np.zeros(nv+nq)))
+prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns+1))
 
 
 tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
@@ -137,19 +134,16 @@ tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
             0., 0., 0.,  # rope_anchor
             -10000.]  # rope
 
-tau_max = [0., 0., 0., 0., 0., 0.,  # Floating base
-            1000., 1000., 1000.,  # Contact 1
-            1000., 1000., 1000.,  # Contact 2
-            0., 0., 0.,  # rope_anchor
-            0.0]  # rope
+tau_max = - tau_min
+
 dd = {'Contact1': f1, 'Contact2': f2, 'rope_anchor2': frope}
 tau = kin_dyn.InverseDynamics(kindyn, dd.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, qdot, qddot, dd)
-prb.createConstraint("inverse_dynamics", tau, nodes=list(range(0, ns)), bounds=dict(lb=tau_min, ub=tau_max))
+prb.createConstraint("inverse_dynamics", tau, nodes=range(0, ns), bounds=dict(lb=tau_min, ub=tau_max))
 
 FKRope = cs.Function.deserialize(kindyn.fk('rope_anchor2'))
 p_rope_init = FKRope(q=q_init)['ee_pos']
 p_rope = FKRope(q=q)['ee_pos']
-prb.createConstraint("rope_anchor_point", p_rope-p_rope_init, bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+prb.createConstraint("rope_anchor_point", p_rope-p_rope_init)
 
 # WALL
 mu = 0.5
@@ -170,28 +164,25 @@ for frame, f in zip(contact_names, forces):
     pd = FK(q=q_init)['ee_pos']
 
     # STANCE PHASE
-    prb.createConstraint(f"{frame}_before_jump", p - pd, nodes=list(range(0, lift_node)), bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+    prb.createConstraint(f"{frame}_before_jump", p - pd, nodes=range(0, lift_node))
 
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R_wall)
-    prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=list(range(0, lift_node)), bounds=dict(lb=fc_lb, ub=fc_ub))
+    prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=range(0, lift_node), bounds=dict(lb=fc_lb, ub=fc_ub))
     
 
     # FLIGHT PHASE
-    prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=list(range(lift_node, touch_down_node)),
-                         bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
-
+    prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=range(lift_node, touch_down_node))
     # TOUCH DOWN PHASE
-    prb.createConstraint(f"{frame}_friction_cone_after_jump", fc, nodes=list(range(touch_down_node, ns)),
+    prb.createConstraint(f"{frame}_friction_cone_after_jump", fc, nodes=range(touch_down_node, ns),
                          bounds=dict(lb=fc_lb, ub=fc_ub))
 
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=qdot)['ee_vel_linear']
-    prb.createConstraint(f"zero_{frame}_vel_after_jump", v, nodes=list(range(touch_down_node, ns + 1)),
-                         bounds=dict(lb=[0., 0., 0.], ub=[0., 0., 0.]))
+    prb.createConstraint(f"zero_{frame}_vel_after_jump", v, nodes=range(touch_down_node, ns + 1))
 
     surface_dict = {'a': 1., 'd': -x_foot}
     c, lb, ub = kin_dyn.surface_point_contact(surface_dict, q, kindyn, frame)
-    prb.createConstraint(f"{frame}_on_wall", c, nodes=list(range(touch_down_node, ns + 1)), bounds=dict(lb=lb, ub=ub))
+    prb.createConstraint(f"{frame}_on_wall", c, nodes=range(touch_down_node, ns + 1), bounds=dict(lb=lb, ub=ub))
 
 # Creates problem
 opts = {'ipopt.tol': 0.01,

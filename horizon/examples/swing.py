@@ -47,7 +47,7 @@ tf = 2.0  # [s]
 dt = tf / ns
 prb.setDt(dt)
 
-L = 0.5 * cs.dot(qdot, qdot)  # Objective term
+L = 0.5 * cs.sumsqr(qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
 F_integrator_LEAPFROG = integrators.LEAPFROG(dae)
 F_integrator = integrators.RK4(dae)
@@ -68,6 +68,7 @@ q_init = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
           0., 0., 0.,
           0., 0.3, 0.,
           0.3]
+
 q.setBounds(q_min, q_max)
 q.setInitialGuess(q_init)
 
@@ -147,9 +148,9 @@ prb.createConstraint("rope_anchor_point", p_rope - p_rope_init)
 
 # SETUP SOLVER
 opts = {
-    'ipopt.tol': 1e-3
-    , 'ipopt.constr_viol_tol': 1e-3
-    , 'ipopt.max_iter': 4000}
+    'ipopt.tol': 1e-3,
+    'ipopt.constr_viol_tol': 1e-3,
+    'ipopt.max_iter': 4000}
 
 solver = solver.Solver.make_solver('ipopt', prb, opts)
 solver.solve()

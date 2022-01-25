@@ -197,21 +197,6 @@ active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-# base_link stays at the same position
-# FK = cs.Function.deserialize(kindyn.fk('base_link'))
-# p_base = FK(q=q)['ee_pos']
-# p_base_start = FK(q=q_init)['ee_pos']
-
-# prb.createCost(f"base_link_pos", 1000*cs.sumsqr(p_base[0:2] - p_base_start[0:2]))
-
-# DFK = cs.Function.deserialize(kindyn.frameVelocity('base_link', cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
-# v_base = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-# 2. velocity of each base_link must be zero
-# prb.createConstraint(f"base_link_vel_before_step", v_base, nodes=range(0, node_start_step))
-# prb.createConstraint(f"base_link_vel_after_step", v_base, nodes=range(node_end_step, n_nodes + 1))
-# COM = cs.Function.deserialize(kindyn.centerOfMass())
-# p_com = COM(q=q_init)['com']
-# exit()
 fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
 q_final = q_init
 
@@ -340,8 +325,6 @@ if plot_all:
     plt.show()
 # ======================================================
 
-
-contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling

@@ -294,7 +294,9 @@ class NlpsolSolver(Solver):
         # fill the self.dt_solution with all the dt values
         elif isinstance(dt, Variable):
             for node_n in range(self.prb.getNNodes()-1):
-                self.dt_solution[node_n] = self.var_solution[dt.getName()][node_n]
+                # from matrix to array
+                sol_dt_array = self.var_solution[dt.getName()].flatten()
+                self.dt_solution[node_n] = sol_dt_array[node_n]
 
         # fill the self.dt_solution with the same dt solution
         elif isinstance(dt, SingleVariable):
