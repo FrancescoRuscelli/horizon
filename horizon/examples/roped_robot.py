@@ -34,7 +34,8 @@ urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
 # OPTIMIZATION PARAMETERS
-ns = 75 # number of nodes
+
+n_nodes = 30
 nc = 3  # number of contacts
 nq = kindyn.nq()  # number of DoFs - NB: 7 DoFs floating base (quaternions)
 DoF = nq - 7  # Contacts + anchor_rope + rope
@@ -42,7 +43,7 @@ nv = kindyn.nv()  # Velocity DoFs
 nf = 3  # 2 feet contacts + rope contact with wall, Force DOfs
 
 # Create horizon problem
-prb = problem.Problem(ns)
+prb = problem.Problem(n_nodes)
 
 # Creates problem STATE variables
 q = prb.createStateVariable("q", nq)
@@ -57,12 +58,9 @@ frope = prb.createInputVariable("frope", nf)
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
-if rope_mode == 'swing':
-    tf = 2. # [s]
-else:
-    tf = 1. # [s]
 
-dt = tf / ns
+tf = 1. # [s]
+dt = tf / n_nodes
 
 prb.setDynamics(xdot)
 prb.setDt(dt)
@@ -78,6 +76,8 @@ else:
     F_integrator = integrators.RK4(dae)
 
 # limits
+length_rope = 1
+
 q_min = kindyn.q_min()
 q_max = kindyn.q_max()
 q_min[:3] = [-10.0, -10.0, -10.0]
@@ -86,8 +86,8 @@ q_min[3:7] = -np.ones(4)
 q_max[3:7] = np.ones(4)
 
 if rope_mode != 'free_fall':
-    q_min[-1] = 0.3
-    q_max[-1] = 0.3
+    q_min[-1] = length_rope
+    q_max[-1] = length_rope
 
 if rope_mode == 'swing':
     q_min[7:13] = np.zeros(6)
@@ -123,11 +123,11 @@ q_init = [0., 0., 0., 0., 0., 0., 1.0,
           0., 0., 0.,
           0., 0., 0.,
           0., 0., 0.,
-          0.3]
+          length_rope]
 
 if rope_mode == 'swing':
     # starting from a tilted position
-    q_init[14] = 0.3 # rope_anchor_y
+    q_init[14] = 0.5 # rope_anchor_y
 
 q.setInitialGuess(q_init)
 
@@ -157,9 +157,9 @@ if rope_mode == 'swing':
     qddot_pprev = qddot.getVarOffset(-2)
     x_pprev, _ = utils.double_integrator_with_floating_base(q_pprev, qdot_pprev, qddot_pprev)
     x_int2 = F_integrator_LEAPFROG(x0=x_prev, x0_prev=x_pprev, p=input_prev[0], time=dt)
-    prb.createConstraint("multiple_shooting2", x_int2["xf"] - x, nodes=range(2, ns + 1))
+    prb.createConstraint("multiple_shooting2", x_int2["xf"] - x, nodes=range(2, n_nodes + 1))
 else:
-    prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns+1))
+    prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, n_nodes + 1))
 
 
 # Constraints
@@ -182,7 +182,7 @@ frame_force_mapping = {'rope_anchor2': frope}
 id = kin_dyn.InverseDynamics(kindyn, ['rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 tau = id.call(q, qdot, qddot, frame_force_mapping)
 
-prb.createConstraint("inverse_dynamics", tau, nodes=range(0, ns), bounds=dict(lb=tau_min, ub=tau_max))
+prb.createConstraint("inverse_dynamics", tau, nodes=range(0, n_nodes), bounds=dict(lb=tau_min, ub=tau_max))
 
 FKRope = cs.Function.deserialize(kindyn.fk('rope_anchor2'))
 
@@ -200,12 +200,12 @@ else:
 prb.createCost("min_joint_vel", weigth_joint_vel*cs.sumsqr(qdot))
 
 if rope_mode != 'swing':
-    prb.createCost("min_joint_acc", 1000.*cs.sumsqr(qddot[6:-1]), range(1, ns))
-    prb.createCost("min_f1", 1000.*cs.sumsqr(f1), range(1, ns))
-    prb.createCost("min_f2", 1000.*cs.sumsqr(f2), range(1, ns))
+    prb.createCost("min_joint_acc", 1000. * cs.sumsqr(qddot[6:-1]), range(1, n_nodes))
+    prb.createCost("min_f1", 1000. * cs.sumsqr(f1), range(1, n_nodes))
+    prb.createCost("min_f2", 1000. * cs.sumsqr(f2), range(1, n_nodes))
 
     frope_prev = frope.getVarOffset(-1)
-    prb.createCost("min_dfrope", 1000.*cs.sumsqr(frope-frope_prev), range(1, ns))
+    prb.createCost("min_dfrope", 1000. * cs.sumsqr(frope-frope_prev), range(1, n_nodes))
 
 # Creates problem
 opts = {'ipopt.tol': 1e-3,
@@ -222,7 +222,7 @@ time = np.arange(0.0, tf + 1e-6, dt)
 
 tau_sol = np.zeros(solution["qddot"].shape)
 ID = kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'])
-for i in range(ns):
+for i in range(n_nodes):
     frame_force_mapping_i = {'Contact1': solution["f1"][:, i], 'Contact2': solution["f2"][:, i], 'rope_anchor2':  solution["frope"][:, i]}
     tau_sol[:, i] = ID.call(solution["q"][:, i], solution["qdot"][:, i], solution["qddot"][:, i], frame_force_mapping_i).toarray().flatten()
 

@@ -10,14 +10,18 @@ from horizon.ros.replay_trajectory import *
 from horizon.transcriptions import integrators
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, rospkg
 import time
 from horizon.ros import utils as horizon_ros_utils
 
 # Loading URDF model in pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'roped_template.urdf')
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+urdffile = os.path.join(path_to_examples, 'urdf', 'roped_template.urdf')
 urdf = open(urdffile, 'r').read()
+
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
+
 
 # OPTIMIZATION PARAMETERS
 ns = 70  # number of shooting nodes
@@ -128,11 +132,11 @@ x_int = F_integrator(x0=x_prev, p=qddot_prev, time=dt_prev)
 prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, ns+1))
 
 
-tau_min = [0., 0., 0., 0., 0., 0.,  # Floating base
+tau_min = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
             -1000., -1000., -1000.,  # Contact 1
             -1000., -1000., -1000.,  # Contact 2
             0., 0., 0.,  # rope_anchor
-            -10000.]  # rope
+            -10000.])  # rope
 
 tau_max = - tau_min
 
