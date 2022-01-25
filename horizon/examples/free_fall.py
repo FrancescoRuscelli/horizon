@@ -58,7 +58,7 @@ frope = prb.createInputVariable("frope", nf)
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
-tf = 2  # [s]
+tf = 2.  # [s]
 dt = tf / ns
 
 prb.setDynamics(xdot)
@@ -177,8 +177,6 @@ tau_min = np.array([0., 0., 0., 0., 0., 0.,  # floating base
            0., 0., 0.,  # rope anchor point
            0.])  # rope
 
-
-
 tau_max = - tau_min
 
 if swing:
@@ -186,6 +184,7 @@ if swing:
 
 if not free_fall:
     tau_min[-1] = -10000.
+
 
 frame_force_mapping = {'rope_anchor2': frope}
 id = kin_dyn.InverseDynamics(kindyn, ['rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
@@ -201,13 +200,15 @@ prb.createConstraint("rope_anchor_point", p_rope - p_rope_init)
 
 
 # Cost function
-prb.createCost("min_joint_vel", 1.*cs.sumsqr(qdot)) #1.  #[6:-1]
-# prb.createCost("min_joint_acc", 1000.*cs.dot(qddot[6:-1], qddot[6:-1]), range(1, ns))
-# prb.createCost("min_f1", 1000.*cs.dot(f1, f1), range(1, ns))
-# prb.createCost("min_f2", 1000.*cs.dot(f2, f2), range(1, ns))
+prb.createCost("min_joint_vel", 1.*cs.sumsqr(qdot)) #1.  #
 
-# frope_prev = frope.getVarOffset(-1)
-# prb.createCost("min_dfrope", 1000.*cs.dot(frope-frope_prev, frope-frope_prev), range(1, ns))
+if free_fall:
+    prb.createCost("min_joint_acc", 1000.*cs.sumsqr(qddot[6:-1]), range(1, ns))
+    prb.createCost("min_f1", 1000.*cs.sumsqr(f1), range(1, ns))
+    prb.createCost("min_f2", 1000.*cs.sumsqr(f2), range(1, ns))
+
+    frope_prev = frope.getVarOffset(-1)
+    prb.createCost("min_dfrope", 1000.*cs.sumsqr(frope-frope_prev), range(1, ns))
 
 # Creates problem
 opts = {'ipopt.tol': 1e-3,
