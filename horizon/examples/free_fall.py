@@ -18,8 +18,7 @@ args = parser.parse_args()
 rviz_replay = False
 plot_sol = True
 resample = False
-free_fall = True
-swing = False
+rope_mode = 'fixed' # 'swing' # 'free_fall' # 'fixed'
 
 
 if args.replay:
@@ -58,7 +57,11 @@ frope = prb.createInputVariable("frope", nf)
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
-tf = 2.  # [s]
+if rope_mode == 'swing':
+    tf = 2. # [s]
+else:
+    tf = 1. # [s]
+
 dt = tf / ns
 
 prb.setDynamics(xdot)
@@ -68,7 +71,7 @@ prb.setDt(dt)
 # Formulate discrete time dynamics
 L = 0.5 * cs.sumsqr(qdot)  # Objective term
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
-if swing:
+if rope_mode == 'swing':
     F_integrator_LEAPFROG = integrators.LEAPFROG(dae)
     F_integrator = integrators.RK4(dae)
 else:
@@ -82,11 +85,7 @@ q_max[:3] = [10.0, 10.0, 10.0]
 q_min[3:7] = -np.ones(4)
 q_max[3:7] = np.ones(4)
 
-if not free_fall:
-    q_min[-1] = 0.1
-    q_max[-1] = 0.1
-
-if swing:
+if rope_mode != 'free_fall':
     q_min[7:13] = np.zeros(6)
     q_max[7:13] = np.zeros(6)
     q_min[-1] = 0.3
@@ -103,35 +102,32 @@ qddot_min = -1000.*np.ones(nv)
 qddot_max = -qddot_min
 qddot.setBounds(qddot_min, qddot_max)
 
-if swing:
+if rope_mode == 'swing':
     f_min = np.zeros(nf)
     f_max = f_min
-    frope_min = -10000. * np.ones(nf)
-    frope_max = -frope_min
 else:
     f_min = -10000.*np.ones(nf)
     f_max = -f_min
-    frope_min = f_min
-    frope_max = f_max
 
+
+frope_min = -10000. * np.ones(nf)
+frope_max = -frope_min
 
 f1.setBounds(f_min, f_max)
 f2.setBounds(f_min, f_max)
 frope.setBounds(frope_min, frope_max)
 
+q_init = [0., 0., 0., 0., 0., 0., 1.0,
+          0., 0., 0.,
+          0., 0., 0.,
+          0., 0., 0.,
+          0.]
 
-if swing:
-    q_init = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-              0., 0., 0.,
-              0., 0., 0.,
-              0., 0.3, 0.,
-              0.3]
-else:
-    q_init = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # floating base
-              0., 0., 0., # contact 1
-              0., 0., 0., # contact 2
-              0., 0., 0., # rope_anchor
-              0.1] # rope
+if rope_mode == 'swing':
+    # starting from a tilted position
+    q_init[14] = 0.3 # rope_anchor_y
+
+q_init[-1] = 0.3
 
 q.setInitialGuess(q_init)
 
@@ -154,7 +150,7 @@ input_prev = input.getVarOffset(-1)
 x_prev, _ = utils.double_integrator_with_floating_base(state_prev[0], state_prev[1], input_prev[0])
 x_int = F_integrator(x0=x_prev, p=input_prev[0], time=dt)
 
-if swing:
+if rope_mode == 'swing':
     prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=1)
     q_pprev = q.getVarOffset(-2)
     qdot_pprev = qdot.getVarOffset(-2)
@@ -179,12 +175,8 @@ tau_min = np.array([0., 0., 0., 0., 0., 0.,  # floating base
 
 tau_max = - tau_min
 
-if swing:
+if rope_mode != 'free_fall':
     tau_min[-1] = -10000.
-
-if not free_fall:
-    tau_min[-1] = -10000.
-
 
 frame_force_mapping = {'rope_anchor2': frope}
 id = kin_dyn.InverseDynamics(kindyn, ['rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
@@ -200,9 +192,14 @@ prb.createConstraint("rope_anchor_point", p_rope - p_rope_init)
 
 
 # Cost function
-prb.createCost("min_joint_vel", 1.*cs.sumsqr(qdot)) #1.  #
+if rope_mode != 'swing':
+    weigth_joint_vel = 100.
+else:
+    weigth_joint_vel = 1.
 
-if free_fall:
+prb.createCost("min_joint_vel", weigth_joint_vel*cs.sumsqr(qdot)) #1.  #
+
+if rope_mode != 'swing':
     prb.createCost("min_joint_acc", 1000.*cs.sumsqr(qddot[6:-1]), range(1, ns))
     prb.createCost("min_f1", 1000.*cs.sumsqr(f1), range(1, ns))
     prb.createCost("min_f2", 1000.*cs.sumsqr(f2), range(1, ns))
