@@ -18,7 +18,7 @@ args = parser.parse_args()
 rviz_replay = False
 plot_sol = True
 resample = False
-rope_mode = 'fixed' # 'swing' # 'free_fall' # 'fixed'
+rope_mode = 'swing' # 'swing' # 'free_fall' # 'fixed'
 
 
 if args.replay:
@@ -34,7 +34,7 @@ urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
 # OPTIMIZATION PARAMETERS
-ns = 75  # number of nodes
+ns = 75 # number of nodes
 nc = 3  # number of contacts
 nq = kindyn.nq()  # number of DoFs - NB: 7 DoFs floating base (quaternions)
 DoF = nq - 7  # Contacts + anchor_rope + rope
@@ -86,10 +86,12 @@ q_min[3:7] = -np.ones(4)
 q_max[3:7] = np.ones(4)
 
 if rope_mode != 'free_fall':
-    q_min[7:13] = np.zeros(6)
-    q_max[7:13] = np.zeros(6)
     q_min[-1] = 0.3
     q_max[-1] = 0.3
+
+if rope_mode == 'swing':
+    q_min[7:13] = np.zeros(6)
+    q_max[7:13] = np.zeros(6)
 
 
 q.setBounds(q_min, q_max)
@@ -121,13 +123,11 @@ q_init = [0., 0., 0., 0., 0., 0., 1.0,
           0., 0., 0.,
           0., 0., 0.,
           0., 0., 0.,
-          0.]
+          0.3]
 
 if rope_mode == 'swing':
     # starting from a tilted position
     q_init[14] = 0.3 # rope_anchor_y
-
-q_init[-1] = 0.3
 
 q.setInitialGuess(q_init)
 
