@@ -7,19 +7,32 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, rospkg, argparse
 from scipy.io import loadmat
 
-def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
-    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
-    traj_z = np.full(traj_len_before, 0.)
-    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
-    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
-    return traj_z
+
+parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
+parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+args = parser.parse_args()
+
+rviz_replay = False
+resampling = True
+plot_sol = True
 
 
+if args.replay:
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospkg, rospy
+    resampling = True
+    rviz_replay = True
+    plot_sol = False
+
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
 # =========================================
-ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
+# mat storer
+file_name = os.path.splitext(os.path.basename(__file__))[0]
+ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
@@ -262,7 +275,6 @@ contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling
-resampling = True
 if resampling:
 
     if isinstance(dt, cs.SX):
@@ -277,11 +289,49 @@ if resampling:
         kindyn,
         cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
-    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
-else:
-    # remember to run a robot_state_publisher
-    repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+if rviz_replay:
 
-repl.sleep(1.)
-repl.replay(is_floating_base=True)
+    # set ROS stuff and launchfile
+    r = rospkg.RosPack()
+    path_to_examples = r.get_path('horizon_examples')
+
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
+    launch.start()
+    rospy.loginfo("'spot' visualization started.")
+
+    if resampling:
+        repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res,
+                                 cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    else:
+        # remember to run a robot_state_publisher
+        repl = replay_trajectory(dt, joint_names, solution['q'], contact_map,
+                                 cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+
+    repl.sleep(1.)
+    repl.replay(is_floating_base=True)
+
+else:
+    print("To visualize the robot trajectory, start the script with the '--replay")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -7,38 +7,35 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, argparse, rospkg
 from scipy.io import loadmat
-# import rospkg
 
-def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
-    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
-    traj_z = np.full(traj_len_before, 0.)
-    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
-    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
-    return traj_z
+parser = argparse.ArgumentParser(
+    description='cart-pole problem: moving the cart so that the pole reaches the upright position')
+parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+args = parser.parse_args()
 
-# ========================================
-# traj = trajectoryInitializer(100, 10, 60, 10)
-# initial_q = -0.5
-# mod_q = initial_q + traj
-#
-# FK = cs.Function.deserialize(kindyn.ik(frame))
-# p = FK(q=q)['ee_pos']
-# p_start = FK(q=q_init)['ee_pos']
+rviz_replay = False
+resampling = False
+plot_sol = True
 
-# plt.scatter(range(mod_q.shape[0]), mod_q)
-# plt.show()
-# exit()
+if args.replay:
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospkg, rospy
 
+    rviz_replay = True
+    plot_sol = False
+
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
 # =========================================
-ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
+# mat storer
+file_name = os.path.splitext(os.path.basename(__file__))[0]
+ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
-transcription_method = 'multiple_shooting'  # direct_collocation # multiple_shooting
+transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-# rospack = rospkg.RosPack()
-# rospack.get_path('spot_urdf')
 urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
@@ -55,7 +52,7 @@ n_nodes = 50
 node_start_step = 20
 node_end_step = 40
 node_peak = 30
-jump_height = 0.2
+jump_height = 0.3
 
 n_c = 4
 n_q = kindyn.nq()
@@ -79,7 +76,7 @@ contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 
 
-load_initial_guess = True
+load_initial_guess = False
 # import initial guess if present
 if load_initial_guess:
     prev_solution = ms.load()
@@ -87,7 +84,7 @@ if load_initial_guess:
     q_dot_ig = prev_solution['q_dot']
     q_ddot_ig = prev_solution['q_ddot']
     f_ig_list = list()
-    for i in range(n_c):
+    for f in f_list:
         f_ig_list.append(prev_solution[f'f{i}'])
 
     dt_ig = prev_solution['dt']
@@ -99,7 +96,6 @@ dt = prb.createInputVariable("dt", 1)  # variable dt as input
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
 prb.setDt(dt)
-
 # SET BOUNDS
 # q bounds
 q_min = [-10., -10., -10., -1., -1., -1., -1.]  # floating base
@@ -189,65 +185,53 @@ tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinD
 prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
 
 # SET FINAL VELOCITY CONSTRAINT
-prb.createFinalConstraint('final_velocity', q_dot)
+# prb.createFinalConstraint('final_velocity', q_dot)
 
 # SET CONTACT POSITION CONSTRAINTS
+active_leg = list()
 active_leg = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
 mu = 1
 R = np.identity(3, dtype=float)  # environment rotation wrt inertial frame
 
-fb_during_jump = np.array([q_init[0], q_init[1], q_init[2] + jump_height, 0.0, 0.0, 0.0, 1.0])
 q_final = q_init
+q_final[0] = q_final[0] + 0.3
 
 for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
-    FK = cs.Function.deserialize(kindyn.fk(frame))
-    p = FK(q=q)['ee_pos']
-    p_start = FK(q=q_init)['ee_pos']
-    p_goal = p_start + [0., 0., jump_height]
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-    DDFK = cs.Function.deserialize(kindyn.frameAcceleration(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
-    a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
-    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step))
+    prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_step + 1))
     prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
     fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+
     prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
     prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
+
     prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_step, node_end_step))
 
-    prb.createConstraint(f"start_{frame}_leg", p - p_start, nodes=node_start_step)
-    prb.createConstraint(f"lift_{frame}_leg", p - p_goal, nodes=node_peak)
-    prb.createConstraint(f"land_{frame}_leg", p - p_start, nodes=node_end_step)
 
+prb.createFinalConstraint(f"final_nominal_fb", q - q_final)
 
 # SET COST FUNCTIONS
+prb.createCost("min_q_dot", 5 * cs.sumsqr(q_dot))
+# prb.createIntermediateCost("min_q_ddot", 10. * cs.sumsqr(q_ddot))
 
-# prb.createCost("min_q_dot", 1. * cs.sumsqr(q_dot))
-# prb.createFinalCost(f"final_nominal_pos", 1000 * cs.sumsqr(q - q_init))
-# for f in f_list:
-#     prb.createIntermediateCost(f"min_{f.getName()}", 0.01 * cs.sumsqr(f))
-
-prb.createResidual("min_q_dot", q_dot)
-prb.createFinalResidual(f"final_nominal_pos", cs.sqrt(1000) * (q - q_init))
 for f in f_list:
-    prb.createIntermediateResidual(f"min_{f.getName()}", cs.sqrt(0.01) * f)
+    prb.createIntermediateCost(f"min_{f.getName()}", 0.001 * cs.sumsqr(f))
 
-
-# prb.createIntermediateCost('min_dt', 100 * cs.sumsqr(dt))
 
 # =============
 # SOLVE PROBLEM
 # =============
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 2000,
-        'ipopt.linear_solver': 'ma57'}
+        'ipopt.max_iter': 2000}
+# 'ipopt.linear_solver': 'ma57'}
 
 solver = solver.Solver.make_solver('ipopt', prb, opts)
 solver.solve()
@@ -325,6 +309,8 @@ if plot_all:
     plt.show()
 # ======================================================
 
+
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling

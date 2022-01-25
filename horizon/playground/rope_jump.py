@@ -104,13 +104,6 @@ dt.setInitialGuess([0.01])
 lift_node = 3 #20
 touch_down_node = 60
 
-
-q_trg = np.array([-.4, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                  0.0, 0.0, 0.0+foot_z_offset,
-                  0.0, 0.0, 0.0+foot_z_offset,
-                  0.0, 0.0, 0.0,
-                  0.3]).tolist()
-
 x_distance = -0.4
 prb.createCost("wall_distance", 100.*cs.sumsqr(q[0] - x_distance), nodes=range(lift_node, ns+1))
 prb.createCost("min_qdot", cs.sumsqr(qdot))

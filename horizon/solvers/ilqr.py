@@ -145,6 +145,17 @@ class SolverILQR(Solver):
     def getSolutionDict(self):
         return self.solution_dict
 
+    def getDt(self):
+        self.dt_solution = np.zeros(self.prb.getNNodes() - 1)
+        if isinstance(self.dt, float):
+            for node_n in range(self.prb.getNNodes() - 1):
+                self.dt_solution[node_n] = self.dt
+        elif isinstance(self.dt, Parameter):
+            for node_n in range(self.prb.getNNodes() - 1):
+                self.dt_solution[node_n] = self.dt.getValues(node_n)
+
+        return self.dt_solution
+
     def print_timings(self):
 
         prof_info = self.ilqr.getProfilingInfo()

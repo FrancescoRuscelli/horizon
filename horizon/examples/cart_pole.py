@@ -211,7 +211,7 @@ print(f"total trajectory time: {total_time}")
 ########################################################################################################################
 
 if plot_sol:
-    time = np.arange(0.0, total_time+1e-6, total_time/ns)
+    time = np.arange(0.0, total_time+1e-6, total_time/ns) # wrong
     plt.figure()
     plt.plot(time, solution['q'][0,:])
     plt.plot(time, solution['q'][1,:])

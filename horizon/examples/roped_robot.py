@@ -58,9 +58,15 @@ frope = prb.createInputVariable("frope", nf)
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
-
-tf = 1. # [s]
+tf = 1.  # [s]
 dt = tf / n_nodes
+
+# if rope_mode == 'jump':
+#     dt = prb.createVariable('dt', 1)
+#     dt.setBounds(0.05, 0.5)
+#     dt.setInitialGuess(0.1)
+
+
 
 prb.setDynamics(xdot)
 prb.setDt(dt)
@@ -76,7 +82,7 @@ else:
     F_integrator = integrators.RK4(dae)
 
 # limits
-length_rope = 1
+rope_lenght = 1
 
 q_min = kindyn.q_min()
 q_max = kindyn.q_max()
@@ -86,23 +92,41 @@ q_min[3:7] = -np.ones(4)
 q_max[3:7] = np.ones(4)
 
 if rope_mode != 'free_fall':
-    q_min[-1] = length_rope
-    q_max[-1] = length_rope
+    q_min[-1] = rope_lenght
+    q_max[-1] = rope_lenght
 
 if rope_mode == 'swing':
     q_min[7:13] = np.zeros(6)
     q_max[7:13] = np.zeros(6)
 
+# if rope_mode == 'jump':
+    # foot_z_offset = 0.5
+    # q_max[9] = q_max[9] + foot_z_offset
+    # q_max[12] = q_max[12] + foot_z_offset
+    # q_max[-1] = 1
+
+q_init = [0., 0., 0., 0., 0., 0., 1.0,
+          0., 0., 0.,
+          0., 0., 0.,
+          0., 0., 0.,
+          rope_lenght]
 
 q.setBounds(q_min, q_max)
+# q.setBounds(q_init, q_init, nodes=0)
+q.setInitialGuess(q_init)
 
 qdot_min = -1000.*np.ones(nv)
 qdot_max = -qdot_min
+qdot_init = np.zeros(nv)
 qdot.setBounds(qdot_min, qdot_max)
+# qdot.setBounds(qdot_init, qdot_init, nodes=0)
+qdot.setInitialGuess(qdot_init)
 
 qddot_min = -1000.*np.ones(nv)
 qddot_max = -qddot_min
+qddot_init = np.zeros(nv)
 qddot.setBounds(qddot_min, qddot_max)
+qddot.setInitialGuess(qdot_init)
 
 if rope_mode == 'swing':
     f_min = np.zeros(nf)
@@ -111,7 +135,6 @@ else:
     f_min = -10000.*np.ones(nf)
     f_max = -f_min
 
-
 frope_min = -10000. * np.ones(nf)
 frope_max = -frope_min
 
@@ -119,23 +142,9 @@ f1.setBounds(f_min, f_max)
 f2.setBounds(f_min, f_max)
 frope.setBounds(frope_min, frope_max)
 
-q_init = [0., 0., 0., 0., 0., 0., 1.0,
-          0., 0., 0.,
-          0., 0., 0.,
-          0., 0., 0.,
-          length_rope]
-
 if rope_mode == 'swing':
     # starting from a tilted position
     q_init[14] = 0.5 # rope_anchor_y
-
-q.setInitialGuess(q_init)
-
-qdot_init = np.zeros(nv)
-qdot.setInitialGuess(qdot_init)
-
-qddot_init = np.zeros(nv)
-qddot.setInitialGuess(qdot_init)
 
 f_init = np.zeros(nf)
 f1.setInitialGuess(f_init)
@@ -179,7 +188,13 @@ if rope_mode != 'free_fall':
     tau_min[-1] = -10000.
 
 frame_force_mapping = {'rope_anchor2': frope}
-id = kin_dyn.InverseDynamics(kindyn, ['rope_anchor2'], cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+
+# if rope_mode == 'jump':
+#     contacts = {'Contact1': f1, 'Contact2': f2}
+#     frame_force_mapping.update(contacts)
+
+
+id = kin_dyn.InverseDynamics(kindyn, frame_force_mapping.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 tau = id.call(q, qdot, qddot, frame_force_mapping)
 
 prb.createConstraint("inverse_dynamics", tau, nodes=range(0, n_nodes), bounds=dict(lb=tau_min, ub=tau_max))
@@ -207,18 +222,48 @@ if rope_mode != 'swing':
     frope_prev = frope.getVarOffset(-1)
     prb.createCost("min_dfrope", 1000. * cs.sumsqr(frope-frope_prev), range(1, n_nodes))
 
+
+# if rope_mode == 'jump':
+#     lift_node = 3
+#     touch_down_node = 25
+#     x_distance = -0.4
+    # prb.createCost("wall_distance", 100. * cs.sumsqr(q[0] - x_distance), nodes=range(lift_node, n_nodes + 1))
+
+    # for frame, f in frame_force_mapping.items():
+    #     if frame != 'rope_anchor2':
+    #         FK = cs.Function.deserialize(kindyn.fk(frame))
+    #         DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
+    #         p = FK(q=q)['ee_pos']
+    #         v = DFK(q=q, qdot=qdot)['ee_vel_linear']
+    #         p_init = FK(q=q_init)['ee_pos']
+
+            # prb.createConstraint(f"{frame}_before_jump", v, nodes=range(0, lift_node))
+            # prb.createConstraint(f"zero_{frame}_vel_after_jump", v, nodes=range(lift_node, touch_down_node))
+
+            # flight phase
+            # prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=range(lift_node, touch_down_node))
+
+            # alpha = 0.3
+            # x_foot = rope_lenght * np.sin(alpha)
+            # surface_dict = {'a': 1., 'd': -x_foot}
+            # c, lb, ub = kin_dyn.surface_point_contact(surface_dict, q, kindyn, frame)
+            # prb.createConstraint(f"{frame}_on_wall", c, nodes=range(touch_down_node, n_nodes + 1), bounds=dict(lb=lb, ub=ub))
+
+
 # Creates problem
 opts = {'ipopt.tol': 1e-3,
         'ipopt.constr_viol_tol': 1e-3,
         'ipopt.max_iter': 2000} #
 
-solver = solver.Solver.make_solver('ipopt', prb, opts)
-solver.solve()
+solv = solver.Solver.make_solver('ipopt', prb, opts)
+solv.solve()
 
-solution = solver.getSolutionDict()
+solution = solv.getSolutionDict()
+dt_sol = solv.getDt()
+total_time = sum(dt_sol)
 
 # ======================================================================================================================
-time = np.arange(0.0, tf + 1e-6, dt)
+time = np.arange(0.0, total_time + 1e-6, total_time/n_nodes)
 
 tau_sol = np.zeros(solution["qddot"].shape)
 ID = kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'])
