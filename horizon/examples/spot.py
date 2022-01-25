@@ -20,7 +20,7 @@ args = parser.parse_args()
 rviz_replay = False
 resampling = False
 plot_sol = True
-action = 'jump_on_wall' #  'wheelie' #  # 'jump_up' # 'jump_forward' # 'jump_on_wall'
+action = 'leap' #  'wheelie' #  # 'jump_up' # 'jump_forward' # 'jump_on_wall' # 'leap'
 solver_type = 'ipopt'  # 'ipopt', 'ilqr'
 
 if args.replay:
@@ -54,9 +54,12 @@ if action == 'jump_twist':
     disp[3:7] = [0, 0, 0.8509035, 0.525322]
 
 if action == 'wheelie':
-    node_action = (20, n_nodes)
+    node_action = [(20, n_nodes)]
+elif action == 'leap':
+    node_action = [(15, 25), (30, 45)]
 else:
-    node_action = (20, 40)
+    node_action = [(20, 40)]
+
 
 # load urdf
 urdffile = os.path.join(path_to_examples, 'urdf', 'spot.urdf')
@@ -127,7 +130,8 @@ prb.createFinalConstraint('final_velocity', q_dot)
 
 # contact handling
 k_all = range(1, n_nodes + 1)
-k_swing = list(range(*[node for node in node_action]))
+list_swing = [list(range(*n_range)) for n_range in node_action]
+k_swing = [item for sublist in list_swing for item in sublist]
 k_stance = list(filterfalse(lambda k: k in k_swing, k_all))
 
 lifted_legs = ['lf_foot', 'rf_foot']
