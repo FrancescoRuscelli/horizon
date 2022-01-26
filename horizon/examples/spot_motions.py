@@ -12,22 +12,25 @@ import os, rospkg, argparse
 from scipy.io import loadmat
 from itertools import filterfalse
 
-parser = argparse.ArgumentParser(
-    description='cart-pole problem: moving the cart so that the pole reaches the upright position')
-parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+spot_actions = ('wheelie', 'jump_up', 'jump_forward', 'jump_on_wall', 'leap')
+spot_solvers = ('ipopt', 'ilqr')
+
+parser = argparse.ArgumentParser(description='spot motions: a set of motions performed by the BostonDynamics quadruped robot')
+parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=spot_actions, default=spot_actions[1])
+parser.add_argument('--solver', '-s', help='choose which solver will be used', choices=spot_solvers, default=spot_solvers[0])
+parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
+
 args = parser.parse_args()
 
-rviz_replay = False
+action = args.action
+rviz_replay = args.replay
+solver_type = args.solver
 resampling = False
 plot_sol = True
-action = 'leap' #  'wheelie' #  # 'jump_up' # 'jump_forward' # 'jump_on_wall' # 'leap'
-solver_type = 'ipopt'  # 'ipopt', 'ilqr'
 
 if args.replay:
     from horizon.ros.replay_trajectory import *
     import roslaunch, rospkg, rospy
-
-    rviz_replay = True
     plot_sol = False
 
 r = rospkg.RosPack()

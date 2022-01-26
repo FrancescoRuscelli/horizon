@@ -45,7 +45,7 @@ v.setBounds(lb=[0, 0], ub=[0, 0], nodes=n_nodes)
 
 obs_center = np.array([0.5, 0.5])
 obs_r = 0.4
-obs = cs.sumsqr(p - obs_center) - obs_r
+obs = cs.sumsqr(p - obs_center) - obs_r**2
 
 obs_cnsrt = prob.createIntermediateConstraint('obstacle', obs)
 obs_cnsrt.setUpperBounds(np.inf)
@@ -62,15 +62,18 @@ plot_all = True
 
 if plot_all:
     hplt = plotter.PlotterHorizon(prob, solution)
-    hplt.plotVariables(grid=True)
-    hplt.plotFunctions(grid=True)
+    hplt.plotVariables(['pos', 'vel', 'force'], grid=True)
+    # hplt.plotFunctions(grid=True)
 
 
-plt.figure()
-plt.plot(solution['pos'][0], solution['pos'][1])
-plt.plot([0, 0], [0, 0], 'bo', markersize=12)
-plt.plot([1, 1], [1, 1], 'g*', markersize=12)
+fig, ax = plt.subplots()
+ax.set_title('xy plane')
+ax.plot(solution['pos'][0], solution['pos'][1])
+ax.plot([0, 0], [0, 0], 'bo', markersize=12)
+ax.plot([1, 1], [1, 1], 'g*', markersize=12)
 circle = plt.Circle(obs_center, radius=obs_r, fc='r')
+ax.add_patch(circle)
+ax.legend(['traj', 'start', 'goal', 'obstacle'])
 plt.gca().add_patch(circle)
 
 plt.show()
