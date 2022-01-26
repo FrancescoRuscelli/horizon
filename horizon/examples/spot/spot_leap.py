@@ -221,9 +221,9 @@ for frame, f in contact_map.items():
     if frame in ['lh_foot', 'rh_foot']:
         prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_leap_hind + 1))
         prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_leap_hind, n_nodes + 1))
-    #
+
         prb.createConstraint(f"{frame}_no_force_during_lift", f, nodes=range(node_start_leap_hind, node_end_leap_hind))
-    #
+
         # prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_end_leap_hind), bounds=dict(lb=fc_lb, ub=fc_ub))
         # prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_leap_hind, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 

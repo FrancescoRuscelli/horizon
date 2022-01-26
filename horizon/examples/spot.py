@@ -48,17 +48,17 @@ n_nodes = 50
 
 disp = [0., 0., 0., 0., 0., 0., 1.]
 
-if action == 'jump_forward':
+if action == 'jump_forward' or action == 'leap':
     disp[0] = 2 # [m]
 if action == 'jump_twist':
     disp[3:7] = [0, 0, 0.8509035, 0.525322]
 
 if action == 'wheelie':
-    node_action = [(20, n_nodes)]
+    node_action = (20, n_nodes)
 elif action == 'leap':
-    node_action = [(15, 25), (30, 45)]
+    node_action = [(15, 35), (30, 45)]
 else:
-    node_action = [(20, 40)]
+    node_action = (20, 40)
 
 
 # load urdf
@@ -128,12 +128,23 @@ prb.createIntermediateConstraint("dynamic_feasibility", tau[:6])
 # final velocity is zero
 prb.createFinalConstraint('final_velocity', q_dot)
 
+
 # contact handling
 k_all = range(1, n_nodes + 1)
-list_swing = [list(range(*n_range)) for n_range in node_action]
-k_swing = [item for sublist in list_swing for item in sublist]
+if action == 'leap':
+    list_swing = [list(range(*n_range)) for n_range in node_action]
+    k_swing = [item for sublist in list_swing for item in sublist]
+    k_swing_front = list(range(*[node for node in node_action[0]]))
+    k_swing_hind = list(range(*[node for node in node_action[1]]))
+    k_stance_front = list(filterfalse(lambda k: k in k_swing_front, k_all))
+    k_stance_hind = list(filterfalse(lambda k: k in k_swing_hind, k_all))
+
+else:
+    k_swing = list(range(*[node for node in node_action]))
+
 k_stance = list(filterfalse(lambda k: k in k_swing, k_all))
 
+# list of lifted legs
 lifted_legs = ['lf_foot', 'rf_foot']
 
 if action != 'wheelie' and action != 'jump_on_wall':
@@ -147,7 +158,11 @@ def barrier(x):
     return cs.if_else(x > 0, 0, x ** 2)
 
 for frame, f in contact_map.items():
-    nodes = k_stance if frame in lifted_legs else k_all
+    nodes_stance = k_stance if frame in lifted_legs else k_all
+
+    if action == 'leap':
+        nodes_stance = k_stance_front if frame in ['lf_foot', 'rf_foot'] else k_stance_hind
+        nodes_swing = k_swing_front if frame in ['lf_foot', 'rf_foot'] else k_swing_hind
 
     FK = cs.Function.deserialize(kindyn.fk(frame))
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
@@ -158,8 +173,13 @@ for frame, f in contact_map.items():
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
     a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
-    prb.createConstraint(f"{frame}_vel", v, nodes=list(nodes))
+    prb.createConstraint(f"{frame}_vel", v, nodes=nodes_stance)
     prb.createIntermediateCost(f'{frame}_fn', barrier(f[2] - 25.0))
+
+
+    if action == 'leap':
+        gc = prb.createConstraint(f'{frame}_ground', p[2], nodes=nodes_swing)
+        gc.setLowerBounds(p_start[2])
 
     if frame in lifted_legs:
         if action == 'jump_on_wall':
@@ -175,10 +195,17 @@ for frame, f in contact_map.items():
                                              nodes=range(k_swing[-1], n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
             prb.createFinalConstraint(f"lift_{frame}_leg", p - p_goal)
 
+
 # swing force is zero
 for leg in lifted_legs:
+    if action == 'leap':
+        nodes = k_swing_front if leg in ['lf_foot', 'rf_foot'] else k_swing_hind
+    else:
+        nodes = k_swing
+
     fzero = np.zeros(n_f)
-    contact_map[leg].setBounds(fzero, fzero, nodes=k_swing)
+    contact_map[leg].setBounds(fzero, fzero, nodes=nodes)
+
 
 if action != 'wheelie' and action != 'jump_on_wall':
     prb.createFinalConstraint(f"final_nominal_pos", q - q_final)
