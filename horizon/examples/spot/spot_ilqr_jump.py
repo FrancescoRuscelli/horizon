@@ -7,16 +7,18 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os, math
+import os, math, rospkg
 from itertools import filterfalse
 
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+# =========================================
 # mat storer
-filename_with_ext = __file__
-filename, _ = os.path.splitext(filename_with_ext)
-ms = mat_storer.matStorer(f'{filename}.mat')
+file_name = os.path.splitext(os.path.basename(__file__))[0]
+ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
 # options
-solver_type = 'ilqr'
+solver_type = 'gnsqp'
 
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
@@ -27,7 +29,7 @@ ilqr_plot_iter = False
 t_jump = (1.0, 1.5)
 
 # load urdf
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'spot.urdf')
+urdffile = rospkg.RosPack().get_path('spot_urdf') + '/urdf/spot.urdf'
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -198,13 +200,13 @@ if solver_type == 'gnsqp':
         opts["epsRegularisation"] = 5. * 10e3 * 1e-7
         opts['hessian_type'] =  'posdef'
         #opts['printLevel'] = 'high'
-        opts['linsol_plugin'] = 'ma57'
+        # opts['linsol_plugin'] = 'ma57'
 
 solver = solver.Solver.make_solver(solver_type, prb, opts)
 
 try:
     solver.set_iteration_callback()
-    solver.plot_iter = ilqr_plot_iter 
+    solver.plot_iter = ilqr_plot_iter
 except:
     pass
 

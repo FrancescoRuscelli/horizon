@@ -27,7 +27,9 @@ rviz_replay = False
 plot_sol = True
 torque_input = False
 optimize_time = True
-y_reference = False
+y_reference = True
+
+ilqr_plot_iter = False
 
 if solver_type == 'ilqr' and optimize_time:
     input("'ilqr' solver supports only float and Parameter dt. Press a button to continue.")
@@ -171,7 +173,6 @@ if optimize_time:
 opts = dict()
 if solver_type == 'gnsqp':
     qp_solver = "osqp"
-
     opts['gnsqp.qp_solver'] = qp_solver
 
     if qp_solver == "qpoases":
@@ -196,15 +197,28 @@ if y_reference:
         q_ref.assign(cos_fun[n], n)
 
 # Solve the problem
-if solver_type == 'gnsqp':
+try:
     solv.set_iteration_callback()
-else:
-    solv.solve()
+    solv.plot_iter = ilqr_plot_iter
+except:
+    pass
 
+solv.solve()
 # Get the solution as a dictionary
 solution = solv.getSolutionDict()
 # Get the array of dt, one for each interval between the nodes
 dt_sol = solv.getDt()
+
+if solver_type == 'gnsqp':
+    print(f"mean Hessian computation time: {sum(solv.getHessianComputationTime())/len(solv.getHessianComputationTime())}")
+    print(f"mean QP computation time: {sum(solv.getQPComputationTime())/len(solv.getQPComputationTime())}")
+    print(f"mean Line Search computation time: {sum(solv.getLineSearchComputationTime()) / len(solv.getLineSearchComputationTime())}")
+
+try:
+    solver.print_timings()
+except:
+    pass
+
 
 total_time = sum(dt_sol)
 print(f"total trajectory time: {total_time}")
