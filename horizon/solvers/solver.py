@@ -1,4 +1,5 @@
 import typing
+import casadi as cs
 from horizon.problem import Problem
 from typing import Dict, Iterable
 from abc import ABC, abstractmethod
@@ -91,6 +92,47 @@ class Solver(ABC):
             self.configure_rti()
             del self.opts['realtime_iteration']
         
+
+    def _getVarList(self, type):
+        var_list = list()
+        for var in self.prb.var_container.getVarList(offset=False):
+            if type == 'ub':
+                retriever = var.getUpperBounds()
+            elif type == 'lb':
+                retriever = var.getLowerBounds()
+            elif type == 'ig':
+                retriever = var.getInitialGuess()
+            else:
+                raise ValueError(f"value '{type}' not allowed.")
+
+            var_list.append(retriever.flatten(order='F'))
+
+        v = cs.vertcat(*var_list)
+        return v
+
+    def _getParList(self):
+        par_list = list()
+        for par in self.prb.var_container.getParList(offset=False):
+            pval = par.getValues().flatten(order='F')
+            par_list.append(pval)
+
+        p = cs.vertcat(*par_list)
+        return p
+
+    def _getFunList(self, type):
+        fun_list = list()
+        for fun in self.prb.function_container.getCnstr().values():
+            if type == 'ub':
+                retriever = fun.getUpperBounds()
+            elif type == 'lb':
+                retriever = fun.getLowerBounds()
+            else:
+                raise ValueError(f"value '{type}' not allowed.")
+
+            fun_list.append(retriever.flatten(order='F'))
+
+        f = cs.vertcat(*fun_list)
+        return f
 
     @abstractmethod
     def solve(self) -> bool:

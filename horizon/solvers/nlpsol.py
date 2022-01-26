@@ -67,89 +67,11 @@ class NlpsolSolver(Solver):
             par_list.append(par.getImpl())
         p = cs.vertcat(*par_list)
 
-        # this is good but the problem is that, without some tampering, i get the variables repeated
-        # ORDERED AS NODES
-        # w = self.var_container.getVarImplList() # ordered as nodes
-        # print(w)
-
-
-        # or ...
-        # ===================================================================================
-        # ===================================================================================
-        # self.vars_impl['nNone'] = dict()
-        # self.pars_impl['nNone'] = dict()
-        # for node in self.prb.nodes:
-        #     node_name = 'n' + str(node)
-        #     # get all implemented vars at node n
-        #     # get all the variable implemented at node n as a list
-        #     var_list_in_node = self.var_container.getVarImpl(node)
-        #     self.vars_impl[node_name] = var_list_in_node # or this
-        #
-        # var_impl_list = self.vars_impl.values()
-        # w = cs.vertcat(*var_impl_list)
-        # or ...
-        # ===================================================================================
-        # ===================================================================================
-        # for node in self.prb.nodes:
-        #     node_name = 'n' + str(node)
-        #     # get all implemented vars at node n
-        #     # get all the variable implemented at node n as a list
-        #     for name_var, value_var in self.var_container.vars.items():
-        #         var_impl = value_var.getImpl(node) #doing a list of these
-        #         # not important right?
-        #         # var_bound_min = self.vars[name].getLowerBounds(node)
-        #         # var_bound_max = self.vars[name].getUpperBounds(node)
-        #         # initial_guess = self.vars[name].getInitialGuess(node)
-        #         var_dict = dict(var=var_impl) #lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
-        #         self.vars_impl[node_name].update({name_var: var_dict})  # or this
-        #
-        # var_impl_list = list()
-        # for vars_in_node in self.vars_impl.values():
-        #     for var_abstract in vars_in_node.keys():
-        #         # get from var_impl the relative var
-        #
-        #         var_impl_list.append(vars_in_node[var_abstract]['var'])
-        #
-        # w = cs.vertcat(*var_impl_list)
-        # ===================================================================================
-        # ===================================================================================
-        # functions
-
-        # should I do it inside function? maybe yes
-        # get function from fun_container
-        # fun_list = list()
-        # for fname, fval in self.fun_container.cnstr_container.items():
-        #     used_vars = list()
-        #     # prepare variables
-        #     for var_name in fval.getVariables().keys():
-        #         var_impl = self.var_container.vars[var_name].getImpl(fval.getNodes())
-        #         # reshape them for all-in-one evaluation of function
-        #         var_impl_matrix = cs.reshape(var_impl, (fval.getDim(), len(fval.getNodes())))
-        #         # generic input --> row: dim // column: nodes
-        #         # [[x_0_0, x_1_0, ... x_N_0],
-        #         #  [x_0_1, x_1_1, ... x_N_1]]
-        #         used_vars.append(var_impl_matrix)
-        #
-        #     # compute function with all used variables on all active nodes
-        #     fun_eval = fval.fun(*used_vars)
-        #     # reshape it as a vector for solver
-        #     fun_eval_vector = cs.reshape(fun_eval, (fval.getDim() * len(fval.getNodes()), 1))
-        #
-        #     fun_list.append(fun_eval_vector)
-        #
-        # g = cs.vertcat(*fun_list)
-        # print(f'g ({g.shape}: {g})')
-        # ===================================================================================
-        # ===================================================================================
-        # or ...
-
         # build constraint functions list
         fun_list = list()
         for fun in self.fun_container.getCnstr().values():
             fun_list.append(fun.getImpl())
         g = cs.vertcat(*fun_list)
-
-        # build cost functions list
 
         # treat differently cost and residual (residual must be quadratized)
         fun_list = list()
@@ -167,44 +89,18 @@ class NlpsolSolver(Solver):
 
 
     def solve(self) -> bool:
-        # update lower bounds of variables
-        lb_list = list()
-        for var in self.var_container.getVarList(offset=False):
-            lb_list.append(var.getLowerBounds().flatten(order='F'))
-        lbw = cs.vertcat(*lb_list)
 
-        # update upper bounds of variables
-        ub_list = list()
-        for var in self.var_container.getVarList(offset=False):
-            ub_list.append(var.getUpperBounds().flatten(order='F'))
-        ubw = cs.vertcat(*ub_list)
-
+        # update lower/upper bounds of variables
+        lbw = self._getVarList('lb')
+        ubw = self._getVarList('ub')
         # update initial guess of variables
-        w0_list = list()
-        for var in self.var_container.getVarList(offset=False):
-            w0_list.append(var.getInitialGuess().flatten(order='F'))
-        w0 = cs.vertcat(*w0_list)
-        # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
-
+        w0 = self._getVarList('ig')
         # update parameters
-        p_list = list()
-        for par in self.var_container.getParList(offset=False):
-            pval = par.getValues().flatten(order='F')
-            p_list.append(pval)
+        p = self._getParList()
+        # update lower/upper bounds of constraints
+        lbg = self._getFunList('lb')
+        ubg = self._getFunList('ub')
 
-        p = cs.vertcat(*p_list)
-
-        # update lower bounds of constraints
-        lbg_list = list()
-        for fun in self.fun_container.getCnstr().values():
-            lbg_list.append(fun.getLowerBounds().flatten(order='F'))
-        lbg = cs.vertcat(*lbg_list)
-
-        # update upper bounds of constraints
-        ubg_list = list()
-        for fun in self.fun_container.getCnstr().values():
-            ubg_list.append(fun.getUpperBounds().flatten(order='F'))
-        ubg = cs.vertcat(*ubg_list)
 
         # solve
         sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
@@ -331,9 +227,6 @@ class NlpsolSolver(Solver):
         else:
             raise ValueError(f'dt of type: {type(dt)} is not supported.')
 
-        # print(self.dt_solution)
-        # print(f'{self.x_opt.shape}:, {self.x_opt}')
-        # print(f'{self.u_opt.shape}:, {self.u_opt}')
 
         return True
 

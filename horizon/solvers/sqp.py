@@ -63,7 +63,6 @@ class GNSQPSolver(Solver):
 
     def solve(self) -> bool:
         # update bounds and initial guess
-
         lb_list = list()
         for var in self.prb.var_container.getVarList(offset=False):
             lb_list.append(var.getLowerBounds().flatten(order='F'))
@@ -141,6 +140,9 @@ class GNSQPSolver(Solver):
 
     def getSolutionDict(self):
         return self.solution
+
+    def getDt(self):
+        pass
 
     def getHessianComputationTime(self):
         return self.solver.getHessianComputationTime()
