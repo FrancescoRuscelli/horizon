@@ -5,17 +5,20 @@ An example of the cart-pole problem: find the trajectory of the cart so that the
 (difference from 'cart_pole.py': system inputs are the torques, not the accelerations)
 '''
 
-from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
-import casadi as cs
-import numpy as np
-from horizon import problem
-from horizon.utils import utils, kin_dyn, mat_storer
-from horizon.transcriptions.transcriptor import Transcriptor
-from horizon.utils.plotter import PlotterHorizon
-from horizon.solvers import solver
-import matplotlib.pyplot as plt
-import os, argparse
+import argparse
+import os
+import rospkg
 
+import casadi as cs
+import matplotlib.pyplot as plt
+import numpy as np
+from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
+
+from horizon import problem
+from horizon.solvers import solver
+from horizon.transcriptions.transcriptor import Transcriptor
+from horizon.utils import utils, kin_dyn
+from horizon.utils.plotter import PlotterHorizon
 
 parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
 parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
@@ -25,7 +28,7 @@ args = parser.parse_args()
 solver_type = 'gnsqp' # todo fails with 'ilqr', 'blocksqp', 'gnsqp'
 rviz_replay = False
 plot_sol = True
-torque_input = False
+torque_input = True
 optimize_time = True
 y_reference = False
 
@@ -35,6 +38,11 @@ if solver_type == 'ilqr' and optimize_time:
     input("'ilqr' solver supports only float and Parameter dt. Press a button to continue.")
     optimize_time = False
 
+if solver_type == 'gnsqp' and y_reference:
+    input("'gnsqp' solver does not support Parameters. Press a button to continue.")
+    y_reference = False
+
+
 if args.replay:
     from horizon.ros.replay_trajectory import *
     import roslaunch, rospkg, rospy
@@ -42,8 +50,11 @@ if args.replay:
     plot_sol = False
 
 
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+
 # Create CasADi interface to Pinocchio
-urdffile = os.path.join(os.getcwd(), 'urdf', 'cart_pole_xy.urdf')
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole_xy.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -53,15 +64,17 @@ nv = kindyn.nv()
 
 # Optimization parameters
 tf = 5.0  # [s]
-ns = 100 # number of nodes
-dt = tf/ns
+n_nodes = 100  # number of nodes
+dt = tf / n_nodes
+
+q_tgt = np.array([0.5, 0, np.pi])
 
 # options for horizon transcription
 transcription_method = 'multiple_shooting'  # can choose between 'multiple_shooting' and 'direct_collocation'
-transcription_opts = dict(integrator='RK4') # integrator used by the multiple_shooting
+transcription_opts = dict(integrator='EULER') # integrator used by the multiple_shooting
 
 # Create horizon problem
-prb = problem.Problem(ns)
+prb = problem.Problem(n_nodes)
 
 # creates the variables for the problem
 # design choice: position and the velocity as state and acceleration as input
@@ -122,19 +135,20 @@ qdot.setBounds(qdot_init, qdot_init, nodes=0)
 qdot.setInitialGuess(qdot_init)
 
 # input limits
+
+tau_lims = np.array([1000, 1000, 0])
+
 if torque_input:
-    tau_lims = np.array([3000, 3000, 0])
     tau_init = [0, 0, 0]
     tau.setBounds(-tau_lims, tau_lims)
+    tau.setInitialGuess(tau_init)
 else:
     qddot_lims = np.array([1000., 1000., 1000.])
-    qddot_init = [0., 0.]
+    qddot_init = [0., 0., 0.]
     qddot.setBounds(-qddot_lims, qddot_lims)
+    qddot.setInitialGuess(qddot_init)
 
-if torque_input:
-    tau.setInitialGuess(tau_init)
-
-if solver_type == 'ipopt':
+if solver_type != 'ilqr':
     # Set transcription method
     th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
@@ -142,58 +156,85 @@ if not torque_input:
     # Set dynamic feasibility:
     # the cart can apply a torque, the joint connecting the cart to the pendulum is UNACTUATED
     # the torques are computed using the inverse dynamics, as the input of the problem is the cart acceleration
-    tau_lims = np.array([1000, 1000., 0.])
     tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-    iv = prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
+    iv = prb.createIntermediateConstraint("dynamic_feasibility", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Set desired constraints
 # at the last node, the pendulum is upright
-prb.createFinalConstraint("up", q[2] - np.pi)
+prb.createFinalConstraint("up", q[2] - q_tgt[2])
+# prb.createFinalConstraint("center", q[0] - q_tgt[0])
 # at the last node, the system velocity is zero
 prb.createFinalConstraint("final_qdot", qdot)
 
 if y_reference:
     # impose a reference to follow for the cart
-    cnrst_ref = prb.createConstraint('sinusoidal_ref', q[1] - q_ref, range(10, ns+1))
+    cnrst_ref = prb.createConstraint('sinusoidal_ref', q[1] - q_ref, range(10, n_nodes + 1))
 
 # Set cost functions
 # regularization of the input
 if torque_input:
-    prb.createIntermediateCost("tau", cs.sumsqr(tau))
+    if solver_type == 'gnsqp':
+        prb.createIntermediateResidual("tau", 1e-1 * tau)
+    else:
+        prb.createIntermediateCost("tau", cs.sumsqr(tau))
 else:
-    prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
+    if solver_type == 'gnsqp':
+        prb.createIntermediateResidual("qddot", qddot)
+    else:
+        prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
-# minimize the velocity
-# prb.createIntermediateCost("damp", 0.01*cs.sumsqr(qdot))
+if solver_type == 'gnsqp':
+    prb.createIntermediateResidual("qdot", 1e-1 * qdot)
+    prb.createIntermediateResidual("qfinal", 1e-1 * (q[2] - q_tgt[2]))
+    prb.createFinalResidual("qdot_f", 1e-1 * qdot)
+    prb.createFinalResidual("qfinal_f", 1e-2 * (q - q_tgt))
+
 
 if optimize_time:
-    prb.createCost("min_dt", ns * 1e5 * cs.sumsqr(dt))
+    if solver_type == 'gnspq':
+        prb.createResidual("min_dt", 1e2 * dt)
+    else:
+        prb.createCost("min_dt", n_nodes * 1e5 * cs.sumsqr(dt))
 
 # ======================================================================================================================
 opts = dict()
 if solver_type == 'gnsqp':
-    qp_solver = "osqp"
-    opts['gnsqp.qp_solver'] = qp_solver
-
-    if qp_solver == "qpoases":
-        opts['sparse'] = True
-        opts['hessian_type'] = 'posdef'
-        opts['printLevel'] = 'none'
-
-    if qp_solver == "osqp":
+    qp_solver = 'osqp'
+    if qp_solver == 'osqp':
+        opts['gnsqp.qp_solver'] = 'osqp'
         opts['warm_start_primal'] = True
         opts['warm_start_dual'] = True
-        opts['osqp.polish'] = False
+        opts['merit_derivative_tolerance'] = 1e-6
+        opts['constraint_violation_tolerance'] = n_nodes * 1e-12
+        opts['osqp.polish'] = True # without this
+        opts['osqp.delta'] = 1e-9 # and this, it does not converge!
         opts['osqp.verbose'] = False
-
-    opts['max_iter'] = 1
+        opts['osqp.rho'] = 0.02
+        opts['osqp.scaled_termination'] = False
+    if qp_solver == 'qpoases': #does not work!
+        opts['gnsqp.qp_solver'] = 'qpoases'
+        opts['sparse'] = True
+        opts["enableEqualities"] = True
+        opts["initialStatusBounds"] = "inactive"
+        opts["numRefinementSteps"] = 0
+        opts["enableDriftCorrection"] = 0
+        opts["terminationTolerance"] = 10e9 * 1e-7
+        opts["enableFlippingBounds"] = False
+        opts["enableNZCTests"] = False
+        opts["enableRamping"] = False
+        opts["enableRegularisation"] = True
+        opts["numRegularisationSteps"] = 2
+        opts["epsRegularisation"] = 5. * 10e3 * 1e-7
+        opts['hessian_type'] =  'posdef'
+        #opts['printLevel'] = 'high'
+        # opts['linsol_plugin'] = 'ma57'
 
 solv = solver.Solver.make_solver(solver_type, prb, opts=opts)
 
 if y_reference:
     # choose the reference for the cart. Notice that this can be done even AFTER the problem is built.
-    cos_fun = 1/3 * np.cos(np.linspace(np.pi/2, 2*np.pi, ns+1))
-    for n in range(ns+1):
+    cos_fun = 1/3 * np.cos(np.linspace(np.pi / 2, 2 * np.pi, n_nodes + 1))
+    for n in range(n_nodes + 1):
         q_ref.assign(cos_fun[n], n)
 
 # Solve the problem
@@ -225,7 +266,7 @@ print(f"total trajectory time: {total_time}")
 ########################################################################################################################
 
 if plot_sol:
-    time = np.arange(0.0, total_time+1e-6, total_time/ns) # wrong
+    time = np.arange(0.0, total_time + 1e-6, total_time / n_nodes) # wrong
     plt.figure()
     plt.plot(time, solution['q'][0,:])
     plt.plot(time, solution['q'][1,:])
@@ -253,7 +294,7 @@ if rviz_replay:
     # visualize the robot in RVIZ
     # joint_list=["cart_joint", "pole_joint"]
     joint_list = ["cart_joint_x", "cart_joint_y", "pole_joint"]
-    replay_trajectory(total_time/ns, joint_list, solution['q']).replay(is_floating_base=False)
+    replay_trajectory(total_time / n_nodes, joint_list, solution['q']).replay(is_floating_base=False)
 
 else:
     print("To visualize the robot trajectory, start the script with the '--replay")

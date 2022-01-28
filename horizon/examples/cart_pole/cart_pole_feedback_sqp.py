@@ -9,8 +9,11 @@ from horizon.solvers import solver, pysqp
 import matplotlib.pyplot as plt
 import os, rospkg, time
 
-# Loading URDF model in pinocchio
-urdffile = os.path.join(os.getcwd(), 'urdf', 'cart_pole.urdf')
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+
+# Create CasADi interface to Pinocchio
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 

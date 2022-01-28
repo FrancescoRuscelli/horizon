@@ -144,7 +144,6 @@ class Solver(ABC):
         fun_sol_dict = dict()
         pos = 0
         for name, fun in self.prb.function_container.getCnstr().items():
-            print(solution['g'])
             val_sol = solution['g'][pos:pos + fun.getDim() * len(fun.getNodes())]
             fun_sol_matrix = np.reshape(val_sol, (fun.getDim(), len(fun.getNodes())), order='F')
             fun_sol_dict[name] = fun_sol_matrix
