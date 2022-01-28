@@ -22,12 +22,12 @@ parser.add_argument('--replay', help='visualize the robot trajectory in rviz', a
 args = parser.parse_args()
 
 # ipopt, gnsqp, ilqr, blocksqp
-solver_type = 'ipopt' # todo fails with 'ilqr', 'blocksqp', 'gnsqp'
+solver_type = 'gnsqp' # todo fails with 'ilqr', 'blocksqp', 'gnsqp'
 rviz_replay = False
 plot_sol = True
 torque_input = False
 optimize_time = True
-y_reference = True
+y_reference = False
 
 ilqr_plot_iter = False
 
@@ -235,7 +235,7 @@ if plot_sol:
 
     hplt = PlotterHorizon(prb, solution)
     hplt.plotVariables()
-    hplt.plotFunctions()
+    # hplt.plotFunctions()
     plt.show()
 
 if rviz_replay:

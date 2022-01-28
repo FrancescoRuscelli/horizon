@@ -1,7 +1,8 @@
 import typing
 import casadi as cs
 from horizon.problem import Problem
-from typing import Dict, Iterable
+from horizon.variables import AbstractVariable, Variable, Parameter, SingleVariable, SingleParameter
+from typing import Dict, Iterable, List
 from abc import ABC, abstractmethod
 import numpy as np
 
@@ -72,6 +73,10 @@ class Solver(ABC):
         self.opts = opts
         self.prb = prb
 
+        self.var_solution: Dict[str:np.array] = dict()
+        self.cnstr_solution: Dict[str:np.array] = dict()
+        self.dt_solution: np.array = None
+
         # save state and control
         self.x = prb.getState().getVars()
         self.u = prb.getInput().getVars()
@@ -133,6 +138,134 @@ class Solver(ABC):
 
         f = cs.vertcat(*fun_list)
         return f
+
+    def _createCnsrtSolDict(self, solution):
+
+        fun_sol_dict = dict()
+        pos = 0
+        for name, fun in self.prb.function_container.getCnstr().items():
+            print(solution['g'])
+            val_sol = solution['g'][pos:pos + fun.getDim() * len(fun.getNodes())]
+            fun_sol_matrix = np.reshape(val_sol, (fun.getDim(), len(fun.getNodes())), order='F')
+            fun_sol_dict[name] = fun_sol_matrix
+            pos = pos + fun.getDim() * len(fun.getNodes())
+
+        return fun_sol_dict
+
+    def _createVarSolDict(self, solution):
+        pos = 0
+        var_sol_dict = dict()
+        for var in self.prb.var_container.getVarList(offset=False):
+            val_sol = solution['x'][pos: pos + var.shape[0] * len(var.getNodes())]
+            # this is to divide in rows the each dim of the var
+            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
+            var_sol_dict[var.getName()] = val_sol_matrix
+            pos = pos + var.shape[0] * len(var.getNodes())
+
+        return var_sol_dict
+
+    def _createVarSolAsInOut(self, solution):
+
+        input_vars = [v.getName() for v in self.prb.getInput().var_list]
+        state_vars = [v.getName() for v in self.prb.getState().var_list]
+        pos = 0
+        for name, var in self.prb.var_container.getVar().items():
+            val_sol = solution['x'][pos: pos + var.shape[0] * len(var.getNodes())]
+            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
+            if name in state_vars:
+                off, _ = self.prb.getState().getVarIndex(name)
+                self.x_opt[off:off + var.shape[0], :] = val_sol_matrix
+            elif name in input_vars:
+                off, _ = self.prb.getInput().getVarIndex(name)
+                self.u_opt[off:off + var.shape[0], :] = val_sol_matrix
+            else:
+                pass
+            pos = pos + var.shape[0] * len(var.getNodes())
+
+    def _createDtSol(self):
+
+        # build dt_solution as an array
+        self.dt_solution = np.zeros(self.prb.getNNodes() - 1)
+        dt = self.prb.getDt()
+
+        if not self.var_solution:
+            raise ValueError('Solution container is empty.')
+        # todo make this better
+        # fill dt_solution
+
+        # if it is a variable, its corresponding solution must be retrieved.
+        # if it is a singleVariable or a singleParameter?
+        # if dt is directly an optimization variable, that's ok, I get it from the var_solution
+        # if dt is a function of some other optimization variables, get all of them and compute the optimized dt
+        #   I do this by using a Function to wrap everything
+        if isinstance(dt, cs.SX) and not isinstance(dt, Variable) and not isinstance(dt, SingleVariable):
+            var_depend = list()
+            for var in self.prb.getVariables().values():
+                if cs.depends_on(dt, var):
+                    var_depend.append(var)
+
+            single_var_flag = False
+            # check type of variable
+            if all([isinstance(var, Variable) for var in var_depend]):
+                pass
+            elif all([isinstance(var, SingleVariable) for var in var_depend]):
+                single_var_flag = True
+            else:
+                raise NotImplementedError('Yet to be done.')
+
+            # create a function with all the variable dt depends on, and return dt
+            temp_dt = cs.Function('temp_dt', var_depend, [dt])
+
+            # fill the self.dt_solution with all the dt values
+            node_n_out = 0
+            for node_n in range(self.prb.getNNodes()-1):
+                node_n_in = node_n
+
+                # if the variable is a SingleVariable, fill dt_solution with the only value of the variable (node_n_out = 0)
+                if not single_var_flag:
+                    node_n_out = node_n
+
+                self.dt_solution[node_n_in] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])[node_n_out]
+
+        # fill the self.dt_solution with all the dt values
+        elif isinstance(dt, Variable):
+            for node_n in range(self.prb.getNNodes()-1):
+                # from matrix to array
+                sol_dt_array = self.var_solution[dt.getName()].flatten()
+                self.dt_solution[node_n] = sol_dt_array[node_n]
+
+        # fill the self.dt_solution with the same dt solution
+        elif isinstance(dt, SingleVariable):
+            for node_n in range(self.prb.getNNodes()-1):
+                self.dt_solution[node_n] = self.var_solution[dt.getName()]
+
+        # if dt is a value, set it to each element of dt_solution
+        elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
+            for node_n in range(self.prb.getNNodes()-1):
+                # get only the nodes where the dt is selected
+                # here dt at node 0 is not defined
+                self.dt_solution[node_n] = dt.getValues(node_n)
+        # if dt is a value, set it to each element of dt_solution
+        elif isinstance(dt, (float, int)):
+            for node_n in range(self.prb.getNNodes() - 1):
+                self.dt_solution[node_n] = dt
+        # if dt is a list, get each dt separately
+        elif isinstance(dt, List):
+            if len(dt) == self.prb.getNNodes() - 1:
+                for node_n in range(self.prb.getNNodes()-1):
+                    dt_val = dt[node_n]
+                    if isinstance(dt_val, SingleVariable):
+                        self.dt_solution[node_n] = self.var_solution[dt_val.getName()]
+                    elif isinstance(dt_val, Variable):
+                        current_node = dt_val.getNodes().index(node_n)
+                        sol_var = self.var_solution[dt_val.getName()].flatten()[current_node]
+                        self.dt_solution[node_n] = sol_var
+                    else:
+                        self.dt_solution[node_n] = dt[node_n]
+            else:
+                raise Exception(f'wrong dt list length: ({len(dt)}) != ({self.prb.getNNodes()-1})')
+        else:
+            raise ValueError(f'dt of type: {type(dt)} is not supported.')
 
     @abstractmethod
     def solve(self) -> bool:

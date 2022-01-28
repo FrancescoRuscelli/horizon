@@ -96,13 +96,15 @@ contact_map = dict(zip(contacts_name, f_list))
 
 # import initial guess if present
 if load_initial_guess:
-    prev_solution = ms.load()
-    q_ig = prev_solution['q']
-    q_dot_ig = prev_solution['q_dot']
-    q_ddot_ig = prev_solution['q_ddot']
-    f_ig_list = list()
-    for f in f_list:
-        f_ig_list.append(prev_solution[f'f{i}'])
+    if os.path.exists(path_to_examples + f'/mat_files/{file_name}.mat'):
+        prev_solution = ms.load()
+        q_ig = prev_solution['q']
+        q_dot_ig = prev_solution['q_dot']
+        q_ddot_ig = prev_solution['q_ddot']
+        f_ig_list = list()
+        i = 0
+        for f in f_list:
+            f_ig_list.append(prev_solution[f.getName()])
 
 # initial state and initial guess
 q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
