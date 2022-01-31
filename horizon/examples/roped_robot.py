@@ -39,6 +39,7 @@ kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 joint_names = kindyn.joint_names()
 if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
+if 'reference' in joint_names: joint_names.remove('reference')
 
 # OPTIMIZATION PARAMETERS
 
@@ -283,8 +284,16 @@ for i in range(n_nodes):
 if resample:
     # resampling
     dt_res = 0.001
-    frame_force_hist_mapping = {'rope_anchor2': solution["frope"]} # 'Contact1': solution["f1"], 'Contact2': solution["f2"],
-    q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(solution["q"], solution["qdot"], solution["qddot"], dt, dt_res, dae, frame_force_hist_mapping, kindyn)
+    frame_force_hist_mapping = {'Contact1': solution["f1"], 'Contact2': solution["f2"], 'rope_anchor2': solution["frope"]} #
+    q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(solution["q"],
+                                                                                                         solution["qdot"],
+                                                                                                         solution["qddot"],
+                                                                                                         dt, dt_res, dae,
+                                                                                                         frame_force_hist_mapping,
+                                                                                                         kindyn,
+                                                                                                         cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+
+
     time_res = np.arange(0.0, q_res.shape[1] * dt_res - dt_res, dt_res)
 
 if plot_sol:
@@ -341,8 +350,8 @@ if plot_sol:
         plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size=20)
 
         plt.figure()
-        # f1_res = frame_force_res_mapping["Contact1"]
-        # f2_res = frame_force_res_mapping["Contact2"]
+        f1_res = frame_force_res_mapping["Contact1"]
+        f2_res = frame_force_res_mapping["Contact2"]
         frope_res = frame_force_res_mapping["rope_anchor2"]
         for i in range(0, 3):
             plt.plot(time_res[:-1], f1_res[i, :])
@@ -370,7 +379,8 @@ if rviz_replay:
     launch.start()
     rospy.loginfo("'roped_robot' visualization started.")
 
-    replay_trajectory(dt_res, joint_names, q_res, frame_force_res_mapping).replay()
+    replay_trajectory(dt_res, joint_names, q_res, frame_force_res_mapping,
+                      cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn).replay()
 
 else:
     print("To visualize the robot trajectory, start the script with the '--replay")
