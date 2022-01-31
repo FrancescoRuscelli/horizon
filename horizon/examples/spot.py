@@ -7,7 +7,6 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-from matplotlib import gridspec
 import os, rospkg, argparse
 from scipy.io import loadmat
 from itertools import filterfalse
@@ -30,6 +29,7 @@ args = parser.parse_args()
 action = args.action
 
 if action == 'walk':
+
   import spot_walk
 else:
   import spot_motions

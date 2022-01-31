@@ -6,8 +6,6 @@ from horizon.transcriptions import integrators
 from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
-import matplotlib.pyplot as plt
-from matplotlib import gridspec
 import os, rospkg, argparse
 from scipy.io import loadmat
 from itertools import filterfalse
@@ -88,6 +86,8 @@ joint_names = kindyn.joint_names()
 if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
+contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
+
 # parameters
 n_c = 4
 n_q = kindyn.nq()
@@ -100,12 +100,11 @@ prb = problem.Problem(n_nodes)
 q = prb.createStateVariable('q', n_q)
 q_dot = prb.createStateVariable('q_dot', n_v)
 q_ddot = prb.createInputVariable('q_ddot', n_v)
-f_list = [prb.createInputVariable(f'f{i}', n_f) for i in range(n_c)]
+f_list = [prb.createInputVariable(f'force_{i}', n_f) for i in contacts_name]
 x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
 prb.setDt(dt)
 # contact map
-contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, f_list))
 
 # import initial guess if present
@@ -328,10 +327,12 @@ else:
 
 # ========================================================
 if plot_sol:
+    import matplotlib.pyplot as plt
+    from matplotlib import gridspec
 
     hplt = plotter.PlotterHorizon(prb, solution)
     # hplt.plotVariables(show_bounds=True, same_fig=True, legend=False)
-    hplt.plotVariables(['f0', 'f1', 'f2', 'f3'], show_bounds=True, gather=2, legend=False)
+    hplt.plotVariables([elem.getName() for elem in f_list], show_bounds=True, gather=2, legend=False)
     # hplt.plotFunctions(show_bounds=True, same_fig=True)
     # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
 
@@ -368,7 +369,7 @@ if plot_sol:
 
     plt.show()
 # ======================================================
-contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
+contact_map = {contacts_name[i]: solution[f_list[i].getName()] for i in range(n_c)}
 
 # resampling
 if resampling:
@@ -388,9 +389,6 @@ if resampling:
 if rviz_replay:
 
     # set ROS stuff and launchfile
-    r = rospkg.RosPack()
-    path_to_examples = r.get_path('horizon_examples')
-
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
     launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])

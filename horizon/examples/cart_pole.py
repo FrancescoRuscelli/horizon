@@ -67,7 +67,6 @@ if solver_type == 'gnsqp' and y_reference:
 if args.replay:
     from horizon.ros.replay_trajectory import *
     import roslaunch, rospkg, rospy
-    rviz_replay = True
     plot_sol = False
 
 
@@ -303,9 +302,6 @@ if plot_sol:
 if rviz_replay:
 
     # set ROS stuff and launchfile
-    r = rospkg.RosPack()
-    path_to_examples = r.get_path('horizon_examples')
-
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
     launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])

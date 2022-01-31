@@ -7,7 +7,6 @@ from horizon.transcriptions import integrators
 from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
-import matplotlib.pyplot as plt
 import os, math, argparse
 from itertools import filterfalse
 import rospkg
@@ -16,26 +15,25 @@ def str2bool(v):
   #susendberg's function
   return v.lower() in ("yes", "true", "t", "1")
 
-spot_solvers = ('ipopt', 'ilqr', 'gnsqp')
+spot_actions = ('walk')
 
 parser = argparse.ArgumentParser(description='spot walking: periodic gait performed by the BostonDynamics quadruped robot')
+parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=spot_actions, default=spot_actions[1])
 parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
 parser.add_argument("--codegen", '-c', type=str2bool, nargs='?', const=True, default=False, help="generate c++ code for faster solving")
-parser.add_argument('--solver', '-s', help='choose which solver will be used', choices=spot_solvers, default=spot_solvers[0])
 
 
 args = parser.parse_args()
 
 rviz_replay = args.replay
-solver_type = args.solver
 codegen = args.codegen
 
 if codegen:
-    if args.solver == 'ilqr':
-        input("code for ilqr will be generated in: '/tmp/ilqr_walk'. Press a key to resume. \n")
-    else:
-        input("codegen available only for 'ilqr' solver. Will be ignored. Press a key to resume. \n")
+    input("code for ilqr will be generated in: '/tmp/ilqr_walk'. Press a key to resume. \n")
 
+solver_type = 'ilqr'
+resampling = False
+plot_sol = True
 
 if rviz_replay:
     from horizon.ros.replay_trajectory import *
@@ -43,12 +41,13 @@ if rviz_replay:
     plot_sol = False
 
 # mat storer
-filename_with_ext = __file__
-filename, _ = os.path.splitext(filename_with_ext)
-ms = mat_storer.matStorer(f'{filename}.mat')
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+file_name = os.path.splitext(os.path.basename(__file__))[0]
+ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
+
 
 # options
-solver_type = 'ilqr'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
@@ -102,21 +101,14 @@ q.setInitialGuess(q_init)
 for f in f_list:
     f.setInitialGuess([0, 0, 55])
 
-# transcription
-if solver_type != 'ilqr':
-    th = Transcriptor.make_method(transcription_method, prb, dt, opts=transcription_opts)
-
 # dynamic feasibility
 id_fn = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 tau = id_fn.call(q, q_dot, q_ddot, contact_map)
 prb.createIntermediateConstraint("dynamic_feasibility", tau[:6])
 
-if solver_type == 'gnsqp':
-    def residual_to_cost(r):
-        return r
-else:
-    def residual_to_cost(r):
-        return cs.sumsqr(r)
+
+def residual_to_cost(r):
+    return cs.sumsqr(r)
 
 # base link vreg
 vref = prb.createParameter('vref', 3)
@@ -175,10 +167,7 @@ for i, frame in enumerate(contacts_name):
     zdes_params.append(z_des)
 
 # cost
-# prb.createCostFunction("min_rot", 10 * cs.sumsqr(q[3:6] - q_init[3:6]))
-# prb.createCostFunction("min_xy", 100 * cs.sumsqr(q[0:2] - q_init[0:2]))
 prb.createCost("min_q", residual_to_cost(0.05 * (q[7:] - q_init[7:])))
-# prb.createCostFunction("min_q_dot", 1e-2 * cs.sumsqr(q_dot))
 prb.createIntermediateCost("min_q_ddot", residual_to_cost(1e-2 * (q_ddot)))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", residual_to_cost(1e-3 * (f)))
@@ -186,11 +175,7 @@ for f in f_list:
 # =============
 # SOLVE PROBLEM
 # =============
-opts = {'ipopt.tol': 0.001,
-        'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 30,
-        'ipopt.linear_solver': 'ma57',
-        'ilqr.max_iter': 440,
+opts = {'ilqr.max_iter': 440,
         'ilqr.alpha_min': 0.1,
         'ilqr.huu_reg': 0.0,
         'ilqr.kkt_reg': 0.0,
@@ -201,19 +186,13 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.constr_decomp_type': 'qr',
         'ilqr.codegen_enabled': codegen,
         'ilqr.codegen_workdir': '/tmp/ilqr_walk',
-        'gnsqp.qp_solver': 'osqp'
         }
 
-opts['warm_start_primal'] = True
-opts['warm_start_dual'] = True
-opts['osqp.polish'] = False
-opts['osqp.verbose'] = False
-
-solver = solver.Solver.make_solver(solver_type, prb, opts)
+solv = solver.Solver.make_solver(solver_type, prb, opts)
 
 try:
-    solver.set_iteration_callback()
-    solver.plot_iter = ilqr_plot_iter
+    solv.set_iteration_callback()
+    solv.plot_iter = ilqr_plot_iter
 except:
     pass
 
@@ -307,12 +286,12 @@ def set_gait_pattern(steps: List[Step], k0: float):
 
 
 def set_initial_guess():
-    xig = np.roll(solver.x_opt, -1, axis=1)
-    xig[:, -1] = solver.x_opt[:, -1]
+    xig = np.roll(solv.x_opt, -1, axis=1)
+    xig[:, -1] = solv.x_opt[:, -1]
     prb.getState().setInitialGuess(xig)
 
-    uig = np.roll(solver.u_opt, -1, axis=1)
-    uig[:, -1] = solver.u_opt[:, -1]
+    uig = np.roll(solv.u_opt, -1, axis=1)
+    uig[:, -1] = solv.u_opt[:, -1]
     prb.getInput().setInitialGuess(uig)
 
     prb.setInitialState(x0=xig[:, 0])
@@ -322,40 +301,55 @@ vref.assign([0.05, 0, 0])
 k0 = 0
 set_gait_pattern(steps=steps, k0=k0)
 t = time.time()
-solver.solve()
+solv.solve()
 elapsed = time.time() - t
 print(f'solved in {elapsed} s')
 
-solution = solver.getSolutionDict()
+solution = solv.getSolutionDict()
+dt_sol = solv.getDt()
+cumulative_dt = np.zeros(len(dt_sol) + 1)
+for i in range(len(dt_sol)):
+    cumulative_dt[i + 1] = dt_sol[i] + cumulative_dt[i]
+
 contact_map = {contacts_name[i]: solution[f_list[i].getName()] for i in range(n_c)}
-repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED,
-                         kindyn)
 
-solver.max_iter = 1
-while True:
-    vref.assign([0.05, 0, 0])
-    k0 += 1
-    set_initial_guess()
-    set_gait_pattern(steps=steps, k0=k0)
-    t = time.time()
-    solver.solve()
-    elapsed = time.time() - t
-    print(f'solved in {elapsed} s')
+if rviz_replay:
 
-    solution = solver.getSolutionDict()
-    repl.frame_force_mapping = {contacts_name[i]: solution[f_list[i].getName()][:, 0:1] for i in range(n_c)}
-    repl.publish_joints(solution['q'][:, 0])
-    repl.publishContactForces(rospy.Time.now(), solution['q'][:, 0], 0)
+    # set ROS stuff and launchfile
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
+    launch.start()
+    rospy.loginfo("'spot' visualization started.")
 
-    for f in f_list:
-        print(f'{f.getName()} = {solution[f.getName()][2, 0]}')
+    repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED,
+                             kindyn)
+
+    solv.max_iter = 1
+    while True:
+        vref.assign([0.05, 0, 0])
+        k0 += 1
+        set_initial_guess()
+        set_gait_pattern(steps=steps, k0=k0)
+        t = time.time()
+        solv.solve()
+        elapsed = time.time() - t
+        print(f'solved in {elapsed} s')
+
+        solution = solv.getSolutionDict()
+        repl.frame_force_mapping = {contacts_name[i]: solution[f_list[i].getName()][:, 0:1] for i in range(n_c)}
+        repl.publish_joints(solution['q'][:, 0])
+        repl.publishContactForces(rospy.Time.now(), solution['q'][:, 0], 0)
+
+        for f in f_list:
+            print(f'{f.getName()} = {solution[f.getName()][2, 0]}')
 
 try:
-    solver.print_timings()
+    solv.print_timings()
 except:
     pass
 
-solution = solver.getSolutionDict()
+solution = solv.getSolutionDict()
 solution_constraints_dict = dict()
 
 if isinstance(dt, cs.SX):
@@ -366,12 +360,11 @@ else:
 
 # ========================================================
 if plot_sol:
+    import matplotlib.pyplot as plt
+    from matplotlib import gridspec
 
     hplt = plotter.PlotterHorizon(prb, solution)
-    # hplt.plotVariables(show_bounds=True, same_fig=True, legend=False)
-    hplt.plotVariables(['f0', 'f1', 'f2', 'f3'], show_bounds=True, gather=2, legend=False)
-    # hplt.plotFunctions(show_bounds=True, same_fig=True)
-    # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
+    hplt.plotVariables([elem.getName() for elem in f_list], show_bounds=True, gather=2, legend=False)
 
     pos_contact_list = list()
     fig = plt.figure()
@@ -405,47 +398,3 @@ if plot_sol:
         plt.scatter(np.array(pos[0, :]), np.array(pos[2, :]), linewidth=0.1)
 
     plt.show()
-# ======================================================
-contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
-
-# resampling
-if resampling:
-
-    if isinstance(dt, cs.SX):
-        dt_before_res = solution['dt'].flatten()
-    else:
-        dt_before_res = dt
-
-    dt_res = 0.001
-    dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
-    q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
-        solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
-        kindyn,
-        cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
-
-if rviz_replay:
-
-    # set ROS stuff and launchfile
-    r = rospkg.RosPack()
-    path_to_examples = r.get_path('horizon_examples')
-
-    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-    roslaunch.configure_logging(uuid)
-    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
-    launch.start()
-    rospy.loginfo("'spot' visualization started.")
-
-    if resampling:
-        repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res,
-                                 cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
-    else:
-        # remember to run a robot_state_publisher
-        repl = replay_trajectory(dt, joint_names, solution['q'], contact_map,
-                                 cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
-
-    repl.sleep(1.)
-    repl.replay(is_floating_base=True)
-
-else:
-    print("To visualize the robot trajectory, start the script with the '--replay")
-
