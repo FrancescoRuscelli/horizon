@@ -20,23 +20,44 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils import utils, kin_dyn
 from horizon.utils.plotter import PlotterHorizon
 
+
+def str2bool(v):
+  #susendberg's function
+  return v.lower() in ("yes", "true", "t", "1")
+
+cart_pole_actions = ()
+cart_pole_input = ('torque', 'acceleration')
+spot_solvers = ('ipopt')
+
 parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
-parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
+parser.add_argument('--input', '-i', help='choose which input of the cart-pole system', choices=cart_pole_input, default='torque')
+parser.add_argument("--minimize_t", '-t', type=str2bool, nargs='?', const=True, default=False, help="minimize the duration of the trajectory.")
+parser.add_argument("--parametric", '-p', type=str2bool, nargs='?', const=True, default=False, help="add a parametric reference for the trajectory.")
+
+# parser.add_argument('--solver', '-s', help='choose which solver will be used', choices=spot_solvers, default=spot_solvers[0])
 args = parser.parse_args()
 
 # ipopt, gnsqp, ilqr, blocksqp
-solver_type = 'gnsqp' # todo fails with 'ilqr', 'blocksqp', 'gnsqp'
-rviz_replay = False
+solver_type = 'ipopt' # todo fails with 'ilqr', 'gnsqp'
+
+rviz_replay = args.replay
+system_input = args.input
+minimize_t = args.minimize_t
+y_reference = args.parametric
+
+resampling = False
 plot_sol = True
-torque_input = True
-optimize_time = True
-y_reference = False
 
-ilqr_plot_iter = False
+# ilqr_plot_iter = False
 
-if solver_type == 'ilqr' and optimize_time:
+torque_input = False
+if system_input == 'torque':
+    torque_input = True
+
+if solver_type == 'ilqr' and minimize_t:
     input("'ilqr' solver supports only float and Parameter dt. Press a button to continue.")
-    optimize_time = False
+    minimize_t = False
 
 if solver_type == 'gnsqp' and y_reference:
     input("'gnsqp' solver does not support Parameters. Press a button to continue.")
@@ -103,7 +124,7 @@ else:
     x, xdot = utils.double_integrator(q, qdot, qddot)
 
 
-if optimize_time:
+if minimize_t:
     # Create final time variable
     dt_min = 0.005
     dt_max = 0.1
@@ -118,8 +139,8 @@ prb.setDt(dt)
 
 # Define LIMITS and INITIAL GUESS
 # joint limits + initial pos
-q_min = [-0.5, -0.5, -2.*np.pi]
-q_max = [0.5, 0.5, 2.*np.pi]
+q_min = [-0.5, -1, -2.*np.pi]
+q_max = [0.5, 1, 2.*np.pi]
 q_init = [0., 0., 0.]
 
 q.setBounds(q_min, q_max)
@@ -190,7 +211,7 @@ if solver_type == 'gnsqp':
     prb.createFinalResidual("qfinal_f", 1e-2 * (q - q_tgt))
 
 
-if optimize_time:
+if minimize_t:
     if solver_type == 'gnspq':
         prb.createResidual("min_dt", 1e2 * dt)
     else:
@@ -233,7 +254,7 @@ solv = solver.Solver.make_solver(solver_type, prb, opts=opts)
 
 if y_reference:
     # choose the reference for the cart. Notice that this can be done even AFTER the problem is built.
-    cos_fun = 1/3 * np.cos(np.linspace(np.pi / 2, 2 * np.pi, n_nodes + 1))
+    cos_fun = np.cos(np.linspace(np.pi / 2, 2 * np.pi, n_nodes + 1))
     for n in range(n_nodes + 1):
         q_ref.assign(cos_fun[n], n)
 

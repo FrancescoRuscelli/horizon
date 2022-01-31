@@ -12,23 +12,37 @@ import os, rospkg, argparse
 from scipy.io import loadmat
 from itertools import filterfalse
 
-spot_actions = ('wheelie', 'jump_up', 'jump_forward', 'jump_on_wall', 'leap')
-spot_solvers = ('ipopt', 'ilqr')
+def str2bool(v):
+  #susendberg's function
+  return v.lower() in ("yes", "true", "t", "1")
+
+spot_actions = ('wheelie', 'jump_up', 'jump_forward', 'jump_on_wall', 'leap', 'jump_twist')
+spot_solvers = ('ipopt', 'ilqr', 'gnsqp')
 
 parser = argparse.ArgumentParser(description='spot motions: a set of motions performed by the BostonDynamics quadruped robot')
 parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=spot_actions, default=spot_actions[1])
 parser.add_argument('--solver', '-s', help='choose which solver will be used', choices=spot_solvers, default=spot_solvers[0])
 parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
+parser.add_argument("--codegen", '-c', type=str2bool, nargs='?', const=True, default=False, help="generate c++ code for faster solving")
 
 args = parser.parse_args()
 
 action = args.action
 rviz_replay = args.replay
 solver_type = args.solver
+codegen = args.codegen
+
+if codegen:
+    if args.solver == 'ilqr':
+        input("code for ilqr will be generated in: '/tmp/spot_motions'. Press a key to resume. \n")
+    else:
+        input("codegen available only for 'ilqr' solver. Will be ignored. Press a key to resume. \n")
+
+
 resampling = False
 plot_sol = True
 
-if args.replay:
+if rviz_replay:
     from horizon.ros.replay_trajectory import *
     import roslaunch, rospkg, rospy
     plot_sol = False
@@ -61,7 +75,7 @@ if action == 'wheelie':
 elif action == 'leap':
     node_action = [(15, 35), (30, 45)]
 else:
-    node_action = (20, 40)
+    node_action = (20, 30)
 
 
 # load urdf
@@ -160,7 +174,7 @@ q_final[:3] = q_final[:3] + disp[:3]
 q_final[3:7] = disp[3:7]
 
 def barrier(x):
-    return cs.if_else(x > 0, 0, x ** 2)
+    return cs.sum1(cs.if_else(x > 0, 0, x ** 2))
 
 for frame, f in contact_map.items():
     nodes_stance = k_stance if frame in lifted_legs else k_all
@@ -183,8 +197,11 @@ for frame, f in contact_map.items():
 
 
     if action == 'leap':
-        gc = prb.createConstraint(f'{frame}_ground', p[2], nodes=nodes_swing)
-        gc.setLowerBounds(p_start[2])
+        if solver_type == 'ilqr':
+            prb.createIntermediateCost(f'{frame}_ground', 1e3 * barrier(p[2] - p_start[2]), nodes=nodes_swing)
+        else:
+            gc = prb.createConstraint(f'{frame}_ground', p[2], nodes=nodes_swing)
+            gc.setLowerBounds(p_start[2])
 
     if frame in lifted_legs:
         if action == 'jump_on_wall':
@@ -196,8 +213,12 @@ for frame, f in contact_map.items():
                               [-np.sin(rot), 0, np.cos(rot)]])
 
             fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R_wall)
-            prb.createIntermediateConstraint(f"{frame}_friction_cone_wall", fc,
-                                             nodes=range(k_swing[-1], n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
+            if solver_type == 'ipopt':
+                prb.createIntermediateConstraint(f"{frame}_fc_wall", fc, nodes=range(k_swing[-1], n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
+            else:
+                prb.createIntermediateCost(f"{frame}_fc_wall_lb", 1 * barrier(fc - fc_lb), nodes=range(k_swing[-1], n_nodes))
+                prb.createIntermediateCost(f"{frame}_fc_wall_ub", 1 * barrier(fc_ub - fc), nodes=range(k_swing[-1], n_nodes))
+
             prb.createFinalConstraint(f"lift_{frame}_leg", p - p_goal)
 
 
@@ -213,24 +234,70 @@ for leg in lifted_legs:
 
 
 if action != 'wheelie' and action != 'jump_on_wall':
-    prb.createFinalConstraint(f"final_nominal_pos", q - q_final)
+    if solver_type == 'ilqr':
+        prb.createFinalConstraint(f"final_nominal_pos_base", q[:6] - q_final[:6])
+        prb.createFinalCost(f"final_nominal_pos_joints", 1e3 * cs.sumsqr(q[7:] - q_final[7:]))
+    else:
+        prb.createFinalConstraint(f"final_nominal_pos", q - q_final)
+
 
 prb.createResidual("min_q_dot", q_dot)
+# prb.createIntermediateResidual("min_q_ddot", 1e-3* (q_ddot))
 for f in f_list:
     prb.createIntermediateResidual(f"min_{f.getName()}", cs.sqrt(3e-3) * f)
 
 # =============
 # SOLVE PROBLEM
 # =============
-opts = {'ipopt.tol': 0.001,
-        'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 2000,
-        # 'ipopt.linear_solver': 'ma57',
-        'ilqr.integrator': 'RK4',
-        'ilqr.closed_loop_forward_pass': True,
-        'ilqr.line_search_accept_ratio': 1e-9,
-        'ilqr.svd_threshold': 1e-12,
-        }
+
+opts = dict()
+
+if solver_type == 'ipopt':
+    opts['ipopt.tol'] = 0.001
+    opts['ipopt.constr_viol_tol'] = n_nodes * 1e-3
+    opts['ipopt.max_iter'] = 2000
+
+if solver_type == 'ilqr':
+    opts['ilqr.max_iter'] =  200
+    opts['ilqr.integrator'] ='RK4'
+    opts['ilqr.closed_loop_forward_pass'] = True
+    opts['ilqr.line_search_accept_ratio'] = 1e-9
+    opts['ilqr.constraint_violation_threshold'] = 1e-3
+    opts['ilqr.step_length_threshold'] = 1e-3
+    opts['ilqr.alpha_min'] = 0.2
+    opts['ilqr.kkt_decomp_type'] = 'qr'
+    opts['ilqr.constr_decomp_type'] = 'qr'
+    opts['ilqr.codegen_enabled'] = codegen
+    opts['ilqr.codegen_workdir'] = '/tmp/spot_motions'
+
+if solver_type == 'gnsqp':
+    qp_solver = 'osqp'
+    if qp_solver == 'osqp':
+        opts['gnsqp.qp_solver'] = 'osqp'
+        opts['warm_start_primal'] = True
+        opts['warm_start_dual'] = True
+        opts['merit_derivative_tolerance'] = 1e-6
+        opts['constraint_violation_tolerance'] = n_nodes * 1e-6
+        opts['osqp.polish'] = True # without this
+        opts['osqp.delta'] = 1e-9 # and this, it does not converge!
+        opts['osqp.verbose'] = False
+        opts['osqp.rho'] = 0.02
+        opts['osqp.scaled_termination'] = False
+    if qp_solver == 'qpoases': #does not work!
+        opts['gnsqp.qp_solver'] = 'qpoases'
+        opts['sparse'] = True
+        opts["enableEqualities"] = True
+        opts["initialStatusBounds"] = "inactive"
+        opts["numRefinementSteps"] = 0
+        opts["enableDriftCorrection"] = 0
+        opts["terminationTolerance"] = 10e9 * 1e-7
+        opts["enableFlippingBounds"] = False
+        opts["enableNZCTests"] = False
+        opts["enableRamping"] = False
+        opts["enableRegularisation"] = True
+        opts["numRegularisationSteps"] = 2
+        opts["epsRegularisation"] = 5. * 10e3 * 1e-7
+        opts['hessian_type'] =  'posdef'
 
 solv = solver.Solver.make_solver(solver_type, prb, opts)
 

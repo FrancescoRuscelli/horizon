@@ -8,9 +8,39 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os, math
+import os, math, argparse
 from itertools import filterfalse
 import rospkg
+
+def str2bool(v):
+  #susendberg's function
+  return v.lower() in ("yes", "true", "t", "1")
+
+spot_solvers = ('ipopt', 'ilqr', 'gnsqp')
+
+parser = argparse.ArgumentParser(description='spot walking: periodic gait performed by the BostonDynamics quadruped robot')
+parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
+parser.add_argument("--codegen", '-c', type=str2bool, nargs='?', const=True, default=False, help="generate c++ code for faster solving")
+parser.add_argument('--solver', '-s', help='choose which solver will be used', choices=spot_solvers, default=spot_solvers[0])
+
+
+args = parser.parse_args()
+
+rviz_replay = args.replay
+solver_type = args.solver
+codegen = args.codegen
+
+if codegen:
+    if args.solver == 'ilqr':
+        input("code for ilqr will be generated in: '/tmp/ilqr_walk'. Press a key to resume. \n")
+    else:
+        input("codegen available only for 'ilqr' solver. Will be ignored. Press a key to resume. \n")
+
+
+if rviz_replay:
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospkg, rospy
+    plot_sol = False
 
 # mat storer
 filename_with_ext = __file__
@@ -169,7 +199,7 @@ opts = {'ipopt.tol': 0.001,
         'ilqr.line_search_accept_ratio': 1e-4,
         'ilqr.kkt_decomp_type': 'ldlt',
         'ilqr.constr_decomp_type': 'qr',
-        'ilqr.codegen_enabled': True,
+        'ilqr.codegen_enabled': codegen,
         'ilqr.codegen_workdir': '/tmp/ilqr_walk',
         'gnsqp.qp_solver': 'osqp'
         }
@@ -335,42 +365,35 @@ else:
     ms.store({**solution, **solution_constraints_dict, **dt_dict})
 
 # ========================================================
-plot_all = False
-plot_fun = False
-plot_forces = False
+if plot_sol:
 
-if plot_forces:
-    for f in [f_list[i].getName() for i in range(len(contacts_name))]:
-        plt.figure()
-        for dim in range(solution[f].shape[0]):
-            plt.plot(np.array(range(solution[f].shape[1])), solution[f][dim, :])
-
-        plt.title(f'force {f}')
-
-    plt.show()
-
-if plot_fun:
     hplt = plotter.PlotterHorizon(prb, solution)
-    # hplt.plotVariables(show_bounds=True, legend=False)
-    hplt.plotFunctions(show_bounds=True)
+    # hplt.plotVariables(show_bounds=True, same_fig=True, legend=False)
+    hplt.plotVariables(['f0', 'f1', 'f2', 'f3'], show_bounds=True, gather=2, legend=False)
+    # hplt.plotFunctions(show_bounds=True, same_fig=True)
     # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
-    plt.show()
 
-if plot_all:
     pos_contact_list = list()
+    fig = plt.figure()
+    fig.suptitle('Contacts')
+    gs = gridspec.GridSpec(2, 2)
+    i = 0
     for contact in contacts_name:
+        ax = fig.add_subplot(gs[i])
+        ax.set_title('{}'.format(contact))
+        i += 1
         FK = cs.Function.deserialize(kindyn.fk(contact))
         pos = FK(q=solution['q'])['ee_pos']
-        plt.figure()
-        plt.title(contact)
-        plt.plot(pos.toarray().T)
+        for dim in range(n_f):
+            ax.plot(np.atleast_2d(cumulative_dt), np.array(pos[dim, :]), marker="x", markersize=3,
+                    linestyle='dotted')  # marker="x", markersize=3, linestyle='dotted'
 
     plt.figure()
     for contact in contacts_name:
         FK = cs.Function.deserialize(kindyn.fk(contact))
         pos = FK(q=solution['q'])['ee_pos']
 
-        plt.title(f'plane_xy')
+        plt.title(f'feet position - plane_xy')
         plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
 
     plt.figure()
@@ -378,16 +401,14 @@ if plot_all:
         FK = cs.Function.deserialize(kindyn.fk(contact))
         pos = FK(q=solution['q'])['ee_pos']
 
-        plt.title(f'plane_xz')
+        plt.title(f'feet position - plane_xz')
         plt.scatter(np.array(pos[0, :]), np.array(pos[2, :]), linewidth=0.1)
 
     plt.show()
 # ======================================================
-
-contact_map = {contacts_name[i]: solution[f_list[i].getName()] for i in range(n_c)}
+contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling
-resampling = False
 if resampling:
 
     if isinstance(dt, cs.SX):
@@ -395,19 +416,36 @@ if resampling:
     else:
         dt_before_res = dt
 
-    dt_res = 0.01
+    dt_res = 0.001
     dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
     q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
         solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
         kindyn,
         cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
-    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED,
-                             kindyn)
-else:
-    # remember to run a robot_state_publisher
-    repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED,
-                             kindyn)
+if rviz_replay:
 
-repl.sleep(1.)
-repl.replay(is_floating_base=True)
+    # set ROS stuff and launchfile
+    r = rospkg.RosPack()
+    path_to_examples = r.get_path('horizon_examples')
+
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
+    launch.start()
+    rospy.loginfo("'spot' visualization started.")
+
+    if resampling:
+        repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res,
+                                 cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    else:
+        # remember to run a robot_state_publisher
+        repl = replay_trajectory(dt, joint_names, solution['q'], contact_map,
+                                 cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+
+    repl.sleep(1.)
+    repl.replay(is_floating_base=True)
+
+else:
+    print("To visualize the robot trajectory, start the script with the '--replay")
+
