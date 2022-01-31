@@ -6,7 +6,7 @@ from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
-import os, argparse
+import os, argparse, rospkg
 import time
 from horizon.ros import utils as horizon_ros_utils
 
@@ -15,23 +15,30 @@ parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart
 parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
 args = parser.parse_args()
 # Switch between suspended and free fall
-rviz_replay = False
+rviz_replay = True
 plot_sol = True
-resample = False
+resample = True
 rope_mode = 'swing' # 'swing' # 'free_fall' # 'fixed'
 
 
-if args.replay:
+if rviz_replay:
     from horizon.ros.replay_trajectory import *
     import roslaunch, rospkg, rospy
-    rviz_replay = True
     resample = True
     plot_sol = False
 
+
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
+
 # Loading URDF model in pinocchio
-urdffile = os.path.join(os.getcwd(), 'urdf', 'roped_template.urdf')
+urdffile = os.path.join(path_to_examples, 'urdf', 'roped_template.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
+
+joint_names = kindyn.joint_names()
+if 'universe' in joint_names: joint_names.remove('universe')
+if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
 
 # OPTIMIZATION PARAMETERS
 
@@ -266,16 +273,17 @@ total_time = sum(dt_sol)
 time = np.arange(0.0, total_time + 1e-6, total_time/n_nodes)
 
 tau_sol = np.zeros(solution["qddot"].shape)
-ID = kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'])
+ID = kin_dyn.InverseDynamics(kindyn, ['rope_anchor2']) #['Contact1', 'Contact2',
 for i in range(n_nodes):
-    frame_force_mapping_i = {'Contact1': solution["f1"][:, i], 'Contact2': solution["f2"][:, i], 'rope_anchor2':  solution["frope"][:, i]}
+    # 'Contact1': solution["f1"][:, i], 'Contact2': solution["f2"][:, i],
+    frame_force_mapping_i = {'rope_anchor2': solution["frope"][:, i]}
     tau_sol[:, i] = ID.call(solution["q"][:, i], solution["qdot"][:, i], solution["qddot"][:, i], frame_force_mapping_i).toarray().flatten()
 
 
 if resample:
     # resampling
     dt_res = 0.001
-    frame_force_hist_mapping = {'Contact1': solution["f1"], 'Contact2': solution["f2"], 'rope_anchor2': solution["frope"]}
+    frame_force_hist_mapping = {'rope_anchor2': solution["frope"]} # 'Contact1': solution["f1"], 'Contact2': solution["f2"],
     q_res, qdot_res, qddot_res, frame_force_res_mapping, tau_res = resampler_trajectory.resample_torques(solution["q"], solution["qdot"], solution["qddot"], dt, dt_res, dae, frame_force_hist_mapping, kindyn)
     time_res = np.arange(0.0, q_res.shape[1] * dt_res - dt_res, dt_res)
 
@@ -333,8 +341,8 @@ if plot_sol:
         plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size=20)
 
         plt.figure()
-        f1_res = frame_force_res_mapping["Contact1"]
-        f2_res = frame_force_res_mapping["Contact2"]
+        # f1_res = frame_force_res_mapping["Contact1"]
+        # f2_res = frame_force_res_mapping["Contact2"]
         frope_res = frame_force_res_mapping["rope_anchor2"]
         for i in range(0, 3):
             plt.plot(time_res[:-1], f1_res[i, :])
@@ -356,21 +364,13 @@ if plot_sol:
 
 if rviz_replay:
 
-    r = rospkg.RosPack()
-    path_to_examples = r.get_path('horizon_examples')
-
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
     launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/roped_template.launch"])
     launch.start()
-    rospy.loginfo("'cart_pole_fd' visualization started.")
+    rospy.loginfo("'roped_robot' visualization started.")
 
-    joint_list = ['Contact1_x', 'Contact1_y', 'Contact1_z',
-                  'Contact2_x', 'Contact2_y', 'Contact2_z',
-                  'rope_anchor1_1_x', 'rope_anchor1_2_y', 'rope_anchor1_3_z',
-                  'rope_joint']
-
-    replay_trajectory(dt_res, joint_list, q_res, frame_force_res_mapping).replay()
+    replay_trajectory(dt_res, joint_names, q_res, frame_force_res_mapping).replay()
 
 else:
     print("To visualize the robot trajectory, start the script with the '--replay")
