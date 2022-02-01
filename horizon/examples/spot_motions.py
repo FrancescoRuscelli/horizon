@@ -211,7 +211,7 @@ for frame, f in contact_map.items():
                               [0,            1,           0],
                               [-np.sin(rot), 0, np.cos(rot)]])
 
-            fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R_wall)
+            fc, fc_lb, fc_ub = kin_dyn.linearized_friction_cone(f, mu, R_wall)
             if solver_type == 'ipopt':
                 prb.createIntermediateConstraint(f"{frame}_fc_wall", fc, nodes=range(k_swing[-1], n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
             else:

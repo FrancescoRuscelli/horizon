@@ -209,7 +209,7 @@ for frame, f in contact_map.items():
         prb.createConstraint(f"{frame}_vel_after_step", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friction_cone(f, mu, R)
     if frame not in active_leg:
         prb.createIntermediateConstraint(f"{frame}_friction_cone", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
     else:

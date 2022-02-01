@@ -18,7 +18,7 @@ def str2bool(v):
 spot_actions = ('walk')
 
 parser = argparse.ArgumentParser(description='spot walking: periodic gait performed by the BostonDynamics quadruped robot')
-parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=spot_actions, default=spot_actions[1])
+parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=spot_actions, default=spot_actions[0])
 parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
 parser.add_argument("--codegen", '-c', type=str2bool, nargs='?', const=True, default=False, help="generate c++ code for faster solving")
 
@@ -334,6 +334,7 @@ if rviz_replay:
         t = time.time()
         solv.solve()
         elapsed = time.time() - t
+        # todo add sleep for dt
         print(f'solved in {elapsed} s')
 
         solution = solv.getSolutionDict()

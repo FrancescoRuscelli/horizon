@@ -207,7 +207,7 @@ for frame, f in contact_map.items():
     # 2. velocity of each end effector must be zero
     DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
     v = DFK(q=q, qdot=q_dot)['ee_vel_linear']
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friction_cone(f, mu, R)
 
     if frame in ['lf_foot', 'rf_foot']:
         prb.createConstraint(f"{frame}_vel_before_lift", v, nodes=range(0, node_start_leap_front + 1))

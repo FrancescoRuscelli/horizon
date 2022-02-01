@@ -16,18 +16,18 @@ import time
 from horizon.ros import utils as horizon_ros_utils
 from itertools import filterfalse
 
-roped_robot_actions = ('jump')
+roped_robot_actions = ('rappel')
 
 parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
 parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
-parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=roped_robot_actions, default=roped_robot_actions[1])
+parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=roped_robot_actions, default=roped_robot_actions[0])
 args = parser.parse_args()
 
 # Switch between suspended and free fall
-rviz_replay = False
+rviz_replay = args.replay
+rope_mode = args.action
 plot_sol = True
 resample = True
-rope_mode = args.action
 
 if rviz_replay:
     from horizon.ros.replay_trajectory import *
@@ -75,7 +75,7 @@ frope = prb.createInputVariable("frope", nf)
 
 # Node times
 # dt = prb.createVariable("dt", 1)
-dt = 0.01
+dt = 0.1
 
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
@@ -88,7 +88,6 @@ q_min = kindyn.q_min()
 q_max = kindyn.q_max()
 
 foot_z_offset = 0.5
-
 
 q_min[:3] = [-10.0, -10.0, -10.0]
 q_min[3:7] = -1 * np.ones(4)
@@ -113,17 +112,10 @@ q.setInitialGuess(q_init)
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, 0)
 
-node_action = (20, 60) #20
-
-x_distance = -0.4
-prb.createCost("wall_distance", 100. * cs.sumsqr(q[0] - x_distance), nodes=range(node_action[0], n_nodes+1))
-prb.createCost("min_qdot", cs.sumsqr(qdot))
-# prb.createIntermediateCost("min_qddot", cs.sumsqr(qddot))
+qdot.setBounds(np.zeros(nv), np.zeros(nv), 0)
 
 
-
-
-prb.createFinalCost("final_orientation", 1e3* cs.sumsqr(q[3:7] - q_init[3:7]))
+node_action = (10, 60) #20
 
 # Constraints
 th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
@@ -132,7 +124,7 @@ tau_min = np.array([0., 0., 0., 0., 0., 0.,  # floating base
                     -1000., -1000., -1000.,  # contact 1
                     -1000., -1000., -1000.,  # contact 2
                     0., 0., 0.,  # rope anchor point
-                    0.])  # rope
+                    -100000.])  # rope
 
 tau_max = - tau_min
 
@@ -146,10 +138,16 @@ p_rope = FKRope(q=q)['ee_pos']
 
 prb.createConstraint("rope_anchor_point", p_rope - p_rope_init)
 
+x_distance = -0.4
+# prb.createCost("wall_distance", 100. * cs.sumsqr(q[0] - x_distance), nodes=range(node_action[0], n_nodes+1))
+prb.createCost("min_qdot", cs.sumsqr(qdot))
+# prb.createIntermediateCost("min_qddot", cs.sumsqr(qddot))
 
-prb.createIntermediateResidual(f"min_{f1.getName()}", 1e-3 * f1)
-prb.createIntermediateResidual(f"min_{f2.getName()}", 1e-3 * f2)
-prb.createIntermediateResidual(f"min_{frope.getName()}", 1e-3 * frope)
+# prb.createFinalCost("final_orientation", 1e3* cs.sumsqr(q[3:7] - q_init[3:7]))
+# prb.createIntermediateResidual(f"min_{f1.getName()}", 1e-3 * f1)
+# prb.createIntermediateResidual(f"min_{f2.getName()}", 1e-3 * f2)
+
+# prb.createIntermediateResidual(f"min_{frope.getName()}", 1e-3 * frope)
 
 # WALL
 mu = 0.5
@@ -179,7 +177,7 @@ for frame, f in zip(contact_names, forces):
     # STANCE PHASE
     prb.createConstraint(f"zero_{frame}_vel_touch", v, nodes=touch_nodes)
 
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R_wall)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friction_cone(f, mu, R_wall)
     prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=touch_nodes[:-1], bounds=dict(lb=fc_lb, ub=fc_ub))
 
     # FLIGHT PHASE
@@ -228,7 +226,6 @@ if resample:
     else:
         dt_before_res = dt
 
-    dt_res = 0.001
     dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': 1}
 
     dt_res = 0.001

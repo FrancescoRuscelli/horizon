@@ -163,7 +163,7 @@ for frame, f in zip(contact_names, forces):
     # STANCE PHASE
     prb.createConstraint(f"{frame}_before_jump", p - pd, nodes=range(0, lift_node))
 
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R_wall)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friction_cone(f, mu, R_wall)
     prb.createConstraint(f"{frame}_friction_cone_before_jump", fc, nodes=range(0, lift_node), bounds=dict(lb=fc_lb, ub=fc_ub))
     
 
