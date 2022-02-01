@@ -22,7 +22,7 @@ urdf = open(urdffile, 'r').read()
 
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
-
+plot_sol = True
 # OPTIMIZATION PARAMETERS
 ns = 70  # number of shooting nodes
 nc = 3  # number of contacts
@@ -192,6 +192,16 @@ solver.solve()
 
 solution = solver.getSolutionDict()
 
+
+if plot_sol:
+    # plots raw solution
+
+    hplt = plotter.PlotterHorizon(prb, solution)
+    hplt.plotVariables(['f1', 'f2', 'frope'])
+    # hplt.plotFunctions()
+    plt.show()
+
+
 q_hist = solution["q"]
 qdot_hist = solution["qdot"]
 qddot_hist = solution["qddot"]
@@ -205,8 +215,6 @@ ID = kin_dyn.InverseDynamics(kindyn, ['Contact1', 'Contact2', 'rope_anchor2'], c
 for i in range(ns):
     frame_force_mapping_i = {'Contact1': f1_hist[:, i], 'Contact2': f2_hist[:, i], 'rope_anchor2': frope_hist[:, i]}
     tau_hist[:, i] = ID.call(q_hist[:, i], qdot_hist[:, i], qddot_hist[:, i], frame_force_mapping_i).toarray().flatten()
-
-
 
 
 # resampling

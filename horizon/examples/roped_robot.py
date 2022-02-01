@@ -10,16 +10,18 @@ import os, argparse, rospkg
 import time
 from horizon.ros import utils as horizon_ros_utils
 
+roped_robot_actions = ('swing', 'free_fall', 'hang')
 
 parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
 parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=roped_robot_actions, default=roped_robot_actions[1])
 args = parser.parse_args()
+
 # Switch between suspended and free fall
-rviz_replay = True
+rviz_replay = args.replay
+rope_mode = args.action
 plot_sol = True
 resample = True
-rope_mode = 'swing' # 'swing' # 'free_fall' # 'fixed'
-
 
 if rviz_replay:
     from horizon.ros.replay_trajectory import *
@@ -299,9 +301,11 @@ if resample:
 if plot_sol:
     # plots raw solution
 
-    # hplt = plotter.PlotterHorizon(prb, solution)
-    # hplt.plotVariables()
+    hplt = plotter.PlotterHorizon(prb, solution)
+    hplt.plotVariables(['f1', 'f2', 'frope'])
     # hplt.plotFunctions()
+    plt.show()
+
 
     plt.figure()
     for i in range(0, 3):
@@ -333,42 +337,42 @@ if plot_sol:
     plt.xlabel('$\mathrm{[sec]}$', size=20)
     plt.ylabel('$\mathrm{ [N] }} $', size=20)
 
-    if resample:
-
-        plt.figure()
-        for i in range(0, 3):
-            plt.plot(time_res, q_res[i, :])
-        plt.suptitle('$\mathrm{Base \ Position \ Resampled}$', size=20)
-        plt.xlabel('$\mathrm{[sec]}$', size=20)
-        plt.ylabel('$\mathrm{[m]}$', size=20)
-
-        plt.figure()
-        for i in range(0, 3):
-            plt.plot(time_res[:-1], qddot_res[i, :])
-        plt.suptitle('$\mathrm{Base \ Acceleration \ Resampled}$', size=20)
-        plt.xlabel('$\mathrm{[sec]}$', size=20)
-        plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size=20)
-
-        plt.figure()
-        f1_res = frame_force_res_mapping["Contact1"]
-        f2_res = frame_force_res_mapping["Contact2"]
-        frope_res = frame_force_res_mapping["rope_anchor2"]
-        for i in range(0, 3):
-            plt.plot(time_res[:-1], f1_res[i, :])
-            plt.plot(time_res[:-1], f2_res[i, :])
-            plt.plot(time_res[:-1], frope_res[i, :])
-        plt.suptitle('$\mathrm{force \ feet \ and \ rope \ resampled}$', size=20)
-        plt.xlabel('$\mathrm{[sec]}$', size=20)
-        plt.ylabel('$\mathrm{ [N] } /  \mathrm{ [sec^2] } $', size=20)
-
-        plt.figure()
-        for i in range(0, 6):
-            plt.plot(time_res[:-1], tau_res[i, :], '-x')
-        plt.suptitle('$\mathrm{base \ force \ resampled}$', size=20)
-        plt.xlabel('$\mathrm{[sec]}$', size=20)
-        plt.ylabel('$\mathrm{ [N] }} $', size=20)
-
-    plt.show()
+    # if resample:
+    #
+    #     plt.figure()
+    #     for i in range(0, 3):
+    #         plt.plot(time_res, q_res[i, :])
+    #     plt.suptitle('$\mathrm{Base \ Position \ Resampled}$', size=20)
+    #     plt.xlabel('$\mathrm{[sec]}$', size=20)
+    #     plt.ylabel('$\mathrm{[m]}$', size=20)
+    #
+    #     plt.figure()
+    #     for i in range(0, 3):
+    #         plt.plot(time_res[:-1], qddot_res[i, :])
+    #     plt.suptitle('$\mathrm{Base \ Acceleration \ Resampled}$', size=20)
+    #     plt.xlabel('$\mathrm{[sec]}$', size=20)
+    #     plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size=20)
+    #
+    #     plt.figure()
+    #     f1_res = frame_force_res_mapping["Contact1"]
+    #     f2_res = frame_force_res_mapping["Contact2"]
+    #     frope_res = frame_force_res_mapping["rope_anchor2"]
+    #     for i in range(0, 3):
+    #         plt.plot(time_res[:-1], f1_res[i, :])
+    #         plt.plot(time_res[:-1], f2_res[i, :])
+    #         plt.plot(time_res[:-1], frope_res[i, :])
+    #     plt.suptitle('$\mathrm{force \ feet \ and \ rope \ resampled}$', size=20)
+    #     plt.xlabel('$\mathrm{[sec]}$', size=20)
+    #     plt.ylabel('$\mathrm{ [N] } /  \mathrm{ [sec^2] } $', size=20)
+    #
+    #     plt.figure()
+    #     for i in range(0, 6):
+    #         plt.plot(time_res[:-1], tau_res[i, :], '-x')
+    #     plt.suptitle('$\mathrm{base \ force \ resampled}$', size=20)
+    #     plt.xlabel('$\mathrm{[sec]}$', size=20)
+    #     plt.ylabel('$\mathrm{ [N] }} $', size=20)
+    #
+    # plt.show()
 
 
 if rviz_replay:
