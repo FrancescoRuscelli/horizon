@@ -21,7 +21,7 @@ parser.add_argument('--replay', help='visualize the robot trajectory in rviz', a
 args = parser.parse_args()
 
 rviz_replay = False
-plot_sol = True
+plot_sol = False
 resample = True
 
 if args.replay:
@@ -265,3 +265,77 @@ if rviz_replay:
 else:
     print("To visualize the robot trajectory, start the script with the '--replay")
 
+refine_solution = True
+if refine_solution:
+    from utils.refiner import Refiner
+
+    prev_solution = solution
+    num_samples = q_res.shape[1]
+    cumulative_dt = np.zeros([n_nodes + 1])
+    for i in range(1, n_nodes + 1):
+        cumulative_dt[i] = cumulative_dt[i - 1] + dt_sol[i - 1]
+
+    cumulative_dt_res = np.zeros([num_samples + 1])
+    for i in range(1, num_samples + 1):
+        cumulative_dt_res[i] = cumulative_dt_res[i - 1] + dt_res
+
+    tau_sol_base = tau_res[:6, :]
+
+    threshold = 5
+    ## get index of values greater than a given threshold for each dimension of the vector, and remove all the duplicate values (given by the fact that there are more dimensions)
+    indices_exceed = np.unique(np.argwhere(np.abs(tau_sol_base) > threshold)[:, 1])
+    # these indices corresponds to some nodes ..
+    values_exceed = cumulative_dt_res[indices_exceed]
+
+    ## search for duplicates and remove them, both in indices_exceed and values_exceed
+    indices_duplicates = np.where(np.in1d(values_exceed, cumulative_dt))
+    value_duplicates = values_exceed[indices_duplicates]
+
+    values_exceed = np.delete(values_exceed, np.where(np.in1d(values_exceed, value_duplicates)))
+    indices_exceed = np.delete(indices_exceed, indices_duplicates)
+
+    ## base vector nodes augmented with new nodes + sort
+    nodes_vec_augmented = np.concatenate((cumulative_dt, values_exceed))
+    nodes_vec_augmented.sort(kind='mergesort')
+
+    print(cumulative_dt)
+    ref = Refiner(prb, nodes_vec_augmented, solv)
+
+    plot_nodes = False
+    if plot_nodes:
+        plt.figure()
+        # nodes old
+        plt.scatter(nodes_vec_augmented, np.zeros([nodes_vec_augmented.shape[0]]), edgecolors='red', facecolor='none')
+        plt.scatter(nodes_vec, np.zeros([nodes_vec.shape[0]]), edgecolors='blue', facecolor='none')
+        plt.show()
+
+    # ======================================================================================================================
+    ref.resetProblem()
+    ref.resetFunctions()
+    ref.resetVarBounds()
+    ref.resetInitialGuess()
+    ref.addProximalCosts()
+    ref.solveProblem()
+    sol_var, sol_cnsrt, sol_dt = ref.getSolution()
+
+    new_prb = ref.getAugmentedProblem()
+
+
+
+    # def findExceedingValues(vec, threshold):
+    #     indices_exceed = np.unique(np.argwhere(np.abs(vec) > threshold)[:, 1])
+    #     # these indices corresponds to some nodes ..
+    #     values_exceed = cumulative_dt_res[indices_exceed]
+    #
+    #     ## search for duplicates and remove them, both in indices_exceed and values_exceed
+    #     indices_duplicates = np.where(np.in1d(values_exceed, cumulative_dt))
+    #     value_duplicates = values_exceed[indices_duplicates]
+    #
+    #     values_exceed = np.delete(values_exceed, np.where(np.in1d(values_exceed, value_duplicates)))
+    #     indices_exceed = np.delete(indices_exceed, indices_duplicates)
+    #
+    #     ## base vector nodes augmented with new nodes + sort
+    #     cumulative_dt_augmented = np.concatenate((cumulative_dt, values_exceed))
+    #     cumulative_dt_augmented.sort(kind='mergesort')
+    #
+    #     return cumulative_dt_augmented

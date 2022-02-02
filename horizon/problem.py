@@ -693,11 +693,22 @@ class Problem:
         old_dim = old_var.getDim()
         old_nodes = old_var.getNodes()
         self.removeVariable(var_name)
-        par = self.createParameter(old_name, old_dim, old_nodes)
+
+        if isinstance(old_var, sv.Variable):
+            par = self.createParameter(old_name, old_dim, old_nodes)
+        elif isinstance(old_var, sv.SingleVariable):
+            par = self.createSingleParameter(old_name, old_dim)
 
         # if the variable is also the dt, set new dt
-        if var_name == self.getDt().getName():
-            self.setDt(par)
+        dt = self.getDt()
+        # if isinstance(dt, List):
+        #     for i in range(len(dt)):
+        #         if isinstance(dt[i], (sv.Variable, sv.SingleVariable)):
+        #             if dt[i].getName() == var_name:
+        #                 dt[i] = par
+        if isinstance(dt, (sv.Variable, sv.SingleVariable)):
+            if var_name == self.getDt().getName():
+                self.setDt(par)
 
         if var_name in [input_var.getName() for input_var in self.getInput()]:
             self.getInput().removeVariable(var_name)
@@ -711,17 +722,30 @@ class Problem:
         # modify constraints on their core (correct?)
         for fun in self.getConstraints().values():
             for i in range(len(fun.vars)):
+                var_index_to_remove = list()
                 if fun.vars[i].getName() == var_name:
-                    # get the right offset, if present
-                    fun.vars[i] = par.getParOffset(fun.vars[i].getOffset())
+                    # get the right offset of the parameter, if present
+                    var_index_to_remove.append(i)
+                    fun.pars.append(par.getParOffset(fun.vars[i].getOffset()))
+
+                for index in sorted(var_index_to_remove, reverse=True):
+                    del fun.vars[index]
 
                 fun._project()
 
         # modify constraints on their core (correct?)
         for fun in self.getCosts().values():
             for i in range(len(fun.vars)):
+                var_index_to_remove = list()
                 if fun.vars[i].getName() == var_name:
-                    fun.vars[i] = par
+                    # get the right offset, if present
+                    var_index_to_remove.append(i)
+                    fun.pars.append(par.getParOffset(fun.vars[i].getOffset()))
+
+                for index in sorted(var_index_to_remove, reverse=True):
+                    del fun.vars[index]
+                # if fun.vars[i].getName() == var_name:
+                #     fun.vars[i] = par
 
                 fun._project()
 

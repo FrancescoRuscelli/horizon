@@ -12,12 +12,12 @@ import os
 from horizon.solvers import Solver
 from itertools import groupby
 from operator import itemgetter
-
+from typing import List
 class Refiner:
     def __init__(self, prb: problem.Problem, new_nodes_vec, solver):
 
-        # self.prev_solution = solver.getSolutionDict()
-        self.prev_solution = solver
+        self.solver = solver
+        self.prev_solution = self.solver.getSolutionDict()
         self.prb = prb
         self.old_n_nodes = self.prb.getNNodes()
 
@@ -26,15 +26,15 @@ class Refiner:
         #    Elements: cumulative dt
         self.new_nodes_vec = new_nodes_vec
 
-        prev_dt = self.prev_solution['dt'].flatten()
-        # prev_dt = solver.getDt()
+        # prev_dt = self.prev_solution['dt'].flatten()
+        prev_dt = self.solver.getDt()
 
         self.nodes_vec = self.get_node_time(prev_dt)
 
         self.new_n_nodes = self.new_nodes_vec.shape[0]
         self.new_dt_vec = np.diff(self.new_nodes_vec)
 
-        old_values = np.in1d(self.new_nodes_vec, nodes_vec)
+        old_values = np.in1d(self.new_nodes_vec, self.nodes_vec)
         self.new_indices = np.arange(len(self.new_nodes_vec))[~old_values]
         self.base_indices = np.arange(len(self.new_nodes_vec))[old_values]
 
@@ -61,7 +61,7 @@ class Refiner:
     def get_node_time(self, dt):
         # get cumulative list of times
         nodes_vec = np.zeros([self.old_n_nodes])
-        for i in range(1, n_nodes + 1):
+        for i in range(1, self.old_n_nodes):
             nodes_vec[i] = nodes_vec[i - 1] + dt[i - 1]
 
         return nodes_vec
@@ -158,8 +158,20 @@ class Refiner:
         # converting variable dt into parameter, if possible
 
         old_dt = self.prb.getDt()
-        if isinstance(old_dt, (Variable, SingleVariable)):
-            self.prb.toParameter(old_dt.getName())
+        # old_dt can be a list.
+        # if it is a list, get all the variables of the list.
+        # substitute them.
+        if isinstance(old_dt, List):
+            variable_to_substitute = list()
+            for elem in old_dt:
+                if isinstance(elem, (Variable, SingleVariable)) and elem not in variable_to_substitute:
+                    variable_to_substitute.append(elem)
+
+            for var in variable_to_substitute:
+                self.prb.toParameter(var.getName())
+        else:
+            if isinstance(old_dt, (Variable, SingleVariable)):
+                self.prb.toParameter(old_dt.getName())
 
     def resetFunctions(self):
         # set constraints
@@ -169,7 +181,7 @@ class Refiner:
             old_lb, old_ub = self.old_cnrst_bounds[name]
 
             print('old nodes:', old_n)
-            cnsrt_nodes_new = ref.expand_nodes(old_n)
+            cnsrt_nodes_new = self.expand_nodes(old_n)
             cnsrt.setNodes(cnsrt_nodes_new, erasing=True)
             print('new nodes:', cnsrt.getNodes())
 
@@ -222,7 +234,7 @@ class Refiner:
             print(f'============================ cost {name} =======================================')
             old_n = self.old_cost_nodes[name]
             print('old nodes:', old_n)
-            cost_nodes_new = ref.expand_nodes(old_n)
+            cost_nodes_new = self.expand_nodes(old_n)
             cost.setNodes(cost_nodes_new, erasing=True)
             print('new nodes:', cost.getNodes())
 
@@ -347,10 +359,14 @@ class Refiner:
 
         # parametric time
         param_dt = self.prb.getDt()
-        for i in range(len(self.new_dt_vec)):
-            param_dt.assign(self.new_dt_vec[i], nodes=i)
+        if isinstance(param_dt, List):
+            for elem in param_dt:
+                elem.assign(self.new_dt_vec[i], nodes=i)
+        else:
+            for i in range(len(self.new_dt_vec)):
+                param_dt.assign(self.new_dt_vec[i], nodes=i)
 
-        #
+
         # Process finished with exit code 0
 
         self.sol = Solver.make_solver('ipopt', self.prb, opts)
@@ -378,7 +394,7 @@ class Refiner:
         # one strategy is adding a "regularization" term
         proximal_cost_state = 1e5
 
-        prb.removeCostFunction('min_q_dot')
+        self.prb.removeCostFunction('min_q_dot')
         # minimize states
         for state_var in self.prb.getState().getVars(abstr=True):
             for node in range(self.new_n_nodes):
@@ -386,7 +402,7 @@ class Refiner:
                     old_sol = self.prev_solution[state_var.getName()]
                     old_n = self.new_to_old[node]
                     print(f'Creating proximal cost for variable {state_var.getName()} at node {node}')
-                    prb.createCost(f"{state_var.getName()}_proximal_{node}", proximal_cost_state * cs.sumsqr(state_var - old_sol[:, old_n]), nodes=node)
+                    self.prb.createCost(f"{state_var.getName()}_proximal_{node}", proximal_cost_state * cs.sumsqr(state_var - old_sol[:, old_n]), nodes=node)
                 if node in self.new_indices:
                     print(f'Proximal cost of {state_var} not created for node {node}: required a value')
                     # prb.createCostFunction(f"q_close_to_res_node_{node}", 1e5 * cs.sumsqr(q - q_res[:, zip_indices_new[node]]), nodes=node)
@@ -399,10 +415,10 @@ class Refiner:
                     if node in self.base_indices:
                         old_sol = self.prev_solution[input_var.getName()]
                         old_n = self.new_to_old[node]
-                        prb.createCost(f"minimize_{input_var.getName()}_node_{node}", proximal_cost_input * cs.sumsqr(input_var - old_sol[:, old_n]), nodes=node)
+                        self.prb.createCost(f"minimize_{input_var.getName()}_node_{node}", proximal_cost_input * cs.sumsqr(input_var - old_sol[:, old_n]), nodes=node)
                     if node in self.new_indices:
                         print(f'Proximal cost of {input_var} created for node {node}: without any value, it is just minimized w.r.t zero')
-                        prb.createCost(f"minimize_{input_var.getName()}_node_{node}", proximal_cost_input * cs.sumsqr(input_var), nodes=node)
+                        self.prb.createCost(f"minimize_{input_var.getName()}_node_{node}", proximal_cost_input * cs.sumsqr(input_var), nodes=node)
 
 
     def getAugmentedProblem(self):
@@ -418,7 +434,7 @@ if __name__ == '__main__':
 
     # rospack = rospkg.RosPack()
     # rospack.get_path('spot_urdf')
-    urdffile = '../playground/urdf/spot.urdf'
+    urdffile = '../examples/urdf/spot.urdf'
     urdf = open(urdffile, 'r').read()
     kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -614,31 +630,31 @@ if __name__ == '__main__':
     # SOLVE PROBLEM
     # =============
     #
-    # opts = {'ipopt.tol': 0.001,
-    #         'ipopt.constr_viol_tol': 0.001,
-    #         'ipopt.max_iter': 2000,
-    #         'ipopt.linear_solver': 'ma57'}
-    #
-    # solver = solver.Solver.make_solver('ipopt', prb, opts)
-    # solver.solve()
-    #
-    # prev_solution = solver.getSolutionDict()
-    # prev_solution_constraints = solver.getConstraintSolutionDict()
-    #
-    # n_nodes = prb.getNNodes() - 1
-    # prev_tau = prev_solution_constraints['inverse_dynamics']
-    # prev_dt = solver.getDt().flatten()
+    opts = {'ipopt.tol': 0.001,
+            'ipopt.constr_viol_tol': 0.001,
+            'ipopt.max_iter': 2000,
+            'ipopt.linear_solver': 'ma57'}
+
+    solver = solver.Solver.make_solver('ipopt', prb, opts)
+    solver.solve()
+
+    prev_solution = solver.getSolutionDict()
+    prev_solution_constraints = solver.getConstraintSolutionDict()
+
+    n_nodes = prb.getNNodes() - 1
+    prev_tau = prev_solution_constraints['inverse_dynamics']
+    prev_dt = solver.getDt().flatten()
     # ===================================================================================================================
     # =============
     # FAKE SOLVE PROBLEM
     # =============
 
-    ms = mat_storer.matStorer('../playground/spot/spot_jump.mat')
-    prev_solution = ms.load()
-    #
-    n_nodes = prev_solution['n_nodes'][0][0]
-    prev_tau = prev_solution['inverse_dynamics']['val'][0][0]
-    prev_dt = prev_solution['dt'].flatten()
+    # ms = mat_storer.matStorer('../playground/spot/spot_jump.mat')
+    # prev_solution = ms.load()
+    # #
+    # n_nodes = prev_solution['n_nodes'][0][0]
+    # prev_tau = prev_solution['inverse_dynamics']['val'][0][0]
+    # prev_dt = prev_solution['dt'].flatten()
     # =========================================
     # =========================================
     # =========================================
@@ -719,7 +735,7 @@ if __name__ == '__main__':
     # ===================================================================================================================
 
 
-    ref = Refiner(prb, nodes_vec_augmented, prev_solution)
+    ref = Refiner(prb, nodes_vec_augmented, solver)
 
     plot_nodes = False
     if plot_nodes:
@@ -753,3 +769,6 @@ if __name__ == '__main__':
 
     info_dict = dict(n_nodes=new_prb.getNNodes(), times=nodes_vec_augmented, dt=sol_dt)
     ms.store({**sol_var, **sol_cnsrt_dict, **info_dict})
+
+
+    import vis_refiner_local

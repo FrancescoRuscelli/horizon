@@ -197,7 +197,7 @@ class Solver(ABC):
         # if dt is directly an optimization variable, that's ok, I get it from the var_solution
         # if dt is a function of some other optimization variables, get all of them and compute the optimized dt
         #   I do this by using a Function to wrap everything
-        if isinstance(dt, cs.SX) and not isinstance(dt, Variable) and not isinstance(dt, SingleVariable):
+        if isinstance(dt, cs.SX) and not isinstance(dt, (Variable, SingleVariable, Parameter, SingleParameter)):
             var_depend = list()
             for var in self.prb.getVariables().values():
                 if cs.depends_on(dt, var):

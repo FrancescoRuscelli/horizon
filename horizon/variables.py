@@ -545,6 +545,10 @@ class Parameter(AbstractVariable):
         Args:
             nodes: offset of the node (shift to n node before or after)
         """
+
+        # if node == 0:
+        #     return self
+
         if node > 0:
             node = f'+{node}'
 
@@ -1015,6 +1019,9 @@ class Variable(AbstractVariable):
         """
 
         # todo call it .getOffset()
+
+        # if node == 0:
+        #     return self
 
         if node > 0:
             node = f'+{node}'
