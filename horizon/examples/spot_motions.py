@@ -22,6 +22,7 @@ parser.add_argument('--action', '-a', help='choose which action spot will perfor
 parser.add_argument('--solver', '-s', help='choose which solver will be used', choices=spot_solvers, default=spot_solvers[0])
 parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
 parser.add_argument("--codegen", '-c', type=str2bool, nargs='?', const=True, default=False, help="generate c++ code for faster solving")
+parser.add_argument("--warmstart", '-w', type=str2bool, nargs='?', const=True, default=False, help="save solutions to mat file")
 
 args = parser.parse_args()
 
@@ -29,6 +30,7 @@ action = args.action
 rviz_replay = args.replay
 solver_type = args.solver
 codegen = args.codegen
+warmstart_flag = args.warmstart
 
 if codegen:
     if args.solver == 'ilqr':
@@ -39,6 +41,7 @@ if codegen:
 
 resampling = False
 plot_sol = True
+load_initial_guess = False
 
 if rviz_replay:
     from horizon.ros.replay_trajectory import *
@@ -49,13 +52,25 @@ r = rospkg.RosPack()
 path_to_examples = r.get_path('horizon_examples')
 
 # mat storer
-file_name = os.path.splitext(os.path.basename(__file__))[0]
-ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
+if warmstart_flag:
+    file_name = os.path.splitext(os.path.basename(__file__))[0]
+    save_dir = path_to_examples + '/mat_files'
+    save_file = path_to_examples + f'/mat_files/{file_name}.mat'
+
+    if not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
+
+    ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
+
+    if os.path.isfile(save_file):
+        print(f'{file_name}.mat file found. Using previous solution as initial guess.')
+        load_initial_guess = True
+    else:
+        print(f'{file_name}.mat file NOT found. The solution will be saved for future warmstarting.')
 
 # options
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
-load_initial_guess = False
 ilqr_plot_iter = False
 
 tf = 2.5
@@ -319,11 +334,12 @@ for i in range(len(dt_sol)):
 
 solution_constraints_dict = dict()
 
-if isinstance(dt, cs.SX):
-    ms.store({**solution, **solution_constraints_dict})
-else:
-    dt_dict = dict(dt=dt)
-    ms.store({**solution, **solution_constraints_dict, **dt_dict})
+if warmstart_flag:
+    if isinstance(dt, cs.SX):
+        ms.store({**solution, **solution_constraints_dict})
+    else:
+        dt_dict = dict(dt=dt)
+        ms.store({**solution, **solution_constraints_dict, **dt_dict})
 
 # ========================================================
 if plot_sol:

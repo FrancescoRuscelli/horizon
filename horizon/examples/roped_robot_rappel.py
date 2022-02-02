@@ -75,7 +75,7 @@ frope = prb.createInputVariable("frope", nf)
 
 # Node times
 # dt = prb.createVariable("dt", 1)
-dt = 0.1
+dt = 0.02
 
 # Creates double integrator
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
@@ -112,7 +112,7 @@ q.setInitialGuess(q_init)
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, 0)
 
-qdot.setBounds(np.zeros(nv), np.zeros(nv), 0)
+qdot.setBounds(np.zeros(nv), np.zeros(nv), [0, n_nodes+1])
 
 
 node_action = (10, 60) #20
@@ -124,7 +124,7 @@ tau_min = np.array([0., 0., 0., 0., 0., 0.,  # floating base
                     -1000., -1000., -1000.,  # contact 1
                     -1000., -1000., -1000.,  # contact 2
                     0., 0., 0.,  # rope anchor point
-                    -100000.])  # rope
+                    -1000.])  # rope
 
 tau_max = - tau_min
 
@@ -139,15 +139,16 @@ p_rope = FKRope(q=q)['ee_pos']
 prb.createConstraint("rope_anchor_point", p_rope - p_rope_init)
 
 x_distance = -0.4
-# prb.createCost("wall_distance", 100. * cs.sumsqr(q[0] - x_distance), nodes=range(node_action[0], n_nodes+1))
+prb.createCost("wall_distance", 1e2 * cs.sumsqr(q[0] - x_distance), nodes=range(node_action[0], n_nodes+1))
 prb.createCost("min_qdot", cs.sumsqr(qdot))
-# prb.createIntermediateCost("min_qddot", cs.sumsqr(qddot))
 
-# prb.createFinalCost("final_orientation", 1e3* cs.sumsqr(q[3:7] - q_init[3:7]))
-# prb.createIntermediateResidual(f"min_{f1.getName()}", 1e-3 * f1)
-# prb.createIntermediateResidual(f"min_{f2.getName()}", 1e-3 * f2)
+frope_prev = frope.getVarOffset(-1)
+prb.createCost("min_df", 1e-4 * cs.sumsqr(frope-frope_prev), nodes=range(1, n_nodes))
+prb.createFinalCost("final_config", 1e3 * cs.sumsqr(q[7:13] - q_init[7:13]))
 
-# prb.createIntermediateResidual(f"min_{frope.getName()}", 1e-3 * frope)
+prb.createIntermediateResidual(f"min_{f1.getName()}", 1e-2 * f1)
+prb.createIntermediateResidual(f"min_{f2.getName()}", 1e-2 * f2)
+prb.createIntermediateResidual(f"min_{frope.getName()}", 1e-3 * frope)
 
 # WALL
 mu = 0.5
@@ -183,7 +184,7 @@ for frame, f in zip(contact_names, forces):
     # FLIGHT PHASE
     prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=lift_nodes)
 
-
+    # LAND
     surface_dict = {'a': 1., 'd': -x_foot}
     c, lb, ub = kin_dyn.surface_point_contact(surface_dict, q, kindyn, frame)
     prb.createFinalConstraint(f"{frame}_on_wall", c, bounds=dict(lb=lb, ub=ub))
@@ -191,8 +192,7 @@ for frame, f in zip(contact_names, forces):
 # Creates problem
 opts = {'ipopt.tol': 0.01,
         'ipopt.constr_viol_tol': 0.01,
-        'ipopt.max_iter': 5000,
-        'ipopt.linear_solver': 'ma57'}
+        'ipopt.max_iter': 1000}
 
 solv = solver.Solver.make_solver('ipopt', prb, opts)
 solv.solve()
@@ -210,11 +210,8 @@ for i in range(n_nodes):
 
 
 if plot_sol:
-    # plots raw solution
-
     hplt = plotter.PlotterHorizon(prb, solution)
     hplt.plotVariables(['f1', 'f2', 'frope'])
-    # hplt.plotFunctions()
     plt.show()
 
 
