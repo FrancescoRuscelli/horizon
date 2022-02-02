@@ -250,19 +250,16 @@ class Solver(ABC):
                 self.dt_solution[node_n] = dt
         # if dt is a list, get each dt separately
         elif isinstance(dt, List):
-            if len(dt) == self.prb.getNNodes() - 1:
-                for node_n in range(self.prb.getNNodes()-1):
-                    dt_val = dt[node_n]
-                    if isinstance(dt_val, SingleVariable):
-                        self.dt_solution[node_n] = self.var_solution[dt_val.getName()]
-                    elif isinstance(dt_val, Variable):
-                        current_node = dt_val.getNodes().index(node_n)
-                        sol_var = self.var_solution[dt_val.getName()].flatten()[current_node]
-                        self.dt_solution[node_n] = sol_var
-                    else:
-                        self.dt_solution[node_n] = dt[node_n]
-            else:
-                raise Exception(f'wrong dt list length: ({len(dt)}) != ({self.prb.getNNodes()-1})')
+            for node_n in range(self.prb.getNNodes()-1):
+                dt_val = dt[node_n]
+                if isinstance(dt_val, SingleVariable):
+                    self.dt_solution[node_n] = self.var_solution[dt_val.getName()]
+                elif isinstance(dt_val, Variable):
+                    current_node = dt_val.getNodes().index(node_n)
+                    sol_var = self.var_solution[dt_val.getName()].flatten()[current_node]
+                    self.dt_solution[node_n] = sol_var
+                else:
+                    self.dt_solution[node_n] = dt[node_n]
         else:
             raise ValueError(f'dt of type: {type(dt)} is not supported.')
 
