@@ -67,6 +67,10 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _line_search_accept_ratio(1e-4),
     _alpha_min(1e-3),
     _svd_threshold(1e-6),
+    _constraint_violation_threshold(1e-6),
+    _defect_norm_threshold(1e-6),
+    _merit_der_threshold(1e-6),
+    _step_length_threshold(1e-6),
     _cost(N+1, IntermediateCost(_nx, _nu)),
     _constraint(N+1, Constraint(_nx, _nu)),
     _value(N+1, ValueFunction(_nx)),
@@ -87,6 +91,10 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _line_search_accept_ratio = value_or(opt, "ilqr.line_search_accept_ratio", 1e-4);
     _alpha_min = value_or(opt, "ilqr.alpha_min", 1e-3);
     _svd_threshold = value_or(opt, "ilqr.svd_threshold", 1e-6);
+    _constraint_violation_threshold = value_or(opt, "ilqr.constraint_violation_threshold", 1e-6);
+    _defect_norm_threshold = value_or(opt, "ilqr.defect_norm_threshold", 1e-6);
+    _merit_der_threshold = value_or(opt, "ilqr.merit_der_threshold", 1e-6);
+    _step_length_threshold = value_or(opt, "ilqr.step_length_threshold", 1e-6);
     _closed_loop_forward_pass = value_or(opt, "ilqr.closed_loop_forward_pass", 1);
     _codegen_workdir = value_or<std::string>(opt, "ilqr.codegen_workdir", "/tmp");
     _codegen_enabled = value_or(opt, "ilqr.codegen_enabled", 0);
@@ -535,7 +543,7 @@ IterativeLQR::DecompositionType IterativeLQR::str_to_decomp_type(const std::stri
     }
     else if(dt_str == "cod")
     {
-        return Lu;
+        return Cod;
     }
     else if(dt_str == "svd")
     {

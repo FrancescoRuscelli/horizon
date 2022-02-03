@@ -1,0 +1,14 @@
+<launch>
+     <!-- send the cogimon robot XML to param server -->
+     <param name="robot_description" textfile="$(find horizon_examples)/urdf/quadruped_template.urdf" />
+
+    <!-- start robot state publisher -->
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" >
+        <param name="publish_frequency" type="double" value="250.0" />
+    </node>
+    
+
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find horizon_examples)/replay/rviz/quadruped_template.rviz" output="screen"/>
+
+
+</launch>

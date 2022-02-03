@@ -158,8 +158,8 @@ std::pair<double, double> IterativeLQR::compute_merit_weights()
 
 
     const double merit_safety_factor = 2.0;
-    double mu_f = lam_x_max * merit_safety_factor;
-    double mu_c = lam_g_max * merit_safety_factor;
+    double mu_f = 1;  // lam_x_max * merit_safety_factor;
+    double mu_c = 1e6;  // lam_g_max * merit_safety_factor;
 
     return {mu_f, mu_c};
 
@@ -256,6 +256,7 @@ void IterativeLQR::line_search(int iter)
     double alpha = _step_length;
     const double eta = _line_search_accept_ratio;
 
+
     // compute merit function weights
     auto [mu_f, mu_c] = compute_merit_weights();
 
@@ -332,15 +333,21 @@ void IterativeLQR::line_search(int iter)
 
 bool IterativeLQR::should_stop()
 {
+
+    const double constraint_violation_threshold = _constraint_violation_threshold;
+    const double defect_norm_threshold = _defect_norm_threshold;
+    const double merit_der_threshold = _merit_der_threshold;
+    const double step_length_threshold = _step_length_threshold;
+
     TIC(should_stop);
 
     // first, evaluate feasibility
-    if(_fp_res->constraint_violation > 1e-6)
+    if(_fp_res->constraint_violation > constraint_violation_threshold)
     {
         return false;
     }
 
-    if(_fp_res->defect_norm > 1e-6)
+    if(_fp_res->defect_norm > defect_norm_threshold)
     {
         return false;
     }
@@ -350,13 +357,13 @@ bool IterativeLQR::should_stop()
     // exit if merit function directional derivative (normalized)
     // is too close to zero
     if(_fp_res->merit_der < 0 &&
-            _fp_res->merit_der/_fp_res->merit > -1e-6)
+            _fp_res->merit_der/_fp_res->merit > - merit_der_threshold)
     {
         return true;
     }
 
     // exit if step size (normalized) is too short
-    if(_fp_res->step_length/_utrj.norm() < 1e-6)
+    if(_fp_res->step_length/_utrj.norm() < step_length_threshold)
     {
         return true;
     }

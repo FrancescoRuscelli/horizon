@@ -1,0 +1,18 @@
+<launch>
+     <!-- send the cogimon robot XML to param server -->
+     <param name="robot_description" textfile="$(find horizon_examples)/urdf/cart_pole_xy.urdf" />
+        
+    <!-- start robot state publisher -->
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" >
+        <param name="publish_frequency" type="double" value="250.0" />
+    </node>
+    
+    <!-- node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui">
+     <param name="publish_default_efforts" value="True"/>
+     </node -->
+
+    <!-- node pkg="robot_inertia_publisher" type="robot_inertia_publisher" name="robot_inertia_publisher" output="screen" / -->
+
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find horizon_examples)/replay/rviz/cart_pole.rviz" output="screen"/>
+
+</launch>

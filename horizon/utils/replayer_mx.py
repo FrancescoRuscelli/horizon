@@ -13,7 +13,7 @@ import os
 from scipy.io import loadmat
 
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../examples/urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../playground/urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -28,7 +28,7 @@ N_control = N
 
 dt = 0.02
 
-ms = mat_storer.matStorer('../examples/spot/spot_backflip_manual.mat')
+ms = mat_storer.matStorer('../playground/spot/spot_backflip_manual.mat')
 solution = ms.load()
 
 sol = solution['a']

@@ -7,19 +7,31 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, argparse, rospkg
 from scipy.io import loadmat
 
-def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
-    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
-    traj_z = np.full(traj_len_before, 0.)
-    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
-    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
-    return traj_z
+parser = argparse.ArgumentParser(
+    description='cart-pole problem: moving the cart so that the pole reaches the upright position')
+parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+args = parser.parse_args()
 
+rviz_replay = False
+resampling = False
+plot_sol = True
 
+if args.replay:
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospkg, rospy
+
+    rviz_replay = True
+    plot_sol = False
+
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
 # =========================================
-ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
+# mat storer
+file_name = os.path.splitext(os.path.basename(__file__))[0]
+ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
@@ -194,7 +206,7 @@ for frame, f in contact_map.items():
     prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friction_cone(f, mu, R)
 
     prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
     prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))

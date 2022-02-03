@@ -7,15 +7,35 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, rospkg, argparse
 
+
+parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
+parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+args = parser.parse_args()
+
+rviz_replay = False
+resampling = False
+plot_sol = True
+
+if args.replay:
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospkg, rospy
+    rviz_replay = True
+    plot_sol = False
+
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
 # =========================================
-ms = mat_storer.matStorer(f'{os.path.splitext(os.path.basename(__file__))[0]}.mat')
+# mat storer
+file_name = os.path.splitext(os.path.basename(__file__))[0]
+ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
+# load urdf
+urdffile = os.path.join(path_to_examples, 'urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -189,7 +209,7 @@ for frame, f in contact_map.items():
     prb.createConstraint(f"{frame}_vel_after_lift", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friction_cone(f, mu, R)
     prb.createIntermediateConstraint(f"{frame}_fc_before_lift", fc, nodes=range(0, node_start_step), bounds=dict(lb=fc_lb, ub=fc_ub))
     prb.createIntermediateConstraint(f"{frame}_fc_after_lift", fc, nodes=range(node_end_step, n_nodes), bounds=dict(lb=fc_lb, ub=fc_ub))
 
@@ -239,7 +259,6 @@ else:
 
 
 # ========================================================
-contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling
@@ -258,11 +277,24 @@ if resampling:
         kindyn,
         cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
-    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
-else:
-    # remember to run a robot_state_publisher
-    repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+if rviz_replay:
+    # set ROS stuff and launchfile
+    r = rospkg.RosPack()
+    path_to_examples = r.get_path('horizon_examples')
 
-repl.sleep(1.)
-repl.replay(is_floating_base=True)
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
+    launch.start()
+    rospy.loginfo("'spot_jump_twist' visualization started.")
+
+    if resampling:
+        repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    else:
+        repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+
+    repl.sleep(1.)
+    repl.replay(is_floating_base=True)
+
+
 

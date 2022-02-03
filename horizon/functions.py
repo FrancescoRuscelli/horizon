@@ -91,6 +91,7 @@ class Function:
 
 
     def _getUsedVarImpl(self):
+        # todo throw with a meaningful error when nodes inserted are wrong
         used_var_impl = list()
         for var in self.vars:
             var_impl = var.getImpl(self.getNodes())

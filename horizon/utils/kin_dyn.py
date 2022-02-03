@@ -43,7 +43,7 @@ def surface_point_contact(plane_dict, q, kindyn, frame):
     return constraint, lb, ub
 
 
-def linearized_friciton_cone(f, mu, R):
+def linearized_friction_cone(f, mu, R):
     """
     Args:
         f: force (only linear components)
