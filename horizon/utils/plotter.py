@@ -41,6 +41,9 @@ class PlotterHorizon:
             else:
                 var_dim_select = dim
 
+        if val.shape[1] == 1:
+            markers = True
+
         baseline = None
         legend_list = list()
         if isinstance(abstract_var, InputVariable):
@@ -101,29 +104,37 @@ class PlotterHorizon:
         if legend:
             ax.legend(legend_list)
 
-    def plotVariables(self, grid=False, same_fig=False, markers=False, show_bounds=True, legend=True, dim=None):
+    def plotVariables(self, names=None, grid=False, gather=None, markers=False, show_bounds=True, legend=True, dim=None):
 
         if self.solution is None:
             raise Exception('Solution not set. Cannot plot variables.')
 
-        if same_fig:
-            fig, gs = self._createPlotGrid(3, len(self.solution), 'Variables')
+        if names is None:
+            selected_sol = self.solution
+        else:
+            if isinstance(names, str):
+                names = [names]
+            selected_sol = {name: self.solution[name] for name in names}
+
+        if gather:
+
+            fig, gs = self._createPlotGrid(gather, len(selected_sol), 'Variables')
             i = 0
-            for key, val in self.solution.items():
+            for key, val in selected_sol.items():
                 ax = fig.add_subplot(gs[i])
                 if grid:
                     ax.grid(axis='x')
-                self._plotVar(val, ax, self.prb.getVariables(key), markers=markers, show_bounds=show_bounds, dim=dim)
+                self._plotVar(val, ax, self.prb.getVariables(key), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
 
                 # options
                 ax.set_title('{}'.format(key))
                 ax.ticklabel_format(useOffset=False, style='plain')
                 ax.yaxis.set_major_formatter(FormatStrFormatter('%g'))
                 # ax.set(xlabel='nodes', ylabel='vals')
-                plt.xticks(list(range(val.shape[1])))
+                # plt.xticks(list(range(val.shape[1])))
                 i = i+1
         else:
-            for key, val in self.solution.items():
+            for key, val in selected_sol.items():
                 fig, ax = plt.subplots()
                 ax.set_title('{}'.format(key))
                 if grid:
@@ -144,21 +155,20 @@ class PlotterHorizon:
         fig, ax = plt.subplots()
         if grid:
             ax.grid(axis='x')
-        self._plotVar(val, ax, prb.getVariables(name), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
+        self._plotVar(val, ax, self.prb.getVariables(name), markers=markers, show_bounds=show_bounds, legend=legend, dim=dim)
 
         ax.set_title('{}'.format(name))
-        plt.xticks(list(range(val.shape[1])))
+        # plt.xticks(list(range(val.shape[1])))
         ax.set(xlabel='nodes', ylabel='vals')
 
-    def plotFunctions(self, grid=False, same_fig=False, markers=None, show_bounds=None, legend=None, dim=None):
+    def plotFunctions(self, grid=False, gather=None, markers=None, show_bounds=None, legend=None, dim=None):
 
         if self.solution is None:
             raise Exception('Solution not set. Cannot plot functions.')
 
         if self.prb.getConstraints():
-
-            if same_fig:
-                fig, gs = self._createPlotGrid(3, len(self.prb.getConstraints()), 'Functions')
+            if gather:
+                fig, gs = self._createPlotGrid(gather, len(self.prb.getConstraints()), 'Functions')
 
                 i = 0
                 for name, fun in self.prb.getConstraints().items():

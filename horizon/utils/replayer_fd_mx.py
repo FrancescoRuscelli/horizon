@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import os
 from scipy.io import loadmat
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../examples/urdf', 'spot.urdf')
+urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../playground/urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -23,7 +23,7 @@ n_f = 3
 
 N = 50
 
-ms = mat_storer.matStorer('../examples/spot_fd_step_manual.mat')
+ms = mat_storer.matStorer('../playground/spot_fd_step_manual.mat')
 solution = ms.load()
 
 sol = solution['a']

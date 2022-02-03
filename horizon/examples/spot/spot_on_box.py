@@ -7,32 +7,30 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os
+import os, rospkg, argparse
 from scipy.io import loadmat
 
 
-def trajectoryInitializer(traj_duration, step_height, traj_len_before=0, traj_len_after=0):
-    t = np.linspace(0, 1, np.ceil(traj_duration - (traj_len_after + traj_len_before)))
-    traj_z = np.full(traj_len_before, 0.)
-    traj_z = np.append(traj_z, (64. * t ** 3. * (1. - t) ** 3.) * step_height)
-    traj_z = np.append(traj_z, np.full(traj_len_after, 0.))
-    return traj_z
+parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
+parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+args = parser.parse_args()
 
-# ========================================
-# traj = trajectoryInitializer(100, 10, 60, 10)
-# initial_q = -0.5
-# mod_q = initial_q + traj
-#
-# FK = cs.Function.deserialize(kindyn.ik(frame))
-# p = FK(q=q)['ee_pos']
-# p_start = FK(q=q_init)['ee_pos']
+rviz_replay = False
+resampling = False
+plot_sol = True
 
-# plt.scatter(range(mod_q.shape[0]), mod_q)
-# plt.show()
-# exit()
+if args.replay:
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospkg, rospy
+    rviz_replay = True
+    plot_sol = False
 
+r = rospkg.RosPack()
+path_to_examples = r.get_path('horizon_examples')
 # =========================================
-ms = mat_storer.matStorer('spot_on_box.mat')
+# mat storer
+file_name = os.path.splitext(os.path.basename(__file__))[0]
+ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
@@ -45,7 +43,6 @@ kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 joint_names = kindyn.joint_names()
 if 'universe' in joint_names: joint_names.remove('universe')
 if 'floating_base_joint' in joint_names: joint_names.remove('floating_base_joint')
-
 
 
 tot_time = 2
@@ -62,10 +59,6 @@ n_f = 3
 
 node_start_step = 50
 node_end_step = node_start_step + n_nodes_step
-print('total nodes:', n_nodes)
-print('starting node of step:', node_start_step)
-print('last node of step:', node_end_step)
-
 
 load_initial_guess = True
 
@@ -210,7 +203,7 @@ for frame, f in contact_map.items():
         prb.createConstraint(f"{frame}_vel_after_step", v, nodes=range(node_end_step, n_nodes + 1))
 
     # friction cones must be satisfied
-    fc, fc_lb, fc_ub = kin_dyn.linearized_friciton_cone(f, mu, R)
+    fc, fc_lb, fc_ub = kin_dyn.linearized_friction_cone(f, mu, R)
     if frame != active_leg:
         prb.createIntermediateConstraint(f"{frame}_friction_cone", fc, bounds=dict(lb=fc_lb, ub=fc_ub))
     else:
@@ -289,27 +282,40 @@ if plot_all:
 
     plt.show()
 # ======================================================
-
-
-contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling
 resampling = True
 if resampling:
+
+    if isinstance(dt, cs.SX):
+        dt_before_res = solution['dt'].flatten()
+    else:
+        dt_before_res = dt
+
     dt_res = 0.001
     dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
     q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
-        solution["q"], solution["q_dot"], solution["q_ddot"], dt, dt_res, dae, contact_map, kindyn,
-                                                                            cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
+        solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
+        kindyn,
+        cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
+if rviz_replay:
+    # set ROS stuff and launchfile
+    r = rospkg.RosPack()
+    path_to_examples = r.get_path('horizon_examples')
 
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
+    launch.start()
+    rospy.loginfo("'spot_jump_twist' visualization started.")
 
-    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
-else:
-    # remember to run a robot_state_publisher
-    repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    if resampling:
+        repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    else:
+        repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
 
-repl.sleep(1.)
-repl.replay(is_floating_base=True)
+    repl.sleep(1.)
+    repl.replay(is_floating_base=True)
 
