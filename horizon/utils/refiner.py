@@ -158,9 +158,8 @@ class Refiner:
         # converting variable dt into parameter, if possible
 
         old_dt = self.prb.getDt()
-        # old_dt can be a list.
-        # if it is a list, get all the variables of the list.
-        # substitute them.
+        # if old_dt is a list, get all the variables of the list.
+        # substitute them with parameters.
         if isinstance(old_dt, List):
             variable_to_substitute = list()
             for elem in old_dt:
@@ -172,6 +171,21 @@ class Refiner:
         else:
             if isinstance(old_dt, (Variable, SingleVariable)):
                 self.prb.toParameter(old_dt.getName())
+
+        self.expandDt()
+
+    def expandDt(self):
+
+        # if dt is a list, expand the list to match the new number of nodes
+        dt = self.prb.getDt()
+        if isinstance(dt, List):
+
+            old_n = range(self.prb.getNNodes()-1)
+            elem_and_expansion_masked = self.find_nodes_to_inject(old_n)
+
+            for expansion in reversed(elem_and_expansion_masked):
+                dt[expansion[0]:expansion[0]] = len(expansion[1]) * [dt[expansion[0]]]
+
 
     def resetFunctions(self):
         # set constraints
@@ -357,12 +371,14 @@ class Refiner:
                 'ipopt.max_iter': 2000,
                 'ipopt.linear_solver': 'ma57'}
 
+
         # parametric time
         param_dt = self.prb.getDt()
         if isinstance(param_dt, List):
             for elem in param_dt:
-                elem.assign(self.new_dt_vec[i], nodes=i)
-        else:
+                if isinstance(elem, Parameter):
+                    elem.assign(self.new_dt_vec[i], nodes=i)
+        elif isinstance(param_dt, Parameter):
             for i in range(len(self.new_dt_vec)):
                 param_dt.assign(self.new_dt_vec[i], nodes=i)
 
@@ -395,6 +411,12 @@ class Refiner:
         proximal_cost_state = 1e5
 
         self.prb.removeCostFunction('min_q_dot')
+
+        self.prb.removeCostFunction('min_qdot')
+        self.prb.removeCostFunction('min_qddot')
+
+
+
         # minimize states
         for state_var in self.prb.getState().getVars(abstr=True):
             for node in range(self.new_n_nodes):

@@ -701,11 +701,11 @@ class Problem:
 
         # if the variable is also the dt, set new dt
         dt = self.getDt()
-        # if isinstance(dt, List):
-        #     for i in range(len(dt)):
-        #         if isinstance(dt[i], (sv.Variable, sv.SingleVariable)):
-        #             if dt[i].getName() == var_name:
-        #                 dt[i] = par
+        if isinstance(dt, List):
+            for i in range(len(dt)):
+                if isinstance(dt[i], (sv.Variable, sv.SingleVariable)):
+                    if dt[i].getName() == var_name:
+                        dt[i] = par
         if isinstance(dt, (sv.Variable, sv.SingleVariable)):
             if var_name == self.getDt().getName():
                 self.setDt(par)
