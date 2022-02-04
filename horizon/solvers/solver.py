@@ -239,7 +239,7 @@ class Solver(ABC):
                 self.dt_solution[node_n] = self.var_solution[dt.getName()]
 
         # if dt is a value, set it to each element of dt_solution
-        elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
+        elif isinstance(dt, (Parameter, SingleParameter)):
             for node_n in range(self.prb.getNNodes()-1):
                 # get only the nodes where the dt is selected
                 # here dt at node 0 is not defined
@@ -258,6 +258,8 @@ class Solver(ABC):
                     current_node = dt_val.getNodes().index(node_n)
                     sol_var = self.var_solution[dt_val.getName()].flatten()[current_node]
                     self.dt_solution[node_n] = sol_var
+                elif isinstance(dt_val, (Parameter, SingleParameter)):
+                    self.dt_solution[node_n] = dt_val.getValues(node_n)
                 else:
                     self.dt_solution[node_n] = dt[node_n]
         else:

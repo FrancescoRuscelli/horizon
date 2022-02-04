@@ -13,6 +13,8 @@ from horizon.solvers import Solver
 from itertools import groupby
 from operator import itemgetter
 from typing import List
+
+
 class Refiner:
     def __init__(self, prb: problem.Problem, new_nodes_vec, solver):
 
@@ -158,9 +160,16 @@ class Refiner:
         # converting variable dt into parameter, if possible
 
         old_dt = self.prb.getDt()
-        # if old_dt is a list, get all the variables of the list.
-        # substitute them with parameters.
+
+        # right now, if dt is constant (or a list with even one constant) the refiner will throw. This is for many reasons:
+        # - dt has to change (since some nodes will be introduced somewhere)
+        # - constraints or costs that uses dt need to change. If dt was a constant, it wouldn't be possible.
+        if isinstance(old_dt, (float, int)) or any(isinstance(elem, (float, int)) for elem in old_dt):
+            error_description = 'A constant value for the dt is not supported. Since dt has to change, it is required a dt of type Variable/SingleVariable or Parameter/SingleParameter'
+            raise NotImplementedError(error_description)
         if isinstance(old_dt, List):
+            # if old_dt is a list, get all the variables of the list.
+            # substitute them with parameters.
             variable_to_substitute = list()
             for elem in old_dt:
                 if isinstance(elem, (Variable, SingleVariable)) and elem not in variable_to_substitute:
@@ -193,6 +202,14 @@ class Refiner:
             print(f'========================== constraint {name} =========================================')
             old_n = self.old_cnsrt_nodes[name]
             old_lb, old_ub = self.old_cnrst_bounds[name]
+
+            # if constraint depends on dt, what to do?
+            # if it is a variable, it is ok. Can be changed and recognized easily.
+            # What if it is a constant?
+            # I have to change that constant value to the new value (old dt to new dt).
+
+            # a possible thing is that i "mark" it, so that I can find it around.
+            # Otherwise it would be impossible to understand which constraint depends on dt?
 
             print('old nodes:', old_n)
             cnsrt_nodes_new = self.expand_nodes(old_n)

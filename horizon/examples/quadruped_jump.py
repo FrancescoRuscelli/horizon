@@ -67,9 +67,11 @@ for i in range(n_c):
     f_list.append(prb.createInputVariable(f'f{i}', n_f))
 
 dt_const = 0.05
+dt_par = prb.createSingleParameter('dt_par', 1)
 dt = prb.createSingleVariable("dt", 1)
 
-dt_list = (lift_node) * [dt_const] + (touch_down_node - lift_node) * [dt] + (n_nodes - touch_down_node) * [dt_const]
+dt_par.assign(dt_const)
+dt_list = (lift_node) * [dt_par] + (touch_down_node - lift_node) * [dt] + (n_nodes - touch_down_node) * [dt_par]
 
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
