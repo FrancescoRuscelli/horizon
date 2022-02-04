@@ -6,7 +6,7 @@ from horizon.transcriptions import integrators
 from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
-import os, rospkg, argparse
+import os, argparse
 from scipy.io import loadmat
 from itertools import filterfalse
 
@@ -48,8 +48,9 @@ if rviz_replay:
     import roslaunch, rospkg, rospy
     plot_sol = False
 
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
+
+path_to_examples = os.path.dirname(os.path.realpath(__file__))
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # mat storer
 if warmstart_flag:

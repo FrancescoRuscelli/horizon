@@ -1,3 +1,6 @@
 recursive-include horizon/solvers *.so
+recursive-include horizon/examples *.launch
+recursive-include horizon/examples *.rviz
 recursive-include horizon/examples *.urdf
+recursive-include horizon/examples *.xml
 recursive-include horizon/external_libs *

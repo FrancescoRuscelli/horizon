@@ -30,7 +30,6 @@ args = parser.parse_args()
 action = args.action
 
 if action == 'walk':
-
-  import spot_walk
+  from horizon.examples import spot_walk
 else:
-  import spot_motions
+  from horizon.examples import spot_motions
