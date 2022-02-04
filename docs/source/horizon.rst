@@ -33,14 +33,6 @@ horizon.misc\_function module
     :undoc-members:
     :show-inheritance:
 
-horizon.nodes module
---------------------
-
-.. automodule:: horizon.nodes
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 horizon.problem module
 ----------------------
 
