@@ -56,7 +56,7 @@ class Refiner:
 
         self.elem_and_expansion = list(zip(indices_to_expand, group_new_indices))
 
-        print('elem_and_expansion', self.elem_and_expansion)
+        print('elem_and_expansion: ', self.elem_and_expansion)
 
     def get_node_time(self, dt):
         # get cumulative list of times
@@ -373,11 +373,15 @@ class Refiner:
 
 
         # parametric time
-        param_dt = self.prb.getDt()
+        param_dt = self.prb.getDt().copy()
         if isinstance(param_dt, List):
-            for elem in param_dt:
-                if isinstance(elem, Parameter):
-                    elem.assign(self.new_dt_vec[i], nodes=i)
+            for i in range(len(param_dt)):
+                if isinstance(param_dt[i], Parameter):
+                    param_dt[i].assign(self.new_dt_vec[i], nodes=i)
+                if isinstance(param_dt[i], SingleParameter):
+                    param_dt[i].assign(self.new_dt_vec[i])
+
+            self.prb.setDt(param_dt)
         elif isinstance(param_dt, Parameter):
             for i in range(len(self.new_dt_vec)):
                 param_dt.assign(self.new_dt_vec[i], nodes=i)
