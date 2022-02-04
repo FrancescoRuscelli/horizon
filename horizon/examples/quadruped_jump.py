@@ -67,10 +67,11 @@ for i in range(n_c):
     f_list.append(prb.createInputVariable(f'f{i}', n_f))
 
 dt_const = 0.05
-dt_par = prb.createSingleParameter('dt_par', 1)
-dt = prb.createSingleVariable("dt", 1)
+dt_par = prb.createParameter('dt_par', 1)
+dt = prb.createVariable("dt", 1, nodes=range(n_nodes+1))
 
-dt_par.assign(dt_const)
+for node in range(n_nodes):
+    dt_par.assign(dt_const, node)
 dt_list = (lift_node) * [dt_par] + (touch_down_node - lift_node) * [dt] + (n_nodes - touch_down_node) * [dt_par]
 
 x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
@@ -271,7 +272,7 @@ else:
 
 refine_solution = True
 if refine_solution:
-    from utils.refiner import Refiner
+    from horizon.utils.refiner import Refiner
 
     prev_solution = solution
     num_samples = q_res.shape[1]

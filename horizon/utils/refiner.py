@@ -161,27 +161,27 @@ class Refiner:
 
         old_dt = self.prb.getDt()
 
-        # right now, if dt is constant (or a list with even one constant) the refiner will throw. This is for many reasons:
+        # todo right now, if dt is constant (or a list with even one constant) the refiner will throw. This is for many reasons:
         # - dt has to change (since some nodes will be introduced somewhere)
         # - constraints or costs that uses dt need to change. If dt was a constant, it wouldn't be possible.
-        if isinstance(old_dt, (float, int)) or any(isinstance(elem, (float, int)) for elem in old_dt):
-            error_description = 'A constant value for the dt is not supported. Since dt has to change, it is required a dt of type Variable/SingleVariable or Parameter/SingleParameter'
-            raise NotImplementedError(error_description)
+        # if not isinstance(old_dt, (Variable, Parameter)) and not all(isinstance(elem, (Variable, Parameter)) for elem in old_dt):
         if isinstance(old_dt, List):
+            error_description = 'A constant value for the dt is not supported. Since dt has to change, it is required a dt of type Variable or Parameter.'
+            raise NotImplementedError(error_description)
             # if old_dt is a list, get all the variables of the list.
             # substitute them with parameters.
-            variable_to_substitute = list()
-            for elem in old_dt:
-                if isinstance(elem, (Variable, SingleVariable)) and elem not in variable_to_substitute:
-                    variable_to_substitute.append(elem)
+            # variable_to_substitute = list()
+            # for elem in old_dt:
+            #     if isinstance(elem, (Variable, SingleVariable)) and elem not in variable_to_substitute:
+            #         variable_to_substitute.append(elem)
 
-            for var in variable_to_substitute:
-                self.prb.toParameter(var.getName())
+            # for var in variable_to_substitute:
+            #     self.prb.toParameter(var.getName())
         else:
             if isinstance(old_dt, (Variable, SingleVariable)):
                 self.prb.toParameter(old_dt.getName())
 
-        self.expandDt()
+        # self.expandDt()
 
     def expandDt(self):
 
@@ -392,19 +392,17 @@ class Refiner:
         # parametric time
         param_dt = self.prb.getDt().copy()
         if isinstance(param_dt, List):
-            for i in range(len(param_dt)):
-                if isinstance(param_dt[i], Parameter):
-                    param_dt[i].assign(self.new_dt_vec[i], nodes=i)
-                if isinstance(param_dt[i], SingleParameter):
-                    param_dt[i].assign(self.new_dt_vec[i])
-
-            self.prb.setDt(param_dt)
+            raise NotImplementedError('dt of type List is yet to implement')
+            # for i in range(len(param_dt)):
+            #     if isinstance(param_dt[i], Parameter):
+            #         param_dt[i].assign(self.new_dt_vec[i], nodes=i)
+            #     if isinstance(param_dt[i], SingleParameter):
+            #         param_dt[i].assign(self.new_dt_vec[i])
+            #
+            # self.prb.setDt(param_dt)
         elif isinstance(param_dt, Parameter):
             for i in range(len(self.new_dt_vec)):
                 param_dt.assign(self.new_dt_vec[i], nodes=i)
-
-
-        # Process finished with exit code 0
 
         self.sol = Solver.make_solver('ipopt', self.prb, opts)
         self.sol.solve()
