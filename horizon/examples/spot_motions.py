@@ -23,6 +23,7 @@ parser.add_argument('--solver', '-s', help='choose which solver will be used', c
 parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
 parser.add_argument("--codegen", '-c', type=str2bool, nargs='?', const=True, default=False, help="generate c++ code for faster solving")
 parser.add_argument("--warmstart", '-w', type=str2bool, nargs='?', const=True, default=False, help="save solutions to mat file")
+parser.add_argument("--plot", '-p', type=str2bool, nargs='?', const=True, default=True, help="plot solutions")
 
 args = parser.parse_args()
 
@@ -31,6 +32,7 @@ rviz_replay = args.replay
 solver_type = args.solver
 codegen = args.codegen
 warmstart_flag = args.warmstart
+plot_sol = args.plot
 
 if codegen:
     if args.solver == 'ilqr':
@@ -38,9 +40,7 @@ if codegen:
     else:
         input("codegen available only for 'ilqr' solver. Will be ignored. Press a key to resume. \n")
 
-
 resampling = False
-plot_sol = True
 load_initial_guess = False
 
 if rviz_replay:

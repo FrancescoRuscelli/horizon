@@ -11,6 +11,12 @@ import os, rospkg, argparse
 from scipy.io import loadmat
 from itertools import filterfalse
 
+
+class TestAction(argparse.Action):
+  def __call__(self, parser, namespace, values, option_string=None):
+    print('Starting the test')
+    parser.exit()
+
 def str2bool(v):
   #susendberg's function
   return v.lower() in ("yes", "true", "t", "1")
@@ -24,6 +30,7 @@ parser.add_argument('--solver', '-s', help='choose which solver will be used', c
 parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
 parser.add_argument("--codegen", '-c', type=str2bool, nargs='?', const=True, default=False, help="generate c++ code for faster solving")
 parser.add_argument("--warmstart", '-w', type=str2bool, nargs='?', const=True, default=False, help="save solutions to mat file")
+parser.add_argument("--plot", '-p', type=str2bool, nargs='?', const=True, default=True, help="plot solutions")
 
 args = parser.parse_args()
 

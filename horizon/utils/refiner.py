@@ -14,6 +14,12 @@ from itertools import groupby
 from operator import itemgetter
 from typing import List
 
+# todo only work with a 'dt' specified as Variable. In fact, if dt is:
+#  - a list: changing the number of nodes with the refiner means inject new nodes between two old nodes. This requires
+#    the possibility to add locally nodes, which is not yet implemented. This is important because, if nodes are injected in a given interval,
+#    all the variables and the constraints defined in that interval needs to be expanded.
+#  - constant: all the constraint and cost functions depending on a constant dt needs to be:
+#     detected (so it cannot be constant, but maybe parameter) and then modified depending on the injected nodes.
 
 class Refiner:
     def __init__(self, prb: problem.Problem, new_nodes_vec, solver):
@@ -390,7 +396,7 @@ class Refiner:
 
 
         # parametric time
-        param_dt = self.prb.getDt().copy()
+        param_dt = self.prb.getDt()
         if isinstance(param_dt, List):
             raise NotImplementedError('dt of type List is yet to implement')
             # for i in range(len(param_dt)):
@@ -745,6 +751,8 @@ if __name__ == '__main__':
 
     tau_sol_base = tau_sol_res[:6, :]
 
+
+
     threshold = 5
     ## get index of values greater than a given threshold for each dimension of the vector, and remove all the duplicate values (given by the fact that there are more dimensions)
     indices_exceed = np.unique(np.argwhere(np.abs(tau_sol_base) > threshold)[:, 1])
@@ -777,6 +785,14 @@ if __name__ == '__main__':
 
 
     ref = Refiner(prb, nodes_vec_augmented, solver)
+
+    nodes_aug = ref.findExceedingValues(tau_sol_base, threshold)
+
+    if nodes_vec_augmented == nodes_aug:
+        print('yes')
+    else:
+        print('not')
+    exit()
 
     plot_nodes = False
     if plot_nodes:
@@ -813,3 +829,103 @@ if __name__ == '__main__':
 
 
     import vis_refiner_local
+
+
+
+# refine_solution = True
+# if refine_solution:
+#     from horizon.utils.refiner import Refiner
+#
+#     prev_solution = solution
+#     num_samples = q_res.shape[1]
+#     cumulative_dt = np.zeros([n_nodes + 1])
+#     for i in range(1, n_nodes + 1):
+#         cumulative_dt[i] = cumulative_dt[i - 1] + dt_sol[i - 1]
+#
+#     cumulative_dt_res = np.zeros([num_samples + 1])
+#     for i in range(1, num_samples + 1):
+#         cumulative_dt_res[i] = cumulative_dt_res[i - 1] + dt_res
+#
+#     tau_sol_base = tau_res[:6, :]
+#
+#     threshold = 10
+#     ## get index of values greater than a given threshold for each dimension of the vector, and remove all the duplicate values (given by the fact that there are more dimensions)
+#     indices_exceed = np.unique(np.argwhere(np.abs(tau_sol_base) > threshold)[:, 1])
+#     # these indices corresponds to some nodes ..
+#     values_exceed = cumulative_dt_res[indices_exceed]
+#
+#     ## search for duplicates and remove them, both in indices_exceed and values_exceed
+#     indices_duplicates = np.where(np.in1d(values_exceed, cumulative_dt))
+#     value_duplicates = values_exceed[indices_duplicates]
+#
+#     values_exceed = np.delete(values_exceed, np.where(np.in1d(values_exceed, value_duplicates)))
+#     indices_exceed = np.delete(indices_exceed, indices_duplicates)
+#
+#     ## base vector nodes augmented with new nodes + sort
+#     cumulative_dt_augmented = np.concatenate((cumulative_dt, values_exceed))
+#     cumulative_dt_augmented.sort(kind='mergesort')
+#
+#     ref = Refiner(prb, cumulative_dt_augmented, solv)
+#
+#     plot_nodes = True
+#     if plot_nodes:
+#         plt.figure()
+#         # nodes old
+#         plt.scatter(cumulative_dt_augmented, np.zeros([cumulative_dt_augmented.shape[0]]), edgecolors='red', facecolor='none')
+#         plt.scatter(cumulative_dt, np.zeros([cumulative_dt.shape[0]]), edgecolors='blue', facecolor='none')
+#         plt.show()
+#
+#     # ======================================================================================================================
+#     ref.resetProblem()
+#     ref.resetFunctions()
+#     ref.resetVarBounds()
+#     ref.resetInitialGuess()
+#     ref.addProximalCosts()
+#     ref.solveProblem()
+#     sol_var, sol_cnsrt, sol_dt = ref.getSolution()
+#
+#     new_prb = ref.getAugmentedProblem()
+#
+#     from utils import mat_storer
+#
+#     ms = mat_storer.matStorer(f'trial_old.mat')
+#     sol_cnsrt_dict = dict()
+#     for name, item in prb.getConstraints().items():
+#         lb, ub = item.getBounds()
+#         lb_mat = np.reshape(lb, (item.getDim(), len(item.getNodes())), order='F')
+#         ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
+#         sol_cnsrt_dict[name] = dict(val=solution_constraints[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
+#
+#     info_dict = dict(n_nodes=prb.getNNodes(), times=cumulative_dt, dt=dt_sol)
+#     ms.store({**solv.getSolutionDict(), **sol_cnsrt_dict, **info_dict})
+#
+#
+#     ms = mat_storer.matStorer(f'trial.mat')
+#     sol_cnsrt_dict = dict()
+#     for name, item in new_prb.getConstraints().items():
+#         lb, ub = item.getBounds()
+#         lb_mat = np.reshape(lb, (item.getDim(), len(item.getNodes())), order='F')
+#         ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
+#         sol_cnsrt_dict[name] = dict(val=sol_cnsrt[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
+#
+#     info_dict = dict(n_nodes=new_prb.getNNodes(), times=cumulative_dt_augmented, dt=sol_dt)
+#     ms.store({**sol_var, **sol_cnsrt_dict, **info_dict})
+
+
+    # def findExceedingValues(vec, threshold):
+    #     indices_exceed = np.unique(np.argwhere(np.abs(vec) > threshold)[:, 1])
+    #     # these indices corresponds to some nodes ..
+    #     values_exceed = cumulative_dt_res[indices_exceed]
+    #
+    #     ## search for duplicates and remove them, both in indices_exceed and values_exceed
+    #     indices_duplicates = np.where(np.in1d(values_exceed, cumulative_dt))
+    #     value_duplicates = values_exceed[indices_duplicates]
+    #
+    #     values_exceed = np.delete(values_exceed, np.where(np.in1d(values_exceed, value_duplicates)))
+    #     indices_exceed = np.delete(indices_exceed, indices_duplicates)
+    #
+    #     ## base vector nodes augmented with new nodes + sort
+    #     cumulative_dt_augmented = np.concatenate((cumulative_dt, values_exceed))
+    #     cumulative_dt_augmented.sort(kind='mergesort')
+    #
+    #     return cumulative_dt_augmented

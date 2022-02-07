@@ -70,8 +70,8 @@ if args.replay:
     plot_sol = False
 
 
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
+path_to_examples = os.path.dirname(os.path.realpath(__file__))
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # Create CasADi interface to Pinocchio
 urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole_xy.urdf')

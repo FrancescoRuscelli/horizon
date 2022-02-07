@@ -6,7 +6,7 @@ from horizon.transcriptions import integrators
 from horizon.solvers import solver
 from horizon.ros.replay_trajectory import *
 import matplotlib.pyplot as plt
-import os, argparse, rospkg
+import os, argparse
 import time
 from horizon.ros import utils as horizon_ros_utils
 
@@ -30,8 +30,8 @@ if rviz_replay:
     plot_sol = False
 
 
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
+path_to_examples = os.path.dirname(os.path.realpath(__file__))
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # Loading URDF model in pinocchio
 urdffile = os.path.join(path_to_examples, 'urdf', 'roped_template.urdf')
@@ -75,8 +75,6 @@ dt = tf / n_nodes
 #     dt = prb.createVariable('dt', 1)
 #     dt.setBounds(0.05, 0.5)
 #     dt.setInitialGuess(0.1)
-
-
 
 prb.setDynamics(xdot)
 prb.setDt(dt)

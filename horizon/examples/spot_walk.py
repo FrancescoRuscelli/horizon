@@ -9,7 +9,6 @@ from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import os, math, argparse
 from itertools import filterfalse
-import rospkg
 
 def str2bool(v):
   #susendberg's function
@@ -22,6 +21,7 @@ parser.add_argument('--action', '-a', help='choose which action spot will perfor
 parser.add_argument('--replay', '-r', help='visualize the robot trajectory in rviz', action='store_true', default=False)
 parser.add_argument("--codegen", '-c', type=str2bool, nargs='?', const=True, default=False, help="generate c++ code for faster solving")
 parser.add_argument("--warmstart", '-w', type=str2bool, nargs='?', const=True, default=False, help="save solutions to mat file")
+parser.add_argument("--plot", '-p', type=str2bool, nargs='?', const=True, default=True, help="plot solutions")
 
 args = parser.parse_args()
 
@@ -42,9 +42,8 @@ if rviz_replay:
     import roslaunch, rospkg, rospy
     plot_sol = False
 
-# mat storer
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
+path_to_examples = os.path.dirname(os.path.realpath(__file__))
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 if warmstart_flag:
     file_name = os.path.splitext(os.path.basename(__file__))[0]
