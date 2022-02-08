@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-import logging
 
-import rospy
 import casadi as cs
 import numpy as np
 from horizon import problem
@@ -30,7 +28,7 @@ plot_sol = args.plot
 resample = True
 
 if rviz_replay:
-    from horizon.ros.replay_trajectory import *
+    from horizon.ros.replay_trajectory import replay_trajectory
     import roslaunch, rospy
     rviz_replay = True
     plot_sol = False
@@ -258,12 +256,15 @@ if plot_sol:
 
 if rviz_replay:
 
-    # set ROS stuff and launchfile
-    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-    roslaunch.configure_logging(uuid)
-    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/quadruped_template.launch"])
-    launch.start()
-    rospy.loginfo("quadruped_jump' visualization started.")
+    try:
+        # set ROS stuff and launchfile
+        uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+        roslaunch.configure_logging(uuid)
+        launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/quadruped_template.launch"])
+        launch.start()
+        rospy.loginfo("quadruped_jump' visualization started.")
+    except:
+        print('Failed to automatically run RVIZ. Launch it manually.')
 
     repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_sol_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
     repl.sleep(1.)

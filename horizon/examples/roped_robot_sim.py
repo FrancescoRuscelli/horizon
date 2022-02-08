@@ -21,8 +21,8 @@ def main(args):
     resample = True
 
     if rviz_replay:
-        from horizon.ros import replay_trajectory
-        import roslaunch, rospkg, rospy
+        from horizon.ros.replay_trajectory import replay_trajectory
+        import roslaunch, rospy
         resample = True
         plot_sol = False
 
@@ -373,11 +373,14 @@ def main(args):
 
     if rviz_replay:
 
-        uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-        roslaunch.configure_logging(uuid)
-        launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/roped_template.launch"])
-        launch.start()
-        rospy.loginfo("'roped_robot' visualization started.")
+        try:
+            uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+            roslaunch.configure_logging(uuid)
+            launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/roped_template.launch"])
+            launch.start()
+            rospy.loginfo("'roped_robot' visualization started.")
+        except:
+            print('Failed to automatically run RVIZ. Launch it manually.')
 
         replay_trajectory(dt_res, joint_names, q_res, frame_force_res_mapping,
                           cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn).replay()

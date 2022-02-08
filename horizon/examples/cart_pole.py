@@ -52,7 +52,7 @@ def main(args):
 
 
     if args.replay:
-        from horizon.ros import replay_trajectory
+        from horizon.ros.replay_trajectory import replay_trajectory
         import roslaunch, rospkg, rospy
         plot_sol = False
 
@@ -289,11 +289,14 @@ def main(args):
     if rviz_replay:
 
         # set ROS stuff and launchfile
-        uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-        roslaunch.configure_logging(uuid)
-        launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])
-        launch.start()
-        rospy.loginfo("'cart_pole' visualization started.")
+        try:
+            uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+            roslaunch.configure_logging(uuid)
+            launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])
+            launch.start()
+            rospy.loginfo("'cart_pole' visualization started.")
+        except:
+            print('Failed to automatically run RVIZ. Launch it manually.')
 
         # visualize the robot in RVIZ
         # joint_list=["cart_joint", "pole_joint"]

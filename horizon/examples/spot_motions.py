@@ -35,8 +35,8 @@ def main(args):
     load_initial_guess = False
 
     if rviz_replay:
-        from horizon.ros import replay_trajectory
-        import roslaunch, rospkg, rospy
+        from horizon.ros.replay_trajectory import replay_trajectory
+        import roslaunch, rospy
         plot_sol = False
 
 
@@ -396,12 +396,15 @@ def main(args):
 
     if rviz_replay:
 
-        # set ROS stuff and launchfile
-        uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-        roslaunch.configure_logging(uuid)
-        launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
-        launch.start()
-        rospy.loginfo("'spot' visualization started.")
+        try:
+            # set ROS stuff and launchfile
+            uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+            roslaunch.configure_logging(uuid)
+            launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
+            launch.start()
+            rospy.loginfo("'spot' visualization started.")
+        except:
+            print('Failed to automatically run RVIZ. Launch it manually.')
 
         if resampling:
             repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res,
