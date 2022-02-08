@@ -15,13 +15,18 @@ import matplotlib.pyplot as plt
 import os, argparse, rospkg
 from itertools import filterfalse
 
+def str2bool(v):
+  #susendberg's function
+  return v.lower() in ("yes", "true", "t", "1")
 
 parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
 parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
+parser.add_argument("--plot", '-p', type=str2bool, nargs='?', const=True, default=True, help="plot solutions")
+
 args = parser.parse_args()
 
-rviz_replay = False
-plot_sol = False
+rviz_replay = args.replay
+plot_sol = args.plot
 resample = True
 
 if rviz_replay:
