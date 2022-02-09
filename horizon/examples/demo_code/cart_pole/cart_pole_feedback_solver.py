@@ -14,25 +14,15 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver, ilqr, blocksqp
 import matplotlib.pyplot as plt
-import os, argparse, time, rospkg
+import os, time
 
-parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
-parser.add_argument('-replay', help='visualize the robot trajectory in rviz', action='store_true')
-
-args = parser.parse_args()
 
 rviz_replay = False
 plot_sol = True
 use_ilqr = True # todo false does not work!
 
-if args.replay:
-    from horizon.ros.replay_trajectory import *
-    import roslaunch, rospy
-    rviz_replay = True
-    plot_sol = False
-
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
+path_to_examples = os.path.abspath(__file__ + "/../../../")
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # Create CasADi interface to Pinocchio
 urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')

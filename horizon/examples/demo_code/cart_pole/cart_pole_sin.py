@@ -11,21 +11,13 @@ from horizon.solvers import solver
 import matplotlib.pyplot as plt
 import os
 
-try:
-    from horizon.ros.replay_trajectory import *
-
-    do_replay = True
-except ImportError:
-    do_replay = False
-
-import os, rospkg
-import time
-from horizon.ros import utils as horizon_ros_utils
-
+rviz_replay = True
+plot_sol = True
 
 # Loading URDF model in pinocchio
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
+path_to_examples = os.path.abspath(__file__ + "/../../../")
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
+
 urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole_xy.urdf')
 urdf = open(urdffile, 'r').read()
 
@@ -34,14 +26,14 @@ kindyn = pycasadi_kin_dyn.CasadiKinDyn(urdf)
 nq = kindyn.nq()
 nv = kindyn.nv()
 
-print("nq: ", nq)
-print("nv: ", nv)
-
 # OPTIMIZATION PARAMETERS
 tf = 5.0  # [s]
 ns = 80  # number of shooting nodes
 dt = tf / ns
-use_ms = True
+
+transcription_method = 'multiple_shooting'  # can choose between 'multiple_shooting' and 'direct_collocation'
+transcription_opts = dict(integrator='EULER')  # integrator used by the multiple_shooting
+
 
 # Create horizon problem
 prb = problem.Problem(ns)
@@ -85,11 +77,7 @@ qddot.setInitialGuess(qddot_init)
 # Cost function
 prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
-# Dynamics
-if use_ms:
-    th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='EULER'))
-else:
-    th = Transcriptor.make_method('direct_collocation', prb)  # opts=dict(degree=5)
+th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
 prb.createFinalConstraint("up", q[2] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
@@ -121,13 +109,28 @@ plt.suptitle('$\mathrm{Base \ Position}$', size=20)
 plt.xlabel('$\mathrm{[sec]}$', size=20)
 plt.ylabel('$\mathrm{[m]}$', size=20)
 
-plot_all = False
-if plot_all:
+
+if plot_sol:
     hplt = PlotterHorizon(prb, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
     plt.show()
 
-if do_replay:
+if rviz_replay:
+
+    from horizon.ros.replay_trajectory import replay_trajectory
+    import roslaunch, rospy
+    # set ROS stuff and launchfile
+
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole_xy.launch"])
+    launch.start()
+    rospy.loginfo("'cart_pole_final_time' visualization started.")
+
+    # visualize the robot in RVIZ
     joint_list = ["cart_joint_x", "cart_joint_y", "pole_joint"]
-    replay_trajectory(tf / ns, joint_list, q_hist).replay(is_floating_base=False)
+    replay_trajectory(tf/ns, joint_list, solution['q']).replay(is_floating_base=False)
+
+else:
+    print("To visualize the robot trajectory, start the script with the '--replay' option.")

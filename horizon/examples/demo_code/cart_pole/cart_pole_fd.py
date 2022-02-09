@@ -2,7 +2,7 @@
 
 '''
 An example of the cart-pole problem: find the trajectory of the cart so that the pole reaches the upright position.
-(difference from 'cart_pole.py': system inputs are the torques, not the accelerations)
+(difference from 'cart_pole_swing.py': system inputs are the torques, not the accelerations)
 '''
 
 from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
@@ -14,26 +14,16 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os, argparse
+import os
 
-
-parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
-parser.add_argument('-replay', help='visualize the robot trajectory in rviz', action='store_true')
-
-args = parser.parse_args()
-
-rviz_replay = False
+rviz_replay = True
 plot_sol = True
 
-if args.replay:
-    from horizon.ros.replay_trajectory import *
-    import roslaunch, rospkg, rospy
-    rviz_replay = True
-    plot_sol = False
-
+path_to_examples = os.path.abspath(__file__ + "/../../../")
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # Create CasADi interface to Pinocchio
-urdffile = os.path.join(os.getcwd(), 'urdf', 'cart_pole.urdf')
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -135,9 +125,9 @@ if plot_sol:
 
 if rviz_replay:
 
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospkg, rospy
     # set ROS stuff and launchfile
-    r = rospkg.RosPack()
-    path_to_examples = r.get_path('horizon_examples')
 
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
@@ -148,6 +138,3 @@ if rviz_replay:
     # visualize the robot in RVIZ
     joint_list=["cart_joint", "pole_joint"]
     replay_trajectory(tf/ns, joint_list, solution['q']).replay(is_floating_base=False)
-
-else:
-    print("To visualize the robot trajectory, start the script with the '--replay' option.")

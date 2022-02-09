@@ -7,25 +7,29 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os, math, rospkg
+import os, math
 from itertools import filterfalse
 
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
-# =========================================
+path_to_examples = os.path.abspath(__file__ + "/../../../")
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
+
 # mat storer
 file_name = os.path.splitext(os.path.basename(__file__))[0]
 ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
 # options
-solver_type = 'gnsqp'
+resampling = True
+rviz_replay = True
+plot_sol = True
 
+solver_type = 'gnsqp'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
+ilqr_plot_iter = False
+
 tf = 2.0
 n_nodes = 100
-ilqr_plot_iter = False
 t_jump = (1.0, 1.5)
 
 # load urdf
@@ -237,29 +241,13 @@ else:
 
 
 # ========================================================
-plot_all = False
-plot_fun = False
-plot_forces = False
-
-if plot_forces:
-    for f in [f'f{i}' for i in range(len(contacts_name))]:
-        plt.figure()
-        for dim in range(solution[f].shape[0]):
-            plt.plot(np.array(range(solution[f].shape[1])), solution[f][dim, :])
-
-        plt.title(f'force {f}')
-
-    plt.show()
-
-if plot_fun:
+if plot_sol:
 
     hplt = plotter.PlotterHorizon(prb, solution)
     # hplt.plotVariables(show_bounds=True, legend=False)
-    hplt.plotFunctions(show_bounds=True)
+    hplt.plotVariables([elem.getName() for elem in f_list], show_bounds=True, gather=2, legend=False)
     # hplt.plotFunction('inverse_dynamics', show_bounds=True, legend=True, dim=range(6))
-    plt.show()
 
-if plot_all:
     pos_contact_list = list()
     for contact in contacts_name:
         FK = cs.Function.deserialize(kindyn.fk(contact))
@@ -268,8 +256,6 @@ if plot_all:
         plt.title(contact)
         for dim in range(n_f):
             plt.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3, linestyle='dotted')
-
-        plt.vlines([node_start_step, node_end_step], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
 
     plt.figure()
     for contact in contacts_name:
@@ -293,7 +279,6 @@ if plot_all:
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling
-resampling = False
 if resampling:
 
     if isinstance(dt, cs.SX):
@@ -308,11 +293,29 @@ if resampling:
         kindyn,
         cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED)
 
-    repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
-else:
-    # remember to run a robot_state_publisher
-    repl = replay_trajectory(dt, joint_names, solution['q'], contact_map, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+if rviz_replay:
 
-repl.sleep(1.)
-repl.replay(is_floating_base=True)
+    from horizon.ros.replay_trajectory import replay_trajectory
+    import roslaunch, rospy
+
+    try:
+        # set ROS stuff and launchfile
+        uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+        roslaunch.configure_logging(uuid)
+        launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
+        launch.start()
+        rospy.loginfo("'spot' visualization started.")
+    except:
+        print('Failed to automatically run RVIZ. Launch it manually.')
+
+    if resampling:
+        repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res,
+                                 cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+    else:
+        # remember to run a robot_state_publisher
+        repl = replay_trajectory(dt, joint_names, solution['q'], contact_map,
+                                 cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
+
+    repl.sleep(1.)
+    repl.replay(is_floating_base=True)
 

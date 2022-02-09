@@ -8,28 +8,18 @@ from horizon import problem
 from horizon.utils import utils
 from horizon.transcriptions import integrators
 from horizon.solvers import solver
-from horizon.ros.replay_trajectory import replay_trajectory
 import matplotlib.pyplot as plt
-import os, argparse
+import os
 
 
-parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
-parser.add_argument('-replay', help='visualize the robot trajectory in rviz', action='store_true')
-
-args = parser.parse_args()
-
-rviz_replay = False
+rviz_replay = True
 plot_sol = True
 
-if args.replay:
-    from horizon.ros.replay_trajectory import *
-    import roslaunch, rospkg, rospy
-    rviz_replay = True
-    plot_sol = False
-
+path_to_examples = os.path.abspath(__file__ + "/../../../")
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # Create CasADi interface to Pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 
 # Create casadi interface to pinocchio
@@ -115,13 +105,13 @@ solver.solve()
 solution = solver.getSolutionDict()
 
 q_hist = solution["q"]
-Tf = solution["tf"]
+tf_sol = solution["tf"]
 
-print(f"Tf: {Tf.flatten()}")
+print(f"Tf: {tf_sol.flatten()}")
 
 if plot_sol:
 
-    time = np.arange(0.0, Tf+1e-6, Tf/ns)
+    time = np.arange(0.0, tf_sol + 1e-6, tf_sol / ns)
     plt.figure()
     plt.plot(time, q_hist[0,:])
     plt.plot(time, q_hist[1,:])
@@ -132,19 +122,19 @@ if plot_sol:
 
 if rviz_replay:
 
+    from horizon.ros.replay_trajectory import replay_trajectory
+    import roslaunch, rospy
     # set ROS stuff and launchfile
-    r = rospkg.RosPack()
-    path_to_examples = r.get_path('horizon_examples')
 
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
     launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])
     launch.start()
-    rospy.loginfo("'cart_pole_fd' visualization started.")
+    rospy.loginfo("'cart_pole_final_time' visualization started.")
 
     # visualize the robot in RVIZ
     joint_list=["cart_joint", "pole_joint"]
-    replay_trajectory(tf/ns, joint_list, solution['q']).replay(is_floating_base=False)
+    replay_trajectory(tf_sol/ns, joint_list, solution['q']).replay(is_floating_base=False)
 
 else:
     print("To visualize the robot trajectory, start the script with the '--replay' option.")

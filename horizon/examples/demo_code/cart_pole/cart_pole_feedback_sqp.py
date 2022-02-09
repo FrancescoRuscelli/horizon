@@ -7,10 +7,10 @@ from horizon import problem
 from horizon.transcriptions import integrators
 from horizon.solvers import solver, pysqp
 import matplotlib.pyplot as plt
-import os, rospkg, time
+import os, time
 
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
+path_to_examples = os.path.abspath(__file__ + "/../../../")
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # Create CasADi interface to Pinocchio
 urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')

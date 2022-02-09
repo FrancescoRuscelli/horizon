@@ -4,35 +4,26 @@
 An example of the cart-pole problem: find the trajectory of the cart so that the pole reaches the upright position.
 '''
 
-from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
+# import the necessary modules
 import casadi as cs
 import numpy as np
 from horizon import problem
-from horizon.utils import utils, kin_dyn, mat_storer
+from horizon.utils import utils, kin_dyn, mat_storer, plotter
 from horizon.transcriptions.transcriptor import Transcriptor
-from horizon.utils.plotter import PlotterHorizon
 from horizon.solvers import solver
+from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import matplotlib.pyplot as plt
-import os, argparse
+import os
 
+# get path to the examples folder and temporary add it to the environment
+path_to_examples = os.path.abspath(__file__ + "/../../../")
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
-parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
-parser.add_argument('-replay', help='visualize the robot trajectory in rviz', action='store_true')
-
-args = parser.parse_args()
-
-rviz_replay = False
+rviz_replay = True
 plot_sol = True
 
-if args.replay:
-    from horizon.ros.replay_trajectory import *
-    import roslaunch, rospkg, rospy
-    rviz_replay = True
-    plot_sol = False
-
-
 # Create CasADi interface to Pinocchio
-urdffile = os.path.join(os.getcwd(), 'urdf', 'cart_pole.urdf')
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -42,11 +33,11 @@ nv = kindyn.nv()
 
 # Optimization parameters
 tf = 5.0  # [s]
-ns = 100  # number of nodes
+ns = 50  # number of nodes
 dt = tf/ns
 
 # options for horizon transcription
-transcription_method = 'multiple_shooting'  # can choose between 'multiple_shooting' and 'direct_collocation'
+transcription_method = 'direct_collocation'  # can choose between 'multiple_shooting' and 'direct_collocation'
 transcription_opts = dict(integrator='RK4') # integrator used by the multiple_shooting
 
 # Create horizon problem
@@ -100,7 +91,7 @@ th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts
 # the torques are computed using the inverse dynamics, as the input of the problem is the cart acceleration
 tau_lims = np.array([1000., 0.])
 tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-iv = prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
+iv = prb.createIntermediateConstraint("dynamic_feasibility", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
 # Set desired constraints
 # at the last node, the pendulum is upright
@@ -134,17 +125,16 @@ if plot_sol:
     plt.xlabel('$\mathrm{[sec]}$', size = 20)
     plt.ylabel('$\mathrm{[m]}$', size = 20)
 
-    hplt = PlotterHorizon(prb, solution)
+    hplt = plotter.PlotterHorizon(prb, solution)
     # hplt.plotVariable('q', show_bounds=False)
     # hplt.plotVariable('q_dot', show_bounds=False)
-    hplt.plotFunction('inverse_dynamics', dim=[1], show_bounds=True)
+    hplt.plotFunction('dynamic_feasibility', dim=[1], show_bounds=True)
     plt.show()
 
 if rviz_replay:
-
+    import roslaunch, rospy
+    from horizon.ros.replay_trajectory import replay_trajectory
     # set ROS stuff and launchfile
-    r = rospkg.RosPack()
-    path_to_examples = r.get_path('horizon_examples')
 
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
@@ -155,9 +145,6 @@ if rviz_replay:
     # visualize the robot in RVIZ
     joint_list=["cart_joint", "pole_joint"]
     replay_trajectory(tf/ns, joint_list, solution['q']).replay(is_floating_base=False)
-
-else:
-    print("To visualize the robot trajectory, start the script with the '--replay' option.")
 
 
 

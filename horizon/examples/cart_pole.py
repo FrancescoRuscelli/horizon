@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-An example of the cart-pole problem: find the trajectory of the cart so that the pole reaches the upright position.
-(difference from 'cart_pole.py': system inputs are the torques, not the accelerations)
+An example of the cart-pole problem
 '''
 
 import argparse
@@ -292,7 +291,7 @@ def main(args):
         try:
             uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
             roslaunch.configure_logging(uuid)
-            launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])
+            launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole_xy.launch"])
             launch.start()
             rospy.loginfo("'cart_pole' visualization started.")
         except:
