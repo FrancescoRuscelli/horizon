@@ -21,7 +21,6 @@ Features
 Install
 =======
 A *pip* package is available: ``pip install casadi_horizon``
- 
 ..or, alternatively, a *conda* package is supported: ``conda install horizon -c francesco_ruscelli``
 
 Getting started
