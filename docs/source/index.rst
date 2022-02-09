@@ -5,39 +5,39 @@
 
 Welcome to horizon's documentation!
 ===================================
-A library for optimal control with a special focus on robotics systems. 
-It relies on direct methods to reduce the problem into a NLP taht can be solved using any desired state-of-the-art solver.
+A framework for trajectory optimization and optimal control tailored to robotic systems.
+It relies on direct methods to reduce an optimization problem into a NLP that can be solved using many state-of-the-art solvers.
 
 Horizon is based on `CasADi <https://web.casadi.org/>`_, a tool for nonlinear optimization and algorithmic differentiation.
+It uses `Pinocchio <https://github.com/stack-of-tasks/pinocchio>`_ to smoothly integrate the robot model into the optimization problem.
 
 Features
 ========
-- **Powerful** and **intuitive**
-- nothing else
+- complete **pipeline** from model aquisition to robot deployment 
+- **intuitive** API allowing a quick setup of the optimization problem
+- ease of configuration and highly *customizable*: integrators, transcription methods, solvers..
+- support **state-of-the-art** non linear solvers
 
 Install
 =======
-pip package is not supported yet, but until then:
- - clone the github repo `horizon <https://github.com/FrancescoRuscelli/horizon_gui>`_
- - run ``python setup.py install``
+A *pip* package is available: ``pip install casadi_horizon``
  
+..or, alternatively, a *conda* package is supported: ``conda install horizon -c francesco_ruscelli``
+
 Getting started
 =======
-If you want to get acquainted with Horizon, I prepared a brief tutorial for you:
+Some examples demonstrating trajectory optimization for different robots are available.
+Besides installing Horizon on your machine and running the examples, you can try out the framework in independent evinronments:
 
-- install the jupyter notebook (``pip install notebook``)
-- open a web browser (e.g. chrome, firefox, …)
-- go to the horizon folder
-- ``jupyter notebook horizon-notebook.ipynb``
-- the notebook should display in a page of your browser
+- on your browser, through JupyterLab: `Horizon-web <https://mybinder.org/v2/gh/FrancescoRuscelli/horizon-live/main?urlpath=lab/tree/index.ipynb>`_
+- on your machine, through Docker: `Horizon-docker` (tbd)
+
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
    
    modules
-
-
 
 Indices and tables
 ==================
