@@ -121,10 +121,8 @@ def main(args):
             q_ig = prev_solution['q']
             q_dot_ig = prev_solution['q_dot']
             q_ddot_ig = prev_solution['q_ddot']
-            f_ig_list = list()
-            i = 0
-            for f in f_list:
-                f_ig_list.append(prev_solution[f.getName()])
+            f_ig_list = [prev_solution[f.getName()] for f in f_list]
+
 
     # initial state and initial guess
     q_init = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
@@ -138,8 +136,17 @@ def main(args):
 
     q.setInitialGuess(q_init)
 
-    for f in f_list:
-        f.setInitialGuess([0, 0, 55])
+    if load_initial_guess:
+        q.setInitialGuess(q_ig)
+        q_dot.setInitialGuess(q_dot_ig)
+        q_ddot.setInitialGuess(q_ddot_ig)
+        [f.setInitialGuess(f_ig) for f, f_ig in zip(f_list, f_ig_list)]
+
+        if isinstance(dt, cs.SX):
+            dt.setInitialGuess(dt_ig)
+    else:
+        [f.setInitialGuess([0, 0, 55]) for f in f_list]
+
 
     # transcription
     if solver_type != 'ilqr':

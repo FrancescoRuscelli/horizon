@@ -59,7 +59,8 @@ x, xdot = utils.double_integrator(q, qdot, qddot)
 prb.setDynamics(xdot)
 prb.setDt(dt)
 
-# Define BOUNDS and INITIAL GUESS
+
+# ================== Set BOUNDS and INITIAL GUESS  ===============================
 # joint limits + initial pos
 q_min = [-0.5, -2.*np.pi]
 q_max = [0.5, 2.*np.pi]
@@ -83,8 +84,10 @@ q.setInitialGuess(q_init)
 qdot.setInitialGuess(qdot_init)
 qddot.setInitialGuess(qddot_init)
 
-# Set transcription method
+# ================== Set TRANSCRIPTION METHOD ===============================
 th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
+
+# ====================== Set CONSTRAINTS ===============================
 
 # Set dynamic feasibility:
 # the cart can apply a torque, the joint connecting the cart to the pendulum is UNACTUATED
@@ -99,24 +102,28 @@ prb.createFinalConstraint("up", q[1] - np.pi)
 # at the last node, the system velocity is zero
 prb.createFinalConstraint("final_qdot", qdot)
 
-# Set cost functions
+# ====================== Set COSTS ===============================
+
 # minimize the acceleration of system (regularization of the input)
 prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
-# Create solver with IPOPT and some desired option
+# the solver class accept different solvers, such as 'ipopt', 'ilqr', 'gnsqp'.
+# Different solver are useful (and feasible) in different situations.
 solv = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
 
 # Solve the problem
 solv.solve()
 
-# Get the solution as a dictionary
+# the solution is retrieved in the form of a dictionary ('variable_name' = values)
 solution = solv.getSolutionDict()
-# Get the array of dt, one for each interval between the nodes
+# the dt is retrieved as a vector of values (size: number of intervals --> n_nodes - 1)
 dt_sol = solv.getDt()
-
-########################################################################################################################
+# ====================== PLOT SOLUTION =======================
 
 if plot_sol:
+    # Horizon expose a plotter to simplify the generation of graphs
+    # Once instantiated, variables and constraints can be plotted with ease
+
     time = np.arange(0.0, tf+1e-6, tf/ns)
     plt.figure()
     plt.plot(time, solution['q'][0,:])
@@ -126,15 +133,16 @@ if plot_sol:
     plt.ylabel('$\mathrm{[m]}$', size = 20)
 
     hplt = plotter.PlotterHorizon(prb, solution)
-    # hplt.plotVariable('q', show_bounds=False)
-    # hplt.plotVariable('q_dot', show_bounds=False)
+    ## plot the desired dimensions of the constraint 'dynamic_feasibility'
     hplt.plotFunction('dynamic_feasibility', dim=[1], show_bounds=True)
     plt.show()
 
+# ====================== REPLAY SOLUTION =======================
 if rviz_replay:
+
+    # set ROS stuff and launchfile
     import roslaunch, rospy
     from horizon.ros.replay_trajectory import replay_trajectory
-    # set ROS stuff and launchfile
 
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)

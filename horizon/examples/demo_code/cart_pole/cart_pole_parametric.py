@@ -26,44 +26,60 @@ kindyn = pycasadi_kin_dyn.CasadiKinDyn(urdf)
 nq = kindyn.nq()
 nv = kindyn.nv()
 
-# OPTIMIZATION PARAMETERS
+# Optimization parameters
 tf = 5.0  # [s]
-ns = 80  # number of shooting nodes
+ns = 80  # number of nodes
 dt = tf / ns
 
-transcription_method = 'multiple_shooting'  # can choose between 'multiple_shooting' and 'direct_collocation'
-transcription_opts = dict(integrator='EULER')  # integrator used by the multiple_shooting
+# options for horizon transcription
+transcription_method = 'multiple_shooting' # can choose between 'multiple_shooting' and 'direct_collocation'
+transcription_opts = dict(integrator='EULER')# integrator used by the multiple_shooting
 
 
 # Create horizon problem
 prb = problem.Problem(ns)
 
-# Creates problem STATE variables
-# q1: cart displacement
+# creates the variables for the problem
+# design choice: position and the velocity as state and acceleration as input
+
+# q0: cart x-displacement
+# q1: cart y-displacement
 # q2: pole rotation
+
+# STATE variables
 q = prb.createStateVariable("q", nq)
 qdot = prb.createStateVariable("qdot", nv)
 
-# Creates problem CONTROL variables
+# CONTROL variables
 qddot = prb.createInputVariable("qddot", nv)
 
+# create a parameter for a reference trajectory.
+# Parameters can be left symbolic when building the problem, and must be set to a specific numerical value before solving.
+# Parameters are very useful to avoid hard-coded values or trajectories: once the problem is built, the parameters values
+# can be changed at will before solving the problem.
+# In this specific case, this parameter is the reference trajectory of the cart pole on the y-axis
 q_ref = prb.createParameter('q_ref', 1)
-# Creates double integrator
+
+# Create double integrator
 x, xdot = utils.double_integrator(q, qdot, qddot)
+
+# Set dynamics of the system and the relative dt
 prb.setDynamics(xdot)
 prb.setDt(dt)
 
-# Limits
+# ================== Set BOUNDS and INITIAL GUESS  ===============================
+# joint limits + initial pos
 q_min = [-0.5, -0.5, -2. * np.pi]
 q_max = [0.5, 0.5, 2. * np.pi]
 q_init = [0., 0., 0.]
-
+# velocity limits + initial vel
 qdot_lims = np.array([100., 100., 100.])
 qdot_init = [0., 0., 0.]
-
+# acceleration limits
 qddot_lims = np.array([1000., 1000., 1000.])
 qddot_init = [0., 0., 0.]
 
+# Set bounds
 q.setBounds(q_min, q_max)
 q.setBounds(q_init, q_init, nodes=0)
 qdot.setBounds((-qdot_lims).tolist(), qdot_lims.tolist())
@@ -75,19 +91,26 @@ qdot.setInitialGuess(qdot_init)
 qddot.setInitialGuess(qddot_init)
 
 # Cost function
-prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
+# ================== Set TRANSCRIPTION METHOD ===============================
 th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts)
 
+# ====================== Set CONSTRAINTS ===============================
+
+#
 prb.createFinalConstraint("up", q[2] - np.pi)
 prb.createFinalConstraint("final_qdot", qdot)
 
 cnrst_ref = prb.createConstraint('sinusoidal_ref', q[1] - q_ref, range(10, ns+1))
 
-# setting underactuation
+# Set dynamic feasibility:
+# the cart can apply a torque, the joint connecting the cart to the pendulum is UNACTUATED
+# the torques are computed using the inverse dynamics, as the input of the problem is the cart acceleration
 tau_lims = np.array([1000., 1000., 0.])
 tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
+
+prb.createIntermediateConstraint("dynamic_feasibility", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
+prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
 # Creates problem
 solver = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4, 'ipopt.max_iter': 2000})
@@ -131,6 +154,3 @@ if rviz_replay:
     # visualize the robot in RVIZ
     joint_list = ["cart_joint_x", "cart_joint_y", "pole_joint"]
     replay_trajectory(tf/ns, joint_list, solution['q']).replay(is_floating_base=False)
-
-else:
-    print("To visualize the robot trajectory, start the script with the '--replay' option.")
