@@ -52,6 +52,14 @@ horizon.tests.something module
     :undoc-members:
     :show-inheritance:
 
+horizon.tests.test\_examples module
+-----------------------------------
+
+.. automodule:: horizon.tests.test_examples
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 horizon.tests.test\_get\_set module
 -----------------------------------
 

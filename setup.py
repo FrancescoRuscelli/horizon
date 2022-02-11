@@ -2,7 +2,21 @@ import setuptools
 from setuptools.command.install import install
 from setuptools.command.develop import develop
 import os, sys
+import codecs
 
+def read(rel_path):
+    here = os.path.abspath(os.path.dirname(__file__))
+    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
+        return fp.read()
+
+def get_version(rel_path):
+    for line in read(rel_path).splitlines():
+        if line.startswith('__version__'):
+            delim = '"' if '"' in line else "'"
+            return line.split(delim)[1]
+    else:
+        raise RuntimeError("Unable to find version string.")
+        
 def _pre_install(dirname):
 
         # create a build dir and run 'make generate_python_package'
@@ -36,7 +50,7 @@ class CustomDevInstallCommand(develop):
 
 setuptools.setup(
     name="casadi_horizon",
-    version="0.3.0",
+    version=get_version("horizon/__init__.py"),
     author="Francesco Ruscelli",
     author_email="francesco.ruscelli@iit.it",
     description="Library for Trajectory Optimization based on CasADi",

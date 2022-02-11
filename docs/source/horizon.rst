@@ -6,8 +6,6 @@ Subpackages
 
 .. toctree::
 
-    horizon.examples
-    horizon.playground
     horizon.ros
     horizon.solvers
     horizon.tests
