@@ -245,7 +245,7 @@ prb.createCost("min_q_dot", 3 * cs.sumsqr(q_dot))
 for f in f_list:
     prb.createIntermediateCost(f"min_{f.getName()}", 0.02 * cs.sumsqr(f))
 
-# ==================+= SOLVE PROBLEM =============================
+# ==================== BUILD PROBLEM =============================
 
 # the chosen solver is IPOPT.
 # populating the options, it is possible to access the internal option of the solver.
@@ -256,6 +256,8 @@ opts = {'ipopt.tol': 0.001,
 # the solver class accept different solvers, such as 'ipopt', 'ilqr', 'gnsqp'.
 # Different solver are useful (and feasible) in different situations.
 solv = Solver.make_solver('ipopt', prb, opts)
+
+# ==================== SOLVE PROBLEM =============================
 solv.solve()
 
 # ====================== SAVE SOLUTION =======================

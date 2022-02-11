@@ -96,7 +96,6 @@ tau_lims = np.array([1000., 0.])
 tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
 iv = prb.createIntermediateConstraint("dynamic_feasibility", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
 
-# Set desired constraints
 # at the last node, the pendulum is upright
 prb.createFinalConstraint("up", q[1] - np.pi)
 # at the last node, the system velocity is zero
@@ -107,11 +106,12 @@ prb.createFinalConstraint("final_qdot", qdot)
 # minimize the acceleration of system (regularization of the input)
 prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
+# ==================== BUILD PROBLEM ===============================
 # the solver class accept different solvers, such as 'ipopt', 'ilqr', 'gnsqp'.
 # Different solver are useful (and feasible) in different situations.
 solv = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4,'ipopt.max_iter': 2000})
 
-# Solve the problem
+# ==================== SOLVE PROBLEM ===============================
 solv.solve()
 
 # the solution is retrieved in the form of a dictionary ('variable_name' = values)
@@ -151,7 +151,7 @@ if rviz_replay:
     rospy.loginfo("'cart_pole' visualization started.")
 
     # visualize the robot in RVIZ
-    joint_list=["cart_joint", "pole_joint"]
+    joint_list= ["cart_joint", "pole_joint"]
     replay_trajectory(tf/ns, joint_list, solution['q']).replay(is_floating_base=False)
 
 

@@ -97,43 +97,58 @@ th = Transcriptor.make_method(transcription_method, prb, opts=transcription_opts
 
 # ====================== Set CONSTRAINTS ===============================
 
-#
-prb.createFinalConstraint("up", q[2] - np.pi)
-prb.createFinalConstraint("final_qdot", qdot)
-
-cnrst_ref = prb.createConstraint('sinusoidal_ref', q[1] - q_ref, range(10, ns+1))
-
 # Set dynamic feasibility:
 # the cart can apply a torque, the joint connecting the cart to the pendulum is UNACTUATED
 # the torques are computed using the inverse dynamics, as the input of the problem is the cart acceleration
 tau_lims = np.array([1000., 1000., 0.])
 tau = kin_dyn.InverseDynamics(kindyn).call(q, qdot, qddot)
-
 prb.createIntermediateConstraint("dynamic_feasibility", tau, bounds=dict(lb=-tau_lims, ub=tau_lims))
+
+# at the last node, the pendulum is upright
+prb.createFinalConstraint("up", q[2] - np.pi)
+# at the last node, the system velocity is zero
+prb.createFinalConstraint("final_qdot", qdot)
+# the trajectory on the y-axis must track q_ref: notice how q_ref is a parameter and NOT a fixed trajectory.
+# It can be changed at will after building the problem
+cnrst_ref = prb.createConstraint('sinusoidal_ref', q[1] - q_ref, range(10, ns+1))
+
+# ====================== Set COSTS ===============================
+
+# minimize the acceleration of system (regularization of the input)
 prb.createIntermediateCost("qddot", cs.sumsqr(qddot))
 
-# Creates problem
+# ==================== BUILD PROBLEM ===============================
+# the solver class accept different solvers, such as 'ipopt', 'ilqr', 'gnsqp'.
+# Different solver are useful (and feasible) in different situations.
 solver = solver.Solver.make_solver('ipopt', prb, opts={'ipopt.tol': 1e-4, 'ipopt.max_iter': 2000})
 
+# the problem is built. Depending on the size of the problem, it may require some time
+# Setting the numerical values of the parameter AFTER the problem is build
+# This values can be changed at will before solving the problem
+# In this case, a cosine function is set as the trajectory of the cart on the y-axis
 cos_fun = 1/3 * np.cos(np.linspace(np.pi/2, 4*2*np.pi, ns+1))
 cos_fun = np.atleast_2d(cos_fun)
 q_ref.assign(cos_fun)
 
-
+# ==================== SOLVE PROBLEM ===============================
 solver.solve()
+# the solution is retrieved in the form of a dictionary ('variable_name' = values)
+
 solution = solver.getSolutionDict()
-q_hist = solution['q']
 
 time = np.arange(0.0, tf + 1e-6, tf / ns)
 plt.figure()
-plt.plot(time, q_hist[0, :])
-plt.plot(time, q_hist[1, :])
+plt.plot(time, solution['q'][0, :])
+plt.plot(time, solution['q'][1, :])
 plt.suptitle('$\mathrm{Base \ Position}$', size=20)
 plt.xlabel('$\mathrm{[sec]}$', size=20)
 plt.ylabel('$\mathrm{[m]}$', size=20)
 
 
 if plot_sol:
+    # Horizon expose a plotter to simplify the generation of graphs
+    # Once instantiated, variables and constraints can be plotted with ease
+
     hplt = PlotterHorizon(prb, solution)
     hplt.plotVariables()
     hplt.plotFunctions()
@@ -141,6 +156,7 @@ if plot_sol:
 
 if rviz_replay:
 
+    # set ROS stuff and launchfile
     from horizon.ros.replay_trajectory import replay_trajectory
     import roslaunch, rospy
     # set ROS stuff and launchfile
