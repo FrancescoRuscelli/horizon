@@ -8,7 +8,6 @@ Subpackages
 
     horizon.ros
     horizon.solvers
-    horizon.tests
     horizon.transcriptions
     horizon.utils
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+from random import random
 
 
 
@@ -49,18 +50,16 @@ class Updater:
             count_staged_files = len(repo.index.diff("HEAD"))
 
             if count_staged_files != 0:
-                repo.index.commit(self.commit_message)
-                repo.create_tag(f'{self.commit_tag}')
+                commit = repo.index.commit(self.commit_message)
+                new_tag = repo.create_tag(f'{self.commit_tag}', ref=commit)
+
+                if push:
+                    print("pushing...")
+                    origin = repo.remote(name='origin')
+                    origin.push(new_tag)
+                    print('done')
             else:
                 print('nothing to commit.')
-
-            print('done')
-
-            if push:
-                print(f"pushing...")
-                origin = repo.remote(name='origin')
-                origin.push()
-                print('done')
 
         except Exception as e:
             print(e)    
@@ -73,6 +72,7 @@ class Updater:
         ignored_files = []
         ignored_files.append(self.package + '/playground/')
         ignored_files.append(self.package + '/examples/')
+        ignored_files.append(self.package + '/tests/')
 
         build_docs_with_sphinx = ["sphinx-apidoc", "-f", "-o", "docs/source", self.package]
         build_docs_with_sphinx.extend(ignored_files)
@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     package_name = "horizon"
     updr = Updater(package_name)
-    #updr.git_update(args.push)
+    updr.git_update(args.push)
     
     if args.docs:
         updr.docs_update()
