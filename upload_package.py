@@ -62,7 +62,7 @@ class Updater:
                 print('nothing to commit.')
 
         except Exception as e:
-            print(e)    
+            print(e)
 
 
     def docs_update(self):
