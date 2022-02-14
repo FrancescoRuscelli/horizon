@@ -2,8 +2,6 @@
 import argparse
 from random import random
 
-
-
 '''
 this file reads the version of the project from __init__ and push everything with tag
 when tag is added, Travis.ci will upload the project to pip
@@ -44,6 +42,7 @@ class Updater:
 
     def git_update(self, push=False):
         print(f"committing and tagging this version...")
+
         try:
             repo = Repo(self.path_to_git_repo)
             repo.git.add('.')
@@ -55,8 +54,7 @@ class Updater:
 
                 if push:
                     print("pushing...")
-                    origin = repo.remote(name='origin')
-                    origin.push(new_tag)
+                    repo.git.push('origin', repo.active_branch, new_tag)
                     print('done')
             else:
                 print('nothing to commit.')
