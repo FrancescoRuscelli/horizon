@@ -30,10 +30,10 @@ def _pre_install(dirname):
     except subprocess.CalledProcessError as e:
         raise
 
-    # try:
-    #     p = subprocess.check_output(["make", "-j8"], cwd=build_dir)
-    # except subprocess.CalledProcessError as e:
-    #     raise
+    try:
+        p = subprocess.check_output(["make", "-j8"], cwd=build_dir)
+    except subprocess.CalledProcessError as e:
+        raise
 
 def _post_install(dirname):
 
