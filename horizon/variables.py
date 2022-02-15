@@ -430,7 +430,7 @@ class Parameter(AbstractVariable):
 
         for n in self._nodes:
             if 'n' + str(n) in self._par_impl:
-                new_par_impl['n' + str(n)] = self._par_impl_dict['n' + str(n)]
+                new_par_impl['n' + str(n)] = self._par_impl['n' + str(n)]
             else:
                 par_impl = cs.SX.sym(self._tag + '_' + str(n), self._dim)
                 new_par_impl['n' + str(n)] = dict()
@@ -447,6 +447,16 @@ class Parameter(AbstractVariable):
             list of nodes the parameter is active on.
         """
         return self._nodes
+
+    def _setNNodes(self, n_nodes):
+        """
+        set a desired number of nodes to the parameter.
+
+        Args:
+            n_nodes: the desired number of nodes to be set
+        """
+        self._nodes = list(n_nodes)
+        self._project()
 
     def assign(self, val, nodes=None):
         """
@@ -1895,6 +1905,13 @@ class VariablesContainer:
             elif isinstance(var, StateVariable):
                 var._setNNodes(list(range(self._nodes)))
             elif isinstance(var, Variable):
+                # todo Right now i'm only changing the number of nodes.
+                #  There is not the notion of positional nodes, i.e.  injecting new nodes between two old nodes.
+                #  this is not correct. For example:
+                #  assume the variable is defined from node n to m.
+                #  assume the nodes i'm injecting are inside this interval [n, m]. Just by changing the number of nodes
+                #  is not enough.
+                #  should add a .injectNodes(nodes, position)/.removeNodes(nodes, positon) so that I can expand/suppress the variables correctly
                 var._setNNodes([node for node in var.getNodes() if node in list(range(self._nodes))])
 
         for par in self._pars.values():

@@ -7,25 +7,17 @@ from horizon.transcriptions.transcriptor import Transcriptor
 from horizon.ros.replay_trajectory import *
 from horizon.solvers import solver
 import matplotlib.pyplot as plt
-import os, rospkg, argparse
+from matplotlib import gridspec
+import os, argparse
 
 
-parser = argparse.ArgumentParser(description='cart-pole problem: moving the cart so that the pole reaches the upright position')
-parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
-args = parser.parse_args()
+path_to_examples = os.path.abspath(__file__ + "/../../../")
+os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
-rviz_replay = False
-resampling = False
-plot_sol = True
+rviz_replay = True
+resampling = True
+plot_sol = False
 
-if args.replay:
-    from horizon.ros.replay_trajectory import *
-    import roslaunch, rospkg, rospy
-    rviz_replay = True
-    plot_sol = False
-
-r = rospkg.RosPack()
-path_to_examples = r.get_path('horizon_examples')
 # =========================================
 # mat storer
 file_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -143,22 +135,15 @@ if isinstance(dt, cs.SX):
 
 # SET INITIAL GUESS
 if load_initial_guess:
-    for node in range(q_ig.shape[1]):
-        q.setInitialGuess(q_ig[:, node], node)
-
-    for node in range(q_dot_ig.shape[1]):
-        q_dot.setInitialGuess(q_dot_ig[:, node], node)
-
-    for node in range(q_ddot_ig.shape[1]):
-        q_ddot.setInitialGuess(q_ddot_ig[:, node], node)
+    q.setInitialGuess(q_ig)
+    q_dot.setInitialGuess(q_dot_ig)
+    q_ddot.setInitialGuess(q_ddot_ig)
 
     for f, f_ig in zip(f_list, f_ig_list):
-        for node in range(f_ig.shape[1]):
-            f.setInitialGuess(f_ig[:, node], node)
+        f.setInitialGuess(f_ig)
 
     if isinstance(dt, cs.SX):
-        for node in range(dt_ig.shape[1]):
-            dt.setInitialGuess(dt_ig[:, node], node)
+        dt.setInitialGuess(dt_ig)
 
 else:
     q.setInitialGuess(q_init)
@@ -180,7 +165,7 @@ tau_lim = np.array([0., 0., 0., 0., 0., 0.,  # Floating base
 tau = kin_dyn.InverseDynamics(kindyn, contact_map.keys(), cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED).call(q, q_dot,
                                                                                                              q_ddot,
                                                                                                              contact_map)
-prb.createIntermediateConstraint("inverse_dynamics", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
+prb.createIntermediateConstraint("dynamic_feasibility", tau, bounds=dict(lb=-tau_lim, ub=tau_lim))
 
 # SET FINAL VELOCITY CONSTRAINT
 prb.createFinalConstraint('final_velocity', q_dot)
@@ -233,14 +218,16 @@ for f in f_list:
 # =============
 opts = {'ipopt.tol': 0.001,
         'ipopt.constr_viol_tol': 0.001,
-        'ipopt.max_iter': 5000,
-        'ipopt.linear_solver': 'ma57'}
+        'ipopt.max_iter': 2000} #        'ipopt.linear_solver': 'ma57'
 
-solver = solver.Solver.make_solver('ipopt', prb, opts)
-solver.solve()
+solv = solver.Solver.make_solver('ipopt', prb, opts)
+solv.solve()
 
-solution = solver.getSolutionDict()
-solution_constraints = solver.getConstraintSolutionDict()
+solution = solv.getSolutionDict()
+dt_sol = solv.getDt()
+cumulative_dt = np.zeros(len(dt_sol)+1)
+
+solution_constraints = solv.getConstraintSolutionDict()
 
 solution_constraints_dict = dict()
 for name, item in prb.getConstraints().items():
@@ -258,11 +245,53 @@ else:
     ms.store({**solution, **solution_constraints_dict, **info_dict, **dt_dict})
 
 
-# ========================================================
+if plot_sol:
+
+    hplt = plotter.PlotterHorizon(prb, solution)
+    # hplt.plotVariables(show_bounds=True, legend=False)
+    # hplt.plotFunctions(show_bounds=True)
+    hplt.plotVariables([elem.getName() for elem in f_list], show_bounds=False, gather=2, legend=False)
+    hplt.plotFunction('dynamic_feasibility', show_bounds=True, legend=True, dim=range(6))
+
+    pos_contact_list = list()
+    fig = plt.figure()
+    fig.suptitle('Contacts')
+    gs = gridspec.GridSpec(2, 2)
+    i = 0
+    for contact in contacts_name:
+        ax = fig.add_subplot(gs[i])
+        ax.set_title('{}'.format(contact))
+        i += 1
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+        for dim in range(n_f):
+            ax.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3,
+                    linestyle='dotted')
+
+        plt.vlines([node_start_step, node_end_step], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
+
+    plt.figure()
+    for contact in contacts_name:
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+
+        plt.title(f'plane_xy')
+        plt.scatter(np.array(pos[0, :]), np.array(pos[1, :]), linewidth=0.1)
+
+    plt.figure()
+    for contact in contacts_name:
+        FK = cs.Function.deserialize(kindyn.fk(contact))
+        pos = FK(q=solution['q'])['ee_pos']
+
+        plt.title(f'plane_xz')
+        plt.scatter(np.array(pos[0, :]), np.array(pos[2, :]), linewidth=0.1)
+
+    plt.show()
+# ======================================================
+
 contact_map = dict(zip(contacts_name, [solution['f0'], solution['f1'], solution['f2'], solution['f3']]))
 
 # resampling
-resampling = True
 if resampling:
 
     if isinstance(dt, cs.SX):
@@ -279,14 +308,14 @@ if resampling:
 
 if rviz_replay:
     # set ROS stuff and launchfile
-    r = rospkg.RosPack()
-    path_to_examples = r.get_path('horizon_examples')
+    from horizon.ros.replay_trajectory import *
+    import roslaunch, rospy
 
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
     roslaunch.configure_logging(uuid)
     launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
     launch.start()
-    rospy.loginfo("'spot_jump_twist' visualization started.")
+    rospy.loginfo("'spot_jump' visualization started.")
 
     if resampling:
         repl = replay_trajectory(dt_res, joint_names, q_res, contact_map_res, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED, kindyn)
@@ -295,6 +324,4 @@ if rviz_replay:
 
     repl.sleep(1.)
     repl.replay(is_floating_base=True)
-
-
 

@@ -1,6 +1,6 @@
 <launch>
      <!-- send the cogimon robot XML to param server -->
-     <param name="robot_description" textfile="$(find horizon_examples)/urdf/cart_pole_xy.urdf" />
+     <param name="robot_description" textfile="$(find horizon_examples)/urdf/cart_pole.urdf" />
         
     <!-- start robot state publisher -->
     <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" >
