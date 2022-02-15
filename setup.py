@@ -41,7 +41,7 @@ def _post_install(dirname):
     build_dir = current_dir + '/' + dirname
 
     try:
-        p = subprocess.run(["make", "generate_conda_package", "-j8"], cwd=build_dir)
+        p = subprocess.run(["make", "generate_python_package", "-j8"], cwd=build_dir)
     except subprocess.CalledProcessError as e:
         raise
 
