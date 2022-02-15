@@ -69,7 +69,7 @@ setuptools.setup(
     author_email="francesco.ruscelli@iit.it",
     description="Library for Trajectory Optimization based on CasADi",
     long_description_content_type="text/markdown",
-    url="https://github.com/FrancescoRuscelli/horizon",
+    url="https://github.com/ADVRHumanoids/horizon",
     packages=['horizon', 'horizon.utils', 'horizon.solvers', 'horizon.transcriptions', 'horizon.examples', 'horizon.ros'],
     install_requires=['casadi', 'numpy', 'matplotlib', 'scipy', 'casadi-kin-dyn', 'rospkg'],
     python_requires=">=3.6",
