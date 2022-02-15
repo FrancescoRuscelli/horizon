@@ -26,12 +26,12 @@ def _pre_install(dirname):
     build_dir = current_dir + '/' + dirname
 
     try:
-        p = subprocess.check_output(["cmake", "-DCMAKE_BUILD_TYPE=Release", "../horizon/cpp"], cwd=build_dir)
+        p = subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", "../horizon/cpp"], cwd=build_dir)
     except subprocess.CalledProcessError as e:
         raise
 
     try:
-        p = subprocess.check_output(["make", "-j8"], cwd=build_dir)
+        p = subprocess.run(["make", "-j8"], cwd=build_dir)
     except subprocess.CalledProcessError as e:
         raise
 
@@ -41,7 +41,7 @@ def _post_install(dirname):
     build_dir = current_dir + '/' + dirname
 
     try:
-        p = subprocess.check_output(["make", "generate_conda_package", "-j8"], cwd=build_dir)
+        p = subprocess.run(["make", "generate_conda_package", "-j8"], cwd=build_dir)
     except subprocess.CalledProcessError as e:
         raise
 
