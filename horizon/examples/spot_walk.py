@@ -324,11 +324,10 @@ def main(args):
     if rviz_replay:
 
         try:
+
             # set ROS stuff and launchfile
-            uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-            roslaunch.configure_logging(uuid)
-            launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
-            launch.start()
+            import subprocess 
+            subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/spot.launch"])
             rospy.loginfo("'spot' visualization started.")
         except:
             print('Failed to automatically run RVIZ. Launch it manually.')

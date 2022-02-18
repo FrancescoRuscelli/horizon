@@ -289,10 +289,9 @@ def main(args):
 
         # set ROS stuff and launchfile
         try:
-            uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-            roslaunch.configure_logging(uuid)
-            launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole_xy.launch"])
-            launch.start()
+            # set ROS stuff and launchfile
+            import subprocess 
+            subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/cart_pole_xy.launch"])
             rospy.loginfo("'cart_pole' visualization started.")
         except:
             print('Failed to automatically run RVIZ. Launch it manually.')

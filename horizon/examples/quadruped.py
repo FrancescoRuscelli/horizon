@@ -29,7 +29,7 @@ resample = True
 
 if rviz_replay:
     from horizon.ros.replay_trajectory import replay_trajectory
-    import roslaunch, rospy
+    import rospy
     rviz_replay = True
     plot_sol = False
     resample = True
@@ -257,11 +257,10 @@ if plot_sol:
 if rviz_replay:
 
     try:
+
         # set ROS stuff and launchfile
-        uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-        roslaunch.configure_logging(uuid)
-        launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/quadruped_template.launch"])
-        launch.start()
+        import subprocess 
+        subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/quadruped_template.launch"])
         rospy.loginfo("quadruped_jump' visualization started.")
     except:
         print('Failed to automatically run RVIZ. Launch it manually.')

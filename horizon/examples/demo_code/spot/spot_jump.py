@@ -375,11 +375,11 @@ if rviz_replay:
     from horizon.ros.replay_trajectory import *
     import roslaunch, rospy
 
-    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-    roslaunch.configure_logging(uuid)
-    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/spot.launch"])
-    launch.start()
-    rospy.loginfo("'spot_jump' visualization started.")
+    # set ROS stuff and launchfile
+    import subprocess 
+    subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/spot.launch"])
+    rospy.loginfo("'spot' visualization started.")
+
 
     # visualize the robot in RVIZ
     # with LOCAL_WORLD_ALIGNED, the forces are rotated in LOCAL frame before being published
