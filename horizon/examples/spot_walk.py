@@ -32,7 +32,7 @@ def main(args):
 
     if rviz_replay:
         from horizon.ros.replay_trajectory import replay_trajectory
-        import roslaunch, rospy
+        import rospy
         plot_sol = False
 
     path_to_examples = os.path.dirname(os.path.realpath(__file__))

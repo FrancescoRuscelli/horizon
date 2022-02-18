@@ -373,7 +373,7 @@ if rviz_replay:
 
     # set ROS stuff and launchfile
     from horizon.ros.replay_trajectory import *
-    import roslaunch, rospy
+    import rospy
 
     # set ROS stuff and launchfile
     import subprocess 

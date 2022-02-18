@@ -144,7 +144,6 @@ if rviz_replay:
     import rospy
     from horizon.ros.replay_trajectory import replay_trajectory
 
-    # set ROS stuff and launchfile
     import subprocess 
     subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/cart_pole.launch"])
     rospy.loginfo("'cart_pole' visualization started.")
