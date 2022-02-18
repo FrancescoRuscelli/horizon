@@ -1,7 +1,9 @@
 import setuptools
-from setuptools.command.install import install
+
 from setuptools.command.develop import develop
-import os, sys
+from setuptools.command.build_py import build_py
+
+import os
 import codecs
 import subprocess
 
@@ -17,9 +19,8 @@ def get_version(rel_path):
             return line.split(delim)[1]
     else:
         raise RuntimeError("Unable to find version string.")
-        
-def _pre_install(dirname):
 
+def _pre_build(dirname):
     # create a build dir and run 'make generate_python_package'
     current_dir = os.getcwd()
     os.makedirs(dirname, exist_ok=True)
@@ -27,40 +28,33 @@ def _pre_install(dirname):
 
     try:
         p = subprocess.run(["cmake", "-DCMAKE_BUILD_TYPE=Release", "../horizon/cpp"], cwd=build_dir)
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         raise
 
     try:
         p = subprocess.run(["make", "-j8"], cwd=build_dir)
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         raise
-
-def _post_install(dirname):
-
-    current_dir = os.getcwd()
-    build_dir = current_dir + '/' + dirname
 
     try:
         p = subprocess.run(["make", "generate_python_package", "-j8"], cwd=build_dir)
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         raise
 
+class CustomBuild(build_py):
+    # called by pip install and by python setup.py build and python setup.py install
+    # build_py is not called by pip install -e
+    def run(self):
+        dir_name = 'temp_build'
+        _pre_build(dir_name)
+        build_py.run(self)
 
-class CustomInstall(install):
-    # called when installing normally (pip install .)
+class CustomDevelop(develop):
+    # called by pip install -e 
     def run(self):
         dir_name = 'temp_build'
-        _pre_install(dir_name)
-        install.run(self)
-        _post_install(dir_name)
-        
-class CustomDevInstallCommand(develop):
-    # called when installing in editable mode (pip install . -e)
-    def run(self):
-        dir_name = 'temp_build'
-        _pre_install(dir_name)
+        _pre_build(dir_name)
         develop.run(self)
-        _post_install(dir_name)
 
 setuptools.setup(
     name="casadi_horizon",
@@ -73,8 +67,8 @@ setuptools.setup(
     packages=['horizon', 'horizon.utils', 'horizon.solvers', 'horizon.transcriptions', 'horizon.examples', 'horizon.ros'],
     install_requires=['casadi', 'numpy', 'matplotlib', 'scipy', 'casadi-kin-dyn', 'rospkg'],
     python_requires=">=3.6",
-    cmdclass={'install': CustomInstall,
-              'develop': CustomDevInstallCommand},
+    cmdclass={'build_py': CustomBuild,
+              'develop': CustomDevelop},
     ext_modules=[
         setuptools.Extension(
             name="ilqrext", sources=[]
