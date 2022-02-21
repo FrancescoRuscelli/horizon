@@ -30,6 +30,8 @@ class TestExamples(unittest.TestCase):
                 for solver in spot_solvers:
                     solver_command = ['--solver', solver]
                     self.runExample(process_command + solver_command)
+        
+        return True
 
     def testRopedRobot(self):
         robot = 'roped_robot'
@@ -41,6 +43,8 @@ class TestExamples(unittest.TestCase):
 
             process_command.extend(arg_combination)
             self.runExample(process_command)
+        
+        return True
 
 
     def testQuadruped(self):
@@ -49,6 +53,8 @@ class TestExamples(unittest.TestCase):
         process_command.extend(['--plot', 'False'])
 
         self.runExample(process_command)
+
+        return True
 
     def testCartPole(self):
         robot = 'cart_pole'
@@ -64,6 +70,15 @@ class TestExamples(unittest.TestCase):
                 self.runExample(process_command + options)
                 options = options[:-1]
 
+        return True
+
 
 if __name__ == '__main__':
-    pass
+
+    unittest.main()
+    # test = TestExamples()
+
+    # test.assertTrue(test.testSpot())
+    # print(test.testCartPole())
+    # test.testQuadruped()
+    # test.testRopedRobot()
