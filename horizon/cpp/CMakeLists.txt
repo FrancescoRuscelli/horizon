@@ -15,8 +15,6 @@ find_package(yaml-cpp REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(CMAKE_CXX_STANDARD 20)
 
-
-
 # ilqr library
 add_library(horizon STATIC
     src/horizon_parser.cpp)
@@ -41,6 +39,10 @@ add_library(sqp STATIC
 
 target_link_libraries(ilqr Eigen3::Eigen casadi)
 target_link_libraries(sqp Eigen3::Eigen casadi ilqr)
+
+install(TARGETS horizon ilqr sqp
+    DESTINATION lib)
+
 
 # python binding
 set(PYBIND11_PYTHON_VERSION 3)
@@ -68,12 +70,12 @@ add_custom_command(TARGET pysqp POST_BUILD
 add_custom_target(generate_python_package
     COMMAND ./copy_external_dependencies.py $<TARGET_FILE:pyilqr> -c -d horizon/external_libs --solib-dst horizon/solvers --solib-rpath ../external_libs
     COMMAND ./copy_external_dependencies.py $<TARGET_FILE:pysqp> -c -d horizon/external_libs --solib-dst horizon/solvers --solib-rpath ../external_libs
-    COMMAND python3 -m build
+    COMMAND ./copy_external_dependencies.py libcasadi_conic_osqp.so -c -f -d horizon/external_libs
     DEPENDS pysqp pyilqr
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/../..
     COMMENT "Generating package ${MODULE_NAME}"
     )
-
+    
 add_custom_target(upload_python_package
     COMMAND twine upload dist/*
     DEPENDS generate_python_package

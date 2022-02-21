@@ -1,0 +1,28 @@
+{
+  "globalOptions": {
+    "background": "#123456",
+    "colladaLoader": "collada2",
+    "fixedFrame": "/world"
+  },
+  "sidebarOpened": true,
+  "displays": [
+    {
+      "isShown": true,
+      "name": "Robot model",
+      "options": {
+        "param": "robot_description"
+      },
+      "type": "urdf"
+    },
+    {
+      "isShown": true,
+      "name": "Grid",
+      "options": {
+        "cellSize": "1",
+        "color": "#cccccc",
+        "numCells": "10"
+      },
+      "type": "grid"
+    }
+  ]
+}

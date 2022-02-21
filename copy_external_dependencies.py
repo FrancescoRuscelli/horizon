@@ -6,30 +6,17 @@ import shutil
 import os
 import sys
 
-import ctypes
-import ctypes.util
-libdl = ctypes.CDLL(ctypes.util.find_library('dl'))
-
-class Dl_info(ctypes.Structure):
-    _fields_ = (('dli_fname', ctypes.c_char_p),
-                ('dli_fbase', ctypes.c_void_p),
-                ('dli_sname', ctypes.c_char_p),
-                ('dli_saddr', ctypes.c_void_p))
-
-libdl.dladdr.argtypes = (ctypes.c_void_p, ctypes.POINTER(Dl_info))
-
 def find_lib(libname):
-
-    sh_obj = ctypes.cdll.LoadLibrary(libname)
-
-    info = Dl_info()
-    result = libdl.dladdr(sh_obj._init, ctypes.byref(info))
-
-    if result and info.dli_fname:
-        libdl_path = info.dli_fname.decode(sys.getfilesystemencoding())
-        return libdl_path
-    else:
-        raise RuntimeError(f'resource {libname} not found')
+    env = os.environ.copy()
+    env['LD_PRELOAD'] = libname
+    ldd_output = subprocess.check_output(['ldd', '/bin/true'], env=env).decode()
+    for line in ldd_output.split('\n'):
+        tokens = line.strip().split(' ')
+        if '=>' not in tokens:
+            continue
+        if libname == tokens[0]:
+            path = tokens[2]
+            return path
 
 def set_rpath(libname, rel_rpath=None):
     
@@ -83,7 +70,6 @@ for line in ldd_output.split('\n'):
     exclude_lib = path.startswith('/usr/lib') or path.startswith('/lib')
     
     if not exclude_lib:
-        print(path)
         if args.dst is not None:
             dst_file = os.path.join(args.dst, libname)
             shutil.copyfile(src=path, dst=dst_file)

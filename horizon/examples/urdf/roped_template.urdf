@@ -245,7 +245,7 @@
     <parent link="rope_link1"/>
     <child link="rope_link2"/>
     <origin rpy="0 0 0" xyz="0 0 0"/>
-    <limit effort="0" lower="0" upper="3" velocity="10"/>
+    <limit effort="0" lower="0" upper="10" velocity="10"/>
 </joint>
 
 <!-- anchor body 2-->

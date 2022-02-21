@@ -1,9 +1,23 @@
 horizon package
 ===============
-horizon.function module
------------------------
 
-.. automodule:: horizon.function
+Subpackages
+-----------
+
+.. toctree::
+
+    horizon.ros
+    horizon.solvers
+    horizon.transcriptions
+    horizon.utils
+
+Submodules
+----------
+
+horizon.functions module
+------------------------
+
+.. automodule:: horizon.functions
     :members:
     :undoc-members:
     :show-inheritance:
@@ -16,14 +30,6 @@ horizon.misc\_function module
     :undoc-members:
     :show-inheritance:
 
-horizon.nodes module
---------------------
-
-.. automodule:: horizon.nodes
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 horizon.problem module
 ----------------------
 
@@ -32,18 +38,18 @@ horizon.problem module
     :undoc-members:
     :show-inheritance:
 
-horizon.state\_variables module
--------------------------------
-
-.. automodule:: horizon.state_variables
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 horizon.type\_doc module
 ------------------------
 
 .. automodule:: horizon.type_doc
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+horizon.variables module
+------------------------
+
+.. automodule:: horizon.variables
     :members:
     :undoc-members:
     :show-inheritance:

@@ -69,7 +69,7 @@ def checkUpperBounds(name, tol=0.):
 transcription_method = 'multiple_shooting'  # direct_collocation
 transcription_opts = dict(integrator='RK4')
 
-urdffile = '../examples/urdf/spot.urdf'
+urdffile = '../playground/urdf/spot.urdf'
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -89,7 +89,7 @@ jump_height = 0.1
 node_start_step = 15
 node_end_step = node_start_step + n_nodes_step
 
-ms = mat_storer.matStorer('../examples/spot/spot_step_fd.mat')
+ms = mat_storer.matStorer('../playground/spot/spot_step_fd.mat')
 solution = ms.load()
 
 # print([name for name in solution])

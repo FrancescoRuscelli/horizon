@@ -430,7 +430,7 @@ class Parameter(AbstractVariable):
 
         for n in self._nodes:
             if 'n' + str(n) in self._par_impl:
-                new_par_impl['n' + str(n)] = self._par_impl_dict['n' + str(n)]
+                new_par_impl['n' + str(n)] = self._par_impl['n' + str(n)]
             else:
                 par_impl = cs.SX.sym(self._tag + '_' + str(n), self._dim)
                 new_par_impl['n' + str(n)] = dict()
@@ -448,13 +448,23 @@ class Parameter(AbstractVariable):
         """
         return self._nodes
 
-    def assign(self, vals, nodes=None):
+    def _setNNodes(self, n_nodes):
+        """
+        set a desired number of nodes to the parameter.
+
+        Args:
+            n_nodes: the desired number of nodes to be set
+        """
+        self._nodes = list(n_nodes)
+        self._project()
+
+    def assign(self, val, nodes=None):
         """
        Assign a value to the parameter at a desired node. Can be assigned also after the problem is built, before solving the problem.
        If not assigned, its default value is zero.
 
        Args:
-           vals: value of the parameter
+           val: value of the parameter
            nodes: nodes at which the parameter is assigned
        """
         if nodes is None:
@@ -462,13 +472,25 @@ class Parameter(AbstractVariable):
         else:
             nodes = misc.checkNodes(nodes, self._nodes)
 
-        vals = misc.checkValueEntry(vals)
+        val = misc.checkValueEntry(val)
 
-        if vals.shape[0] != self._dim:
+        if val.shape[0] != self._dim:
             raise Exception('Wrong dimension of parameter values inserted.')
 
-        for node in nodes:
-            self._par_impl['n' + str(node)]['val'] = vals
+        # if a matrix of values is being provided, check cols match len(nodes)
+        multiple_vals = val.ndim == 2 and val.shape[1] != 1
+
+        if multiple_vals and val.shape[1] != len(nodes):
+            raise Exception(f'Wrong dimension of {val_type} inserted.')
+
+        for i, node in enumerate(nodes):
+
+            if multiple_vals:
+                v = val[:, i]
+            else:
+                v = val
+
+            self._par_impl['n' + str(node)]['val'] = v
 
     def getImpl(self, nodes=None):
         """
@@ -533,6 +555,10 @@ class Parameter(AbstractVariable):
         Args:
             nodes: offset of the node (shift to n node before or after)
         """
+
+        # if node == 0:
+        #     return self
+
         if node > 0:
             node = f'+{node}'
 
@@ -1003,6 +1029,9 @@ class Variable(AbstractVariable):
         """
 
         # todo call it .getOffset()
+
+        # if node == 0:
+        #     return self
 
         if node > 0:
             node = f'+{node}'
@@ -1876,6 +1905,13 @@ class VariablesContainer:
             elif isinstance(var, StateVariable):
                 var._setNNodes(list(range(self._nodes)))
             elif isinstance(var, Variable):
+                # todo Right now i'm only changing the number of nodes.
+                #  There is not the notion of positional nodes, i.e.  injecting new nodes between two old nodes.
+                #  this is not correct. For example:
+                #  assume the variable is defined from node n to m.
+                #  assume the nodes i'm injecting are inside this interval [n, m]. Just by changing the number of nodes
+                #  is not enough.
+                #  should add a .injectNodes(nodes, position)/.removeNodes(nodes, positon) so that I can expand/suppress the variables correctly
                 var._setNNodes([node for node in var.getNodes() if node in list(range(self._nodes))])
 
         for par in self._pars.values():

@@ -1,21 +1,17 @@
 from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.variables import AbstractVariable, Variable, Parameter, SingleVariable, SingleParameter
 from horizon.functions import CostFunction, ResidualFunction
-from typing import Dict
+from typing import Dict, List
 import casadi as cs
 import numpy as np
 import pprint
+
 
 class NlpsolSolver(Solver):
     
     def __init__(self, prb: Problem, opts: Dict, solver_plugin: str) -> None:
         
         super().__init__(prb, opts=opts)
-        
-        self.var_solution: Dict[str:np.array] = None
-        self.cnstr_solution: Dict[str:np.array] = None
-        self.dt_solution: np.array = None
         
         # generate problem to be solved
         self.var_container = self.prb.var_container
@@ -66,89 +62,11 @@ class NlpsolSolver(Solver):
             par_list.append(par.getImpl())
         p = cs.vertcat(*par_list)
 
-        # this is good but the problem is that, without some tampering, i get the variables repeated
-        # ORDERED AS NODES
-        # w = self.var_container.getVarImplList() # ordered as nodes
-        # print(w)
-
-
-        # or ...
-        # ===================================================================================
-        # ===================================================================================
-        # self.vars_impl['nNone'] = dict()
-        # self.pars_impl['nNone'] = dict()
-        # for node in self.prb.nodes:
-        #     node_name = 'n' + str(node)
-        #     # get all implemented vars at node n
-        #     # get all the variable implemented at node n as a list
-        #     var_list_in_node = self.var_container.getVarImpl(node)
-        #     self.vars_impl[node_name] = var_list_in_node # or this
-        #
-        # var_impl_list = self.vars_impl.values()
-        # w = cs.vertcat(*var_impl_list)
-        # or ...
-        # ===================================================================================
-        # ===================================================================================
-        # for node in self.prb.nodes:
-        #     node_name = 'n' + str(node)
-        #     # get all implemented vars at node n
-        #     # get all the variable implemented at node n as a list
-        #     for name_var, value_var in self.var_container.vars.items():
-        #         var_impl = value_var.getImpl(node) #doing a list of these
-        #         # not important right?
-        #         # var_bound_min = self.vars[name].getLowerBounds(node)
-        #         # var_bound_max = self.vars[name].getUpperBounds(node)
-        #         # initial_guess = self.vars[name].getInitialGuess(node)
-        #         var_dict = dict(var=var_impl) #lb=var_bound_min, ub=var_bound_max, w0=initial_guess)
-        #         self.vars_impl[node_name].update({name_var: var_dict})  # or this
-        #
-        # var_impl_list = list()
-        # for vars_in_node in self.vars_impl.values():
-        #     for var_abstract in vars_in_node.keys():
-        #         # get from var_impl the relative var
-        #
-        #         var_impl_list.append(vars_in_node[var_abstract]['var'])
-        #
-        # w = cs.vertcat(*var_impl_list)
-        # ===================================================================================
-        # ===================================================================================
-        # functions
-
-        # should I do it inside function? maybe yes
-        # get function from fun_container
-        # fun_list = list()
-        # for fname, fval in self.fun_container.cnstr_container.items():
-        #     used_vars = list()
-        #     # prepare variables
-        #     for var_name in fval.getVariables().keys():
-        #         var_impl = self.var_container.vars[var_name].getImpl(fval.getNodes())
-        #         # reshape them for all-in-one evaluation of function
-        #         var_impl_matrix = cs.reshape(var_impl, (fval.getDim(), len(fval.getNodes())))
-        #         # generic input --> row: dim // column: nodes
-        #         # [[x_0_0, x_1_0, ... x_N_0],
-        #         #  [x_0_1, x_1_1, ... x_N_1]]
-        #         used_vars.append(var_impl_matrix)
-        #
-        #     # compute function with all used variables on all active nodes
-        #     fun_eval = fval.fun(*used_vars)
-        #     # reshape it as a vector for solver
-        #     fun_eval_vector = cs.reshape(fun_eval, (fval.getDim() * len(fval.getNodes()), 1))
-        #
-        #     fun_list.append(fun_eval_vector)
-        #
-        # g = cs.vertcat(*fun_list)
-        # print(f'g ({g.shape}: {g})')
-        # ===================================================================================
-        # ===================================================================================
-        # or ...
-
         # build constraint functions list
         fun_list = list()
         for fun in self.fun_container.getCnstr().values():
             fun_list.append(fun.getImpl())
         g = cs.vertcat(*fun_list)
-
-        # build cost functions list
 
         # treat differently cost and residual (residual must be quadratized)
         fun_list = list()
@@ -166,154 +84,35 @@ class NlpsolSolver(Solver):
 
 
     def solve(self) -> bool:
-        # update lower bounds of variables
-        lb_list = list()
-        for var in self.var_container.getVarList(offset=False):
-            lb_list.append(var.getLowerBounds().flatten(order='F'))
-        lbw = cs.vertcat(*lb_list)
 
-        # update upper bounds of variables
-        ub_list = list()
-        for var in self.var_container.getVarList(offset=False):
-            ub_list.append(var.getUpperBounds().flatten(order='F'))
-        ubw = cs.vertcat(*ub_list)
-
+        # update lower/upper bounds of variables
+        lbw = self._getVarList('lb')
+        ubw = self._getVarList('ub')
         # update initial guess of variables
-        w0_list = list()
-        for var in self.var_container.getVarList(offset=False):
-            w0_list.append(var.getInitialGuess().flatten(order='F'))
-        w0 = cs.vertcat(*w0_list)
-        # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
-
+        w0 = self._getVarList('ig')
         # update parameters
-        p_list = list()
-        for par in self.var_container.getParList(offset=False):
-            pval = par.getValues().flatten(order='F')
-            p_list.append(pval)
-
-        p = cs.vertcat(*p_list)
-
-        # update lower bounds of constraints
-        lbg_list = list()
-        for fun in self.fun_container.getCnstr().values():
-            lbg_list.append(fun.getLowerBounds().flatten(order='F'))
-        lbg = cs.vertcat(*lbg_list)
-
-        # update upper bounds of constraints
-        ubg_list = list()
-        for fun in self.fun_container.getCnstr().values():
-            ubg_list.append(fun.getUpperBounds().flatten(order='F'))
-        ubg = cs.vertcat(*ubg_list)
+        p = self._getParList()
+        # update lower/upper bounds of constraints
+        lbg = self._getFunList('lb')
+        ubg = self._getFunList('ub')
 
         # solve
         sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
-        fun_sol_dict = dict()
-        pos = 0
-        for name, fun in self.fun_container.getCnstr().items():
-            val_sol = sol['g'][pos:pos + fun.getDim() * len(fun.getNodes())]
-            fun_sol_matrix = np.reshape(val_sol, (fun.getDim(), len(fun.getNodes())), order='F')
-            fun_sol_dict[name] = fun_sol_matrix
-            pos = pos + fun.getDim() * len(fun.getNodes())
-
-        self.cnstr_solution = fun_sol_dict
+        self.cnstr_solution = self._createCnsrtSolDict(sol)
 
         # retrieve state and input trajector
-        input_vars = [v.getName() for v in self.prb.getInput().var_list]
-        state_vars = [v.getName() for v in self.prb.getState().var_list]
+
 
         # get solution dict
-        pos = 0
-        var_sol_dict = dict()
-        for var in self.var_container.getVarList(offset=False):
-            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
-            # this is to divide in rows the each dim of the var
-            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
-            var_sol_dict[var.getName()] = val_sol_matrix
-            pos = pos + var.shape[0] * len(var.getNodes())
+        self.var_solution = self._createVarSolDict(sol)
 
-        self.var_solution = var_sol_dict
 
         # get solution as state/input
-        pos = 0
-        for name, var in self.var_container.getVar().items():
-            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
-            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
-            if name in state_vars:
-                off, _ = self.prb.getState().getVarIndex(name)
-                self.x_opt[off:off+var.shape[0], :] = val_sol_matrix
-            elif name in input_vars:
-                off, _ = self.prb.getInput().getVarIndex(name)
-                self.u_opt[off:off+var.shape[0], :] = val_sol_matrix
-            else:
-                pass
-            pos = pos + var.shape[0] * len(var.getNodes())
+        self._createVarSolAsInOut(sol)
 
         # build dt_solution as an array
-        self.dt_solution = np.zeros(self.prb.getNNodes()-1)
-        dt = self.prb.getDt()
-
-        # todo make this better
-        # fill dt_solution
-
-        # if it is a variable, its corresponding solution must be retrieved.
-        # if it is a singleVariable or a singleParameter?
-        # if dt is directly an optimization variable, that's ok, I get it from the var_solution
-        # if dt is a function of some other optimization variables, get all of them and compute the optimized dt
-        #   I do this by using a Function to wrap everything
-
-        if isinstance(dt, Variable):
-            var_depend = list()
-            for var in self.prb.getVariables().values():
-                if cs.depends_on(dt, var):
-                    var_depend.append(var)
-
-            # create a function with all the variable dt depends on, and return dt
-            temp_dt = cs.Function('temp_dt', var_depend, [dt])
-
-            # fill the self.dt_solution with all the dt values
-            for node_n in range(self.prb.getNNodes()-1):
-                self.dt_solution[node_n] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])[node_n]
-
-        # fill the self.dt_solution with the same dt solution
-        elif isinstance(dt, SingleVariable):
-            var_depend = list()
-            for var in self.prb.getVariables().values():
-                if cs.depends_on(dt, var):
-                    var_depend.append(var)
-
-            # create a function with all the variable dt depends on, and return dt
-            temp_dt = cs.Function('temp_dt', var_depend, [dt])
-
-            for node_n in range(self.prb.getNNodes()-1):
-                self.dt_solution[node_n] = temp_dt(*[self.var_solution[var.getName()] for var in var_depend])
-
-        # if dt is a value, set it to each element of dt_solution
-        elif isinstance(dt, Parameter) or isinstance(dt, SingleParameter):
-            for node_n in range(self.prb.getNNodes()-1):
-                # get only the nodes where the dt is selected
-                # here dt at node 0 is not defined
-                self.dt_solution[node_n] = dt.getValues(node_n)
-        # if dt is a value, set it to each element of dt_solution
-        elif isinstance(dt, (float, int)):
-            for node_n in range(self.prb.getNNodes() - 1):
-                self.dt_solution[node_n] = dt
-        # if dt is a list, get each dt separately
-        # TODO WIP
-        elif len(dt) == self.prb.getNNodes():
-            print('WARNING: work in progress.')
-            sol_n = 0
-            for node_n in range(self.prb.getNNodes()-1):
-                dt_val = dt[node_n]
-                if isinstance(dt_val, AbstractVariable):
-                    self.dt_solution[node_n] = self.var_solution[dt_val.getName()][sol_n]
-                    sol_n += 1
-                else:
-                    self.dt_solution[node_n] = dt[node_n]
-
-        # print(self.dt_solution)
-        # print(f'{self.x_opt.shape}:, {self.x_opt}')
-        # print(f'{self.u_opt.shape}:, {self.u_opt}')
+        self._createDtSol()
 
         return True
 
@@ -419,7 +218,7 @@ if __name__ == '__main__':
     # cnsrt9 = prob.createConstraint('cnsrt9', y, nodes=N)
     #
 
-    cost1 = prob.createCostFunction('cost1', x+p)
+    cost1 = prob.createCost('cost1', x+p)
     # =========
 
     # todo check if everything is allright!

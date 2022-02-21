@@ -137,12 +137,6 @@ def double_integrator_with_floating_base(q, ndot, nddot):
     else:
         third = ndot[6:ndot.shape[0], :]
 
-
-    # print(first.shape)
-    # print(cs.vertcat(*quaterniondot).shape)
-    # print(third.shape)
-    # print(nddot.shape)
-    # print('------------')
     xdot = cs.vertcat(first, cs.vertcat(*quaterniondot), third, nddot)
 
 

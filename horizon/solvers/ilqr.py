@@ -145,6 +145,17 @@ class SolverILQR(Solver):
     def getSolutionDict(self):
         return self.solution_dict
 
+    def getDt(self):
+        self.dt_solution = np.zeros(self.prb.getNNodes() - 1)
+        if isinstance(self.dt, float):
+            for node_n in range(self.prb.getNNodes() - 1):
+                self.dt_solution[node_n] = self.dt
+        elif isinstance(self.dt, Parameter):
+            for node_n in range(self.prb.getNNodes() - 1):
+                self.dt_solution[node_n] = self.dt.getValues(node_n)
+
+        return self.dt_solution
+
     def print_timings(self):
 
         prof_info = self.ilqr.getProfilingInfo()
@@ -232,15 +243,16 @@ class SolverILQR(Solver):
 
     
     def _iter_callback(self, fpres):
+        
         if not fpres.accepted:
             return
 
         fpres.print()
 
-        if self.plot_iter and fpres.accepted:
+        if self.plot_iter:
 
             if self.xax is None:
-                _, (self.xax, self.uax, self.dax, self.hax) = plt.subplots(2, 2)
+                _, ((self.xax, self.uax), (self.dax, self.hax)) = plt.subplots(2, 2)
             
             plt.sca(self.xax)
             plt.cla()
@@ -262,7 +274,7 @@ class SolverILQR(Solver):
 
             plt.sca(self.dax)
             plt.cla()
-            plt.plot(fpres.defect_values.T)
+            plt.plot(np.linalg.norm(fpres.defect_values, axis=1))
             plt.grid()
             plt.title(f'Dynamics gaps (iter {fpres.iter})')
             plt.xlabel('Node [-]')
@@ -281,51 +293,3 @@ class SolverILQR(Solver):
             print("Press a button!")
             plt.waitforbuttonpress()
 
-
-                    
-                
-                
-
-
-            
-
-############# TESTING STUFF TO BE REMOVED #######################
-if __name__ == '__main__':
-
-    from matplotlib import pyplot as plt
-
-    # create problem
-    N = 100
-    dt = 0.03
-    prb = Problem(N)
-
-    # create variables
-    p = prb.createStateVariable('p', 2)
-    theta = prb.createStateVariable('theta', 1)
-    v = prb.createInputVariable('v', 1)
-    omega = prb.createInputVariable('omega', 1)
-
-    # define dynamics 
-    x = prb.getState().getVars()
-    u = prb.getInput().getVars()
-    xdot = cs.vertcat(v*cs.cos(theta), 
-                    v*cs.sin(theta),
-                    omega)
-    prb.setDynamics(xdot)
-
-    # Cost function
-    x_tgt = np.array([1, 0, 0])
-    prb.createIntermediateCost("reg", 1e-6*cs.sumsqr(u))
-    prb.createFinalConstraint("gothere", x - x_tgt)
-
-    # initial state
-    x0 = np.array([0, 0, np.pi/2])
-    prb.setInitialState(x0=x0)
-
-    # TEST ILQR
-    sol = SolverILQR(prb, dt)
-    sol.solve()
-    sol.print_timings()
-
-    plt.plot(sol.ilqr.getStateTrajectory().T, '-')
-    plt.show()

@@ -18,7 +18,6 @@ class GNSQPSolver(Solver):
 
         super().__init__(prb, opts=opts)
 
-        self.solution: Dict[str:np.array] = None
         self.prb = prb
 
         # generate problem to be solved
@@ -62,85 +61,43 @@ class GNSQPSolver(Solver):
             fpres.print()
 
     def solve(self) -> bool:
+
         # update bounds and initial guess
-
-        lb_list = list()
-        for var in self.prb.var_container.getVarList(offset=False):
-            lb_list.append(var.getLowerBounds().flatten(order='F'))
-        lbw = cs.vertcat(*lb_list)
-
-        # update upper bounds of variables
-        ub_list = list()
-        for var in self.prb.var_container.getVarList(offset=False):
-            ub_list.append(var.getUpperBounds().flatten(order='F'))
-        ubw = cs.vertcat(*ub_list)
-
+        # update lower/upper bounds of variables
+        lbw = self._getVarList('lb')
+        ubw = self._getVarList('ub')
         # update initial guess of variables
-        w0_list = list()
-        for var in self.prb.var_container.getVarList(offset=False):
-            w0_list.append(var.getInitialGuess().flatten(order='F'))
-        w0 = cs.vertcat(*w0_list)
-        # to transform it to matrix form ---> vals = np.reshape(vals, (self.shape[0], len(self.nodes)), order='F')
-
+        w0 = self._getVarList('ig')
         # update parameters
-        p_list = list()
-        for par in self.prb.var_container.getParList():
-            p_list.append(par.getValues().flatten(order='F'))
-        p = cs.vertcat(*p_list)
-
-        # update lower bounds of constraints
-        lbg_list = list()
-        for fun in self.prb.function_container.getCnstr().values():
-            lbg_list.append(fun.getLowerBounds().flatten(order='F'))
-        lbg = cs.vertcat(*lbg_list)
-
-        # update upper bounds of constraints
-        ubg_list = list()
-        for fun in self.prb.function_container.getCnstr().values():
-            ubg_list.append(fun.getUpperBounds().flatten(order='F'))
-        ubg = cs.vertcat(*ubg_list)
+        p = self._getParList()
+        # update lower/upper bounds of constraints
+        lbg = self._getFunList('lb')
+        ubg = self._getFunList('ub')
 
         # solve
         sol = self.solver.solve(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
 
-        # retrieve state and input trajector
-        input_vars = [v.getName() for v in self.prb.getInput().var_list]
-        state_vars = [v.getName() for v in self.prb.getState().var_list]
+        # self.cnstr_solution = self._createCnsrtSolDict(sol)
 
         # get solution dict
-        pos = 0
-        solution_dict = dict()
-        for var in self.var_container.getVarList(offset=False):
-            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
-            # this is to divide in rows the each dim of the var
-            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
-            solution_dict[var.getName()] = val_sol_matrix
-            pos = pos + var.shape[0] * len(var.getNodes())
-
-        self.solution = solution_dict
+        self.var_solution = self._createVarSolDict(sol)
 
         # get solution as state/input
-        pos = 0
-        for name, var in self.var_container.getVar().items():
-            val_sol = sol['x'][pos: pos + var.shape[0] * len(var.getNodes())]
-            val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
-            if name in state_vars:
-                off, _ = self.prb.getState().getVarIndex(name)
-                self.x_opt[off:off + var.shape[0], :] = val_sol_matrix
-            elif name in input_vars:
-                off, _ = self.prb.getInput().getVarIndex(name)
-                self.u_opt[off:off + var.shape[0], :] = val_sol_matrix
-            else:
-                pass
-            pos = pos + var.shape[0] * len(var.getNodes())
+        self._createVarSolAsInOut(sol)
 
-        # print(f'{self.x_opt.shape}:, {self.x_opt}')
-        # print(f'{self.u_opt.shape}:, {self.u_opt}')
+        # build dt_solution as an array
+        self._createDtSol()
 
         return True
 
     def getSolutionDict(self):
-        return self.solution
+        return self.var_solution
+
+    def getConstraintSolutionDict(self):
+        return self.cnstr_solution
+
+    def getDt(self):
+        return self.dt_solution
 
     def getHessianComputationTime(self):
         return self.solver.getHessianComputationTime()

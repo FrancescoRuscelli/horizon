@@ -67,6 +67,10 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _line_search_accept_ratio(1e-4),
     _alpha_min(1e-3),
     _svd_threshold(1e-6),
+    _constraint_violation_threshold(1e-6),
+    _defect_norm_threshold(1e-6),
+    _merit_der_threshold(1e-6),
+    _step_length_threshold(1e-6),
     _cost(N+1, IntermediateCost(_nx, _nu)),
     _constraint(N+1, Constraint(_nx, _nu)),
     _value(N+1, ValueFunction(_nx)),
@@ -78,6 +82,7 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _tmp(_N)
 {
     // set options
+    _verbose = value_or(opt, "ilqr.verbose", 0);
     _step_length = value_or(opt, "ilqr.step_length", 1.0);
     _hxx_reg = value_or(opt, "ilqr.hxx_reg", 0.0);
     _huu_reg = value_or(opt, "ilqr.huu_reg", 0.0);
@@ -86,6 +91,10 @@ IterativeLQR::IterativeLQR(cs::Function fdyn,
     _line_search_accept_ratio = value_or(opt, "ilqr.line_search_accept_ratio", 1e-4);
     _alpha_min = value_or(opt, "ilqr.alpha_min", 1e-3);
     _svd_threshold = value_or(opt, "ilqr.svd_threshold", 1e-6);
+    _constraint_violation_threshold = value_or(opt, "ilqr.constraint_violation_threshold", 1e-6);
+    _defect_norm_threshold = value_or(opt, "ilqr.defect_norm_threshold", 1e-6);
+    _merit_der_threshold = value_or(opt, "ilqr.merit_der_threshold", 1e-6);
+    _step_length_threshold = value_or(opt, "ilqr.step_length_threshold", 1e-6);
     _closed_loop_forward_pass = value_or(opt, "ilqr.closed_loop_forward_pass", 1);
     _codegen_workdir = value_or<std::string>(opt, "ilqr.codegen_workdir", "/tmp");
     _codegen_enabled = value_or(opt, "ilqr.codegen_enabled", 0);
@@ -202,7 +211,7 @@ void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& int
                grad,
                hess);
 
-    std::cout << "adding cost '" << inter_cost << "' at k = ";
+    if(_verbose) std::cout << "adding cost '" << inter_cost << "' at k = ";
 
     for(int k : indices)
     {
@@ -211,12 +220,12 @@ void IterativeLQR::setCost(std::vector<int> indices, const casadi::Function& int
             throw std::invalid_argument("wrong intermediate cost node index");
         }
 
-        std::cout << k << " ";
+        if(_verbose) std::cout << k << " ";
 
         _cost[k].addCost(c);
     }
 
-    std::cout << "\n";
+    if(_verbose) std::cout << "\n";
 }
 
 void IterativeLQR::setFinalCost(const casadi::Function &final_cost)
@@ -255,7 +264,7 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
     c->setConstraint(ic_fn,
                      ic_jac);
 
-    std::cout << "adding constraint '" << inter_constraint << "' at k = ";
+    if(_verbose) std::cout << "adding constraint '" << inter_constraint << "' at k = ";
 
     for(size_t i = 0; i < indices.size(); i++)
     {
@@ -271,12 +280,12 @@ void IterativeLQR::setConstraint(std::vector<int> indices,
             c->setTargetValue(target_values[i]);
         }
 
-        std::cout << k << " ";
+        if(_verbose) std::cout << k << " ";
 
         _constraint[k].addConstraint(c);
     }
 
-    std::cout << "\n";
+    if(_verbose) std::cout << "\n";
 }
 
 void IterativeLQR::setFinalConstraint(const casadi::Function &final_constraint)
@@ -534,7 +543,7 @@ IterativeLQR::DecompositionType IterativeLQR::str_to_decomp_type(const std::stri
     }
     else if(dt_str == "cod")
     {
-        return Lu;
+        return Cod;
     }
     else if(dt_str == "svd")
     {
@@ -580,7 +589,7 @@ void IterativeLQR::add_param_to_map(const casadi::Function& f)
                                          std::numeric_limits<double>::quiet_NaN()
                                          );
 
-        std::cout << "adding parameter '" << f.name_in(i) << "', " <<
+        if(_verbose) std::cout << "adding parameter '" << f.name_in(i) << "', " <<
                      "size = " << param_size << "\n";
     }
 }
@@ -851,11 +860,6 @@ IterativeLQR::ForwardPassResult::ForwardPassResult(int nx, int nu, int N):
 
 void IterativeLQR::ForwardPassResult::print() const
 {
-    if(!accepted)
-    {
-        return;
-    }
-
     printf("%2.2d alpha=%.3e  reg=%.3e  merit=%.3e  dm=%.3e  mu_f=%.3e  mu_c=%.3e  cost=%.3e  delta_u=%.3e  constr=%.3e  gap=%.3e \n",
            iter, alpha, hxx_reg, merit, merit_der, mu_f, mu_c, cost, step_length, constraint_violation, defect_norm);
 }

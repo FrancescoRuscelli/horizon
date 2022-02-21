@@ -17,6 +17,23 @@
 # sys.path.insert(0, os.path.abspath('.'))
 
 import stanford_theme
+import os, sys
+import codecs
+
+
+def read(rel_path):
+    here = os.path.abspath(os.path.dirname(__file__) + '/../..')
+    print(here)
+    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
+        return fp.read()
+
+def get_version(rel_path):
+    for line in read(rel_path).splitlines():
+        if line.startswith('__version__'):
+            delim = '"' if '"' in line else "'"
+            return line.split(delim)[1]
+    else:
+        raise RuntimeError("Unable to find version string.")
 
 # -- Project information -----------------------------------------------------
 
@@ -25,9 +42,9 @@ copyright = '2021, Francesco Ruscelli'
 author = 'Francesco Ruscelli'
 
 # The short X.Y version
-version = '1.0.0'
+version = get_version("horizon/__init__.py")
 # The full version, including alpha/beta/rc tags
-release = '1.0.0.'
+release = get_version("horizon/__init__.py")
 
 
 # -- General configuration ---------------------------------------------------

@@ -211,6 +211,8 @@ private:
 
     static DecompositionType str_to_decomp_type(const std::string& dt_str);
 
+    bool _verbose;
+
     const int _nx;
     const int _nu;
     const int _N;
@@ -223,6 +225,11 @@ private:
     double _line_search_accept_ratio;
     double _alpha_min;
     double _svd_threshold;
+    double _constraint_violation_threshold;
+    double _defect_norm_threshold;
+    double _merit_der_threshold;
+    double _step_length_threshold;
+
     bool _closed_loop_forward_pass;
     std::string _codegen_workdir;
     bool _codegen_enabled;

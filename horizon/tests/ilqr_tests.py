@@ -47,7 +47,9 @@ class EqualityConstrained(unittest.TestCase):
             opts={
                 'ilqr.integrator': 'RK4',
                 'ilqr.line_search_accept_ratio': 1e-9,
-                'ilqr.svd_threshold': 1e-9,
+                'ilqr.svd_threshold': 1e-12,
+                'ilqr.alpha_min': 0.1,
+                'ilqr.hxx_reg': 1000.,
             })
 
         self.solver = solver
