@@ -30,7 +30,7 @@ class TestExamples(unittest.TestCase):
                 for solver in spot_solvers:
                     solver_command = ['--solver', solver]
                     self.runExample(process_command + solver_command)
-        
+
         return True
 
     def testRopedRobot(self):
@@ -73,12 +73,13 @@ class TestExamples(unittest.TestCase):
         return True
 
 
+    def test_examples(self):
+        test.assertTrue(test.testSpot())
+        test.assertTrue(test.testCartPole())
+        test.assertTrue(testQuadruped())
+        test.assertTrue(testRopedRobot())
+
 if __name__ == '__main__':
 
-    unittest.main()
-    # test = TestExamples()
-
-    # test.assertTrue(test.testSpot())
-    # print(test.testCartPole())
-    # test.testQuadruped()
-    # test.testRopedRobot()
+    test = TestExamples()
+    test.test_examples()
