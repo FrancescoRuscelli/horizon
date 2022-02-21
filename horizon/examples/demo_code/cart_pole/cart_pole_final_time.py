@@ -147,8 +147,8 @@ if rviz_replay:
     import rospy
     from horizon.ros.replay_trajectory import replay_trajectory
 
-    import subprocess 
-    subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/cart_pole.launch"])
+    import subprocess
+    subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=cart_pole'])
     rospy.loginfo("'cart_pole' visualization started.")
 
     # visualize the robot in RVIZ

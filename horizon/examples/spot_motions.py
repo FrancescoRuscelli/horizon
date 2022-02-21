@@ -405,10 +405,9 @@ def main(args):
     if rviz_replay:
 
         try:
-
             # set ROS stuff and launchfile
-            import subprocess 
-            subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/spot.launch"])
+            import subprocess
+            subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=spot'])
             rospy.loginfo("'spot' visualization started.")
             
         except:

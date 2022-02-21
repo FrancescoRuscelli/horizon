@@ -240,7 +240,7 @@ def main(args):
         try:
             
             import subprocess 
-            subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/roped_template.launch"])
+            subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=roped_template'])
             rospy.loginfo("'roped_robot' visualization started.")
         except:
             print('Failed to automatically run RVIZ. Launch it manually.')

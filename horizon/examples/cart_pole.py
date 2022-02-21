@@ -291,7 +291,7 @@ def main(args):
         try:
             # set ROS stuff and launchfile
             import subprocess 
-            subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/cart_pole_xy.launch"])
+            subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=cart_pole_xy'])
             rospy.loginfo("'cart_pole' visualization started.")
         except:
             print('Failed to automatically run RVIZ. Launch it manually.')

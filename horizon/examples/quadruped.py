@@ -259,8 +259,9 @@ if rviz_replay:
     try:
 
         # set ROS stuff and launchfile
-        import subprocess 
-        subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/quadruped_template.launch"])
+        import subprocess
+
+        subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=quadruped_template'])
         rospy.loginfo("quadruped_jump' visualization started.")
     except:
         print('Failed to automatically run RVIZ. Launch it manually.')
