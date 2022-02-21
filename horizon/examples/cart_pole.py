@@ -52,7 +52,7 @@ def main(args):
 
     if args.replay:
         from horizon.ros.replay_trajectory import replay_trajectory
-        import roslaunch, rospkg, rospy
+        import rospkg, rospy
         plot_sol = False
 
 
