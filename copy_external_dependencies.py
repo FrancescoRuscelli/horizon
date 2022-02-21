@@ -70,7 +70,6 @@ for line in ldd_output.split('\n'):
     exclude_lib = path.startswith('/usr/lib') or path.startswith('/lib')
     
     if not exclude_lib:
-        print(path)
         if args.dst is not None:
             dst_file = os.path.join(args.dst, libname)
             shutil.copyfile(src=path, dst=dst_file)

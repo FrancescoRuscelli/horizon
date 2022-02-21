@@ -141,13 +141,11 @@ if plot_sol:
 if rviz_replay:
 
     # set ROS stuff and launchfile
-    import roslaunch, rospy
+    import rospy
     from horizon.ros.replay_trajectory import replay_trajectory
 
-    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-    roslaunch.configure_logging(uuid)
-    launch = roslaunch.parent.ROSLaunchParent(uuid, [path_to_examples + "/replay/launch/cart_pole.launch"])
-    launch.start()
+    import subprocess
+    subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=cart_pole'])
     rospy.loginfo("'cart_pole' visualization started.")
 
     # visualize the robot in RVIZ

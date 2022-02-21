@@ -42,9 +42,14 @@ class Updater:
 
     def git_update(self, push=False):
         print(f"committing and tagging this version...")
+        repo = Repo(self.path_to_git_repo)
+        tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime)
+        latest_tag = tags[-1]
+        if latest_tag.name == f'v{self.version}':
+            raise ValueError(f'Current version ({latest_tag.name}) already uploaded. Set a new version.')
 
         try:
-            repo = Repo(self.path_to_git_repo)
+
             repo.git.add('.')
             count_staged_files = len(repo.index.diff("HEAD"))
 
