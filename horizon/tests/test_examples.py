@@ -74,10 +74,10 @@ class TestExamples(unittest.TestCase):
 
 
     def test_examples(self):
-        test.assertTrue(test.testSpot())
-        test.assertTrue(test.testCartPole())
-        test.assertTrue(testQuadruped())
-        test.assertTrue(testRopedRobot())
+        self.assertTrue(self.testSpot())
+        self.assertTrue(self.testCartPole())
+        self.assertTrue(self.testQuadruped())
+        self.assertTrue(self.testRopedRobot())
 
 if __name__ == '__main__':
 
