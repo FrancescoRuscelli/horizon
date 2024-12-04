@@ -39,7 +39,7 @@ class CollisionHandler:
                 d = CollisionHandler.dist_capsule_capsule(bc, Tb, wc, cs.DM.eye(4))
                 dlist.append(d)
             
-        return cs.vertcat(*dlist)
+        return cs.SX(cs.vertcat(*dlist))
     
 
     @classmethod

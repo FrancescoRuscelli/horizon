@@ -1,0 +1,46 @@
+<launch>
+
+    <!-- LOAD URDF AND SRDF IN PARAM SERVER -->
+    <arg name="enable_crane" default="false"/>
+    <arg name="simulation" default="false"/>
+    <arg name="fixed_base" default="false"/>
+    <arg name="use_mimic" default="false"/>
+
+    <param name="robot_description" command=" $(find xacro)/xacro --inorder '$(find kangaroo_horizon)/urdf/kangaroo_cartesio.urdf.xacro'
+                enable_crane:=$(arg enable_crane) simulation:=$(arg simulation) fixed_base:=$(arg fixed_base) use_mimic:=$(arg use_mimic)"/>
+
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" >
+        <param name="publish_frequency" type="double" value="250.0" />
+    </node>
+
+    <param name="contact_model" value="2"/>
+    <param name="number_of_legs" value="2"/>
+
+    <param name="transcription_method" value="multiple_shooting"/>
+    <param name="max_iteration" value="5"/>
+
+    <param name="world_frame_link" value="left_sole_link"/>
+
+    <rosparam param = "foot_frames">["left_foot_upper",  "left_foot_lower",
+                                     "right_foot_upper", "right_foot_lower"]</rosparam>
+
+    <rosparam param = "joint_init">[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, <!-- px, py, pz, qx, qy, qz, qw -->
+                                    0.0, 0.04999999999997918, 0.0, <!-- 'leg_left_1_joint', 'leg_left_2_joint', 'leg_left_3_joint', -->
+                                    1.1693870096573384, 2.3401777720374923, 0.6999999999999997, <!-- 'leg_left_femur_joint', 'leg_left_knee_joint', 'leg_left_length_joint' -->
+                                    -0.049999999999970346, 0.0, <!-- 'leg_left_4_joint', 'leg_left_5_joint' -->
+                                    0.0, 0.04999999999997918, 0.0, <!-- 'leg_right_1_joint', 'leg_right_2_joint', 'leg_right_3_joint', -->
+                                    1.1693870096573384, 2.3401777720374923, 0.6999999999999997, <!-- 'leg_right_femur_joint', 'leg_right_knee_joint', 'leg_right_length_joint' -->
+                                    -0.049999999999970346, 0.0]</rosparam> <!-- 'leg_right_4_joint', 'leg_right_5_joint' -->
+
+    <node pkg="joy" type="joy_node" name="joy_node">
+        <param name="dev" type="string" value="/dev/input/js0" />
+        <!-- param name="autorepeat_rate" type="double" value="10." / -->
+        <param name="deadzone" type="double" value="0.2" />
+    </node>
+
+
+    <!-- RVIZ -->
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find horizon_examples)/SRBD_horizon.rviz"/>
+
+
+</launch>

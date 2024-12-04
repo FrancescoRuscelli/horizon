@@ -7,6 +7,79 @@ import casadi as cs
 import numpy as np
 np.set_printoptions(suppress=True, precision=3)
 
+def _test_a_vs_b(self, a: Solver, b: Solver):
+    a.solve()
+    b.solve()
+    xerr = a.x_opt - b.x_opt
+    uerr = a.u_opt - b.u_opt
+    self.assertLess(np.abs(xerr).max(), 1e-6)
+    self.assertLess(np.abs(uerr).max(), 1e-6)
+
+class InitialStateOpt(unittest.TestCase):
+
+    def make_problem(self, solver_type):
+        
+        N = 10
+        tf = 1.0
+        prob = Problem(N)
+        prob.setDt(tf/N)
+
+        # mass-damper falling ball with rocket
+        p = prob.createStateVariable('p', dim=3)
+        v = prob.createStateVariable('v', dim=3)
+        fz = prob.createInputVariable('fz', dim=1)
+
+        x = prob.getState().getVars()
+        g = np.array([0, 0, -10])
+        F = cs.vertcat(0, 0, fz)
+
+        xdot = cs.vertcat(
+            v,
+            F + g - v
+        )
+
+        prob.setDynamics(xdot)
+
+        # initial and final constraints
+        p0 = np.array([0, 0, 0])
+        prob.createConstraint('initial', p - p0, nodes=0)
+
+        ptgt = np.array([1, 1, 1])
+        prob.createFinalConstraint('final', p - ptgt)
+
+        prob.createFinalConstraint('z_vel', v[2])
+
+        # min effort
+        prob.createIntermediateResidual('min_effort', fz)
+
+        # solve first with ilqr
+        if solver_type == 'ilqr':
+            ilqrsol = Solver.make_solver('ilqr', prob,  
+                    opts={'max_iter': 1, 'ilqr.integrator': 'RK4'})
+            ilqrsol.set_iteration_callback()
+            return ilqrsol
+
+        # solver with sqp or ipopt need a dynamic constraint
+        th = Transcriptor.make_method('multiple_shooting', prob, opts=dict(integrator='RK4'))
+
+        # blocksqp needs exact hessian to be accurate
+        opts = None 
+        if solver_type == 'blocksqp':
+            opts = {'hess_update': 4}
+            
+        bsqpsol = Solver.make_solver(solver_type, prob, opts)
+        return bsqpsol
+
+    def test_ilqr_vs_ipopt(self):
+        print(self.__class__.__name__, self._testMethodName)
+        ilqr = self.make_problem('ilqr')
+        ipopt = self.make_problem('ipopt')
+        _test_a_vs_b(self, ipopt, ilqr)
+        
+
+        
+
+
 class SolverConsistency(unittest.TestCase):
     def setUp(self) -> None:
         A11 = np.array([[1, 2], [3, 4]])
@@ -17,23 +90,23 @@ class SolverConsistency(unittest.TestCase):
         B32 = np.array([[1, -2], [-3, 4]])
         self.matrices = [A11, A13, A21, A32, B21, B32]
 
-    def _test_a_vs_b(self, a: Solver, b: Solver):
-        a.solve()
-        b.solve()
-        xerr = a.x_opt - b.x_opt
-        uerr = a.u_opt - b.u_opt
-        self.assertLess(np.abs(xerr).max(), 1e-6)
-        self.assertLess(np.abs(uerr).max(), 1e-6)
-
     def test_blocksqp_vs_ipopt(self):
+        print(self.__class__.__name__, self._testMethodName)
         ipopt = make_problem('ipopt', *self.matrices)
         blocksqp = make_problem('blocksqp', *self.matrices)
-        self._test_a_vs_b(ipopt, blocksqp)
+        _test_a_vs_b(self, ipopt, blocksqp)
+
+    def test_gnsqp_vs_ipopt(self):
+        print(self.__class__.__name__, self._testMethodName)
+        ipopt = make_problem('ipopt', *self.matrices)
+        gnsqp = make_problem('gnsqp', *self.matrices)
+        _test_a_vs_b(self, ipopt, gnsqp)
     
     def test_blocksqp_vs_ilqr(self):
+        print(self.__class__.__name__, self._testMethodName)
         ilqr = make_problem('ilqr', *self.matrices)
         blocksqp = make_problem('blocksqp', *self.matrices)
-        self._test_a_vs_b(ilqr, blocksqp)
+        _test_a_vs_b(self, ilqr, blocksqp)
 
 def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     # on a linear-quadratic problem, all solvers should agree on the solution
@@ -48,6 +121,8 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     x3 = prob.createStateVariable('x3', dim=2)
     u1 = prob.createInputVariable('u1', dim=2)
     u2 = prob.createInputVariable('u2', dim=2)
+    u3 = prob.createInputVariable('u3', dim=2)
+
     x = prob.getState().getVars()
 
     xdot = cs.vertcat(
@@ -58,25 +133,30 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     prob.setDynamics(xdot)
 
     # a random cost
-    prob.createIntermediateCost('c12', cs.sumsqr(x1 + x2))
-    prob.createIntermediateCost('c23', cs.sumsqr(x2 + x3))
-    prob.createIntermediateCost('c13', cs.sumsqr(x1 + x3))
-    prob.createIntermediateCost('u', cs.sumsqr(u1) + cs.sumsqr(u2))
+    cost_weight = prob.createParameter('cost_weight', 1)
+    cost_weight.assign(2.)
+    prob.createIntermediateResidual('c12', x1 + cost_weight*x2)
+    prob.createIntermediateResidual('c23', x2 + x3)
+    prob.createIntermediateResidual('c13', x1 + x3)
+    prob.createIntermediateResidual('u', cs.vertcat(u1, u2))
 
     # a final constraint
-    xtgt = np.array([1, 2, 2, 3, 3, 4])
-    # prob.createFinalConstraint('xtgt', x - xtgt)
+    xtgt_value = np.array([1, 2, 2, 3, 3, 4])
+    xtgt = prob.createParameter('xtgt', 6)
+    xtgt.assign(xtgt_value)
+    prob.createFinalConstraint('xtgt', x - xtgt)
 
     # an initial state
-    x0 = -xtgt
+    x0 = -xtgt_value
     prob.getState().setBounds(lb=x0, ub=x0, nodes=0)
-    prob.getState().setBounds(lb=xtgt, ub=xtgt, nodes=N)
+    # prob.getState().setBounds(lb=xtgt, ub=xtgt, nodes=N)
     prob.getState().setInitialGuess(x0)
 
     # solve first with ilqr
     if solver_type == 'ilqr':
         ilqrsol = Solver.make_solver('ilqr', prob,  
                 opts={'max_iter': 3, 'ilqr.integrator': 'EULER'})
+        ilqrsol.set_iteration_callback()
         return ilqrsol
 
     # solver with sqp or ipopt need a dynamic constraint
@@ -86,6 +166,8 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     opts = None 
     if solver_type == 'blocksqp':
         opts = {'hess_update': 4}
+    else:
+        opts = {'gnsqp.osqp.polish': True}
         
     bsqpsol = Solver.make_solver(solver_type, prob, opts)
     return bsqpsol

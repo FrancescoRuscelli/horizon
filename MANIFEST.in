@@ -1,4 +1,4 @@
-recursive-include horizon/solvers *.so
+recursive-include horizon/solvers *
 recursive-include horizon/examples *.launch
 recursive-include horizon/examples *.rviz
 recursive-include horizon/examples *.urdf

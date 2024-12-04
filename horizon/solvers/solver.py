@@ -36,23 +36,26 @@ class Solver(ABC):
 
         if type == 'blocksqp':
             from . import blocksqp
-            return blocksqp.BlockSqpSolver(prb, opts)
+            ret = blocksqp.BlockSqpSolver(prb, opts)
         elif type == 'ipopt':
             from . import ipopt
-            return ipopt.IpoptSolver(prb, opts)
+            ret = ipopt.IpoptSolver(prb, opts)
         elif type == 'ilqr':
             from . import ilqr
-            return ilqr.SolverILQR(prb, opts)
+            ret = ilqr.SolverILQR(prb, opts)
         elif type == 'gnsqp':
             from . import sqp
-            qp_solver = 'qpoases'
+            qp_solver = 'osqp'
             if opts is not None:
                 if 'gnsqp.qp_solver' in opts:
                     qp_solver = opts['gnsqp.qp_solver']
-                    del opts['gnsqp.qp_solver']
-            return sqp.GNSQPSolver(prb, opts, qp_solver)
+            ret = sqp.GNSQPSolver(prb, opts, qp_solver)
         else:
             raise KeyError(f'unsupperted solver type "{type}"')
+
+        ret.type = type
+        return ret
+
 
     def __init__(self, 
                  prb: Problem,
@@ -80,7 +83,6 @@ class Solver(ABC):
         # save state and control
         self.x = prb.getState().getVars()
         self.u = prb.getInput().getVars()
-        self.xdot = prb.getDynamics()
         self.dt = prb.getDt()
 
         # derived classes should at least provide the optimal state trajectory, 
@@ -156,7 +158,7 @@ class Solver(ABC):
         var_sol_dict = dict()
         for var in self.prb.var_container.getVarList(offset=False):
             val_sol = solution['x'][pos: pos + var.shape[0] * len(var.getNodes())]
-            # this is to divide in rows the each dim of the var
+            # this is to divide in rows each dim of the var
             val_sol_matrix = np.reshape(val_sol, (var.shape[0], len(var.getNodes())), order='F')
             var_sol_dict[var.getName()] = val_sol_matrix
             pos = pos + var.shape[0] * len(var.getNodes())
@@ -291,6 +293,12 @@ class Solver(ABC):
         Returns:
             array: array of dt values for each node
         """
+        pass
+
+    def getSolutionState(self):
+        pass
+
+    def getSolutionInput(self):
         pass
 
     def configure_rti(self) -> bool:

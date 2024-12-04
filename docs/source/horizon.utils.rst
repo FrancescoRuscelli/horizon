@@ -116,14 +116,6 @@ horizon.utils.vis\_refiner\_global module
     :undoc-members:
     :show-inheritance:
 
-horizon.utils.vis\_refiner\_local module
-----------------------------------------
-
-.. automodule:: horizon.utils.vis_refiner_local
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 
 Module contents
 ---------------

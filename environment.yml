@@ -1,0 +1,35 @@
+name: hori
+channels:
+- conda-forge
+- robostack
+- francesco_ruscelli
+dependencies:
+- python=3.8
+- nodejs=14
+- jupyterlab=3.2
+- yaml-cpp
+- pip
+- casadi
+- numpy
+- matplotlib
+- scipy
+- rospkg
+- pybind11
+- urdfdom
+- conda-build
+- conda-verify
+- anaconda-client
+- ros-noetic-ros-base
+- ros-noetic-pinocchio
+- francesco_ruscelli::casadi_kin_dyn
+#- ros-noetic-catkin
+#- ros-noetic-robot-state-publisher
+#- ros-noetic-joint-state-publisher
+#- ros-noetic-ros-core
+#- ros-noetic-rospy
+#- ros-noetic-xacro
+#- ros-noetic-rosbridge-suite
+#- ros-noetic-rosbag
+#- ros-noetic-rosauth
+#- ros-noetic-tf2-web-republisher
+

@@ -5,6 +5,7 @@ build/
 temp_build/
 docs/source/_build
 *.user
+*.orig
 dist
 venv
 *.so*

@@ -23,6 +23,7 @@ def get_version(rel_path):
 def _pre_build(dirname):
     # create a build dir and run 'make generate_python_package'
     current_dir = os.getcwd()
+    print('building from dir: ', current_dir)
     os.makedirs(dirname, exist_ok=True)
     build_dir = current_dir + '/' + dirname
 
@@ -64,8 +65,8 @@ setuptools.setup(
     description="Library for Trajectory Optimization based on CasADi",
     long_description_content_type="text/markdown",
     url="https://github.com/ADVRHumanoids/horizon",
-    packages=['horizon', 'horizon.utils', 'horizon.solvers', 'horizon.transcriptions', 'horizon.examples', 'horizon.ros'],
-    install_requires=['casadi', 'numpy', 'matplotlib', 'scipy', 'casadi-kin-dyn', 'rospkg'],
+    packages=['horizon', 'horizon.utils', 'horizon.solvers', 'horizon.transcriptions', 'horizon.examples', 'horizon.ros', 'horizon.rhc', 'horizon.rhc.ros', 'horizon.rhc.tasks'],
+    install_requires=['numpy', 'matplotlib', 'scipy', 'casadi-kin-dyn', 'rospkg'],
     python_requires=">=3.6",
     cmdclass={'build_py': CustomBuild,
               'develop': CustomDevelop},

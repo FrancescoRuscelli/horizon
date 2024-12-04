@@ -7,7 +7,7 @@ except ImportError as e:
 from horizon.variables import Parameter
 from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.functions import Function, Constraint, ResidualFunction
+from horizon.functions import Function, Constraint, Residual, RecedingResidual
 from typing import Dict, List
 from horizon.transcriptions import integrators
 import casadi as cs
@@ -27,48 +27,60 @@ class SolverILQR(Solver):
         # init base class
         super().__init__(prb, filtered_opts)
 
+        # get type of abstract variables in horizon problem (SX or MX)
+        abstract_casadi_type = self.prb.default_abstract_casadi_type
+
         # save max iter if any
         self.max_iter = self.opts.get('ilqr.max_iter', 100)
         
         # num shooting interval
         self.N = prb.getNNodes() - 1  
 
-        # get integrator and compute discrete dynamics in the form (x, u, p) -> f
-        integrator_name = self.opts.get('ilqr.integrator', 'RK4')
-        dae = {'ode': self.xdot, 'x': self.x, 'p': self.u, 'quad': 0}
+        # # get integrator and compute discrete dynamics in the form (x, u, p) -> f
+        # integrator_name = self.opts.get('ilqr.integrator', 'RK4')
+        # dae = {'ode': self.xdot, 'x': self.x, 'p': self.u, 'quad': 0}
 
-        # handle parametric time
-        integrator_opt = {}
+        # # handle parametric time
+        # integrator_opt = {}
 
-        self.int = integrators.__dict__[integrator_name](dae, integrator_opt)
-        if isinstance(self.dt, float):
-            # integrator_opt['tf'] = self.dt
-            x_int = self.int(self.x, self.u, self.dt)[0]
-            dt_name = 'dt'
-            time = cs.SX.sym(dt_name, 0)
+        # self.int = integrators.__dict__[integrator_name](dae, integrator_opt, self.prb.default_casadi_type)
+        # if isinstance(self.dt, float):
+        #     # integrator_opt['tf'] = self.dt
+        #     x_int = self.int(self.x, self.u, self.dt)[0]
+        #     dt_name = 'dt'
+        #     time = abstract_casadi_type.sym(dt_name, 0)
 
-        elif isinstance(self.dt, Parameter):
-            time = cs.SX.sym(self.dt.getName(), 1)
-            x_int = self.int(self.x, self.u, time)[0]
-            dt_name = self.dt.getName()
-            pass
-        else:
-            raise TypeError('ilqr supports only float and Parameter dt')
+        # elif isinstance(self.dt, Parameter):
+        #     time = abstract_casadi_type.sym(self.dt.getName(), 1)
+        #     x_int = self.int(self.x, self.u, time)[0]
+        #     dt_name = self.dt.getName()
+        #     pass
+        # else:
+        #     raise TypeError('ilqr supports only float and Parameter dt')
 
-        self.dyn = cs.Function('f', 
-                               {'x': self.x, 'u': self.u, dt_name: time, 'f': x_int},
-                               ['x', 'u', dt_name], ['f']
-                               )
+        # all_params = self.prb.getParameters()
+        # depend_params = {}
+        # for pname, p in all_params.items():
+        #     if cs.depends_on(x_int, p):
+        #         depend_params[pname] = p
+        
+
+        # self.dyn = cs.Function('f', 
+        #                        {'x': self.x, 'u': self.u, dt_name: time, 'f': x_int, **depend_params},
+        #                        ['x', 'u', dt_name] + list(depend_params.keys()), ['f']
+        #                        )
 
         # create ilqr solver
-        self.ilqr = IterativeLQR(self.dyn, self.N, self.opts)
+        self.ilqr = IterativeLQR(self.prb.getIntegrator(), self.N, self.opts)
+
+        # should we use GN approx for residuals?
+        self.use_gn = self.opts.get('ilqr.enable_gn', False)
 
         # set constraints, costs, bounds
         self._set_constraint()
         self._set_cost()
         self._set_bounds()
         
-
         # set a default iteration callback
         self.plot_iter = False
         self.xax = None 
@@ -78,6 +90,9 @@ class SolverILQR(Solver):
 
         # empty solution dict
         self.solution_dict = dict()
+
+        # print iteration statistics
+        self.set_iteration_callback()
 
     def save(self):
         data = self.prb.save()
@@ -94,6 +109,7 @@ class SolverILQR(Solver):
         if cb is None:
             self.ilqr.setIterationCallback(self._iter_callback)
         else:
+            print('setting custom iteration callback')
             self.ilqr.setIterationCallback(cb)
 
 
@@ -106,12 +122,12 @@ class SolverILQR(Solver):
         x0 = self.prb.getInitialState()
         xinit = self.prb.getState().getInitialGuess()
         uinit = self.prb.getInput().getInitialGuess()
-        xinit[:, 0] = x0.flatten()
 
         # update initial guess
         self.ilqr.setStateInitialGuess(xinit)
         self.ilqr.setInputInitialGuess(uinit)
-        self.ilqr.setIterationCallback(self._iter_callback)
+
+        # self.ilqr.setIterationCallback(self._iter_callback)
         
         # update parameters
         self._set_param_values()
@@ -140,6 +156,9 @@ class SolverILQR(Solver):
             off, dim = self.prb.getInput().getVarIndex(vname)
             self.solution_dict[vname] = self.u_opt[off:off+dim, :]
 
+        self.solution_dict['x_opt'] = self.x_opt
+        self.solution_dict['u_opt'] = self.u_opt
+
         return ret
     
     def getSolutionDict(self):
@@ -156,9 +175,25 @@ class SolverILQR(Solver):
 
         return self.dt_solution
 
+    def getSolutionState(self):
+        return self.solution_dict['x_opt']
+
+    def getSolutionInput(self):
+        return self.solution_dict['u_opt']
+
+    def getConstraintsValues(self):
+        return self.ilqr.getConstraintsValues()
+
+    def getCostsValues(self):
+        return self.ilqr.getCostsValues()
+
     def print_timings(self):
 
         prof_info = self.ilqr.getProfilingInfo()
+
+        # max string length
+        keys = prof_info.timings.keys()
+        max_len = max([len(k) for k in keys])
 
         if len(prof_info.timings) == 0:
             return
@@ -167,13 +202,38 @@ class SolverILQR(Solver):
         for k, v in prof_info.timings.items():
             if '_inner' not in k:
                 continue
-            print(f'{k[:-6]:30}{np.mean(v)} us')
+            print(f'{k[:-6]:{max_len}}{np.mean(v)} us')
 
         print('\ntimings (iter):')
         for k, v in prof_info.timings.items():
             if '_inner' in k:
                 continue
             print(f'{k:30}{np.mean(v)*1e-3} ms')
+
+    def save_iterations(self, matfile='/tmp/ilqr_data.mat'):
+        from scipy.io import savemat
+        
+        hist_vector = self.ilqr.getIterationHistory()
+        savemat(matfile, 
+        {
+            'constraint_violation': [h.constraint_violation for h in hist_vector],
+            'alpha': [h.alpha for h in hist_vector],
+            'defect_norm': [h.defect_norm for h in hist_vector],
+            'cost': [h.cost for h in hist_vector],
+            'merit': [h.merit for h in hist_vector],
+            'merit_der': [h.merit_der for h in hist_vector],
+            'mu_f': [h.mu_f for h in hist_vector],
+            'mu_c': [h.mu_c for h in hist_vector],
+            'step_length': [h.step_length for h in hist_vector],
+            'hxx_reg': [h.hxx_reg for h in hist_vector],
+            'xtrj': [h.xtrj for h in hist_vector],
+            'utrj': [h.utrj for h in hist_vector],
+            'constraint_values': [h.constraint_values for h in hist_vector],
+            'profiling':  self.ilqr.getProfilingInfo().timings,
+            'x_opt': self.x_opt,
+            'u_opt': self.u_opt,
+        }, long_field_names=True)
+
 
     def _update_nodes(self):
 
@@ -191,7 +251,6 @@ class SolverILQR(Solver):
         self._set_fun(container=self.prb.function_container.getCost(),
                 set_to_ilqr=self.ilqr.setIntermediateCost, 
                 outname='l')
-
     
     def _set_constraint(self):
 
@@ -218,78 +277,99 @@ class SolverILQR(Solver):
             input_list = f.getVariables()
             param_list = f.getParameters()
 
-            # save function value
-            if isinstance(f, ResidualFunction):
-                value = cs.sumsqr(f.getFunction()(*input_list, *param_list))
-            else:
-                value = f.getFunction()(*input_list, *param_list)
+            # fn value
+            value = f.getFunction()(*input_list, *param_list)
 
+            # set to ilqr fn could change if this is a residual
+            # and we're in gn mode
+            set_to_ilqr_actual = set_to_ilqr
+            outname_actual = outname
+
+            # save function value
+            if isinstance(f, (Residual, RecedingResidual)) and self.use_gn:
+                outname_actual = 'res'
+                set_to_ilqr_actual = self.ilqr.setIntermediateResidual
+            elif isinstance(f, (Residual, RecedingResidual)) and not self.use_gn:
+                value = cs.sumsqr(value)
+                
             # wrap function
             l = cs.Function(fname, 
                             [self.x, self.u] + param_list, [value], 
                             ['x', 'u'] + [p.getName() for p in param_list], 
-                            [outname]
+                            [outname_actual]
                             )
 
 
-            set_to_ilqr(f.getNodes(), l)
+            set_to_ilqr_actual(f.getNodes(), l)
         
     
     def _set_param_values(self):
 
+
+        # apparently ilqr creates the parameters with dimensions: par_dim x n+1
+        # generally speaking, this is not necessarily true
         params = self.prb.var_container.getParList()
+
         for p in params:
-            self.ilqr.setParameterValue(p.getName(), p.getValues())
+            # todo small hack:
+            #  the parameters inside the ilqr are defined on ALL nodes
+            #  horizon allows to define parameters only on desired nodes
+            #  so i'm masking the parameter values with a matrix of nan of N+1 dimension
+            p_vals_temp = p.getValues()
+            p_vals = np.empty((p.getDim(), self.N+1))
+            p_vals[:] = np.nan
+            p_vals[:, p.getNodes()] = p_vals_temp
+            self.ilqr.setParameterValue(p.getName(), p_vals)
+
+        if isinstance(self.prb.getDt(), Parameter):
+            self.ilqr.setParameterValue('dt', self.prb.getDt().getValues())
+        else:
+            self.ilqr.setParameterValue('dt', np.full((1, self.N + 1), self.prb.getDt()))
 
     
     def _iter_callback(self, fpres):
-        
+
         if not fpres.accepted:
             return
-
+            print('-', end='', flush=True)
+        else:
+            print('*', end='', flush=True)
+            
         fpres.print()
+        # print(f'il male è {fpres.constraint_values[0]} + {np.linalg.norm(fpres.defect_values[:, 0])}')
 
         if self.plot_iter:
 
-            if self.xax is None:
-                _, ((self.xax, self.uax), (self.dax, self.hax)) = plt.subplots(2, 2)
-            
-            plt.sca(self.xax)
-            plt.cla()
-            plt.plot(fpres.xtrj.T)
-            plt.grid()
-            plt.title(f'State trajectory (iter {fpres.iter})')
-            plt.xlabel('Node [-]')
-            plt.ylabel('State')
-            plt.legend([f'x{i}' for i in range(self.nx)])
+            if self.dax is None:
+                _, (self.dax, self.hax) = plt.subplots(2)
+                self.dax.set_yscale('log')
+                self.hax.set_yscale('log')
+                
+                plt.sca(self.dax)
+                self.dline = plt.plot(np.linalg.norm(fpres.defect_values, axis=0), '-o')[0]
+                plt.grid()
+                plt.title(f'Dynamics gaps (iter {fpres.iter})')
+                plt.xlabel('Node [-]')
+                plt.ylabel('Gap')
+                plt.legend([f'd{i}' for i in range(self.nx)])
+                
+                plt.sca(self.hax)
+                self.hline = plt.plot(fpres.constraint_values, '-o')[0]
+                plt.grid()
+                plt.title(f'Constraint violation (iter {fpres.iter})')
+                plt.xlabel('Node [-]')
+                plt.ylabel('Constraint 1-norm')
+                plt.tight_layout()
+                plt.ion()
+                plt.show()
 
-            plt.sca(self.uax)
-            plt.cla()
-            plt.plot(fpres.utrj.T)
-            plt.grid()
-            plt.title(f'Input trajectory (iter {fpres.iter})')
-            plt.xlabel('Node [-]')
-            plt.ylabel('Input')
-            plt.legend([f'u{i}' for i in range(self.nu)])
 
-            plt.sca(self.dax)
-            plt.cla()
-            plt.plot(np.linalg.norm(fpres.defect_values, axis=1))
-            plt.grid()
-            plt.title(f'Dynamics gaps (iter {fpres.iter})')
-            plt.xlabel('Node [-]')
-            plt.ylabel('Gap')
-            plt.legend([f'd{i}' for i in range(self.nx)])
-
-            plt.sca(self.hax)
-            plt.cla()
-            plt.plot(fpres.constraint_values)
-            plt.grid()
-            plt.title(f'Constraint violation (iter {fpres.iter})')
-            plt.xlabel('Node [-]')
-            plt.ylabel('Constraint 1-norm')
-
-            plt.draw()
-            print("Press a button!")
+            self.dline.set_ydata(np.linalg.norm(fpres.defect_values, axis=0))
+            self.hline.set_ydata(fpres.constraint_values)
+            self.dax.relim()
+            self.hax.relim()
+            self.dax.autoscale_view()
+            self.hax.autoscale_view()
+            plt.pause(0.01)
             plt.waitforbuttonpress()
 

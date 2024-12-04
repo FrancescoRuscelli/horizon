@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+
 import numpy as np
 from horizon import problem
 from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter
@@ -28,7 +29,6 @@ def main(args):
 
 
     path_to_examples = os.path.dirname(os.path.realpath(__file__))
-    os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
     # Loading URDF model in pinocchio
     urdffile = os.path.join(path_to_examples, 'urdf', 'roped_template.urdf')
@@ -42,7 +42,7 @@ def main(args):
 
     # OPTIMIZATION PARAMETERS
 
-    n_nodes = 30
+    n_nodes = 3
     nc = 3  # number of contacts
     nq = kindyn.nq()  # number of DoFs - NB: 7 DoFs floating base (quaternions)
     DoF = nq - 7  # Contacts + anchor_rope + rope
@@ -50,7 +50,7 @@ def main(args):
     nf = 3  # 2 feet contacts + rope contact with wall, Force DOfs
 
     # Create horizon problem
-    prb = problem.Problem(n_nodes)
+    prb = problem.Problem(n_nodes, casadi_type=cs.MX)
 
     # Creates problem STATE variables
     q = prb.createStateVariable("q", nq)
@@ -63,7 +63,7 @@ def main(args):
     frope = prb.createInputVariable("frope", nf)
 
     # Creates double integrator
-    x, xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
+    xdot = utils.double_integrator_with_floating_base(q, qdot, qddot)
 
     tf = 1.  # [s]
     dt = tf / n_nodes
@@ -76,10 +76,12 @@ def main(args):
     prb.setDynamics(xdot)
     prb.setDt(dt)
 
-
     # Formulate discrete time dynamics
     L = 0.5 * cs.sumsqr(qdot)  # Objective term
-    dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': L}
+
+
+    dae = {'x': prb.getState().getVars(), 'p': qddot, 'ode': xdot, 'quad': L}
+
     if rope_mode == 'swing':
         F_integrator_LEAPFROG = integrators.LEAPFROG(dae)
         F_integrator = integrators.RK4(dae)
@@ -105,10 +107,10 @@ def main(args):
         q_max[7:13] = np.zeros(6)
 
     # if rope_mode == 'jump':
-        # foot_z_offset = 0.5
-        # q_max[9] = q_max[9] + foot_z_offset
-        # q_max[12] = q_max[12] + foot_z_offset
-        # q_max[-1] = 1
+    # foot_z_offset = 0.5
+    # q_max[9] = q_max[9] + foot_z_offset
+    # q_max[12] = q_max[12] + foot_z_offset
+    # q_max[-1] = 1
 
     q_init = [0., 0., 0., 0., 0., 0., 1.0,
               0., 0., 0.,
@@ -161,20 +163,25 @@ def main(args):
     state_prev = state.getVarOffset(-1)
     input_prev = input.getVarOffset(-1)
 
-    x_prev, _ = utils.double_integrator_with_floating_base(state_prev[0], state_prev[1], input_prev[0])
+    # x_prev, _ = utils.double_integrator_with_floating_base(state_prev[0], state_prev[1], input_prev[0])
+    x_prev = prb.getState().getVarOffset(-1).getVars()
+    x = prb.getState().getVars()
+
     x_int = F_integrator(x0=x_prev, p=input_prev[0], time=dt)
+
 
     if rope_mode == 'swing':
         prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=1)
         q_pprev = q.getVarOffset(-2)
         qdot_pprev = qdot.getVarOffset(-2)
         qddot_pprev = qddot.getVarOffset(-2)
-        x_pprev, _ = utils.double_integrator_with_floating_base(q_pprev, qdot_pprev, qddot_pprev)
+        # x_pprev, _ = utils.double_integrator_with_floating_base(q_pprev, qdot_pprev, qddot_pprev)
+        x_pprev = prb.getState().getVarOffset(-2).getVars()
+
         x_int2 = F_integrator_LEAPFROG(x0=x_prev, x0_prev=x_pprev, p=input_prev[0], time=dt)
         prb.createConstraint("multiple_shooting2", x_int2["xf"] - x, nodes=range(2, n_nodes + 1))
     else:
         prb.createConstraint("multiple_shooting", x_int["xf"] - x, nodes=range(1, n_nodes + 1))
-
 
     # Constraints
     prb.createConstraint("q_init", q - q_init, nodes=0)
@@ -226,34 +233,6 @@ def main(args):
 
         frope_prev = frope.getVarOffset(-1)
         prb.createCost("min_dfrope", 1000. * cs.sumsqr(frope-frope_prev), range(1, n_nodes))
-
-
-    # if rope_mode == 'jump':
-    #     lift_node = 3
-    #     touch_down_node = 25
-    #     x_distance = -0.4
-        # prb.createCost("wall_distance", 100. * cs.sumsqr(q[0] - x_distance), nodes=range(lift_node, n_nodes + 1))
-
-        # for frame, f in frame_force_mapping.items():
-        #     if frame != 'rope_anchor2':
-        #         FK = cs.Function.deserialize(kindyn.fk(frame))
-        #         DFK = cs.Function.deserialize(kindyn.frameVelocity(frame, cas_kin_dyn.CasadiKinDyn.LOCAL_WORLD_ALIGNED))
-        #         p = FK(q=q)['ee_pos']
-        #         v = DFK(q=q, qdot=qdot)['ee_vel_linear']
-        #         p_init = FK(q=q_init)['ee_pos']
-
-                # prb.createConstraint(f"{frame}_before_jump", v, nodes=range(0, lift_node))
-                # prb.createConstraint(f"zero_{frame}_vel_after_jump", v, nodes=range(lift_node, touch_down_node))
-
-                # flight phase
-                # prb.createConstraint(f"{frame}_no_force_during_jump", f, nodes=range(lift_node, touch_down_node))
-
-                # alpha = 0.3
-                # x_foot = rope_lenght * np.sin(alpha)
-                # surface_dict = {'a': 1., 'd': -x_foot}
-                # c, lb, ub = kin_dyn.surface_point_contact(surface_dict, q, kindyn, frame)
-                # prb.createConstraint(f"{frame}_on_wall", c, nodes=range(touch_down_node, n_nodes + 1), bounds=dict(lb=lb, ub=ub))
-
 
     # Creates problem
     opts = {'ipopt.tol': 1e-3,
@@ -333,49 +312,13 @@ def main(args):
         plt.xlabel('$\mathrm{[sec]}$', size=20)
         plt.ylabel('$\mathrm{ [N] }} $', size=20)
 
-        # if resample:
-        #
-        #     plt.figure()
-        #     for i in range(0, 3):
-        #         plt.plot(time_res, q_res[i, :])
-        #     plt.suptitle('$\mathrm{Base \ Position \ Resampled}$', size=20)
-        #     plt.xlabel('$\mathrm{[sec]}$', size=20)
-        #     plt.ylabel('$\mathrm{[m]}$', size=20)
-        #
-        #     plt.figure()
-        #     for i in range(0, 3):
-        #         plt.plot(time_res[:-1], qddot_res[i, :])
-        #     plt.suptitle('$\mathrm{Base \ Acceleration \ Resampled}$', size=20)
-        #     plt.xlabel('$\mathrm{[sec]}$', size=20)
-        #     plt.ylabel('$\mathrm{ [m] } /  \mathrm{ [sec^2] } $', size=20)
-        #
-        #     plt.figure()
-        #     f1_res = frame_force_res_mapping["Contact1"]
-        #     f2_res = frame_force_res_mapping["Contact2"]
-        #     frope_res = frame_force_res_mapping["rope_anchor2"]
-        #     for i in range(0, 3):
-        #         plt.plot(time_res[:-1], f1_res[i, :])
-        #         plt.plot(time_res[:-1], f2_res[i, :])
-        #         plt.plot(time_res[:-1], frope_res[i, :])
-        #     plt.suptitle('$\mathrm{force \ feet \ and \ rope \ resampled}$', size=20)
-        #     plt.xlabel('$\mathrm{[sec]}$', size=20)
-        #     plt.ylabel('$\mathrm{ [N] } /  \mathrm{ [sec^2] } $', size=20)
-        #
-        #     plt.figure()
-        #     for i in range(0, 6):
-        #         plt.plot(time_res[:-1], tau_res[i, :], '-x')
-        #     plt.suptitle('$\mathrm{base \ force \ resampled}$', size=20)
-        #     plt.xlabel('$\mathrm{[sec]}$', size=20)
-        #     plt.ylabel('$\mathrm{ [N] }} $', size=20)
-        #
-        # plt.show()
-
 
     if rviz_replay:
 
         try:
             # set ROS stuff and launchfile
-            import subprocess 
+            import subprocess
+            os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
             subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=roped_template'])
             rospy.loginfo("'roped_robot' visualization started.")
         except:

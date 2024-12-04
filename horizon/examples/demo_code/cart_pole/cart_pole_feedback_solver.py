@@ -22,7 +22,6 @@ plot_sol = True
 use_ilqr = True # todo false does not work!
 
 path_to_examples = os.path.abspath(__file__ + "/../../../")
-os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # Create CasADi interface to Pinocchio
 urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')

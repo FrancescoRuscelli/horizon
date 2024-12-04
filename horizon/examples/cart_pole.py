@@ -6,7 +6,6 @@ An example of the cart-pole problem
 
 import argparse
 import os
-
 import casadi as cs
 import matplotlib.pyplot as plt
 import numpy as np
@@ -57,7 +56,6 @@ def main(args):
 
 
     path_to_examples = os.path.dirname(os.path.realpath(__file__))
-    os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
     # Create CasADi interface to Pinocchio
     urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole_xy.urdf')
@@ -104,10 +102,9 @@ def main(args):
     if torque_input:
         fd = kindyn.aba()  # this is the forward dynamics function:
         qddot = fd(q=q, v=qdot, tau=tau)['a']  # qddot = M^-1(tau - h)
-        x, xdot = utils.double_integrator(q, qdot, qddot)  # xdot = [qdot, qddot]
+        xdot = utils.double_integrator(qdot, qddot)  # xdot = [qdot, qddot]
     else:
-        x, xdot = utils.double_integrator(q, qdot, qddot)
-
+        xdot = utils.double_integrator(qdot, qddot)
 
     if minimize_t:
         # Create final time variable
@@ -286,11 +283,10 @@ def main(args):
         plt.show()
 
     if rviz_replay:
-
-        # set ROS stuff and launchfile
         try:
             # set ROS stuff and launchfile
-            import subprocess 
+            import subprocess
+            os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
             subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=cart_pole_xy'])
             rospy.loginfo("'cart_pole' visualization started.")
         except:

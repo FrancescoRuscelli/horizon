@@ -10,11 +10,15 @@ import matplotlib.pyplot as plt
 import os, math
 from itertools import filterfalse
 
+# get path to the examples folder
 path_to_examples = os.path.abspath(__file__ + "/../../../")
-os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # mat storer
 file_name = os.path.splitext(os.path.basename(__file__))[0]
+# if the folder /mat_files does not exist, create it
+save_dir = path_to_examples + '/mat_files'
+if not os.path.isdir(save_dir):
+    os.makedirs(save_dir)
 ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
 # options
@@ -22,7 +26,7 @@ resampling = True
 rviz_replay = True
 plot_sol = True
 
-solver_type = 'gnsqp'
+solver_type = 'ilqr'
 transcription_method = 'multiple_shooting'
 transcription_opts = dict(integrator='RK4')
 load_initial_guess = False
@@ -33,7 +37,7 @@ n_nodes = 100
 t_jump = (1.0, 1.5)
 
 # load urdf
-urdffile = rospkg.RosPack().get_path('spot_urdf') + '/urdf/spot.urdf'
+urdffile = os.path.join(path_to_examples, 'urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -55,7 +59,7 @@ q = prb.createStateVariable('q', n_q)
 q_dot = prb.createStateVariable('q_dot', n_v)
 q_ddot = prb.createInputVariable('q_ddot', n_v)
 f_list = [prb.createInputVariable(f'f{i}', n_f) for i in range(n_c)]
-x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
+x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 prb.setDynamics(x_dot)
 prb.setDt(dt)
 
@@ -287,7 +291,7 @@ if resampling:
         dt_before_res = dt
 
     dt_res = 0.001
-    dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
+    dae = {'x': prb.getState().getVars(), 'p': q_ddot, 'ode': x_dot, 'quad': 1}
     q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
         solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
         kindyn,
@@ -301,6 +305,8 @@ if rviz_replay:
     try:
         # set ROS stuff and launchfile
         import subprocess
+        # temporary add the example path to the environment
+        os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
         subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=spot'])
         rospy.loginfo("'spot' visualization started.")
     except:

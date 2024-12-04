@@ -1,4 +1,4 @@
-horizon package
+Horizon package
 ===============
 
 Subpackages

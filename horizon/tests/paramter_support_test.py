@@ -41,6 +41,12 @@ class ParamTest(unittest.TestCase):
         blocksqp = make_problem('blocksqp', *self.matrices)
         self._test_a_vs_b(ilqr, blocksqp)
 
+    def test_gnsqp_vs_ilqr(self):
+        ilqr = make_problem('ilqr', *self.matrices)
+        blocksqp = make_problem('gnsqp', *self.matrices)
+        self._test_a_vs_b(ilqr, blocksqp)
+
+
 def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     # on a linear-quadratic problem, all solvers should agree on the solution
     N = 5
@@ -66,10 +72,10 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     prob.setDynamics(xdot)
 
     # a random cost
-    prob.createIntermediateCost('c12', cs.sumsqr(x2 - p1))
-    prob.createIntermediateCost('c23', cs.sumsqr(x1 + x3))
-    prob.createIntermediateCost('c13', cs.sumsqr(x1 - x3))
-    prob.createIntermediateCost('u', 0*1e-6*cs.sumsqr(u1) + cs.sumsqr(u2))
+    prob.createIntermediateResidual('c12', x2 - p1)
+    prob.createIntermediateResidual('c23', x1 + x3)
+    prob.createIntermediateResidual('c13', x1 - x3)
+    prob.createIntermediateResidual('u', u2)
 
     # a final constraint
     xtgt = prob.createParameter('xtgt', 6)
@@ -101,6 +107,16 @@ def make_problem(solver_type, A11, A13, A21, A32, B21, B32):
     opts = None 
     if solver_type == 'blocksqp':
         opts = {'hess_update': 4}
+    elif solver_type == 'gnsqp':
+        opts = dict()
+        opts['gnsqp.qp_solver'] = 'osqp'
+        opts['merit_derivative_tolerance'] = 1e-6
+        opts['constraint_violation_tolerance'] = 1e-12
+        opts['osqp.polish'] = True # without this
+        opts['osqp.delta'] = 1e-9 # and this, it does not converge!
+        opts['osqp.verbose'] = False
+        opts['osqp.rho'] = 0.02
+        opts['osqp.scaled_termination'] = False
         
     bsqpsol = Solver.make_solver(solver_type, prob, opts)
     return bsqpsol

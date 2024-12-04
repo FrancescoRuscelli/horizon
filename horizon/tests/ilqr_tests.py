@@ -47,9 +47,6 @@ class EqualityConstrained(unittest.TestCase):
             opts={
                 'ilqr.integrator': 'RK4',
                 'ilqr.line_search_accept_ratio': 1e-9,
-                'ilqr.svd_threshold': 1e-12,
-                'ilqr.alpha_min': 0.1,
-                'ilqr.hxx_reg': 1000.,
             })
 
         self.solver = solver
@@ -62,9 +59,88 @@ class EqualityConstrained(unittest.TestCase):
         self.solver.set_iteration_callback()
         ret = self.solver.solve()
         self.assertTrue(ret)
+
+
+class Unicycle(unittest.TestCase):
+    def setUp(self) -> None:
         
+        # particle subject to a force about +x axis,
+        # and constrained to a x2 = x1^2 parabola
+        # m*ddx + m*g = [tau, 0] + Jc'*f
+        
+        N = 1000
+        tf = 1.0
+        dt = tf/N
+        prb = Problem(N)
+
+        p = prb.createStateVariable('p', 2)
+        theta = prb.createStateVariable('theta', 1)
+        v = prb.createStateVariable('v', 1)
+        omega = prb.createStateVariable('omega', 1)
+        a = prb.createInputVariable('a', 1)
+        omegadot = prb.createInputVariable('omegadot', 1)
+
+        xdot = cs.vertcat(v*cs.cos(theta), 
+                          v*cs.sin(theta),
+                          omega,
+                          a,
+                          omegadot) 
+
+        x = prb.getState().getVars()
+        u = prb.getInput().getVars()
+
+        omegadot.setBounds(-20, 20)
+
+        prb.setDynamics(xdot)
+        prb.setDt(dt)
+
+        x0 = np.array([0, 0, 0, 0, 0])
+        prb.setInitialState(x0)
+
+        # we need to set an appropriate initial guess to break symmetry
+        theta.setInitialGuess(cs.pi/2.0)
+
+        # regularize state
+        prb.createIntermediateResidual('u_reg', u)
+
+        # x-y-theta goal
+        prb.createFinalConstraint('goal_p', p - np.array([0, 1.0]))
+        prb.createFinalConstraint('goal_theta', theta)
+
+        # end at zero velocity
+        prb.createFinalConstraint('vf', cs.vertcat(v, omega))
+        
+        # save prb
+        self.prb = prb
+
+        
+    def test_simple_constrained(self):
+        solver = Solver.make_solver('ilqr', 
+            self.prb,
+            opts={
+                'ilqr.rho_base': 1.0,
+                'ilqr.enable_auglag': False,
+                'ilqr.max_iter': 20,
+            })
+
+        solver.set_iteration_callback()
+        ret = solver.solve()
+        self.assertTrue(ret)
+
     
-  
+    def test_bound_constrained(self):
+        solver = Solver.make_solver('ilqr', 
+            self.prb,
+            opts={
+                'ilqr.rho_base': 1.0,
+                'ilqr.enable_auglag': True,
+                'ilqr.max_iter': 200,
+            })
+
+        solver.set_iteration_callback()
+        ret = solver.solve()
+        self.assertTrue(ret)
+
 
 
 if __name__ == '__main__':

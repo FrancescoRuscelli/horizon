@@ -1,0 +1,49 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: "horizon"
+  version: {{ data.get('version') }}
+
+source:
+  path: .
+
+build:
+  noarch: python
+  number: 0
+  script: python3 -m pip install -v .
+
+requirements:
+  host:
+    - python 3.8
+    - setuptools
+
+test:
+  import:
+    - horizon
+  # requires:
+    # - scipy
+    # - casadi
+    # - numpy
+    # - rospkg
+    # - pybind11
+    # - urdfdom
+    # - ros-noetic-ros-base
+    # - ros-noetic-pinocchio
+    # - francesco_ruscelli::casadi_kin_dyn
+    # - matplotlib
+    # - pytest
+
+  # source_files:
+    # - horizon/tests/test_examples.py
+    # - horizon/tests/test_solvers.py
+  # commands:
+    # - python3 -m pytest horizon/tests/test_examples.py
+    # - python3 -m pytest horizon/tests/test_solvers.py
+
+about:
+  home: https://github.com/ADVRHumanoids/horizon.git
+  summary: "Trajectory optimization framework tailored for robotics applications based on CasADi"
+
+extra:
+  recipe-maintainers:
+    - francesco_ruscelli

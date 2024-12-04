@@ -37,14 +37,18 @@ os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # mat storer
 file_name = os.path.splitext(os.path.basename(__file__))[0]
+# if the folder /mat_files does not exist, create it
+save_dir = path_to_examples + '/mat_files'
+if not os.path.isdir(save_dir):
+    os.makedirs(save_dir)
 ms = mat_storer.matStorer(path_to_examples + f'/mat_files/{file_name}.mat')
 
 # options for horizon transcription
-transcription_method = 'multiple_shooting' # can choose between 'multiple_shooting' and 'direct_collocation'
-transcription_opts = dict(integrator='RK4') # integrator used by the multiple_shooting
+transcription_method = 'multiple_shooting'  # can choose between 'multiple_shooting' and 'direct_collocation'
+transcription_opts = dict(integrator='RK4')  # integrator used by the multiple_shooting
 
 
-# Create CasADi interface to Pinocchio
+# Create CasADi interface to Pinocchio with casadi_kin_dyn
 urdffile = os.path.join(path_to_examples, 'urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
@@ -59,8 +63,6 @@ if 'floating_base_joint' in joint_names:
 # Optimization parameters
 n_nodes = 50
 node_action = (20, 40)
-node_start_step = 20
-node_end_step = 40
 
 # number of contacts (4 feet of spot)
 n_c = 4
@@ -70,6 +72,7 @@ n_v = kindyn.nv()
 # Dimension of the forces (x,y,z) [no torques]
 n_f = 3
 
+stance_orientation = [0, 0, 0.8509035, 0.525322] # equivalent to 2/3 * pi
 # Contact links name
 contacts_name = ['lf_foot', 'rf_foot', 'lh_foot', 'rh_foot']
 
@@ -104,7 +107,7 @@ if load_initial_guess:
 
 
 # Creates double integrator taking care of the floating base part
-x, x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
+x_dot = utils.double_integrator_with_floating_base(q, q_dot, q_ddot)
 
 # Set dynamics of the system and the relative dt
 prb.setDynamics(x_dot)
@@ -201,7 +204,7 @@ prb.createFinalConstraint('final_velocity', q_dot)
 # set a final pose of the floating base and robot configuration:
 # rotate the robot orientation on the z-axis
 q_final = q_init.copy()
-q_final[3:7] = [0, 0, 0.8509035, 0.525322] # equivalent to 2/3 * pi
+# q_final[3:7] = stance_orientation
 prb.createFinalConstraint(f"final_nominal_pos", q - q_final)
 
 
@@ -223,7 +226,7 @@ for frame, f in contact_map.items():
     a = DDFK(q=q, qdot=q_dot)['ee_acc_linear']
 
     # velocity of each end effector must be zero before and after the jump
-    prb.createConstraint(f"{frame}_vel_ground", v, nodes=nodes_stance)
+    prb.createConstraint(f"{frame}_vel_ground", v, nodes=nodes_stance + [nodes_swing[0]])
 
     # friction cones must be satisfied while the robot is touching the ground
     # parameters of the friction cones:
@@ -278,7 +281,7 @@ for name, item in prb.getConstraints().items():
     ub_mat = np.reshape(ub, (item.getDim(), len(item.getNodes())), order='F')
     solution_constraints_dict[name] = dict(val=solution_constraints[name], lb=lb_mat, ub=ub_mat, nodes=item.getNodes())
 
-info_dict = dict(n_nodes=n_nodes, node_start_step=node_start_step, node_end_step=node_end_step)
+info_dict = dict(n_nodes=n_nodes, node_action=node_action, stance_orientation=stance_orientation)
 
 if isinstance(dt, cs.SX):
     ms.store({**solution, **solution_constraints_dict, **info_dict})
@@ -317,7 +320,7 @@ if plot_sol:
             ax.plot(np.array([range(pos.shape[1])]), np.array(pos[dim, :]), marker="x", markersize=3,
                     linestyle='dotted')
 
-        plt.vlines([node_start_step, node_end_step], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
+        plt.vlines([node_action[0], node_action[1]], plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], linestyles='dashed', colors='k', linewidth=0.4)
 
     plt.figure()
     for contact in contacts_name:
@@ -358,7 +361,7 @@ if resampling:
         dt_before_res = dt
 
     dt_res = 0.001
-    dae = {'x': x, 'p': q_ddot, 'ode': x_dot, 'quad': 1}
+    dae = {'x': prb.getState().getVars(), 'p': q_ddot, 'ode': x_dot, 'quad': 1}
     q_res, qdot_res, qddot_res, contact_map_res, tau_res = resampler_trajectory.resample_torques(
         solution["q"], solution["q_dot"], solution["q_ddot"], dt_before_res, dt_res, dae, contact_map,
         kindyn,
@@ -374,9 +377,9 @@ if rviz_replay:
     # set ROS stuff and launchfile
     from horizon.ros.replay_trajectory import *
     import rospy
-
-    # set ROS stuff and launchfile
     import subprocess
+    # temporary add the example path to the environment
+    os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
     subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=spot'])
     rospy.loginfo("'spot' visualization started.")
 

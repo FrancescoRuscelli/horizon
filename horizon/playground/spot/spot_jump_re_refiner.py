@@ -27,7 +27,7 @@ urdffile = '../urdf/spot.urdf'
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
-ms = mat_storer.matStorer('../spot/spot_jump_refined_local.mat')
+ms = mat_storer.matStorer('../spot/refiner_spot_jump.mat')
 prev_solution = ms.load()
 
 
@@ -72,9 +72,9 @@ dt_res = 0.001
 q_sym = cs.SX.sym('q', n_q)
 q_dot_sym = cs.SX.sym('q_dot', n_v)
 q_ddot_sym = cs.SX.sym('q_ddot', n_v)
-x, x_dot = utils.double_integrator_with_floating_base(q_sym, q_dot_sym, q_ddot_sym)
+x_dot = utils.double_integrator_with_floating_base(q_sym, q_dot_sym, q_ddot_sym)
 
-dae = {'x': x, 'p': q_ddot_sym, 'ode': x_dot, 'quad': 1}
+dae = {'x': cs.vertcat(q_sym, q_dot_sym), 'p': q_ddot_sym, 'ode': x_dot, 'quad': 1}
 q_res, qdot_res, qddot_res, contact_map_res, tau_sol_res = resampler_trajectory.resample_torques(
     prev_q, prev_q_dot, prev_q_ddot, prev_dt, dt_res, dae, prev_contact_map,
     kindyn,

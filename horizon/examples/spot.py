@@ -1,13 +1,6 @@
-import time
+#!/usr/bin/env python3
 
-from horizon import problem
-from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_storer
-from horizon.transcriptions import integrators
-from horizon.transcriptions.transcriptor import Transcriptor
-from horizon.solvers import solver
-import os, argparse
-from scipy.io import loadmat
-from itertools import filterfalse
+import argparse
 
 def str2bool(v):
   #susendberg's function

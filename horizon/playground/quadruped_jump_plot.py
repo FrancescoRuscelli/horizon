@@ -2,7 +2,7 @@ from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_sto
 import matplotlib.pyplot as plt
 import numpy as np
 
-# ms = mat_storer.matStorer('../playground/spot/spot_jump_refined_local.mat')
+# ms = mat_storer.matStorer('../playground/spot/refiner_spot_jump.mat')
 ms = mat_storer.matStorer('trial.mat')
 solution_refined = ms.load()
 nodes_vec_refined = solution_refined['times'][0]

@@ -9,7 +9,7 @@ solution_refined = ms.load()
 dt_res = solution_refined['dt_res'][0][0]
 n_nodes_refined = solution_refined['n_nodes'][0][0]
 
-ms = mat_storer.matStorer('../playground/spot/spot_jump.mat')
+ms = mat_storer.matStorer('../playground/mesh_refiner/refining_mat/spot_jump.mat')
 solution = ms.load()
 dt = solution['dt'].flatten()
 n_nodes = 50

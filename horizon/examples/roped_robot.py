@@ -1,11 +1,6 @@
-from horizon import problem
-from horizon.utils import utils, kin_dyn, resampler_trajectory, plotter, mat_storer
-from horizon.transcriptions import integrators
-from horizon.transcriptions.transcriptor import Transcriptor
-from horizon.solvers import solver
-import os, argparse
-from scipy.io import loadmat
-from itertools import filterfalse
+#!/usr/bin/env python3
+
+import argparse
 
 def str2bool(v):
   #susendberg's function
@@ -33,6 +28,8 @@ if __name__ == '__main__':
   parser.add_argument('--replay', help='visualize the robot trajectory in rviz', action='store_true')
   parser.add_argument('--action', '-a', help='choose which action spot will perform', choices=roped_robot_actions, default=roped_robot_actions[1])
   parser.add_argument("--plot", '-p', type=str2bool, nargs='?', const=True, default=True, help="plot solutions")
+  parser.add_argument("--warmstart", '-w', type=str2bool, nargs='?', const=True, default=False,
+                      help="save solutions to mat file")
 
   args = parser.parse_args()
   main(args)

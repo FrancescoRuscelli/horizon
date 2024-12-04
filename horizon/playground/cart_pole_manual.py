@@ -20,8 +20,9 @@ try:
 except ImportError:
     do_replay = False
 
+path_to_examples = os.path.abspath(__file__ + "/../../examples/")
 # Loading URDF model in pinocchio
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'urdf', 'cart_pole.urdf')
+urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -30,7 +31,7 @@ nv = kindyn.nv()
 
 # OPTIMIZATION PARAMETERS
 tf = 5.0  # [s]
-ns = 30  # number of shooting nodes
+ns = 100 # number of shooting nodes
 dt = tf/ns
 
 N_control = ns
@@ -47,11 +48,12 @@ q = cs.MX.sym("q", nq)
 qdot = cs.MX.sym("qdot", nv)
 qddot = cs.MX.sym("qddot", nv)
 
+x = cs.vertcat(q, qdot)
 # Creates double integrator
-x, xdot = utils.double_integrator(q, qdot, qddot)
+xdot = utils.double_integrator(qdot, qddot)
 dae = {'x': x, 'p': qddot, 'ode': xdot, 'quad': 1}
-integrator = integ.RK4(dae, opts=dict(tf=dt))
-
+integrator = integ.RK4(dae)
+# int_map = integrator
 int_map = integrator.map(N_control, 'thread', 15)
 
 type_sym = cs.SX
@@ -62,12 +64,15 @@ q_ddot_i = type_sym.sym("q_ddot_i", nv, N_control)
 X = cs.vertcat(q_i, q_dot_i)
 U = q_ddot_i
 
-X_int = int_map(X[:, :ns], U) #dt_i because it's N+1
+X_int = int_map(X[:, :ns], U, dt)[0] #dt_i because it's N+1
 # starting from node 1
-g_multi_shoot = X_int[0] - X[:, 1:]
+g_multi_shoot = X_int - X[:, 1:]
 
 g_up = q_i[1, ns] - np.pi
+g_up_all = q_i[1, :] - np.pi
+
 g_vel = q_dot_i[:, ns]
+
 
 # Limits
 q_min = [-0.5, -2.*np.pi]
@@ -110,6 +115,11 @@ tau_ubg = np.tile(tau_lims, (N_control, 1)).T
 up_lbg = np.zeros(g_up.shape)
 up_ubg = np.zeros(g_up.shape)
 
+up_all_lbg = - cs.inf * np.ones(g_up_all.shape)
+up_all_lbg[:, ns] = 0
+up_all_ubg = cs.inf * np.ones(g_up_all.shape)
+up_all_ubg[:, ns] = 0
+
 vel_lbg = np.zeros(g_vel.shape)
 vel_ubg = np.zeros(g_vel.shape)
 
@@ -143,15 +153,22 @@ tau_ubg_flat = np.reshape(tau_ubg, [1, g_tau_i.shape[0] * g_tau_i.shape[1]], ord
 up_lbg_flat = np.reshape(up_lbg, [1, g_up.shape[0] * g_up.shape[1]], order='F')
 up_ubg_flat = np.reshape(up_ubg, [1, g_up.shape[0] * g_up.shape[1]], order='F')
 
+up_all_lbg_flat = np.reshape(up_all_lbg, [1, g_up_all.shape[0] * g_up_all.shape[1]], order='F')
+up_all_ubg_flat = np.reshape(up_all_ubg, [1, g_up_all.shape[0] * g_up_all.shape[1]], order='F')
+
 vel_lbg_flat = np.reshape(vel_lbg, [1, g_vel.shape[0] * g_vel.shape[1]], order='F')
 vel_ubg_flat = np.reshape(vel_ubg, [1, g_vel.shape[0] * g_vel.shape[1]], order='F')
 
 w = cs.veccat(q_i, q_dot_i, q_ddot_i) # dt_i
-g = cs.veccat(g_multi_shoot, g_tau_i, g_up, g_vel)
+# g = cs.veccat(g_multi_shoot, g_tau_i, g_up, g_vel)
+g = cs.veccat(g_multi_shoot, g_tau_i, g_up_all, g_vel)
 f = sum(f_list)
 
-lbg = np.concatenate((multi_shoot_lbg_flat, tau_lbg_flat, up_lbg_flat, vel_lbg_flat), axis=1)
-ubg = np.concatenate((multi_shoot_ubg_flat, tau_ubg_flat, up_ubg_flat, vel_ubg_flat), axis=1)
+# lbg = np.concatenate((multi_shoot_lbg_flat, tau_lbg_flat, up_lbg_flat, vel_lbg_flat), axis=1)
+# ubg = np.concatenate((multi_shoot_ubg_flat, tau_ubg_flat, up_ubg_flat, vel_ubg_flat), axis=1)
+
+lbg = np.concatenate((multi_shoot_lbg_flat, tau_lbg_flat, up_all_lbg_flat, vel_lbg_flat), axis=1)
+ubg = np.concatenate((multi_shoot_ubg_flat, tau_ubg_flat, up_all_ubg_flat, vel_ubg_flat), axis=1)
 
 prob_dict = {'f': f, 'x': w, 'g': cs.vec(g)}
 
@@ -163,6 +180,7 @@ tic = time.time()
 solver = cs.nlpsol('solver', 'ipopt', prob_dict, opts)
 toc = time.time()
 print('time elapsed loading:', toc - tic)
+
 
 tic = time.time()
 solution = solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)

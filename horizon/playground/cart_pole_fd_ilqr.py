@@ -22,7 +22,7 @@ nq = kindyn.nq()
 nv = kindyn.nv()
 
 # OPTIMIZATION PARAMETERS
-ns = 300  # number of shooting nodes
+ns = 100  # number of shooting nodes
 tf = 5.0  # [s]
 dt = tf/ns
 use_ms = True
@@ -46,14 +46,14 @@ xdot = cs.vertcat(qdot, fd(q=q, v=qdot, tau=tau)['a'])
 prb.setDynamics(xdot)
 prb.setDt(dt)
 # Limits
-q_min = [-1, -2.*np.pi]
-q_max = [1, 2.*np.pi]
-q_init = [0.0, np.pi-1]
+q_min = [-10, -2.*np.pi]
+q_max = [10, 2.*np.pi]
+q_init = [0.0, 0.1]
 
 qdot_lims = np.array([100., 100.])
 qdot_init = [0., 0.]
 
-tau_lims = np.array([3000])
+tau_lims = np.array([30])
 tau_init = [0]
 
 q.setBounds(q_min, q_max)
@@ -65,14 +65,14 @@ u.setBounds(-tau_lims, tau_lims)
 
 # Cost function
 qtgt = np.array([0.0, np.pi])
-prb.createIntermediateCost("err", cs.sumsqr(q - qtgt))
-prb.createIntermediateCost("tau", cs.sumsqr(tau))
-prb.createIntermediateCost("qdot", cs.sumsqr(qdot))
+prb.createIntermediateResidual("err", q - qtgt)
+prb.createIntermediateResidual("tau", tau)
+prb.createIntermediateResidual("qdot", qdot)
 
 if solver_type != 'ilqr':
     # Dynamics
     if use_ms:
-        th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='EULER'))
+        th = Transcriptor.make_method('multiple_shooting', prb, opts=dict(integrator='RK4'))
     else:
         th = Transcriptor.make_method('direct_collocation', prb)  # opts=dict(degree=5)
 
@@ -82,11 +82,21 @@ prb.createFinalConstraint("center", q[0] - qtgt[0])
 prb.createFinalConstraint("final_qdot", qdot)
 
 # Creates problem
-solver = Solver.make_solver(solver_type, prb)  #, opts={'max_iter': 10})
+solver = Solver.make_solver(solver_type, prb, opts={
+    'ilqr.alpha_min': 1e-6,
+    'ilqr.enable_gn': True,
+    'ilqr.line_search_accept_ratio': -1e-3,
+    'ilqr.merit_der_threshold': 1e-6,
+    'ilqr.rho_base': 1e3,
+    'ilqr.rho_growth_factor': 10.0,
+    'ilqr.enable_auglag': True,
+    'ilqr.codegen_enabled': True, 
+    'ilqr.codegen_workdir': '/tmp/cart_pole_fd'
+    })  #, opts={'max_iter': 10})
 
-solver.plot_iter = True
+# solver.plot_iter = True
 solver.set_iteration_callback()
-solver.max_iter = 400
+solver.max_iter = 5000
 solver.solve()
 
 q_hist = solver.x_opt[:2, :]

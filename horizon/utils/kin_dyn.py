@@ -1,6 +1,58 @@
 from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
+from horizon.utils import utils
 import casadi as cs
 import numpy as np
+
+def SRBD(m, I, f_dict, r, rddot, p_dict, w, wdot):
+    """
+    Returns Single Rigid Body Dynamics constraint
+    Args:
+        m: robot mass
+        I: robot centroidal inertia
+        f_dict: dictionary of contact forces
+        r: com position
+        rddot: com acceleration
+        p_dict: dictionary of contact points
+        w: base angular velocity (in WORLD frame) TODO: BUG: sohuld be in LOCAL Frame!
+        wdot: base angular acceleration
+    Returns:
+        constraint as a vertcat
+        m(rddot - g) - sum(f) = 0
+        Iwdot + w x Iw - sum(r - p) x f = 0
+    """
+    g = np.array([0., 0., -9.81])
+    eq1 = m * (rddot - g)
+    eq2 = cs.mtimes(I, wdot) + cs.mtimes(utils.skew(w), cs.mtimes(I,  w))
+    for i, f in f_dict.items():
+        eq1 = eq1 - f
+        eq2 = eq2 - cs.mtimes(utils.skew(p_dict[i] - r),  f)
+
+    return cs.vertcat(eq1, eq2)
+
+def fSRBD(m, I, f_dict, r, p_dict, w):
+    """
+    Returns com acceleration and base_link angular acceleration using Single Rigid Body Dynamics
+    Args:
+        m: robot mass
+        I: robot centroidal inertia
+        f_dict: dictionary of contact forces
+        r: com position
+        p_dict: dictionary of contact points
+        w: base angular velocity (in WORLD frame) TODO: BUG: sohuld be in LOCAL Frame!
+    Returns:
+        rddot = g + sum(f)/m
+        wdot = (w x Iw)/I + (sum(r - p) x f)/I
+    """
+    iI = cs.inv(I)
+
+    rddot = np.array([0., 0., -9.81])
+    wdot = -cs.mtimes(iI, cs.mtimes(utils.skew(w), cs.mtimes(I,  w)))
+
+    for i, f in f_dict.items():
+        rddot = rddot + cs.mtimes(1./m, f)
+        wdot = wdot + cs.mtimes(iI, cs.mtimes(utils.skew(p_dict[i] - r),  f))
+
+    return rddot, wdot
 
 def surface_point_contact(plane_dict, q, kindyn, frame):
     """
@@ -174,10 +226,10 @@ class InverseDynamics():
                 WORLD
                 LOCAL_WORLD_ALIGNED
         """
-        self.id = cs.Function.deserialize(kindyn.rnea())
+        self.id = kindyn.rnea()
         self.contact_jacobians = dict()
         for frame in contact_frames:
-            self.contact_jacobians[frame] = cs.Function.deserialize(kindyn.jacobian(frame, force_reference_frame))
+            self.contact_jacobians[frame] = kindyn.jacobian(frame, force_reference_frame)
 
     def call(self, q, qdot, qddot, frame_force_mapping=dict(), tau_ext=0):
         """

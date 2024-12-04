@@ -1,6 +1,6 @@
 from horizon.solvers import Solver
 from horizon.problem import Problem
-from horizon.functions import CostFunction, ResidualFunction
+from horizon.functions import Cost, RecedingCost, Residual, RecedingResidual
 from typing import Dict, List
 import casadi as cs
 import numpy as np
@@ -8,11 +8,11 @@ import pprint
 
 
 class NlpsolSolver(Solver):
-    
+
     def __init__(self, prb: Problem, opts: Dict, solver_plugin: str) -> None:
-        
+
         super().__init__(prb, opts=opts)
-        
+
         # generate problem to be solved
         self.var_container = self.prb.var_container
         self.fun_container = self.prb.function_container
@@ -20,7 +20,12 @@ class NlpsolSolver(Solver):
         self.vars_impl = dict()
         self.pars_impl = dict()
 
+        self.cond_warm_start = self.opts.get('ipopt.warm_start_init_point', 'no') == 'yes'
+        self.lam_x0 = None
+        self.lam_g0 = None
+
         # dictionary of implemented variables
+        self.dict_sol = dict(x0=None, lbx=None, ubx=None, lbg=None, ubg=None, p=None)
 
         j, w, g, p = self.build()
         # implement the abstract state variable with the current node
@@ -33,7 +38,6 @@ class NlpsolSolver(Solver):
         # w = self.var_container.getVarImplList()
         # g = self.function_container.getCnstrFList()
         # p = self.var_container.getParameterList()
-
 
         self.prob_dict = {'f': j, 'x': w, 'g': g, 'p': p}
 
@@ -52,36 +56,42 @@ class NlpsolSolver(Solver):
         # build variables
         var_list = list()
         for var in self.var_container.getVarList(offset=False):
+            # x_2_3 --> dim 2 of node 3
+            # order is: x_0_0, x_1_0, x_0_1, x_1_1 ...
             var_list.append(var.getImpl())
-        w = cs.vertcat(*var_list)
-
+        w = cs.veccat(*var_list)
 
         # build parameters
         par_list = list()
         for par in self.var_container.getParList(offset=False):
             par_list.append(par.getImpl())
-        p = cs.vertcat(*par_list)
+        p = cs.veccat(*par_list)
 
         # build constraint functions list
         fun_list = list()
         for fun in self.fun_container.getCnstr().values():
-            fun_list.append(fun.getImpl())
-        g = cs.vertcat(*fun_list)
+            fun_to_append = fun.getImpl()
+            if fun_to_append is not None:
+                fun_list.append(fun_to_append)
+        g = cs.veccat(*fun_list)
 
+        # todo: residual, recedingResidual should be the same class
         # treat differently cost and residual (residual must be quadratized)
         fun_list = list()
         for fun in self.fun_container.getCost().values():
-            if isinstance(fun, CostFunction):
-                fun_list.append(fun.getImpl())
-            elif isinstance(fun, ResidualFunction):
-                fun_list.append(cs.sumsqr(fun.getImpl()))
-            else:
-                raise Exception('wrong type of function found in fun_container')
+            fun_to_append = fun.getImpl()
+            if fun_to_append is not None:
+                if type(fun) in (Cost, RecedingCost):
+                    fun_list.append(fun_to_append[:])
+                elif type(fun) in (Residual, RecedingResidual):
+                    fun_list.append(cs.sumsqr(fun_to_append[:]))
+                else:
+                    raise Exception('wrong type of function found in fun_container')
 
-        j = cs.sum1(cs.vertcat(*fun_list))
+        # if it is empty, just set j to []
+        j = cs.sum1(cs.veccat(*fun_list)) if fun_list else []
 
         return j, w, g, p
-
 
     def solve(self) -> bool:
 
@@ -96,25 +106,43 @@ class NlpsolSolver(Solver):
         lbg = self._getFunList('lb')
         ubg = self._getFunList('ub')
 
+        # last guard
+        if lbg.shape != self.prob_dict['g'].shape:
+            raise ValueError(
+                f'Constraint bounds have mismatching shape: {lbg.shape}. Allowed dimensions: {self.prob_dict["g"].shape}. '
+                f'Be careful: if you added constraints or variables after loading the problem, you have to rebuild it before solving it!')
+
+        # update solver arguments
+        self.dict_sol['x0'] = w0
+        self.dict_sol['lbx'] = lbw
+        self.dict_sol['ubx'] = ubw
+        self.dict_sol['lbg'] = lbg
+        self.dict_sol['ubg'] = ubg
+        self.dict_sol['p'] = p
+
         # solve
-        sol = self.solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg, p=p)
+        sol = self.solver(**self.dict_sol)
+
+        if self.cond_warm_start:
+            self.dict_sol['lam_x0'] = sol['lam_x']
+            self.dict_sol['lam_g0'] = sol['lam_g']
 
         self.cnstr_solution = self._createCnsrtSolDict(sol)
 
         # retrieve state and input trajector
 
-
         # get solution dict
         self.var_solution = self._createVarSolDict(sol)
 
-
         # get solution as state/input
         self._createVarSolAsInOut(sol)
+        self.var_solution['x_opt'] = self.x_opt
+        self.var_solution['u_opt'] = self.u_opt
 
         # build dt_solution as an array
         self._createDtSol()
 
-        return True
+        return self.solver.stats()['success']
 
     def getSolutionDict(self):
         return self.var_solution
@@ -124,6 +152,12 @@ class NlpsolSolver(Solver):
 
     def getDt(self):
         return self.dt_solution
+
+    def getSolutionState(self):
+        return self.var_solution['x_opt']
+
+    def getSolutionInput(self):
+        return self.var_solution['u_opt']
 
 if __name__ == '__main__':
 
@@ -200,7 +234,7 @@ if __name__ == '__main__':
     cnsrt1 = prob.createIntermediateConstraint('cnsrt1', x + u)
     cnsrt1.setLowerBounds([-np.inf, -np.inf])
     ## this is new, bitches!
-    print(cnsrt1.getImpl(2)) # the constraints get implemented as soon as it get created muahahah
+    print(cnsrt1.getImpl(2))  # the constraints get implemented as soon as it get created muahahah
     ## =========
     # cnsrt2 = prob.createConstraint('cnsrt2', x * y[0:2], nodes=[3, 8])
     ## =========
@@ -218,12 +252,12 @@ if __name__ == '__main__':
     # cnsrt9 = prob.createConstraint('cnsrt9', y, nodes=N)
     #
 
-    cost1 = prob.createCost('cost1', x+p)
+    cost1 = prob.createCost('cost1', x + p)
     # =========
 
     # todo check if everything is allright!
     for i in range(N):
-        x.setLowerBounds(np.array(range(i, i+2)), nodes=i)
+        x.setLowerBounds(np.array(range(i, i + 2)), nodes=i)
 
     p.assign([20, 20], nodes=4)
     # f.assign([121, 122, 120, 119])
@@ -232,5 +266,3 @@ if __name__ == '__main__':
     prob.setDynamics(xdot)
     sol = NlpsolSolver(prb=prob, opts=dict(), solver_plugin='ipopt')
     sol.solve()
-
-

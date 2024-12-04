@@ -1,0 +1,10 @@
+constraints: []
+costs: ['final_base_y', 'min_rot', 'joint_posture', 'joint_regularization', 'final_y']
+
+joint_regularization:
+  type: 'Regularization'
+  nodes: 'all'
+  weight:
+#    velocity: 0.01
+    acceleration: 0.01
+    force: 0.01 # todo <----- how to do?

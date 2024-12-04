@@ -45,7 +45,8 @@ def RK4(dae, opts=None, casadi_type=cs.SX):
     return f
 
 
-urdffile = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../urdf', 'spot.urdf')
+path_to_examples = os.path.abspath(__file__ + "/../../../examples/")
+urdffile = os.path.join(path_to_examples, 'urdf', 'spot.urdf')
 urdf = open(urdffile, 'r').read()
 kindyn = cas_kin_dyn.CasadiKinDyn(urdf)
 
@@ -54,12 +55,12 @@ n_q = kindyn.nq()
 n_v = kindyn.nv()
 n_f = 3
 
-N = 100
+N = 200
 N_states = N + 1
 N_control = N
 dt = 0.01
 
-node_start_step = 30
+node_start_step = 170
 node_end_step = N
 # ====================
 # unraveled dimensions
@@ -130,6 +131,7 @@ g_v_list = list()
 g_lift_list = list()
 g_fc_list = list()
 g_no_force_list = list()
+g_no_force_all_list = list()
 # active_leg = slice(0,3)
 
 
@@ -173,7 +175,11 @@ for frame, f in contact_map.items():
         g_lift_list.append(p_i[:, node_start_step + 20] - p_goal)
 
 # no force during lift of one leg
+# WITH NO FORCE LIST ONLY ON TARGET NODES
 g_no_force_list.append(f_i[0:3, node_start_step:])
+
+# WITH NO FORCE LIST ON ALL NODES (THE BOUNDS CHANGES)
+# g_no_force_list.append(f_i[0:3, :])
 
 
 # g_land = p_i[:, 90] - p_start
@@ -309,6 +315,19 @@ for elem in g_no_force_list:
 g_no_force_ubw = list()
 for elem in g_no_force_list:
     g_no_force_ubw.append(np.zeros(elem.shape))
+
+# THE BOUNDS OF NO FORCE ON ALL THE NODES
+# g_no_force_lbw = list()
+# for elem in g_no_force_list:
+#     temp_mat = - cs.inf * np.ones(elem.shape)
+#     temp_mat[:, node_start_step:] = np.zeros(N - node_start_step)
+#     g_no_force_lbw.append(temp_mat)
+#
+# g_no_force_ubw = list()
+# for elem in g_no_force_list:
+#     temp_mat = cs.inf * np.ones(elem.shape)
+#     temp_mat[:, node_start_step:] = np.zeros(N - node_start_step)
+#     g_no_force_ubw.append(temp_mat)
 
 # upper bound constraints
 tau_g_ubw = np.tile(tau_lim, (N_control, 1)).T

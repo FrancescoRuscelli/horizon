@@ -16,7 +16,6 @@ plot_sol = True
 
 # Loading URDF model in pinocchio
 path_to_examples = os.path.abspath(__file__ + "/../../../")
-os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole_xy.urdf')
 urdf = open(urdffile, 'r').read()
@@ -61,7 +60,7 @@ qddot = prb.createInputVariable("qddot", nv)
 q_ref = prb.createParameter('q_ref', 1)
 
 # Create double integrator
-x, xdot = utils.double_integrator(q, qdot, qddot)
+xdot = utils.double_integrator(qdot, qddot)
 
 # Set dynamics of the system and the relative dt
 prb.setDynamics(xdot)
@@ -159,8 +158,9 @@ if rviz_replay:
     # set ROS stuff and launchfile
     import rospy
     from horizon.ros.replay_trajectory import replay_trajectory
-
-    import subprocess 
+    import subprocess
+    # temporary add the example path to the environment
+    os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
     subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=cart_pole_xy'])
     rospy.loginfo("'cart_pole' visualization started.")
 

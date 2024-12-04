@@ -42,3 +42,7 @@ add_test(NAME testCasadiUtils COMMAND testCasadiUtils)
 ADD_EXECUTABLE(testQr testQr.cpp)
 TARGET_LINK_LIBRARIES(testQr ${TestLibs})
 add_test(NAME testQr COMMAND testQr)
+
+ADD_EXECUTABLE(testIlqr testIlqr.cpp)
+TARGET_LINK_LIBRARIES(testIlqr ${TestLibs})
+add_test(NAME testIlqr COMMAND testIlqr)

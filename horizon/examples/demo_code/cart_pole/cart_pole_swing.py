@@ -15,9 +15,8 @@ from casadi_kin_dyn import pycasadi_kin_dyn as cas_kin_dyn
 import matplotlib.pyplot as plt
 import os
 
-# get path to the examples folder and temporary add it to the environment
+# get path to the examples folder
 path_to_examples = os.path.abspath(__file__ + "/../../../")
-os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 rviz_replay = True
 plot_sol = True
@@ -53,7 +52,7 @@ qdot = prb.createStateVariable("qdot", nv)
 qddot = prb.createInputVariable("qddot", nv)
 
 # Creates double integrator
-x, xdot = utils.double_integrator(q, qdot, qddot)
+xdot = utils.double_integrator(qdot, qddot)
 
 # Set dynamics of the system and the relative dt
 prb.setDynamics(xdot)
@@ -143,8 +142,9 @@ if rviz_replay:
     # set ROS stuff and launchfile
     import rospy
     from horizon.ros.replay_trajectory import replay_trajectory
-
     import subprocess
+    # temporary add the example path to the environment
+    os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
     subprocess.Popen(["roslaunch", path_to_examples + "/replay/launch/launcher.launch", 'robot:=cart_pole'])
     rospy.loginfo("'cart_pole' visualization started.")
 

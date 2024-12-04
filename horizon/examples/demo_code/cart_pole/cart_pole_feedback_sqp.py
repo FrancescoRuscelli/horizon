@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import os, time
 
 path_to_examples = os.path.abspath(__file__ + "/../../../")
-os.environ['ROS_PACKAGE_PATH'] += ':' + path_to_examples
 
 # Create CasADi interface to Pinocchio
 urdffile = os.path.join(path_to_examples, 'urdf', 'cart_pole.urdf')
